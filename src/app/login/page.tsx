@@ -146,9 +146,9 @@ export default function LoginPage() {
                             {isLoading ? (
                                 <>
                                     <motion.div
-                                        animate={{ rotate: 360 }}
-                                        transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
-                                        className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full"
+                                        animate={{ opacity: [0.3, 1, 0.3] }}
+                                        transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut" }}
+                                        className="w-5 h-5 rounded-full bg-white"
                                     />
                                     <span>登入中...</span>
                                 </>

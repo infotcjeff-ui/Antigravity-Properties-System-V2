@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
-import { useProperties, useProprietors, useRents, useRelations } from '@/hooks/useStorage';
+import { usePropertyWithRelationsQuery } from '@/hooks/useStorage';
 import type { Property, Proprietor, Rent } from '@/lib/db';
 import {
     ArrowLeft,
@@ -54,44 +54,13 @@ const landUseLabels: Record<string, string> = {
 
 export default function PropertyDetailsPage() {
     const params = useParams();
-    const router = useRouter();
-    const { getPropertyWithRelations } = useRelations();
-    const { getProprietors } = useProprietors();
-
-    const [property, setProperty] = useState<Property | null>(null);
-    const [proprietor, setProprietor] = useState<Proprietor | null>(null);
-    const [tenant, setTenant] = useState<Proprietor | null>(null);
-    const [rents, setRents] = useState<Rent[]>([]);
-    const [allProprietors, setAllProprietors] = useState<Proprietor[]>([]);
-    const [loading, setLoading] = useState(true);
+    const { data: property, isLoading: loading } = usePropertyWithRelationsQuery(params.id as string);
     const [currentImageIndex, setCurrentImageIndex] = useState(0);
     const [lightboxImage, setLightboxImage] = useState<string | null>(null);
 
-    useEffect(() => {
-        const loadData = async () => {
-            if (!params.id) return;
-            try {
-                const [data, props] = await Promise.all([
-                    getPropertyWithRelations(params.id as string),
-                    getProprietors()
-                ]);
-
-                if (data) {
-                    setProperty(data);
-                    setProprietor(data.proprietor || null);
-                    setTenant(data.tenant || null);
-                    setRents(data.rents || []);
-                }
-                setAllProprietors(props);
-            } catch (error) {
-                console.error('Failed to load property details:', error);
-            } finally {
-                setLoading(false);
-            }
-        };
-
-        loadData();
-    }, [params.id, getPropertyWithRelations]);
+    const proprietor = property?.proprietor || null;
+    const tenant = property?.tenant || null;
+    const rents = property?.rents || [];
 
     const nextImage = () => {
         if (property?.images && property.images.length > 0) {
@@ -109,9 +78,9 @@ export default function PropertyDetailsPage() {
         return (
             <div className="flex items-center justify-center min-h-[60vh]">
                 <motion.div
-                    animate={{ rotate: 360 }}
-                    transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                    className="w-12 h-12 border-4 border-purple-500 border-t-transparent rounded-full"
+                    animate={{ opacity: [0.3, 1, 0.3] }}
+                    transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut" }}
+                    className="w-12 h-12 rounded-full bg-purple-500"
                 />
             </div>
         );
@@ -132,7 +101,6 @@ export default function PropertyDetailsPage() {
 
     return (
         <div className="space-y-6">
-            {/* Back Button */}
             <motion.div initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }}>
                 <Link
                     href="/"
@@ -347,7 +315,7 @@ export default function PropertyDetailsPage() {
                             </h2>
                             <div className="space-y-3">
                                 {rents.map((rent) => {
-                                    const otherParty = allProprietors.find(p => p.id === (rent.tenantId || rent.proprietorId));
+                                    const otherParty = rent.type === 'rent_out' ? rent.tenant : rent.proprietor;
 
                                     // Handle both new and legacy rent data formats
                                     const startDate = rent.type === 'rent_out'

@@ -27,6 +27,11 @@ export interface Property {
   createdBy?: string; // UUID of the user who created this record
   createdAt: Date;
   updatedAt: Date;
+
+  // Relations
+  proprietor?: Proprietor;
+  tenant?: Proprietor;
+  rents?: Rent[];
 }
 
 export interface Proprietor {
@@ -88,6 +93,11 @@ export interface Rent {
   createdBy?: string; // UUID of the user who created this record
   createdAt: Date;
   updatedAt: Date;
+
+  // Relations
+  property?: Property;
+  proprietor?: Proprietor;
+  tenant?: Proprietor;
 }
 
 // Dexie Database Class

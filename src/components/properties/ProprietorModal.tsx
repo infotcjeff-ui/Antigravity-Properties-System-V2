@@ -331,9 +331,9 @@ export default function ProprietorModal({ onClose, onSuccess, mode = 'proprietor
                                 {saving ? (
                                     <>
                                         <motion.div
-                                            animate={{ rotate: 360 }}
-                                            transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                                            className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full"
+                                            animate={{ opacity: [0.3, 1, 0.3] }}
+                                            transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut" }}
+                                            className="w-4 h-4 rounded-full bg-white"
                                         />
                                         儲存中...
                                     </>

@@ -34,7 +34,9 @@ const toSnake = (obj: any) => {
 
 export const fetchProperties = async (user?: any, options?: { query?: string }): Promise<Property[]> => {
     try {
-        let queryBuilder = supabase.from('properties').select('*');
+        // EXCLUDE heavy fields: images, geo_maps, notes
+        const fields = 'id, name, code, address, type, status, land_use, lot_index, lot_area, location, google_drive_plan_url, has_planning_permission, proprietor_id, tenant_id, created_by, created_at, updated_at, images';
+        let queryBuilder = supabase.from('properties').select(fields);
 
         if (options?.query) {
             const q = options.query;
@@ -123,7 +125,9 @@ export const fetchRents = async (user?: any): Promise<Rent[]> => {
 
 export const fetchRentsWithRelations = async (options?: { type?: 'renting' | 'rent_out' }): Promise<any[]> => {
     try {
-        let query = supabase.from('rents').select('*, properties(*), proprietor:proprietors(*), tenant:proprietors(*)');
+        // EXCLUDE heavy fields from property join
+        const propFields = 'id, name, code, address, type, status, land_use, lot_index, lot_area, location, google_drive_plan_url, has_planning_permission, proprietor_id, tenant_id, created_by, created_at, updated_at, images';
+        let query = supabase.from('rents').select(`*, property:properties(${propFields}), proprietor:proprietors!proprietor_id(*), tenant:proprietors!tenant_id(*)`);
 
         if (options?.type) {
             query = query.eq('type', options.type);
@@ -131,11 +135,14 @@ export const fetchRentsWithRelations = async (options?: { type?: 'renting' | 're
 
         const { data, error } = await query.order('created_at', { ascending: false });
 
-        if (error) throw error;
+        if (error) {
+            console.error('Supabase query error:', error);
+            throw error;
+        }
 
         return (data || []).map(r => ({
             ...toCamel(r),
-            property: toCamel(r.properties),
+            property: toCamel(r.property),
             proprietor: toCamel(r.proprietor),
             tenant: toCamel(r.tenant)
         }));
@@ -147,7 +154,8 @@ export const fetchRentsWithRelations = async (options?: { type?: 'renting' | 're
 
 export const fetchPropertiesWithRelations = async (user?: any): Promise<PropertyWithRelations[]> => {
     try {
-        let pQuery = supabase.from('properties').select('*');
+        const fields = 'id, name, code, address, type, status, land_use, lot_index, lot_area, location, google_drive_plan_url, has_planning_permission, proprietor_id, tenant_id, created_by, created_at, updated_at, images';
+        let pQuery = supabase.from('properties').select(fields);
         let oQuery = supabase.from('proprietors').select('*');
         let rQuery = supabase.from('rents').select('*');
 
@@ -827,15 +835,6 @@ export function useRents() {
     };
 }
 
-export function useRentsQuery() {
-    const { user } = useAuth();
-    return useQuery({
-        queryKey: ['rents', user?.id],
-        queryFn: () => fetchRents(user),
-        staleTime: 5 * 60 * 1000, // 5 minutes
-    });
-}
-
 // ==================== RELATION HELPERS ====================
 
 export interface PropertyWithRelations extends Property {
@@ -900,23 +899,6 @@ export function useRelations() {
         getPropertiesWithRelations,
         getPropertyWithRelations
     };
-}
-
-export function useRelationsQuery() {
-    const { user } = useAuth();
-    return useQuery({
-        queryKey: ['relations', user?.id],
-        queryFn: () => fetchPropertiesWithRelations(user),
-        staleTime: 5 * 60 * 1000, // 5 minutes
-    });
-}
-
-export function useDashboardStatsQuery() {
-    return useQuery({
-        queryKey: ['dashboard-stats'],
-        queryFn: fetchDashboardStats,
-        staleTime: 30 * 1000, // 30 seconds
-    });
 }
 
 // ==================== DATABASE GLOBAL HOOKS ====================
@@ -1079,4 +1061,49 @@ export function useDatabase() {
         seedData,
         syncLocalToCloud
     };
+}
+export function useRentsQuery() {
+    const { user } = useAuth();
+    return useQuery({
+        queryKey: ['rents', user?.id],
+        queryFn: () => fetchRents(user),
+        staleTime: 2 * 60 * 1000, // 2 minutes
+    });
+}
+
+export function useRentsWithRelationsQuery(options?: { type?: 'renting' | 'rent_out' }) {
+    const { user } = useAuth();
+    return useQuery({
+        queryKey: ['rents-with-relations', user?.id, options?.type],
+        queryFn: () => fetchRentsWithRelations(options),
+        staleTime: 2 * 60 * 1000,
+    });
+}
+
+export function useDashboardStatsQuery() {
+    const { user } = useAuth();
+    return useQuery({
+        queryKey: ['dashboard-stats', user?.id],
+        queryFn: fetchDashboardStats,
+        staleTime: 30 * 1000, // 30 seconds
+    });
+}
+
+export function usePropertiesWithRelationsQuery() {
+    const { user } = useAuth();
+    return useQuery({
+        queryKey: ['properties-with-relations', user?.id],
+        queryFn: () => fetchPropertiesWithRelations(user),
+        staleTime: 5 * 60 * 1000,
+    });
+}
+
+export function usePropertyWithRelationsQuery(id: string) {
+    const { getPropertyWithRelations } = useRelations();
+    return useQuery({
+        queryKey: ['property-with-relations', id],
+        queryFn: () => getPropertyWithRelations(id),
+        enabled: !!id,
+        staleTime: 5 * 60 * 1000,
+    });
 }

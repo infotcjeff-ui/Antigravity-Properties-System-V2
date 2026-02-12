@@ -309,9 +309,9 @@ export default function RentModal({ propertyId, rent, onClose, onSuccess }: Rent
                                 {loadingData ? (
                                     <div className="flex-1 px-4 py-3 bg-zinc-50 dark:bg-white/5 border border-zinc-200 dark:border-white/10 rounded-xl flex items-center gap-2">
                                         <motion.div
-                                            animate={{ rotate: 360 }}
-                                            transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                                            className="w-4 h-4 border-2 border-purple-500/30 border-t-purple-500 rounded-full"
+                                            animate={{ opacity: [0.3, 1, 0.3] }}
+                                            transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut" }}
+                                            className="w-4 h-4 rounded-full bg-purple-500"
                                         />
                                         <span className="text-zinc-400 dark:text-white/40">載入中...</span>
                                     </div>
@@ -518,14 +518,15 @@ export default function RentModal({ propertyId, rent, onClose, onSuccess }: Rent
                             className="px-6 py-2 bg-gradient-to-r from-purple-600 to-blue-600 rounded-xl text-white font-medium shadow-lg shadow-purple-500/20 disabled:opacity-50 flex items-center gap-2"
                         >
                             {saving ? (
-                                <>
-                                    <motion.div
-                                        animate={{ rotate: 360 }}
-                                        transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                                        className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full"
-                                    />
-                                    {rent ? '更新中...' : '創建中...'}
-                                </>
+                                <motion.div
+                                    initial={{ opacity: 0 }}
+                                    animate={{ opacity: [0.4, 1, 0.4] }}
+                                    transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut" }}
+                                    className="flex items-center gap-2"
+                                >
+                                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                    <span>{rent ? '更新中...' : '創建中...'}</span>
+                                </motion.div>
                             ) : (
                                 rent ? '更新記錄' : '創建記錄'
                             )}

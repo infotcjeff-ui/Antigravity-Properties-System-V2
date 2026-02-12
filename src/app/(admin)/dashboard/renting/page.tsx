@@ -1,29 +1,18 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useRents, useProperties, useProprietors } from '@/hooks/useStorage';
-import type { Rent, Property, Proprietor } from '@/lib/db';
+import { useRentsWithRelationsQuery } from '@/hooks/useStorage';
+import { useQueryClient } from '@tanstack/react-query';
+import type { Rent } from '@/lib/db';
 import { BentoCard } from '@/components/layout/BentoGrid';
 import RentModal from '@/components/properties/RentModal';
 
 export default function RentingPage() {
-    const { getRentsWithRelations, loading } = useRents();
-
-    const [rents, setRents] = useState<Rent[]>([]);
-    const [properties, setProperties] = useState<Map<string, Property>>(new Map());
-    const [proprietors, setProprietors] = useState<Map<string, Proprietor>>(new Map());
+    const queryClient = useQueryClient();
+    const { data: rents = [], isLoading } = useRentsWithRelationsQuery({ type: 'renting' });
     const [showModal, setShowModal] = useState(false);
     const [selectedRent, setSelectedRent] = useState<Rent | null>(null);
-
-    const loadData = useCallback(async () => {
-        const rentData = await getRentsWithRelations('renting');
-        setRents(rentData);
-    }, [getRentsWithRelations]);
-
-    useEffect(() => {
-        loadData();
-    }, [loadData]);
 
     const statusColors: Record<string, string> = {
         active: 'bg-green-500/20 text-green-400',
@@ -32,13 +21,13 @@ export default function RentingPage() {
         cancelled: 'bg-red-500/20 text-red-400',
     };
 
-    if (loading) {
+    if (isLoading) {
         return (
             <div className="flex items-center justify-center min-h-[60vh]">
                 <motion.div
-                    animate={{ rotate: 360 }}
-                    transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                    className="w-12 h-12 border-4 border-purple-500 border-t-transparent rounded-full"
+                    animate={{ opacity: [0.3, 1, 0.3] }}
+                    transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut" }}
+                    className="w-12 h-12 rounded-full bg-purple-500"
                 />
             </div>
         );
@@ -189,7 +178,6 @@ export default function RentingPage() {
                         </tbody>
                     </table>
                 )}
-                {/* Modal */}
                 <AnimatePresence>
                     {showModal && (
                         <RentModal
@@ -199,7 +187,7 @@ export default function RentingPage() {
                                 setSelectedRent(null);
                             }}
                             onSuccess={() => {
-                                loadData();
+                                queryClient.invalidateQueries({ queryKey: ['rents-with-relations'] });
                                 setShowModal(false);
                                 setSelectedRent(null);
                             }}

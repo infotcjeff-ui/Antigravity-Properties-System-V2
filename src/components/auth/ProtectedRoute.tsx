@@ -35,9 +35,9 @@ export default function ProtectedRoute({ children, requiredRole }: ProtectedRout
                     className="flex flex-col items-center gap-4"
                 >
                     <motion.div
-                        animate={{ rotate: 360 }}
-                        transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                        className="w-12 h-12 border-4 border-purple-500 border-t-transparent rounded-full"
+                        animate={{ opacity: [0.3, 1, 0.3] }}
+                        transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut" }}
+                        className="w-12 h-12 rounded-full bg-purple-500"
                     />
                     <p className="text-white/70 text-sm">Loading...</p>
                 </motion.div>

@@ -30,10 +30,15 @@ export default function RentingPage() {
         return (
             <div className="flex items-center justify-center min-h-[60vh]">
                 <motion.div
-                    animate={{ rotate: 360 }}
-                    transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                    className="w-12 h-12 border-4 border-purple-500 border-t-transparent rounded-full"
-                />
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: [0.4, 1, 0.4] }}
+                    transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut" }}
+                    className="flex flex-col items-center gap-4"
+                >
+                    <div className="w-12 h-12 bg-purple-500/20 rounded-2xl flex items-center justify-center">
+                        <div className="w-6 h-6 border-2 border-purple-500 border-t-transparent rounded-full animate-spin" />
+                    </div>
+                </motion.div>
             </div>
         );
     }

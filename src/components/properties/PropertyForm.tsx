@@ -1000,14 +1000,15 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                         className="px-5 py-2.5 bg-gradient-to-r from-purple-600 to-blue-600 rounded-xl text-white font-medium shadow-lg shadow-purple-500/20 disabled:opacity-50 flex items-center gap-2"
                     >
                         {saving ? (
-                            <>
-                                <motion.div
-                                    animate={{ rotate: 360 }}
-                                    transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                                    className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full"
-                                />
-                                Saving...
-                            </>
+                            <motion.div
+                                initial={{ opacity: 0 }}
+                                animate={{ opacity: [0.4, 1, 0.4] }}
+                                transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut" }}
+                                className="flex items-center gap-2"
+                            >
+                                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                <span>處理中...</span>
+                            </motion.div>
                         ) : (
                             property ? '更新物業' : '新增物業'
                         )}

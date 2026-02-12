@@ -95,7 +95,6 @@ export default function Sidebar({ isAuthenticated = false }: SidebarProps) {
             animate={{ x: 0 }}
             className="fixed left-0 top-0 h-screen w-[280px] bg-white dark:bg-[#0f0f1a]/95 backdrop-blur-xl border-r border-zinc-200 dark:border-white/5 flex flex-col z-50 transition-colors duration-300"
         >
-            {/* Logo */}
             <div className="p-6 border-b border-zinc-200 dark:border-white/5">
                 <Link href="/" className="flex items-center gap-3">
                     <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 to-blue-600 flex items-center justify-center shadow-lg shadow-purple-500/20">

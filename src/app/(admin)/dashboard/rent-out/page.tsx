@@ -1,8 +1,8 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useRentsQuery, usePropertiesQuery, useProprietorsQuery } from '@/hooks/useStorage';
+import { useRentsWithRelationsQuery } from '@/hooks/useStorage';
 import { useQueryClient } from '@tanstack/react-query';
 import type { Rent } from '@/lib/db';
 import { BentoCard } from '@/components/layout/BentoGrid';
@@ -10,32 +10,23 @@ import RentModal from '@/components/properties/RentModal';
 
 export default function RentOutPage() {
     const queryClient = useQueryClient();
-    const { data: allProprietors, isLoading: proprietorsLoading } = useProprietorsQuery();
-    const { data: allRents, isLoading: rentsLoading } = useRentsQuery();
-    const { data: allProperties, isLoading: propertiesLoading } = usePropertiesQuery();
+    const { data: rents = [], isLoading } = useRentsWithRelationsQuery({ type: 'rent_out' });
 
     const [showModal, setShowModal] = useState(false);
     const [selectedRent, setSelectedRent] = useState<Rent | null>(null);
-
-    // Filter for rent_out type
-    const rents = useMemo(() => (allRents || []).filter(r => r.type === 'rent_out'), [allRents]);
-    const properties = useMemo(() => new Map((allProperties || []).map(p => [p.id!, p])), [allProperties]);
-    const proprietors = useMemo(() => new Map((allProprietors || []).map(o => [o.id!, o])), [allProprietors]);
-
-    const loading = rentsLoading || propertiesLoading || proprietorsLoading;
 
     // Calculate total income - use (monthly rental * periods)
     const totalIncome = rents
         .filter(r => r.status === 'active' || r.status === 'completed' || r.rentOutStatus === 'renting')
         .reduce((sum, r) => sum + ((r.rentOutMonthlyRental || r.amount || 0) * (r.rentOutPeriods || 1)), 0);
 
-    if (loading) {
+    if (isLoading) {
         return (
             <div className="flex items-center justify-center min-h-[60vh]">
                 <motion.div
-                    animate={{ rotate: 360 }}
-                    transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                    className="w-12 h-12 border-4 border-purple-500 border-t-transparent rounded-full"
+                    animate={{ opacity: [0.3, 1, 0.3] }}
+                    transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut" }}
+                    className="w-12 h-12 rounded-full bg-purple-500"
                 />
             </div>
         );
@@ -150,10 +141,10 @@ export default function RentOutPage() {
                             </tr>
                         </thead>
                         <tbody>
-                            {rents.map((rent, index) => {
-                                const property = properties.get(rent.propertyId);
-                                const proprietor = rent.proprietorId ? proprietors.get(rent.proprietorId) : null;
-                                const tenant = rent.tenantId ? proprietors.get(rent.tenantId) : null;
+                            {rents.map((rent: any, index) => {
+                                const property = rent.property;
+                                const proprietor = rent.proprietor;
+                                const tenant = rent.tenant;
 
                                 // Handle both new and legacy rent data formats
                                 const startDate = rent.rentOutStartDate || rent.startDate;
@@ -211,7 +202,6 @@ export default function RentOutPage() {
                 )}
             </div>
 
-            {/* Modal */}
             <AnimatePresence>
                 {showModal && (
                     <RentModal
@@ -221,7 +211,7 @@ export default function RentOutPage() {
                             setSelectedRent(null);
                         }}
                         onSuccess={() => {
-                            queryClient.invalidateQueries({ queryKey: ['rents'] });
+                            queryClient.invalidateQueries({ queryKey: ['rents-with-relations'] });
                             setShowModal(false);
                             setSelectedRent(null);
                         }}

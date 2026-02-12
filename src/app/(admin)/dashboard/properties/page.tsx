@@ -113,13 +113,12 @@ export default function ManagePropertiesPage() {
                 />
             </div>
 
-            {/* Properties Table */}
             {isLoading ? (
                 <div className="flex items-center justify-center min-h-[40vh]">
                     <motion.div
-                        animate={{ rotate: 360 }}
-                        transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                        className="w-10 h-10 border-4 border-purple-500 border-t-transparent rounded-full"
+                        animate={{ opacity: [0.3, 1, 0.3] }}
+                        transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut" }}
+                        className="w-10 h-10 rounded-full bg-purple-500"
                     />
                 </div>
             ) : (

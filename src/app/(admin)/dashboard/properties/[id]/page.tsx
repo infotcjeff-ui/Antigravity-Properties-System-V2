@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
-import { useProperties, useProprietors, useRents } from '@/hooks/useStorage';
+import { useProperties, useProprietors, useRents, usePropertyWithRelationsQuery, useProprietorsQuery } from '@/hooks/useStorage';
 import type { Property, Proprietor, Rent } from '@/lib/db';
 import {
     ArrowLeft,
@@ -53,49 +53,12 @@ const landUseLabels: Record<string, string> = {
 export default function PropertyDetailsPage() {
     const params = useParams();
     const router = useRouter();
-    const { getProperties } = useProperties();
-    const { getProprietors } = useProprietors();
-    const { getRents } = useRents();
+    const { data: property, isLoading: loading } = usePropertyWithRelationsQuery(params.id as string);
+    const { data: allProprietors = [] } = useProprietorsQuery();
 
-    const [property, setProperty] = useState<Property | null>(null);
-    const [proprietor, setProprietor] = useState<Proprietor | null>(null);
-    const [allProprietors, setAllProprietors] = useState<Proprietor[]>([]);
-    const [rents, setRents] = useState<Rent[]>([]);
-    const [loading, setLoading] = useState(true);
+    const proprietor = property?.proprietor || null;
+    const rents = property?.rents || [];
     const [currentImageIndex, setCurrentImageIndex] = useState(0);
-
-    useEffect(() => {
-        const loadData = async () => {
-            try {
-                const properties = await getProperties();
-                const found = properties.find(p => p.id === params.id);
-
-                if (found) {
-                    setProperty(found);
-
-                    // Load proprietors
-                    const proprietors = await getProprietors();
-                    setAllProprietors(proprietors);
-
-                    if (found.proprietorId) {
-                        const foundProprietor = proprietors.find(p => p.id === found.proprietorId);
-                        setProprietor(foundProprietor || null);
-                    }
-
-                    // Load related rents
-                    const allRents = await getRents();
-                    const propertyRents = allRents.filter(r => r.propertyId === found.id);
-                    setRents(propertyRents);
-                }
-            } catch (error) {
-                console.error('Failed to load property:', error);
-            } finally {
-                setLoading(false);
-            }
-        };
-
-        loadData();
-    }, [params.id, getProperties, getProprietors, getRents]);
 
     const nextImage = () => {
         if (property?.images && property.images.length > 0) {
@@ -113,9 +76,9 @@ export default function PropertyDetailsPage() {
         return (
             <div className="flex items-center justify-center min-h-[60vh]">
                 <motion.div
-                    animate={{ rotate: 360 }}
-                    transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                    className="w-12 h-12 border-4 border-purple-500 border-t-transparent rounded-full"
+                    animate={{ opacity: [0.3, 1, 0.3] }}
+                    transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut" }}
+                    className="w-12 h-12 rounded-full bg-purple-500"
                 />
             </div>
         );
@@ -325,7 +288,7 @@ export default function PropertyDetailsPage() {
                                                     )}
                                                     {/* Display Other Party Name */}
                                                     {(() => {
-                                                        const otherParty = allProprietors.find(p => p.id === (rent.tenantId || rent.proprietorId));
+                                                        const otherParty = rent.tenant || rent.proprietor;
                                                         return otherParty ? (
                                                             <span className="text-zinc-700 dark:text-white/80 text-xs font-medium bg-zinc-100 dark:bg-white/10 px-2 py-0.5 rounded">
                                                                 {otherParty.name}
