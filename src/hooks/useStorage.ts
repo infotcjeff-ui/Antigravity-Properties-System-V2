@@ -622,6 +622,29 @@ export function useProprietors() {
         setLoading(true);
         setError(null);
         try {
+            // Nullify FK references in properties before deleting
+            await supabase
+                .from('properties')
+                .update({ proprietor_id: null })
+                .eq('proprietor_id', id);
+
+            await supabase
+                .from('properties')
+                .update({ tenant_id: null })
+                .eq('tenant_id', id);
+
+            // Nullify FK references in rents before deleting
+            await supabase
+                .from('rents')
+                .update({ proprietor_id: null })
+                .eq('proprietor_id', id);
+
+            await supabase
+                .from('rents')
+                .update({ tenant_id: null })
+                .eq('tenant_id', id);
+
+            // Now delete the proprietor
             const { error: sbError } = await supabase
                 .from('proprietors')
                 .delete()
