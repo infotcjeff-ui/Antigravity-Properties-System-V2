@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
-import { useProperties, useProprietors, useRents, usePropertyWithRelationsQuery, useProprietorsQuery } from '@/hooks/useStorage';
+import { usePropertyWithRelationsQuery, useProprietorsQuery } from '@/hooks/useStorage';
 import type { Property, Proprietor, Rent } from '@/lib/db';
 import {
     ArrowLeft,
@@ -16,7 +16,11 @@ import {
     FileText,
     ChevronLeft,
     ChevronRight,
+    X,
+    Map,
+    Image as ImageIcon,
 } from 'lucide-react';
+import DOMPurify from 'dompurify';
 
 const statusColors: Record<string, string> = {
     holding: 'bg-emerald-600/80 text-white border-emerald-500/50',
@@ -50,6 +54,14 @@ const landUseLabels: Record<string, string> = {
     recreation_use: '休憩用地',
 };
 
+function EmptyPlaceholder() {
+    return (
+        <div className="flex items-center justify-center py-8">
+            <p className="text-zinc-400 dark:text-white/30 text-sm">暫無。</p>
+        </div>
+    );
+}
+
 export default function PropertyDetailsPage() {
     const params = useParams();
     const router = useRouter();
@@ -57,8 +69,10 @@ export default function PropertyDetailsPage() {
     const { data: allProprietors = [] } = useProprietorsQuery();
 
     const proprietor = property?.proprietor || null;
+    const tenant = property?.tenant || null;
     const rents = property?.rents || [];
     const [currentImageIndex, setCurrentImageIndex] = useState(0);
+    const [lightboxImage, setLightboxImage] = useState<string | null>(null);
 
     const nextImage = () => {
         if (property?.images && property.images.length > 0) {
@@ -155,8 +169,9 @@ export default function PropertyDetailsPage() {
                         )}
                     </>
                 ) : (
-                    <div className="w-full h-full flex items-center justify-center">
-                        <Building2 className="w-24 h-24 text-white/20" />
+                    <div className="w-full h-full flex flex-col items-center justify-center gap-2">
+                        <ImageIcon className="w-16 h-16 text-zinc-300 dark:text-white/15" />
+                        <p className="text-zinc-400 dark:text-white/30 text-sm">暫無。</p>
                     </div>
                 )}
 
@@ -182,10 +197,15 @@ export default function PropertyDetailsPage() {
                         <h1 className="text-3xl font-bold text-zinc-900 dark:text-white">{property.name}</h1>
                         <p className="text-zinc-500 dark:text-white/50 mt-1">Code: {property.code}</p>
 
-                        {property.address && (
+                        {property.address ? (
                             <div className="flex items-start gap-2 mt-4 text-zinc-600 dark:text-white/70">
                                 <MapPin className="w-5 h-5 flex-shrink-0 mt-0.5" />
                                 <span>{property.address}</span>
+                            </div>
+                        ) : (
+                            <div className="flex items-start gap-2 mt-4 text-zinc-400 dark:text-white/30">
+                                <MapPin className="w-5 h-5 flex-shrink-0 mt-0.5" />
+                                <span className="italic">暫無。</span>
                             </div>
                         )}
 
@@ -193,76 +213,144 @@ export default function PropertyDetailsPage() {
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-6">
                             <div className="bg-zinc-50 dark:bg-white/5 rounded-xl p-4 border border-zinc-100 dark:border-none">
                                 <p className="text-zinc-400 dark:text-white/40 text-sm">Type / 類型</p>
-                                <p className="text-zinc-900 dark:text-white font-medium mt-1">{typeLabels[property.type]}</p>
+                                <p className="text-zinc-900 dark:text-white font-medium mt-1">{typeLabels[property.type] || '暫無。'}</p>
                             </div>
                             <div className="bg-zinc-50 dark:bg-white/5 rounded-xl p-4 border border-zinc-100 dark:border-none">
                                 <p className="text-zinc-400 dark:text-white/40 text-sm">Land Use / 土地用途</p>
-                                <p className="text-zinc-900 dark:text-white font-medium mt-1">{landUseLabels[property.landUse]}</p>
+                                <p className="text-zinc-900 dark:text-white font-medium mt-1">{landUseLabels[property.landUse] || '暫無。'}</p>
                             </div>
-                            {property.lotIndex && (
-                                <div className="bg-zinc-50 dark:bg-white/5 rounded-xl p-4 border border-zinc-100 dark:border-none">
-                                    <p className="text-zinc-400 dark:text-white/40 text-sm">Lot Index / 物業地段</p>
-                                    <p className="text-zinc-900 dark:text-white font-medium mt-1">{property.lotIndex}</p>
-                                </div>
-                            )}
-                            {property.lotArea && (
-                                <div className="bg-zinc-50 dark:bg-white/5 rounded-xl p-4 border border-zinc-100 dark:border-none">
-                                    <p className="text-zinc-400 dark:text-white/40 text-sm">Lot Area / 地段面積</p>
-                                    <p className="text-zinc-900 dark:text-white font-medium mt-1">{property.lotArea}</p>
-                                </div>
-                            )}
+                            <div className="bg-zinc-50 dark:bg-white/5 rounded-xl p-4 border border-zinc-100 dark:border-none">
+                                <p className="text-zinc-400 dark:text-white/40 text-sm">Lot Index / 物業地段</p>
+                                <p className={`font-medium mt-1 ${property.lotIndex ? 'text-zinc-900 dark:text-white' : 'text-zinc-400 dark:text-white/30'}`}>
+                                    {property.lotIndex || '暫無。'}
+                                </p>
+                            </div>
+                            <div className="bg-zinc-50 dark:bg-white/5 rounded-xl p-4 border border-zinc-100 dark:border-none">
+                                <p className="text-zinc-400 dark:text-white/40 text-sm">Lot Area / 地段面積</p>
+                                <p className={`font-medium mt-1 ${property.lotArea ? 'text-zinc-900 dark:text-white' : 'text-zinc-400 dark:text-white/30'}`}>
+                                    {property.lotArea || '暫無。'}
+                                </p>
+                            </div>
                         </div>
 
-                        {/* Planning Permission */}
-                        {property.hasPlanningPermission && (
-                            <div className="mt-6 p-[15px] border-l-[3px] border-amber-500 bg-amber-500/5 rounded-r-xl">
-                                <p className="text-xs font-semibold text-amber-500 uppercase tracking-wider mb-1">最新規劃許可申請 / Property Application Permission</p>
+                        {/* Notes Section - always show */}
+                        <div className="mt-6 mb-4 p-[10px] border-l-[3px] border-purple-500 bg-purple-500/5 rounded-r-xl">
+                            <p className="text-xs font-semibold text-purple-500 uppercase tracking-wider mb-1">備註 / Notes</p>
+                            {property.notes ? (
+                                <div
+                                    className="text-zinc-700 dark:text-white/80 text-sm rich-text-content"
+                                    dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(property.notes) }}
+                                />
+                            ) : (
+                                <p className="text-zinc-400 dark:text-white/30 text-sm text-center py-2">暫無。</p>
+                            )}
+                            <style jsx global>{`
+                                .rich-text-content ul {
+                                    list-style-type: disc;
+                                    margin-left: 1.5rem;
+                                    margin-top: 0.5rem;
+                                    margin-bottom: 0.5rem;
+                                }
+                                .rich-text-content ol {
+                                    list-style-type: decimal;
+                                    margin-left: 1.5rem;
+                                    margin-top: 0.5rem;
+                                    margin-bottom: 0.5rem;
+                                }
+                                .rich-text-content p {
+                                    margin-bottom: 0.5rem;
+                                }
+                                .rich-text-content a {
+                                    color: #a855f7;
+                                    text-decoration: underline;
+                                }
+                                .rich-text-content h1, .rich-text-content h2, .rich-text-content h3 {
+                                    font-weight: bold;
+                                    margin-top: 1rem;
+                                    margin-bottom: 0.5rem;
+                                }
+                                .rich-text-content h1 { font-size: 1.25rem; }
+                                .rich-text-content h2 { font-size: 1.125rem; }
+                                .rich-text-content h3 { font-size: 1rem; }
+                            `}</style>
+                        </div>
+
+                        {/* Planning Permission - always show */}
+                        <div className="mt-6 p-[15px] border-l-[3px] border-amber-500 bg-amber-500/5 rounded-r-xl">
+                            <p className="text-xs font-semibold text-amber-500 uppercase tracking-wider mb-1">最新規劃許可申請 / Property Application Permission</p>
+                            {property.hasPlanningPermission ? (
                                 <p className="text-zinc-700 dark:text-white/80 text-sm font-medium">{property.hasPlanningPermission}</p>
-                            </div>
-                        )}
+                            ) : (
+                                <p className="text-zinc-400 dark:text-white/30 text-sm text-center py-2">暫無。</p>
+                            )}
+                        </div>
                     </div>
 
-                    {/* Proprietor */}
-                    {proprietor && (
+                    {/* Proprietor and Tenant - always show */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        {/* Proprietor */}
                         <div className="bg-white dark:bg-white/5 rounded-2xl border border-zinc-200 dark:border-white/10 p-6 shadow-sm dark:shadow-none">
                             <h2 className="text-lg font-semibold text-zinc-900 dark:text-white mb-4 flex items-center gap-2">
-                                <User className="w-5 h-5" />
+                                <User className="w-5 h-5 text-purple-500" />
                                 Proprietor / 資產擁有方
                             </h2>
-                            <div className="flex items-center gap-4">
-                                <div className="w-12 h-12 rounded-full bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center text-white font-semibold">
-                                    {proprietor.name.charAt(0).toUpperCase()}
+                            {proprietor ? (
+                                <div className="flex items-center gap-4">
+                                    <div className="w-12 h-12 rounded-full bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center text-white font-semibold">
+                                        {proprietor.name.charAt(0).toUpperCase()}
+                                    </div>
+                                    <div>
+                                        <p className="text-zinc-900 dark:text-white font-medium">{proprietor.name}</p>
+                                        <p className="text-zinc-500 dark:text-white/50 text-sm">
+                                            {proprietor.code} {proprietor.englishName ? `• ${proprietor.englishName}` : ''}
+                                        </p>
+                                    </div>
                                 </div>
-                                <div>
-                                    <p className="text-zinc-900 dark:text-white font-medium">{proprietor.name}</p>
-                                    <p className="text-zinc-500 dark:text-white/50 text-sm">
-                                        {proprietor.code} {proprietor.englishName ? `• ${proprietor.englishName}` : ''}
-                                    </p>
-                                </div>
-                            </div>
+                            ) : (
+                                <EmptyPlaceholder />
+                            )}
                         </div>
-                    )}
 
-                    {/* Rent History */}
-                    {rents.length > 0 && (
+                        {/* Tenant */}
                         <div className="bg-white dark:bg-white/5 rounded-2xl border border-zinc-200 dark:border-white/10 p-6 shadow-sm dark:shadow-none">
                             <h2 className="text-lg font-semibold text-zinc-900 dark:text-white mb-4 flex items-center gap-2">
-                                <Calendar className="w-5 h-5" />
-                                Rent History / 租務記錄
+                                <User className="w-5 h-5 text-blue-500" />
+                                Tenant / 目前承租人
                             </h2>
+                            {tenant ? (
+                                <div className="flex items-center gap-4">
+                                    <div className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center text-white font-semibold">
+                                        {tenant.name.charAt(0).toUpperCase()}
+                                    </div>
+                                    <div>
+                                        <p className="text-zinc-900 dark:text-white font-medium">{tenant.name}</p>
+                                        <p className="text-zinc-500 dark:text-white/50 text-sm">
+                                            {tenant.code} {tenant.englishName ? `• ${tenant.englishName}` : ''}
+                                        </p>
+                                    </div>
+                                </div>
+                            ) : (
+                                <EmptyPlaceholder />
+                            )}
+                        </div>
+                    </div>
+
+                    {/* Rent History - always show */}
+                    <div className="bg-white dark:bg-white/5 rounded-2xl border border-zinc-200 dark:border-white/10 p-6 shadow-sm dark:shadow-none">
+                        <h2 className="text-lg font-semibold text-zinc-900 dark:text-white mb-4 flex items-center gap-2">
+                            <Calendar className="w-5 h-5" />
+                            Rent History / 租務記錄
+                        </h2>
+                        {rents.length > 0 ? (
                             <div className="space-y-3">
                                 {rents.map((rent) => {
-                                    // Handle both new and legacy rent data formats
                                     const startDate = rent.type === 'rent_out'
                                         ? (rent.rentOutStartDate || rent.startDate)
                                         : (rent.rentingStartDate || rent.startDate);
                                     const endDate = rent.type === 'rent_out'
                                         ? (rent.rentOutEndDate || rent.endDate)
                                         : (rent.rentingEndDate || rent.endDate);
-
-                                    // Fix: Ensure proper date comparison
                                     const isExpired = endDate ? new Date(endDate).getTime() < new Date().getTime() : false;
-
                                     const monthlyRent = rent.type === 'rent_out'
                                         ? (rent.rentOutMonthlyRental || rent.amount || 0)
                                         : (rent.rentingMonthlyRental || rent.amount || 0);
@@ -286,7 +374,6 @@ export default function PropertyDetailsPage() {
                                                             已過期
                                                         </span>
                                                     )}
-                                                    {/* Display Other Party Name */}
                                                     {(() => {
                                                         const otherParty = rent.tenant || rent.proprietor;
                                                         return otherParty ? (
@@ -300,13 +387,18 @@ export default function PropertyDetailsPage() {
                                                     {startDate ? new Date(startDate).toLocaleDateString() : '-'} - {endDate ? new Date(endDate).toLocaleDateString() : '-'}
                                                 </p>
                                             </div>
-                                            <p className="text-zinc-900 dark:text-white font-semibold">${(monthlyRent as any).toLocaleString()} /月</p>
+                                            <div className="text-right">
+                                                <p className="text-zinc-900 dark:text-white font-semibold">${(monthlyRent as any).toLocaleString()} /月</p>
+                                                <p className="text-zinc-400 dark:text-white/30 text-[10px]">{rent.location || rent.rentOutAddressDetail || '-'}</p>
+                                            </div>
                                         </div>
                                     );
                                 })}
                             </div>
-                        </div>
-                    )}
+                        ) : (
+                            <EmptyPlaceholder />
+                        )}
+                    </div>
                 </motion.div>
 
                 {/* Right Column - Map & Documents */}
@@ -316,48 +408,63 @@ export default function PropertyDetailsPage() {
                     transition={{ delay: 0.2 }}
                     className="space-y-6"
                 >
-                    {/* Map */}
-                    {property.location && (
-                        <div className="bg-white dark:bg-white/5 rounded-2xl border border-zinc-200 dark:border-white/10 p-6 shadow-sm dark:shadow-none">
-                            <h2 className="text-lg font-semibold text-zinc-900 dark:text-white mb-4 flex items-center gap-2">
-                                <MapPin className="w-5 h-5" />
-                                Location / 位置
-                            </h2>
-                            <div className="aspect-square rounded-xl overflow-hidden bg-white/5">
-                                <iframe
-                                    width="100%"
-                                    height="100%"
-                                    frameBorder="0"
-                                    style={{ border: 0 }}
-                                    src={`https://www.google.com/maps/embed/v1/place?key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}&q=${property.location.lat},${property.location.lng}&zoom=15`}
-                                    allowFullScreen
-                                />
-                            </div>
-                            <p className="text-zinc-400 dark:text-white/40 text-xs mt-2">
-                                📍 {property.location.lat.toFixed(6)}, {property.location.lng.toFixed(6)}
-                            </p>
-                        </div>
-                    )}
+                    {/* Map - always show, uses address */}
+                    <div className="bg-white dark:bg-white/5 rounded-2xl border border-zinc-200 dark:border-white/10 p-6 shadow-sm dark:shadow-none">
+                        <h2 className="text-lg font-semibold text-zinc-900 dark:text-white mb-4 flex items-center gap-2">
+                            <MapPin className="w-5 h-5" />
+                            Location / 位置
+                        </h2>
+                        {property.address ? (
+                            <>
+                                <div className="aspect-[4/3] rounded-xl overflow-hidden bg-white/5">
+                                    <iframe
+                                        width="100%"
+                                        height="100%"
+                                        frameBorder="0"
+                                        style={{ border: 0 }}
+                                        src={`https://www.google.com/maps/embed/v1/place?key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}&q=${encodeURIComponent(property.address)}&zoom=15`}
+                                        allowFullScreen
+                                    />
+                                </div>
+                                <p className="text-zinc-400 dark:text-white/40 text-xs mt-2">
+                                    📍 {property.address}
+                                </p>
+                            </>
+                        ) : (
+                            <EmptyPlaceholder />
+                        )}
+                    </div>
 
-                    {/* Geo Maps */}
-                    {property.geoMaps && property.geoMaps.length > 0 && (
-                        <div className="bg-white dark:bg-white/5 rounded-2xl border border-zinc-200 dark:border-white/10 p-6 shadow-sm dark:shadow-none">
-                            <h2 className="text-lg font-semibold text-zinc-900 dark:text-white mb-4">Geo Maps / 地圖</h2>
+                    {/* Geo Maps - always show */}
+                    <div className="bg-white dark:bg-white/5 rounded-2xl border border-zinc-200 dark:border-white/10 p-6 shadow-sm dark:shadow-none">
+                        <h2 className="text-lg font-semibold text-zinc-900 dark:text-white mb-4 flex items-center gap-2">
+                            <Map className="w-5 h-5" />
+                            地理資訊圖
+                        </h2>
+                        {property.geoMaps && property.geoMaps.length > 0 ? (
                             <div className="grid grid-cols-2 gap-2">
                                 {property.geoMaps.map((map, idx) => (
-                                    <img key={idx} src={map} alt={`Geo Map ${idx + 1}`} className="rounded-lg" />
+                                    <img
+                                        key={idx}
+                                        src={map}
+                                        alt={`Geo Map ${idx + 1}`}
+                                        className="rounded-lg cursor-pointer hover:opacity-80 transition-opacity"
+                                        onClick={() => setLightboxImage(map)}
+                                    />
                                 ))}
                             </div>
-                        </div>
-                    )}
+                        ) : (
+                            <EmptyPlaceholder />
+                        )}
+                    </div>
 
-                    {/* Documents */}
-                    {property.googleDrivePlanUrl && (
-                        <div className="bg-white dark:bg-white/5 rounded-2xl border border-zinc-200 dark:border-white/10 p-6 shadow-sm dark:shadow-none">
-                            <h2 className="text-lg font-semibold text-zinc-900 dark:text-white mb-4 flex items-center gap-2">
-                                <FileText className="w-5 h-5" />
-                                Documents / 文件
-                            </h2>
+                    {/* Documents - always show */}
+                    <div className="bg-white dark:bg-white/5 rounded-2xl border border-zinc-200 dark:border-white/10 p-6 shadow-sm dark:shadow-none">
+                        <h2 className="text-lg font-semibold text-zinc-900 dark:text-white mb-4 flex items-center gap-2">
+                            <FileText className="w-5 h-5" />
+                            Documents / 文件
+                        </h2>
+                        {property.googleDrivePlanUrl ? (
                             <a
                                 href={property.googleDrivePlanUrl}
                                 target="_blank"
@@ -367,10 +474,36 @@ export default function PropertyDetailsPage() {
                                 <ExternalLink className="w-4 h-4" />
                                 <span>View Plan on Google Drive</span>
                             </a>
-                        </div>
-                    )}
+                        ) : (
+                            <EmptyPlaceholder />
+                        )}
+                    </div>
                 </motion.div>
             </div>
+
+            {/* Lightbox Overlay */}
+            {lightboxImage && (
+                <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-4"
+                    onClick={() => setLightboxImage(null)}
+                >
+                    <button
+                        className="absolute top-4 right-4 text-white/70 hover:text-white transition-colors"
+                        onClick={() => setLightboxImage(null)}
+                    >
+                        <X className="w-8 h-8" />
+                    </button>
+                    <img
+                        src={lightboxImage}
+                        alt="Geo Map Fullscreen"
+                        className="max-w-full max-h-[90vh] object-contain rounded-lg"
+                        onClick={(e) => e.stopPropagation()}
+                    />
+                </motion.div>
+            )}
         </div>
     );
 }

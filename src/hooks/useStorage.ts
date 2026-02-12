@@ -34,8 +34,8 @@ const toSnake = (obj: any) => {
 
 export const fetchProperties = async (user?: any, options?: { query?: string }): Promise<Property[]> => {
     try {
-        // EXCLUDE heavy fields: images, geo_maps, notes
-        const fields = 'id, name, code, address, type, status, land_use, lot_index, lot_area, location, google_drive_plan_url, has_planning_permission, proprietor_id, tenant_id, created_by, created_at, updated_at, images';
+        // Select all fields needed for both list and edit views
+        const fields = 'id, name, code, address, type, status, land_use, lot_index, lot_area, location, google_drive_plan_url, has_planning_permission, proprietor_id, tenant_id, created_by, created_at, updated_at, images, geo_maps, notes';
         let queryBuilder = supabase.from('properties').select(fields);
 
         if (options?.query) {
@@ -49,7 +49,11 @@ export const fetchProperties = async (user?: any, options?: { query?: string }):
         if (sbError) throw sbError;
         return (data || []).map(toCamel) as Property[];
     } catch (err: any) {
-        console.error('Failed to fetch properties:', err.message || err);
+        if (err instanceof TypeError && err.message === 'Failed to fetch') {
+            console.error('Network Error: Unable to reach Supabase. Check your URL and internet connection.');
+        } else {
+            console.error('Failed to fetch properties:', err.message || err);
+        }
         return [];
     }
 };
@@ -64,8 +68,12 @@ export const fetchProperty = async (id: string): Promise<Property | undefined> =
 
         if (sbError) throw sbError;
         return toCamel(data) as Property;
-    } catch (err) {
-        console.error('Failed to fetch property:', err);
+    } catch (err: any) {
+        if (err instanceof TypeError && err.message === 'Failed to fetch') {
+            console.error('Network Error: Unable to reach Supabase. Check your URL and internet connection.');
+        } else {
+            console.error('Failed to fetch property:', err);
+        }
         return undefined;
     }
 };
@@ -81,8 +89,12 @@ export const fetchProprietors = async (user?: any): Promise<Proprietor[]> => {
 
         if (sbError) throw sbError;
         return (data || []).map(toCamel) as Proprietor[];
-    } catch (err) {
-        console.error('Failed to fetch proprietors:', err);
+    } catch (err: any) {
+        if (err instanceof TypeError && err.message === 'Failed to fetch') {
+            console.error('Network Error: Unable to reach Supabase. Check your URL and internet connection.');
+        } else {
+            console.error('Failed to fetch proprietors:', err);
+        }
         return [];
     }
 };
@@ -117,8 +129,12 @@ export const fetchRents = async (user?: any): Promise<Rent[]> => {
             return [];
         }
         return (data || []).map(d => toCamel(d)) as Rent[];
-    } catch (err) {
-        console.error('Failed to fetch rents:', err);
+    } catch (err: any) {
+        if (err instanceof TypeError && err.message === 'Failed to fetch') {
+            console.error('Network Error: Unable to reach Supabase. Check your URL and internet connection.');
+        } else {
+            console.error('Failed to fetch rents:', err);
+        }
         return [];
     }
 };
@@ -146,8 +162,12 @@ export const fetchRentsWithRelations = async (options?: { type?: 'renting' | 're
             proprietor: toCamel(r.proprietor),
             tenant: toCamel(r.tenant)
         }));
-    } catch (err) {
-        console.error('Failed to fetch rents with relations:', err);
+    } catch (err: any) {
+        if (err instanceof TypeError && err.message === 'Failed to fetch') {
+            console.error('Network Error: Unable to reach Supabase. Check your URL and internet connection.');
+        } else {
+            console.error('Failed to fetch rents with relations:', err);
+        }
         return [];
     }
 };
@@ -187,8 +207,12 @@ export const fetchPropertiesWithRelations = async (user?: any): Promise<Property
                 rents: camelRents.filter(r => r.propertyId === camelProperty.id)
             } as PropertyWithRelations;
         });
-    } catch (err) {
-        console.error('Failed to fetch properties with relations:', err);
+    } catch (err: any) {
+        if (err instanceof TypeError && err.message === 'Failed to fetch') {
+            console.error('Network Error: Unable to reach Supabase. Check your URL and internet connection.');
+        } else {
+            console.error('Failed to fetch properties with relations:', err);
+        }
         return [];
     }
 };
@@ -210,8 +234,12 @@ export const fetchUserStats = async (userId: string) => {
             proprietorCount: proprietorCount || 0,
             rentCount: rentCount || 0
         };
-    } catch (err) {
-        console.error(`Failed to fetch stats for user ${userId}:`, err);
+    } catch (err: any) {
+        if (err instanceof TypeError && err.message === 'Failed to fetch') {
+            console.error('Network Error: Unable to reach Supabase. Check your URL and internet connection.');
+        } else {
+            console.error(`Failed to fetch stats for user ${userId}:`, err);
+        }
         return { propertyCount: 0, proprietorCount: 0, rentCount: 0 };
     }
 };
@@ -285,8 +313,12 @@ export const fetchDashboardStats = async () => {
                 suspended: suspendedCount || 0
             }
         };
-    } catch (err) {
-        console.error('Failed to fetch dashboard stats:', err);
+    } catch (err: any) {
+        if (err instanceof TypeError && err.message === 'Failed to fetch') {
+            console.error('Network Error: Unable to reach Supabase. Check your URL and internet connection.');
+        } else {
+            console.error('Failed to fetch dashboard stats:', err);
+        }
         return {
             totalProperties: 0,
             totalProprietors: 0,
@@ -352,19 +384,27 @@ export function useProperties() {
                 notes: property.notes,
                 proprietor_id: property.proprietorId,
                 tenant_id: property.tenantId,
-                created_by: user?.id
             };
+
+            // Remove undefined/null values so Supabase doesn't try to insert them
+            const cleanData = Object.fromEntries(
+                Object.entries(propertyData).filter(([_, v]) => v !== undefined && v !== null)
+            );
 
             const { error: sbError } = await supabase
                 .from('properties')
-                .insert([propertyData]);
+                .insert([cleanData]);
 
             if (sbError) throw sbError;
             return id;
         } catch (err: any) {
             setError('Failed to add property to cloud');
             console.error('Add Property Error:', err);
+            // Better error reporting for Supabase errors
             if (err.message) console.error('Error Message:', err.message);
+            if (err.code) console.error('Error Code:', err.code);
+            if (err.details) console.error('Error Details:', err.details);
+            if (err.hint) console.error('Error Hint:', err.hint);
             return null;
         } finally {
             setLoading(false);
@@ -397,10 +437,10 @@ export function useProperties() {
         } catch (err: any) {
             setError('Failed to update property in cloud');
             console.error('Update Property Error:', err);
-            if (err.message) console.error('Error Details:', err.message);
-            if (err.message?.includes('column')) {
-                console.error('HINT: This error usually means a column is missing in your Supabase table. Please run the migration script.');
-            }
+            if (err.message) console.error('Error Message:', err.message);
+            if (err.code) console.error('Error Code:', err.code);
+            if (err.details) console.error('Error Details:', err.details);
+            if (err.hint) console.error('Error Hint:', err.hint);
             return false;
         } finally {
             setLoading(false);
@@ -504,7 +544,6 @@ export function useProprietors() {
                 category: proprietor.category,
                 english_name: proprietor.englishName,
                 short_name: proprietor.shortName,
-                created_by: user?.id
             };
 
             // Only add description if provided (column may not exist in database)
@@ -531,7 +570,6 @@ export function useProprietors() {
                         category: proprietor.category,
                         english_name: proprietor.englishName,
                         short_name: proprietor.shortName,
-                        created_by: user?.id
                     };
                     const { error: retryError } = await supabase
                         .from('proprietors')
@@ -671,7 +709,6 @@ export function useRents() {
                 type: rent.type,
                 created_at: now,
                 updated_at: now,
-                created_by: user?.id
             };
 
             // Add legacy fields if present
@@ -710,9 +747,21 @@ export function useRents() {
             if (rent.rentingEndDate) rentData.renting_end_date = rent.rentingEndDate;
             if (rent.rentingDeposit) rentData.renting_deposit = rent.rentingDeposit;
 
+            // Convert Date objects to ISO strings for Supabase
+            for (const key of Object.keys(rentData)) {
+                if (rentData[key] instanceof Date) {
+                    rentData[key] = rentData[key].toISOString();
+                }
+            }
+
+            // Remove undefined/null optional fields
+            const cleanRentData = Object.fromEntries(
+                Object.entries(rentData).filter(([_, v]) => v !== undefined)
+            );
+
             const { error: sbError } = await supabase
                 .from('rents')
-                .insert([rentData]);
+                .insert([cleanRentData]);
 
             if (sbError) throw sbError;
             return id;

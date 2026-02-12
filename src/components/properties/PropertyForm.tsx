@@ -194,15 +194,17 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
             const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
 
             if (property?.id) {
-                await updateProperty(property.id, propertyData);
-                // Trigger update notification
+                const updated = await updateProperty(property.id, propertyData);
+                if (!updated) return; // Error already handled in hook
+
                 addNotification(
                     `Property "${formData.name}" updated at ${timeStr}`,
                     'update'
                 );
             } else {
-                await addProperty(propertyData);
-                // Trigger create notification
+                const newId = await addProperty(propertyData);
+                if (!newId) return; // Error already handled in hook
+
                 addNotification(
                     `Property "${formData.name}" created at ${timeStr}`,
                     'create'
@@ -212,6 +214,10 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
             // Invalidate all relevant queries to ensure data consistency
             queryClient.invalidateQueries({ queryKey: ['properties'] });
             queryClient.invalidateQueries({ queryKey: ['properties-with-relations'] });
+            // Also invalidate the individual property detail query (used by detail pages)
+            if (property?.id) {
+                queryClient.invalidateQueries({ queryKey: ['property-with-relations', property.id] });
+            }
 
             onSuccess();
         } catch (err) {

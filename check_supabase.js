@@ -1,6 +1,6 @@
 
-const supabaseUrl = 'https://gmpkqwrkechzojbqhfxx.supabase.co';
-const supabaseKey = 'sb_publishable_Xli-Md9J88Ghe5w9cPnqKg_zVf6BL8S';
+const supabaseUrl = 'https://kyuezxvnufrjdevkbvkj.supabase.co';
+const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imt5dWV6eHZudWZyamRldmtidmtqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzA4Mzg0NzIsImV4cCI6MjA4NjQxNDQ3Mn0.KlY1j8dXADzzIiz0rCpTv747h2-XhklzWbiYYeDi7BU';
 
 async function checkTable(tableName) {
     try {
@@ -12,7 +12,7 @@ async function checkTable(tableName) {
         });
 
         if (!response.ok) {
-            console.error(`Fetch ${tableName} failed:`, response.status);
+            console.error(`Fetch ${tableName} failed:`, response.status, response.statusText);
             return 0;
         }
 
@@ -32,7 +32,6 @@ async function run() {
     console.log('Checking all Supabase tables...');
     await checkTable('properties');
     await checkTable('proprietors');
-    await checkTable('transactions');
     await checkTable('rents');
 }
 
