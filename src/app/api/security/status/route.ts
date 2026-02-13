@@ -6,7 +6,7 @@ export async function GET() {
     return NextResponse.json({
         enabled: isArcjetConfigured,
         provider: 'Arcjet',
-        features: ['Shield', 'Bot Detection', 'Rate Limiting'],
+        features: ['Shield', 'Rate Limiting'],
         status: isArcjetConfigured ? 'active' : 'inactive'
     });
 }

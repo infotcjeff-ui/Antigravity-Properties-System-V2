@@ -15,14 +15,6 @@ const aj = arcjet({
         shield({
             mode: "DRY_RUN", // Try "LIVE" to block requests
         }),
-        detectBot({
-            mode: "DRY_RUN", // Try "LIVE" to block requests
-            allow: [
-                "CATEGORY:SEARCH_ENGINE", // Google, Bing, etc
-                "CATEGORY:PREVIEW", // Slack, Discord, etc
-                "CATEGORY:MONITOR", // Uptime monitors, etc
-            ],
-        }),
         // Create a fixed window rate limit. Other algorithms are supported.
         fixedWindow({
             mode: "DRY_RUN", // Try "LIVE" to block requests
