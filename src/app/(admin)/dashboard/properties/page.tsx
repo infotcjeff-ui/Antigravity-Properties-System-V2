@@ -78,6 +78,8 @@ export default function ManagePropertiesPage() {
         handleFormClose();
         // Invalidate query to refetch
         queryClient.invalidateQueries({ queryKey: ['properties'] });
+        // Force a page refresh as requested by the user
+        window.location.reload();
     };
 
     return (

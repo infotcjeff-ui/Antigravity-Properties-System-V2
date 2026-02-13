@@ -2,6 +2,7 @@
 
 import React, { useState, ChangeEvent } from 'react';
 import { Upload, Loader2, CheckCircle2, XCircle, Image as ImageIcon } from 'lucide-react';
+import { FileUpload } from './file-upload';
 
 interface ImageUploadProps {
     onUploadSuccess?: (url: string) => void;
@@ -73,25 +74,14 @@ export const ImageUpload: React.FC<ImageUploadProps> = ({
             </h3>
 
             <div className="relative group">
-                <input
-                    type="file"
-                    onChange={handleFileChange}
-                    accept="image/*"
-                    className="hidden"
-                    id="file-upload"
-                    disabled={uploading}
-                />
-                <label
-                    htmlFor="file-upload"
-                    className={`flex flex-col items-center justify-center w-full h-48 border-2 border-dashed rounded-xl cursor-pointer transition-all
-                        ${previewUrl
-                            ? 'border-purple-400 bg-purple-50/30'
-                            : 'border-gray-300 bg-gray-50 hover:bg-gray-100 hover:border-purple-400 dark:bg-gray-900 dark:border-gray-600 dark:hover:bg-gray-800'
+                {!previewUrl ? (
+                    <FileUpload onChange={(files) => {
+                        if (files.length > 0) {
+                            handleFileChange({ target: { files } } as any);
                         }
-                        ${uploading ? 'opacity-50 cursor-not-allowed' : ''}
-                    `}
-                >
-                    {previewUrl ? (
+                    }} />
+                ) : (
+                    <div className={`flex flex-col items-center justify-center w-full h-48 border-2 border-dashed rounded-xl cursor-pointer transition-all border-purple-400 bg-purple-50/30 ${uploading ? 'opacity-50 cursor-not-allowed' : ''}`}>
                         <div className="relative w-full h-full p-2">
                             {/* eslint-disable-next-line @next/next/no-img-element */}
                             <img
@@ -99,22 +89,15 @@ export const ImageUpload: React.FC<ImageUploadProps> = ({
                                 alt="Preview"
                                 className="w-full h-full object-contain rounded-lg"
                             />
-                            <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/20 rounded-lg">
-                                <p className="text-white text-sm font-medium">Change Image</p>
+                            <div
+                                onClick={() => setPreviewUrl(null)}
+                                className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/20 rounded-lg cursor-pointer"
+                            >
+                                <p className="text-white text-sm font-medium">Clear & Change Image</p>
                             </div>
                         </div>
-                    ) : (
-                        <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                            <Upload className="w-10 h-10 mb-3 text-gray-400 group-hover:text-purple-500 transition-colors" />
-                            <p className="mb-2 text-sm text-gray-500 dark:text-gray-400 text-center px-4">
-                                <span className="font-semibold">Click to upload</span> or drag and drop
-                            </p>
-                            <p className="text-xs text-gray-400 dark:text-gray-500">
-                                JPEG, PNG, WEBP or GIF (MAX. 10MB)
-                            </p>
-                        </div>
-                    )}
-                </label>
+                    </div>
+                )}
             </div>
 
             {error && (

@@ -78,7 +78,9 @@ export default function DashboardSidebar({ userRole = 'client' }: DashboardSideb
     const pathname = usePathname();
     const router = useRouter();
 
-    const isActive = (href: string) => pathname === href;
+    const isActive = (href: string) => {
+        return pathname === href || pathname.startsWith(href + '/');
+    };
 
     const handleLogout = () => {
         localStorage.removeItem('pms_auth');

@@ -74,34 +74,6 @@ export default function AdminLayout({
 
             {/* Main Content */}
             <div className="ml-[280px]">
-                {/* Simple Top Bar */}
-                <motion.div
-                    initial={{ opacity: 0, y: -10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="sticky top-0 z-40 h-16 px-6 flex items-center justify-between bg-white/80 dark:bg-[#0f0f1a]/80 backdrop-blur-xl border-b border-zinc-200 dark:border-white/5"
-                >
-                    <div>
-                        <h2 className="text-zinc-900 dark:text-white font-semibold">
-                            {pathname === '/dashboard' ? 'Overview' :
-                                pathname.includes('proprietors') ? 'Manage Proprietors' :
-                                    pathname.includes('rent-out') ? 'Manage Rent Out' :
-                                        pathname.includes('renting') ? 'Manage Renting' :
-                                            pathname.includes('relations') ? 'Manage Relations' :
-                                                'Dashboard'}
-                        </h2>
-                    </div>
-
-                    <div className="flex items-center gap-4">
-                        <ThemeToggle />
-                        {/* Role Badge */}
-                        <span className={`px-3 py-1.5 rounded-full text-xs font-medium ${userRole === 'admin'
-                            ? 'bg-purple-100 dark:bg-purple-500/20 text-purple-600 dark:text-purple-400'
-                            : 'bg-blue-100 dark:bg-blue-500/20 text-blue-600 dark:text-blue-400'
-                            }`}>
-                            {userRole === 'admin' ? '🔐 Administrator' : '👤 Client'}
-                        </span>
-                    </div>
-                </motion.div>
 
                 {/* Content */}
                 <AnimatePresence mode="wait">

@@ -5,7 +5,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
     Globe, Check, Sun, Moon, Image as ImageIcon, Trash2, Eye, X,
     ExternalLink, RefreshCw, AlertTriangle, HardDrive, FolderOpen,
-    Github, Cloud, Database, Layers, CheckSquare, Square, XCircle
+    Github, Cloud, Database, Layers, CheckSquare, Square, XCircle,
+    ShieldCheck
 } from 'lucide-react';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useQueryClient } from '@tanstack/react-query';
@@ -54,6 +55,7 @@ export default function SettingsPage() {
 
     // Service status state
     const [supabaseStatus, setSupabaseStatus] = useState<'checking' | 'online' | 'offline'>('checking');
+    const [arcjetStatus, setArcjetStatus] = useState<'checking' | 'active' | 'inactive'>('checking');
     const [tanstackInfo, setTanstackInfo] = useState({ queries: 0, stale: 0 });
 
     useEffect(() => {
@@ -98,6 +100,20 @@ export default function SettingsPage() {
         const allQueries = cache.getAll();
         const staleQueries = allQueries.filter(q => q.isStale());
         setTanstackInfo({ queries: allQueries.length, stale: staleQueries.length });
+
+        // Arcjet Security
+        setArcjetStatus('checking');
+        try {
+            const res = await fetch('/api/security/status');
+            if (res.ok) {
+                const data = await res.json();
+                setArcjetStatus(data.status);
+            } else {
+                setArcjetStatus('inactive');
+            }
+        } catch {
+            setArcjetStatus('inactive');
+        }
     }, [queryClient]);
 
     useEffect(() => {
@@ -560,6 +576,35 @@ export default function SettingsPage() {
                                 )}
                             </div>
                         </div>
+
+                        {/* Arcjet Security */}
+                        <div className="flex items-center justify-between p-3 rounded-xl bg-zinc-50 dark:bg-white/5">
+                            <div className="flex items-center gap-3">
+                                <div className="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center">
+                                    <ShieldCheck className="w-4 h-4 text-white" />
+                                </div>
+                                <div>
+                                    <span className="text-sm font-medium text-zinc-900 dark:text-white">Arcjet Security</span>
+                                    <p className="text-xs text-zinc-500 dark:text-white/40">{t('安全性增強功能', 'Security enhancement')}</p>
+                                </div>
+                            </div>
+                            {arcjetStatus === 'checking' ? (
+                                <span className="px-2 py-1 rounded-md bg-zinc-200 dark:bg-white/10 text-zinc-500 dark:text-white/40 text-xs font-medium flex items-center gap-1">
+                                    <RefreshCw className="w-3 h-3 animate-spin" />
+                                    {t('檢查中', 'Checking')}
+                                </span>
+                            ) : arcjetStatus === 'active' ? (
+                                <span className="px-2 py-1 rounded-md bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 text-xs font-medium flex items-center gap-1.5">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-pulse" />
+                                    {t('已啟動', 'Active')}
+                                </span>
+                            ) : (
+                                <span className="px-2 py-1 rounded-md bg-zinc-500/10 text-zinc-500 text-xs font-medium flex items-center gap-1.5">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-zinc-400" />
+                                    {t('未配置', 'Inactive')}
+                                </span>
+                            )}
+                        </div>
                     </div>
                 </motion.div>
             </div>
@@ -603,164 +648,168 @@ export default function SettingsPage() {
                 </div>
 
                 {/* Multi-select toolbar */}
-                {uploads.length > 0 && (
-                    <div className="flex items-center justify-between mb-4 p-3 rounded-xl bg-zinc-50 dark:bg-white/5 border border-zinc-100 dark:border-white/5">
-                        {selectMode ? (
-                            <>
-                                <div className="flex items-center gap-3">
-                                    <button
-                                        onClick={exitSelectMode}
-                                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm text-zinc-600 dark:text-white/60 hover:bg-zinc-200 dark:hover:bg-white/10 transition-all"
-                                    >
-                                        <XCircle className="w-4 h-4" />
-                                        {t('取消選擇', 'Cancel')}
-                                    </button>
+                {
+                    uploads.length > 0 && (
+                        <div className="flex items-center justify-between mb-4 p-3 rounded-xl bg-zinc-50 dark:bg-white/5 border border-zinc-100 dark:border-white/5">
+                            {selectMode ? (
+                                <>
+                                    <div className="flex items-center gap-3">
+                                        <button
+                                            onClick={exitSelectMode}
+                                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm text-zinc-600 dark:text-white/60 hover:bg-zinc-200 dark:hover:bg-white/10 transition-all"
+                                        >
+                                            <XCircle className="w-4 h-4" />
+                                            {t('取消選擇', 'Cancel')}
+                                        </button>
+                                        <span className="text-sm text-zinc-500 dark:text-white/40">
+                                            {t(`已選 ${selectedFiles.size} 個`, `${selectedFiles.size} selected`)}
+                                        </span>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <button
+                                            onClick={selectedFiles.size === uploads.length ? deselectAll : selectAll}
+                                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm text-zinc-600 dark:text-white/60 hover:bg-zinc-200 dark:hover:bg-white/10 transition-all"
+                                        >
+                                            <CheckSquare className="w-4 h-4" />
+                                            {selectedFiles.size === uploads.length ? t('取消全選', 'Deselect All') : t('全選', 'Select All')}
+                                        </button>
+                                        <button
+                                            onClick={handleDeleteSelected}
+                                            disabled={selectedFiles.size === 0}
+                                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm bg-red-500 text-white hover:bg-red-600 shadow-sm transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                                        >
+                                            <Trash2 className="w-4 h-4" />
+                                            {t(`刪除 (${selectedFiles.size})`, `Delete (${selectedFiles.size})`)}
+                                        </button>
+                                    </div>
+                                </>
+                            ) : (
+                                <div className="flex items-center justify-between w-full">
                                     <span className="text-sm text-zinc-500 dark:text-white/40">
-                                        {t(`已選 ${selectedFiles.size} 個`, `${selectedFiles.size} selected`)}
+                                        {t('點擊圖片可預覽，懸停可刪除', 'Click to preview, hover to delete')}
                                     </span>
-                                </div>
-                                <div className="flex items-center gap-2">
                                     <button
-                                        onClick={selectedFiles.size === uploads.length ? deselectAll : selectAll}
-                                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm text-zinc-600 dark:text-white/60 hover:bg-zinc-200 dark:hover:bg-white/10 transition-all"
+                                        onClick={() => setSelectMode(true)}
+                                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm text-zinc-600 dark:text-white/60 hover:bg-zinc-200 dark:hover:bg-white/10 border border-zinc-200 dark:border-white/10 transition-all"
                                     >
                                         <CheckSquare className="w-4 h-4" />
-                                        {selectedFiles.size === uploads.length ? t('取消全選', 'Deselect All') : t('全選', 'Select All')}
-                                    </button>
-                                    <button
-                                        onClick={handleDeleteSelected}
-                                        disabled={selectedFiles.size === 0}
-                                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm bg-red-500 text-white hover:bg-red-600 shadow-sm transition-all disabled:opacity-40 disabled:cursor-not-allowed"
-                                    >
-                                        <Trash2 className="w-4 h-4" />
-                                        {t(`刪除 (${selectedFiles.size})`, `Delete (${selectedFiles.size})`)}
+                                        {t('多選模式', 'Multi-Select')}
                                     </button>
                                 </div>
-                            </>
-                        ) : (
-                            <div className="flex items-center justify-between w-full">
-                                <span className="text-sm text-zinc-500 dark:text-white/40">
-                                    {t('點擊圖片可預覽，懸停可刪除', 'Click to preview, hover to delete')}
-                                </span>
-                                <button
-                                    onClick={() => setSelectMode(true)}
-                                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm text-zinc-600 dark:text-white/60 hover:bg-zinc-200 dark:hover:bg-white/10 border border-zinc-200 dark:border-white/10 transition-all"
-                                >
-                                    <CheckSquare className="w-4 h-4" />
-                                    {t('多選模式', 'Multi-Select')}
-                                </button>
-                            </div>
-                        )}
-                    </div>
-                )}
+                            )}
+                        </div>
+                    )
+                }
 
-                {uploadsLoading && uploads.length === 0 ? (
-                    <div className="flex items-center justify-center py-12">
-                        <RefreshCw className="w-6 h-6 text-zinc-400 animate-spin" />
-                    </div>
-                ) : uploads.length === 0 ? (
-                    <div className="text-center py-12 border border-dashed border-zinc-200 dark:border-white/10 rounded-xl">
-                        <ImageIcon className="w-10 h-10 text-zinc-300 dark:text-white/20 mx-auto mb-3" />
-                        <p className="text-zinc-500 dark:text-white/40 text-sm">
-                            {t('尚未上載任何圖片', 'No files uploaded yet')}
-                        </p>
-                    </div>
-                ) : (
-                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
-                        {uploads.map((file) => {
-                            const isSelected = selectedFiles.has(file.url);
-                            return (
-                                <motion.div
-                                    key={file.url}
-                                    layout
-                                    initial={{ opacity: 0, scale: 0.9 }}
-                                    animate={{ opacity: 1, scale: 1 }}
-                                    className={`group relative bg-zinc-50 dark:bg-white/5 rounded-xl border overflow-hidden transition-all hover:shadow-lg ${isSelected
+                {
+                    uploadsLoading && uploads.length === 0 ? (
+                        <div className="flex items-center justify-center py-12">
+                            <RefreshCw className="w-6 h-6 text-zinc-400 animate-spin" />
+                        </div>
+                    ) : uploads.length === 0 ? (
+                        <div className="text-center py-12 border border-dashed border-zinc-200 dark:border-white/10 rounded-xl">
+                            <ImageIcon className="w-10 h-10 text-zinc-300 dark:text-white/20 mx-auto mb-3" />
+                            <p className="text-zinc-500 dark:text-white/40 text-sm">
+                                {t('尚未上載任何圖片', 'No files uploaded yet')}
+                            </p>
+                        </div>
+                    ) : (
+                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+                            {uploads.map((file) => {
+                                const isSelected = selectedFiles.has(file.url);
+                                return (
+                                    <motion.div
+                                        key={file.url}
+                                        layout
+                                        initial={{ opacity: 0, scale: 0.9 }}
+                                        animate={{ opacity: 1, scale: 1 }}
+                                        className={`group relative bg-zinc-50 dark:bg-white/5 rounded-xl border overflow-hidden transition-all hover:shadow-lg ${isSelected
                                             ? 'border-purple-500 ring-2 ring-purple-500/30 shadow-purple-500/10'
                                             : 'border-zinc-200 dark:border-white/10 hover:border-purple-300 dark:hover:border-purple-500/30'
-                                        }`}
-                                >
-                                    {/* Selection checkbox overlay */}
-                                    {selectMode && (
-                                        <button
-                                            onClick={() => toggleFileSelect(file.url)}
-                                            className="absolute top-2 left-2 z-10"
-                                        >
-                                            {isSelected ? (
-                                                <div className="w-6 h-6 rounded-md bg-purple-500 flex items-center justify-center shadow-lg">
-                                                    <Check className="w-4 h-4 text-white" />
-                                                </div>
-                                            ) : (
-                                                <div className="w-6 h-6 rounded-md bg-white/80 dark:bg-zinc-800/80 backdrop-blur-sm border border-zinc-300 dark:border-white/20 flex items-center justify-center shadow-sm hover:border-purple-400 transition-colors">
-                                                    <Square className="w-3.5 h-3.5 text-zinc-400" />
-                                                </div>
-                                            )}
-                                        </button>
-                                    )}
-
-                                    {/* Image Thumbnail */}
-                                    <div
-                                        className="aspect-square relative cursor-pointer overflow-hidden"
-                                        onClick={() => {
-                                            if (selectMode) {
-                                                toggleFileSelect(file.url);
-                                            } else {
-                                                setPreviewImage(file.url);
-                                            }
-                                        }}
+                                            }`}
                                     >
-                                        <img
-                                            src={file.url}
-                                            alt={file.filename}
-                                            className={`w-full h-full object-cover transition-transform duration-300 ${selectMode ? '' : 'group-hover:scale-105'
-                                                } ${isSelected ? 'opacity-80' : ''}`}
-                                            loading="lazy"
-                                        />
-                                        {/* Hover overlay (only in non-select mode) */}
-                                        {!selectMode && (
-                                            <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-all flex items-center justify-center">
-                                                <Eye className="w-6 h-6 text-white opacity-0 group-hover:opacity-100 transition-all transform scale-50 group-hover:scale-100" />
-                                            </div>
-                                        )}
-                                    </div>
-
-                                    {/* File Info */}
-                                    <div className="p-2.5">
-                                        <p className="text-xs font-medium text-zinc-700 dark:text-white/70 truncate" title={file.filename}>
-                                            {file.filename}
-                                        </p>
-                                        <div className="flex items-center justify-between mt-1.5">
-                                            <div className="flex items-center gap-1.5">
-                                                {file.folder && (
-                                                    <span className="flex items-center gap-0.5 text-[10px] text-zinc-500 dark:text-white/40 bg-zinc-100 dark:bg-white/10 px-1.5 py-0.5 rounded">
-                                                        <FolderOpen className="w-2.5 h-2.5" />
-                                                        {file.folder}
-                                                    </span>
+                                        {/* Selection checkbox overlay */}
+                                        {selectMode && (
+                                            <button
+                                                onClick={() => toggleFileSelect(file.url)}
+                                                className="absolute top-2 left-2 z-10"
+                                            >
+                                                {isSelected ? (
+                                                    <div className="w-6 h-6 rounded-md bg-purple-500 flex items-center justify-center shadow-lg">
+                                                        <Check className="w-4 h-4 text-white" />
+                                                    </div>
+                                                ) : (
+                                                    <div className="w-6 h-6 rounded-md bg-white/80 dark:bg-zinc-800/80 backdrop-blur-sm border border-zinc-300 dark:border-white/20 flex items-center justify-center shadow-sm hover:border-purple-400 transition-colors">
+                                                        <Square className="w-3.5 h-3.5 text-zinc-400" />
+                                                    </div>
                                                 )}
-                                                <span className="text-[10px] text-zinc-500 dark:text-white/40">
-                                                    {file.sizeFormatted}
-                                                </span>
-                                            </div>
+                                            </button>
+                                        )}
+
+                                        {/* Image Thumbnail */}
+                                        <div
+                                            className="aspect-square relative cursor-pointer overflow-hidden"
+                                            onClick={() => {
+                                                if (selectMode) {
+                                                    toggleFileSelect(file.url);
+                                                } else {
+                                                    setPreviewImage(file.url);
+                                                }
+                                            }}
+                                        >
+                                            <img
+                                                src={file.url}
+                                                alt={file.filename}
+                                                className={`w-full h-full object-cover transition-transform duration-300 ${selectMode ? '' : 'group-hover:scale-105'
+                                                    } ${isSelected ? 'opacity-80' : ''}`}
+                                                loading="lazy"
+                                            />
+                                            {/* Hover overlay (only in non-select mode) */}
                                             {!selectMode && (
-                                                <button
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        handleDeleteSingle(file);
-                                                    }}
-                                                    className="p-1 rounded-md text-zinc-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 transition-all opacity-0 group-hover:opacity-100"
-                                                    title={t('刪除', 'Delete')}
-                                                >
-                                                    <Trash2 className="w-3.5 h-3.5" />
-                                                </button>
+                                                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-all flex items-center justify-center">
+                                                    <Eye className="w-6 h-6 text-white opacity-0 group-hover:opacity-100 transition-all transform scale-50 group-hover:scale-100" />
+                                                </div>
                                             )}
                                         </div>
-                                    </div>
-                                </motion.div>
-                            );
-                        })}
-                    </div>
-                )}
-            </motion.div>
-        </div>
+
+                                        {/* File Info */}
+                                        <div className="p-2.5">
+                                            <p className="text-xs font-medium text-zinc-700 dark:text-white/70 truncate" title={file.filename}>
+                                                {file.filename}
+                                            </p>
+                                            <div className="flex items-center justify-between mt-1.5">
+                                                <div className="flex items-center gap-1.5">
+                                                    {file.folder && (
+                                                        <span className="flex items-center gap-0.5 text-[10px] text-zinc-500 dark:text-white/40 bg-zinc-100 dark:bg-white/10 px-1.5 py-0.5 rounded">
+                                                            <FolderOpen className="w-2.5 h-2.5" />
+                                                            {file.folder}
+                                                        </span>
+                                                    )}
+                                                    <span className="text-[10px] text-zinc-500 dark:text-white/40">
+                                                        {file.sizeFormatted}
+                                                    </span>
+                                                </div>
+                                                {!selectMode && (
+                                                    <button
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            handleDeleteSingle(file);
+                                                        }}
+                                                        className="p-1 rounded-md text-zinc-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 transition-all opacity-0 group-hover:opacity-100"
+                                                        title={t('刪除', 'Delete')}
+                                                    >
+                                                        <Trash2 className="w-3.5 h-3.5" />
+                                                    </button>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </motion.div>
+                                );
+                            })}
+                        </div>
+                    )
+                }
+            </motion.div >
+        </div >
     );
 }

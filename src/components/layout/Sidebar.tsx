@@ -57,7 +57,13 @@ export default function Sidebar({ isAuthenticated = false }: SidebarProps) {
         );
     };
 
-    const isActive = (href: string) => pathname === href;
+    const isActive = (href: string) => {
+        if (href === '/') {
+            return pathname === '/' || pathname.startsWith('/properties');
+        }
+        return pathname === href || pathname.startsWith(href + '/');
+    };
+
     const isParentActive = (item: NavItem) => {
         if (isActive(item.href)) return true;
         return item.children?.some(child => isActive(child.href));

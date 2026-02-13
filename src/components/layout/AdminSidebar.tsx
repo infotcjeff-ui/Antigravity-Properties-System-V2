@@ -92,7 +92,9 @@ export default function AdminSidebar() {
         );
     };
 
-    const isActive = (href: string) => pathname === href;
+    const isActive = (href: string) => {
+        return pathname === href || pathname.startsWith(href + '/');
+    };
     const isParentActive = (item: NavItem) => {
         if (isActive(item.href)) return true;
         return item.children?.some(child => isActive(child.href));
@@ -129,8 +131,8 @@ export default function AdminSidebar() {
                                     <button
                                         onClick={() => toggleExpand(item.label)}
                                         className={`w-full flex items-center justify-between px-4 py-3 rounded-xl transition-all ${isParentActive(item)
-                                                ? 'bg-purple-500/20 text-white'
-                                                : 'text-white/60 hover:text-white hover:bg-white/5'
+                                            ? 'bg-purple-500/20 text-white'
+                                            : 'text-white/60 hover:text-white hover:bg-white/5'
                                             }`}
                                     >
                                         <div className="flex items-center gap-3">
@@ -159,8 +161,8 @@ export default function AdminSidebar() {
                                                     <Link
                                                         href={item.href}
                                                         className={`flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all ${isActive(item.href)
-                                                                ? 'bg-purple-500/20 text-white'
-                                                                : 'text-white/50 hover:text-white hover:bg-white/5'
+                                                            ? 'bg-purple-500/20 text-white'
+                                                            : 'text-white/50 hover:text-white hover:bg-white/5'
                                                             }`}
                                                     >
                                                         <div className={`w-1.5 h-1.5 rounded-full ${isActive(item.href) ? 'bg-purple-500' : 'bg-white/30'}`} />
@@ -172,8 +174,8 @@ export default function AdminSidebar() {
                                                         <Link
                                                             href={child.href}
                                                             className={`flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all ${isActive(child.href)
-                                                                    ? 'bg-purple-500/20 text-white'
-                                                                    : 'text-white/50 hover:text-white hover:bg-white/5'
+                                                                ? 'bg-purple-500/20 text-white'
+                                                                : 'text-white/50 hover:text-white hover:bg-white/5'
                                                                 }`}
                                                         >
                                                             <div className={`w-1.5 h-1.5 rounded-full ${isActive(child.href) ? 'bg-purple-500' : 'bg-white/30'}`} />
@@ -189,8 +191,8 @@ export default function AdminSidebar() {
                                 <Link
                                     href={item.href}
                                     className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${isActive(item.href)
-                                            ? 'bg-purple-500/20 text-white'
-                                            : 'text-white/60 hover:text-white hover:bg-white/5'
+                                        ? 'bg-purple-500/20 text-white'
+                                        : 'text-white/60 hover:text-white hover:bg-white/5'
                                         }`}
                                 >
                                     {item.icon}

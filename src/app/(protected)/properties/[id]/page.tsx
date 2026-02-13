@@ -529,9 +529,22 @@ export default function PropertyDetailsPage() {
                                     <h3 className="text-lg font-semibold text-zinc-900 dark:text-white">
                                         {t('Rent Details', '租約詳情')}
                                     </h3>
-                                    <span className={`px-2 py-0.5 rounded text-xs ${selectedRent.type === 'rent_out' ? 'bg-green-500/20 text-green-600 dark:text-green-400' : 'bg-blue-500/20 text-blue-600 dark:text-blue-400'}`}>
-                                        {selectedRent.type === 'rent_out' ? '收租' : '交租'}
-                                    </span>
+                                    <div className="flex items-center gap-2">
+                                        <span className={`px-2 py-0.5 rounded text-xs ${selectedRent.type === 'rent_out' ? 'bg-green-500/20 text-green-600 dark:text-green-400' : 'bg-blue-500/20 text-blue-600 dark:text-blue-400'}`}>
+                                            {selectedRent.type === 'rent_out' ? '收租' : '交租'}
+                                        </span>
+                                        {(() => {
+                                            const endDate = selectedRent.type === 'rent_out'
+                                                ? (selectedRent.rentOutEndDate || selectedRent.endDate)
+                                                : (selectedRent.rentingEndDate || selectedRent.endDate);
+                                            const isExpired = endDate ? new Date(endDate) < new Date() : false;
+                                            return isExpired && (
+                                                <span className="px-1.5 py-0.5 rounded-md text-[10px] font-bold bg-red-100 dark:bg-red-500/30 text-red-600 dark:text-red-400 border border-red-200 dark:border-red-500/30 animate-pulse">
+                                                    {t('Expired', '已過期')}
+                                                </span>
+                                            );
+                                        })()}
+                                    </div>
                                 </div>
                             </div>
                             <button

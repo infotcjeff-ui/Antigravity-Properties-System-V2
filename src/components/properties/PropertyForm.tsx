@@ -12,6 +12,7 @@ import ProprietorModal from '@/components/properties/ProprietorModal';
 import RentModal from '@/components/properties/RentModal';
 import RichTextEditor from '@/components/common/RichTextEditor';
 import AnimatedSelect from '@/components/ui/AnimatedSelect';
+import { FileUpload } from '@/components/ui/file-upload';
 
 interface PropertyFormProps {
     property?: Property | null;
@@ -382,18 +383,13 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                                     </div>
                                 ))}
                                 {formData.images.length < 5 && (
-                                    <label className="w-20 h-20 border-2 border-dashed border-zinc-200 dark:border-white/10 rounded-xl flex items-center justify-center cursor-pointer hover:border-purple-400 dark:hover:border-white/30 hover:bg-purple-50 dark:hover:bg-white/5 transition-all text-zinc-400 dark:text-white/30">
-                                        <input
-                                            type="file"
-                                            accept="image/*"
-                                            multiple
-                                            onChange={(e) => handleImageUpload(e, 'images')}
-                                            className="sr-only"
-                                        />
-                                        <svg className="w-6 h-6 text-purple-500/50" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                                        </svg>
-                                    </label>
+                                    <div className="w-full mt-2">
+                                        <FileUpload onChange={(files) => {
+                                            if (files.length > 0) {
+                                                handleImageUpload({ target: { files } } as any, 'images');
+                                            }
+                                        }} />
+                                    </div>
                                 )}
                             </div>
                         </div>
@@ -423,18 +419,13 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                                     </div>
                                 ))}
                                 {formData.geoMaps.length < 2 && (
-                                    <label className="w-20 h-20 border-2 border-dashed border-zinc-200 dark:border-white/10 rounded-xl flex items-center justify-center cursor-pointer hover:border-purple-400 dark:hover:border-white/30 hover:bg-purple-50 dark:hover:bg-white/5 transition-all text-zinc-400 dark:text-white/30">
-                                        <input
-                                            type="file"
-                                            accept="image/*"
-                                            multiple
-                                            onChange={(e) => handleImageUpload(e, 'geoMaps')}
-                                            className="sr-only"
-                                        />
-                                        <svg className="w-6 h-6 text-purple-500/50" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                                        </svg>
-                                    </label>
+                                    <div className="w-full mt-2">
+                                        <FileUpload onChange={(files) => {
+                                            if (files.length > 0) {
+                                                handleImageUpload({ target: { files } } as any, 'geoMaps');
+                                            }
+                                        }} />
+                                    </div>
                                 )}
                             </div>
                         </div>
