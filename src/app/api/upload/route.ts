@@ -3,9 +3,13 @@ import path from 'path';
 import { writeFile, mkdir } from 'fs/promises';
 import { v4 as uuidv4 } from 'uuid';
 import sharp from 'sharp';
+import { verifyRequest } from '@/lib/security';
 
 export async function POST(request: NextRequest) {
     try {
+        // Security: verify request with Arcjet at route level to stay within Vercel Middleware size limits
+        await verifyRequest(request);
+
         const formData = await request.formData();
         const file = formData.get('file') as File | null;
         const folder = (formData.get('folder') as string) || 'general';
@@ -55,6 +59,9 @@ export async function POST(request: NextRequest) {
         });
 
     } catch (err: any) {
+        if (err.message === "Potential attack detected" || err.message === "Bot access denied" || err.message === "Too many requests" || err.message === "Access denied") {
+            return NextResponse.json({ error: err.message }, { status: 403 });
+        }
         console.error('Upload API Error:', err);
         return NextResponse.json({ error: 'Internal server error during upload.' }, { status: 500 });
     }

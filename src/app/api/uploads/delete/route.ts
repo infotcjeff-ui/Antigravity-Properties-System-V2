@@ -2,9 +2,13 @@ import { NextRequest, NextResponse } from 'next/server';
 import path from 'path';
 import { unlink } from 'fs/promises';
 import { createClient } from '@supabase/supabase-js';
+import { verifyRequest } from '@/lib/security';
 
 export async function DELETE(request: NextRequest) {
     try {
+        // Security: verify request with Arcjet at route level to stay within Vercel Middleware size limits
+        await verifyRequest(request);
+
         const { url: fileUrl } = await request.json();
 
         if (!fileUrl || typeof fileUrl !== 'string') {
@@ -53,6 +57,9 @@ export async function DELETE(request: NextRequest) {
             affectedProperties,
         });
     } catch (err: any) {
+        if (err.message === "Potential attack detected" || err.message === "Bot access denied" || err.message === "Too many requests" || err.message === "Access denied") {
+            return NextResponse.json({ error: err.message }, { status: 403 });
+        }
         if (err.code === 'ENOENT') {
             return NextResponse.json({ error: 'File not found' }, { status: 404 });
         }

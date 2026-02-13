@@ -6,7 +6,8 @@ export async function GET() {
     return NextResponse.json({
         enabled: isArcjetConfigured,
         provider: 'Arcjet',
-        features: ['Shield', 'Rate Limiting'],
+        layer: 'API Route (Serverless)',
+        features: ['Shield', 'Bot Detection (API layer)'],
         status: isArcjetConfigured ? 'active' : 'inactive'
     });
 }
