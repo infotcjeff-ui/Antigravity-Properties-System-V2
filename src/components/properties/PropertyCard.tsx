@@ -33,7 +33,7 @@ const typeLabels: Record<string, string> = {
 
 export default function PropertyCard({ property, index = 0 }: PropertyCardProps) {
     return (
-        <Link href={`/properties/${property.id}`}>
+        <Link href={`/properties/${encodeURIComponent(property.name)}`}>
             <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}

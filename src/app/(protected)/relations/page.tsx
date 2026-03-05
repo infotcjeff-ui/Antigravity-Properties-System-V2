@@ -163,14 +163,19 @@ export default function RelationsPage() {
                                             <div>
                                                 <p className="text-zinc-400 dark:text-white/40">土地用途</p>
                                                 <p className="text-zinc-700 dark:text-white/80 capitalize">{
-                                                    property.landUse === 'open_storage' ? '露天倉儲' :
-                                                        property.landUse === 'residential_a' ? '住宅(甲)' :
-                                                            property.landUse === 'residential_c' ? '住宅(丙類)' :
-                                                                property.landUse === 'open_space' ? '開放空間' :
-                                                                    property.landUse === 'recreation_use' ? '休憩用地' :
-                                                                        property.landUse === 'village_dev' ? '鄉村式發展' :
-                                                                            property.landUse === 'conservation_area' ? '保育區' :
-                                                                                property.landUse === 'unknown' ? '未知' : '-'
+                                                    (() => {
+                                                        const labels: Record<string, string> = {
+                                                            open_storage: '露天倉儲',
+                                                            residential_a: '住宅(甲)',
+                                                            residential_c: '住宅(丙類)',
+                                                            open_space: '開放空間',
+                                                            recreation_use: '休憩用地',
+                                                            village_dev: '鄉村式發展',
+                                                            conservation_area: '保育區',
+                                                            unknown: '未知'
+                                                        };
+                                                        return property.landUse ? property.landUse.split(',').map(u => labels[u.trim()] || u.trim()).join(', ') : '-';
+                                                    })()
                                                 }</p>
                                             </div>
                                             <div>

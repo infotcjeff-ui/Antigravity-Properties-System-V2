@@ -32,12 +32,6 @@ const navItems: NavItem[] = [
         icon: <Building2 className="w-5 h-5" />,
         requiresAuth: false,
     },
-    {
-        label: '關聯表',
-        href: '/relations',
-        icon: <Network className="w-5 h-5" />,
-        requiresAuth: true,
-    },
 ];
 
 interface SidebarProps {

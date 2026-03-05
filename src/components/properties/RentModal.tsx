@@ -130,6 +130,22 @@ export default function RentModal({ propertyId, rent, onClose, onSuccess }: Rent
         loadData();
     }, [getProprietors, getProperties]);
 
+    // Auto-calculate rentOutTotalAmount
+    useEffect(() => {
+        if (formData.type === 'rent_out') {
+            const monthly = parseFloat(formData.rentOutMonthlyRental);
+            const periods = parseInt(formData.rentOutPeriods);
+            const newTotal = (!isNaN(monthly) && !isNaN(periods)) ? (monthly * periods).toString() : '';
+
+            if (formData.rentOutTotalAmount !== newTotal) {
+                setFormData(prev => ({
+                    ...prev,
+                    rentOutTotalAmount: newTotal
+                }));
+            }
+        }
+    }, [formData.rentOutMonthlyRental, formData.rentOutPeriods, formData.type, formData.rentOutTotalAmount]);
+
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
         const { name, value } = e.target;
         setFormData(prev => ({ ...prev, [name]: value }));
@@ -372,7 +388,14 @@ export default function RentModal({ propertyId, rent, onClose, onSuccess }: Rent
 
                             <div className="space-y-2">
                                 <label className={labelClass}>出租合約總額</label>
-                                <input type="number" name="rentOutTotalAmount" value={formData.rentOutTotalAmount} onChange={handleChange} className={inputClass} placeholder="600000" />
+                                <input
+                                    type="number"
+                                    name="rentOutTotalAmount"
+                                    value={formData.rentOutTotalAmount}
+                                    readOnly
+                                    className={`${inputClass} bg-zinc-100 dark:bg-white/5 cursor-not-allowed opacity-80`}
+                                    placeholder="自動計算"
+                                />
                             </div>
 
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

@@ -1,6 +1,6 @@
 
 const supabaseUrl = 'https://kyuezxvnufrjdevkbvkj.supabase.co';
-const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imt5dWV6eHZudWZyamRldmtidmtqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzA4Mzg0NzIsImV4cCI6MjA4NjQxNDQ3Mn0.KlY1j8dXADzzIiz0rCpTv747h2-XhklzWbiYYeDi7BU';
+const supabaseKey = 'sb_publishable_-AJtGIzi3xri4iKLJStYmA_Haz5WsQ9';
 
 async function checkTable(tableName) {
     try {

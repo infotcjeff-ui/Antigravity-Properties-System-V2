@@ -13,7 +13,7 @@ export interface Property {
   lotArea: string;
   type: 'group_asset' | 'co_investment' | 'external_lease' | 'managed_asset';
   status: 'holding' | 'renting' | 'sold' | 'suspended';
-  landUse: 'unknown' | 'open_storage' | 'residential_a' | 'residential_c' | 'open_space' | 'recreation_use' | 'village_dev' | 'conservation_area';
+  landUse: string;
   images: string[]; // Base64 strings, max 5, total 5MB
   geoMaps: string[]; // Base64 strings, max 2
   location: {

@@ -2,18 +2,33 @@
 
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useRentsWithRelationsQuery } from '@/hooks/useStorage';
+import { useRentsWithRelationsQuery, useRents } from '@/hooks/useStorage';
 import { useQueryClient } from '@tanstack/react-query';
 import type { Rent } from '@/lib/db';
 import { BentoCard } from '@/components/layout/BentoGrid';
 import RentModal from '@/components/properties/RentModal';
+import PropertyDetailModal from '@/components/properties/PropertyDetailModal';
 
 export default function RentOutPage() {
     const queryClient = useQueryClient();
     const { data: rents = [], isLoading } = useRentsWithRelationsQuery({ type: 'rent_out' });
 
     const [showModal, setShowModal] = useState(false);
+    const [showPropertyModal, setShowPropertyModal] = useState(false);
     const [selectedRent, setSelectedRent] = useState<Rent | null>(null);
+    const [selectedProperty, setSelectedProperty] = useState<string | null>(null);
+    const { deleteRent } = useRents();
+
+    const handleDelete = async (e: React.MouseEvent, id: string) => {
+        e.stopPropagation();
+        if (window.confirm('確定要刪除這條記錄嗎？')) {
+            const success = await deleteRent(id);
+            if (success) {
+                queryClient.invalidateQueries({ queryKey: ['rents-with-relations'] });
+                queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] });
+            }
+        }
+    };
 
     // Calculate total income - use (monthly rental * periods)
     const totalIncome = rents
@@ -40,20 +55,6 @@ export default function RentOutPage() {
                     <h1 className="text-2xl font-bold text-zinc-900 dark:text-white">收租管理</h1>
                     <p className="text-zinc-500 dark:text-white/50 mt-1">管理物業的租金收入與記錄</p>
                 </div>
-                <motion.button
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
-                    onClick={() => {
-                        setSelectedRent(null);
-                        setShowModal(true);
-                    }}
-                    className="px-5 py-2.5 bg-gradient-to-r from-purple-600 to-blue-600 rounded-xl text-white font-medium shadow-lg shadow-purple-500/20 hover:shadow-purple-500/30 transition-shadow flex items-center gap-2"
-                >
-                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                    </svg>
-                    新增收租記錄
-                </motion.button>
             </div>
 
             {/* Stats */}
@@ -121,12 +122,11 @@ export default function RentOutPage() {
             {/* Rent List */}
             <div className="glass-card overflow-hidden">
                 {rents.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center py-16 text-zinc-400 dark:text-white/40">
-                        <svg className="w-16 h-16 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <div className="flex flex-col items-center justify-center py-24 text-zinc-400 dark:text-white/40">
+                        <svg className="w-20 h-20 mb-6 opacity-20" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                         </svg>
-                        <p className="text-lg">No rent income records yet</p>
-                        <p className="text-sm mt-1">Add your first rent income to get started</p>
+                        <p className="text-xl font-medium">暫無收租資料。</p>
                     </div>
                 ) : (
                     <table className="w-full">
@@ -136,8 +136,8 @@ export default function RentOutPage() {
                                 <th className="p-4 font-medium">租客</th>
                                 <th className="p-4 font-medium">金額</th>
                                 <th className="p-4 font-medium">租約期間</th>
-                                <th className="p-4 font-medium">狀態</th>
-                                <th className="p-4 font-medium">Actions</th>
+                                <th className="p-4 font-medium">租務狀態</th>
+                                <th className="p-4 font-medium">操作</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -159,8 +159,10 @@ export default function RentOutPage() {
                                         animate={{ opacity: 1, y: 0 }}
                                         transition={{ delay: index * 0.05 }}
                                         onClick={() => {
-                                            setSelectedRent(rent);
-                                            setShowModal(true);
+                                            if (property?.name) {
+                                                setSelectedProperty(property.name);
+                                                setShowPropertyModal(true);
+                                            }
                                         }}
                                         className="border-b border-zinc-100 dark:border-white/5 hover:bg-zinc-50 dark:hover:bg-white/5 transition-colors cursor-pointer"
                                     >
@@ -180,16 +182,30 @@ export default function RentOutPage() {
                                                         ? 'bg-red-100 dark:bg-red-500/20 text-red-600 dark:text-red-400 border border-red-200 dark:border-red-500/30'
                                                         : 'bg-green-100 dark:bg-green-500/20 text-green-600 dark:text-green-400 border border-green-200 dark:border-green-500/30'
                                                         }`}>
-                                                        {isExpired ? '已過期' : status === 'renting' ? 'Renting' : status === 'listing' ? 'Listing' : status}
+                                                        {isExpired ? '已過期' : status === 'renting' ? '出租中' : status === 'listing' ? '放租中' : status}
                                                     </span>
                                                 );
                                             })()}
                                         </td>
-                                        <td className="p-4">
+                                        <td className="p-4" onClick={(e) => e.stopPropagation()}>
                                             <div className="flex items-center gap-2">
-                                                <button className="p-2 rounded-lg text-zinc-400 dark:text-white/50 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-white/10 transition-all">
+                                                <button
+                                                    onClick={() => {
+                                                        setSelectedRent(rent);
+                                                        setShowModal(true);
+                                                    }}
+                                                    className="p-2 rounded-lg text-zinc-400 dark:text-white/50 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-white/10 transition-all"
+                                                >
                                                     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                                    </svg>
+                                                </button>
+                                                <button
+                                                    onClick={(e) => handleDelete(e, rent.id)}
+                                                    className="p-2 rounded-lg text-zinc-400 dark:text-white/50 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10 transition-all"
+                                                >
+                                                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                                                     </svg>
                                                 </button>
                                             </div>
@@ -214,6 +230,18 @@ export default function RentOutPage() {
                             queryClient.invalidateQueries({ queryKey: ['rents-with-relations'] });
                             setShowModal(false);
                             setSelectedRent(null);
+                        }}
+                    />
+                )}
+            </AnimatePresence>
+
+            <AnimatePresence>
+                {showPropertyModal && selectedProperty && (
+                    <PropertyDetailModal
+                        propertyName={selectedProperty}
+                        onClose={() => {
+                            setShowPropertyModal(false);
+                            setSelectedProperty(null);
                         }}
                     />
                 )}

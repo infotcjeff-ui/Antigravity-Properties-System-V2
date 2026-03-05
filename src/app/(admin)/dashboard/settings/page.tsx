@@ -173,8 +173,17 @@ export default function SettingsPage() {
         setDeleteConfirm({ files: [file] });
     };
 
+
     const confirmDelete = async () => {
         if (!deleteConfirm) return;
+
+        // Double confirmation
+        const message = deleteConfirm.files.length > 1
+            ? `確定要刪除這 ${deleteConfirm.files.length} 個檔案嗎？\n此操作將影響關聯到這些圖片的物業顯示。`
+            : `確定要刪除「${deleteConfirm.files[0].filename}」嗎？\n此操作將影響關聯到此圖片的物業顯示。`;
+
+        if (!window.confirm(message)) return;
+
         setDeleting(true);
         try {
             let deletedCount = 0;
@@ -685,9 +694,7 @@ export default function SettingsPage() {
                                 </>
                             ) : (
                                 <div className="flex items-center justify-between w-full">
-                                    <span className="text-sm text-zinc-500 dark:text-white/40">
-                                        {t('點擊圖片可預覽，懸停可刪除', 'Click to preview, hover to delete')}
-                                    </span>
+
                                     <button
                                         onClick={() => setSelectMode(true)}
                                         className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm text-zinc-600 dark:text-white/60 hover:bg-zinc-200 dark:hover:bg-white/10 border border-zinc-200 dark:border-white/10 transition-all"

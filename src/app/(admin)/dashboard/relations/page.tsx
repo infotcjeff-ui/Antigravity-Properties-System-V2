@@ -3,10 +3,13 @@
 import { useState, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { usePropertiesWithRelationsQuery, type PropertyWithRelations } from '@/hooks/useStorage';
+import { useLanguage } from '@/components/common/LanguageSwitcher';
 
 export default function RelationsPage() {
     const { data: propertiesData, isLoading } = usePropertiesWithRelationsQuery();
     const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
+    const language = useLanguage();
+    const t = (zh: string, en: string) => language === 'zh-TW' ? zh : en;
 
     // Sort A-Z by code
     const data = useMemo(() => {
@@ -154,20 +157,34 @@ export default function RelationsPage() {
                                         {/* Property Details */}
                                         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                                             <div>
-                                                <p className="text-zinc-400 dark:text-white/40">Address</p>
+                                                <p className="text-zinc-400 dark:text-white/40">{t('地址', 'Address')}</p>
                                                 <p className="text-zinc-700 dark:text-white/80">{property.address || '-'}</p>
                                             </div>
                                             <div>
-                                                <p className="text-zinc-400 dark:text-white/40">Lot Area</p>
+                                                <p className="text-zinc-400 dark:text-white/40">{t('地段面積', 'Lot Area')}</p>
                                                 <p className="text-zinc-700 dark:text-white/80">{property.lotArea || '-'}</p>
                                             </div>
                                             <div>
-                                                <p className="text-zinc-400 dark:text-white/40">Land Use</p>
-                                                <p className="text-zinc-700 dark:text-white/80 capitalize">{property.landUse?.replace('_', ' ') || '-'}</p>
+                                                <p className="text-zinc-400 dark:text-white/40">{t('土地用途', 'Land Use')}</p>
+                                                <p className="text-zinc-700 dark:text-white/80 capitalize">{
+                                                    (() => {
+                                                        const labels: Record<string, string> = {
+                                                            open_storage: t('露天倉儲', 'Open Storage'),
+                                                            residential_a: t('住宅(甲)', 'Residential (A)'),
+                                                            residential_c: t('住宅(丙類)', 'Residential (C)'),
+                                                            open_space: t('開放空間', 'Open Space'),
+                                                            recreation_use: t('休憩用地', 'Recreation Use'),
+                                                            village_dev: t('鄉村式發展', 'Village Dev'),
+                                                            conservation_area: t('保育區', 'Conservation Area'),
+                                                            unknown: t('未知', 'Unknown')
+                                                        };
+                                                        return property.landUse ? property.landUse.split(',').map(u => labels[u.trim()] || u.trim().replace('_', ' ')).join(', ') : '-';
+                                                    })()
+                                                }</p>
                                             </div>
                                             <div>
-                                                <p className="text-zinc-400 dark:text-white/40">Planning Permission</p>
-                                                <p className="text-zinc-700 dark:text-white/80">{property.hasPlanningPermission ? 'Yes' : 'No'}</p>
+                                                <p className="text-zinc-400 dark:text-white/40">{t('規劃許可', 'Planning Permission')}</p>
+                                                <p className="text-zinc-700 dark:text-white/80">{property.hasPlanningPermission ? t('有', 'Yes') : t('無', 'No')}</p>
                                             </div>
                                         </div>
 

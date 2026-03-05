@@ -44,7 +44,7 @@ export const fetchProperties = async (user?: any, options?: { query?: string }):
         }
 
         const { data, error: sbError } = await queryBuilder
-            .order('name', { ascending: true });
+            .order('code', { ascending: true });
 
         if (sbError) throw sbError;
         return (data || []).map(toCamel) as Property[];
@@ -190,7 +190,7 @@ export const fetchPropertiesWithRelations = async (user?: any): Promise<Property
             { data: proprietors },
             { data: rentsData }
         ] = await Promise.all([
-            pQuery,
+            pQuery.order('code', { ascending: true }),
             oQuery,
             rQuery
         ]);
@@ -384,6 +384,7 @@ export function useProperties() {
                 notes: property.notes,
                 proprietor_id: property.proprietorId,
                 tenant_id: property.tenantId,
+                created_by: user?.id,
             };
 
             // Remove undefined/null values so Supabase doesn't try to insert them
@@ -544,6 +545,7 @@ export function useProprietors() {
                 category: proprietor.category,
                 english_name: proprietor.englishName,
                 short_name: proprietor.shortName,
+                created_by: user?.id,
             };
 
             // Only add description if provided (column may not exist in database)
@@ -570,6 +572,7 @@ export function useProprietors() {
                         category: proprietor.category,
                         english_name: proprietor.englishName,
                         short_name: proprietor.shortName,
+                        created_by: user?.id,
                     };
                     const { error: retryError } = await supabase
                         .from('proprietors')
@@ -732,6 +735,7 @@ export function useRents() {
                 type: rent.type,
                 created_at: now,
                 updated_at: now,
+                created_by: user?.id,
             };
 
             // Add legacy fields if present
@@ -809,7 +813,7 @@ export function useRents() {
             };
 
             // Mapping Rent fields to DB columns
-            if (updates.propertyId) rentData.property_id = updates.propertyId;
+            if (updates.propertyId !== undefined) rentData.property_id = updates.propertyId;
             if (updates.proprietorId !== undefined) rentData.proprietor_id = updates.proprietorId;
             if (updates.tenantId !== undefined) rentData.tenant_id = updates.tenantId;
             if (updates.type) rentData.type = updates.type;
@@ -916,6 +920,7 @@ export interface PropertyWithRelations extends Property {
 }
 
 export function useRelations() {
+    const { user } = useAuth();
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
@@ -931,11 +936,16 @@ export function useRelations() {
         setLoading(true);
         setError(null);
         try {
-            const { data: property, error: pError } = await supabase
+            const queryFields = user
+                ? '*'
+                : 'id, name, code, address, type, status, land_use, lot_index, lot_area, location, has_planning_permission, proprietor_id, tenant_id, created_by, created_at, updated_at, images, notes';
+
+            const { data, error: pError } = await supabase
                 .from('properties')
-                .select('*')
+                .select(queryFields)
                 .eq('id', propertyId)
                 .single();
+            const property = data as any;
 
             if (pError || !property) return null;
 
@@ -948,7 +958,7 @@ export function useRelations() {
             ] = await Promise.all([
                 camelProperty.proprietorId ? supabase.from('proprietors').select('*').eq('id', camelProperty.proprietorId).single() : { data: null },
                 camelProperty.tenantId ? supabase.from('proprietors').select('*').eq('id', camelProperty.tenantId).single() : { data: null },
-                supabase.from('rents').select('*').eq('property_id', propertyId)
+                supabase.from('rents').select('*, proprietor:proprietors!proprietor_id(*), tenant:proprietors!tenant_id(*)').eq('property_id', propertyId)
             ]);
 
             return {
@@ -965,11 +975,55 @@ export function useRelations() {
         }
     }, []);
 
+    const getPropertyWithRelationsByName = useCallback(async (name: string): Promise<PropertyWithRelations | null> => {
+        setLoading(true);
+        setError(null);
+        try {
+            const queryFields = user
+                ? '*'
+                : 'id, name, code, address, type, status, land_use, lot_index, lot_area, location, has_planning_permission, proprietor_id, tenant_id, created_by, created_at, updated_at, images, notes';
+
+            const { data, error: pError } = await supabase
+                .from('properties')
+                .select(queryFields)
+                .eq('name', name)
+                .single();
+            const property = data as any;
+
+            if (pError || !property) return null;
+
+            const camelProperty = toCamel(property) as Property;
+
+            const [
+                { data: proprietor },
+                { data: tenant },
+                { data: rentsData }
+            ] = await Promise.all([
+                camelProperty.proprietorId ? supabase.from('proprietors').select('*').eq('id', camelProperty.proprietorId).single() : { data: null },
+                camelProperty.tenantId ? supabase.from('proprietors').select('*').eq('id', camelProperty.tenantId).single() : { data: null },
+                supabase.from('rents').select('*, proprietor:proprietors!proprietor_id(*), tenant:proprietors!tenant_id(*)').eq('property_id', property.id)
+            ]);
+
+            return {
+                ...camelProperty,
+                proprietor: proprietor ? toCamel(proprietor) : undefined,
+                tenant: tenant ? toCamel(tenant) : undefined,
+                rents: (rentsData || []).map(r => toCamel(r)) as Rent[]
+            } as PropertyWithRelations;
+        } catch (err) {
+            console.error('Failed to fetch property with relations by name:', err);
+            return null;
+        } finally {
+            setLoading(false);
+        }
+    }, []);
+
     return {
         loading,
         error,
         getPropertiesWithRelations,
-        getPropertyWithRelations
+        getPropertyWithRelations,
+        getPropertyWithRelationsByName
     };
 }
 
@@ -1176,6 +1230,16 @@ export function usePropertyWithRelationsQuery(id: string) {
         queryKey: ['property-with-relations', id],
         queryFn: () => getPropertyWithRelations(id),
         enabled: !!id,
+        staleTime: 5 * 60 * 1000,
+    });
+}
+
+export function usePropertyWithRelationsByNameQuery(name: string) {
+    const { getPropertyWithRelationsByName } = useRelations();
+    return useQuery({
+        queryKey: ['property-with-relations-by-name', name],
+        queryFn: () => getPropertyWithRelationsByName(name),
+        enabled: !!name,
         staleTime: 5 * 60 * 1000,
     });
 }

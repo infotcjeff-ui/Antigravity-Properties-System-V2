@@ -6,7 +6,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useProperties, usePropertiesQuery } from '@/hooks/useStorage';
 import type { Property } from '@/lib/db';
 import PropertyCard from '@/components/properties/PropertyCard';
-import PropertyMap from '@/components/properties/PropertyMap';
+import PropertyMapDynamic from '@/components/properties/PropertyMapDynamic';
 import PropertyForm from '@/components/properties/PropertyForm';
 import { Building2, Grid3X3, Map, Search, Plus } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
@@ -25,7 +25,9 @@ export default function PropertiesPage() {
 
     const properties = useMemo(() => {
         if (!qProperties) return [];
-        return [...qProperties].sort((a, b) => a.code.localeCompare(b.code));
+        return [...qProperties].sort((a, b) =>
+            (a.code || '').trim().localeCompare((b.code || '').trim(), undefined, { numeric: true, sensitivity: 'base' })
+        );
     }, [qProperties]);
 
     const filteredProperties = useMemo(() => {
@@ -168,7 +170,7 @@ export default function PropertiesPage() {
                     )}
                 </div>
             ) : (
-                <PropertyMap properties={filteredProperties} />
+                <PropertyMapDynamic properties={filteredProperties} />
             )}
 
             {/* Property Form Modal */}

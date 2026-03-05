@@ -83,8 +83,8 @@ export default function TopBar({ onSearch, placeholder = '搜尋...', isAuthenti
             animate={{ opacity: 1, y: 0 }}
             className="sticky top-0 z-40 h-16 px-6 flex items-center justify-between bg-white/90 dark:bg-[#0f0f1a]/80 backdrop-blur-xl border-b border-zinc-200 dark:border-white/5 transition-colors duration-300"
         >
-            {/* Search */}
-            <div className="relative flex-1 max-w-md">
+            {/* Search - Hidden for now */}
+            <div className="relative flex-1 max-w-md hidden">
                 <div className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 dark:text-white/30">
                     <Search className="w-5 h-5" />
                 </div>
@@ -96,6 +96,8 @@ export default function TopBar({ onSearch, placeholder = '搜尋...', isAuthenti
                     className="w-full pl-10 pr-4 py-2.5 bg-zinc-100 dark:bg-white/5 border border-zinc-200 dark:border-white/10 rounded-xl text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-purple-500/30 transition-all"
                 />
             </div>
+            {/* Spacer for when search is hidden to keep flex layout intact if needed, or flex-1 handles it */}
+            <div className="flex-1" />
 
             {/* Right side actions */}
             <div className="flex items-center gap-3">

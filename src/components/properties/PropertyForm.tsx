@@ -12,7 +12,9 @@ import ProprietorModal from '@/components/properties/ProprietorModal';
 import RentModal from '@/components/properties/RentModal';
 import RichTextEditor from '@/components/common/RichTextEditor';
 import AnimatedSelect from '@/components/ui/AnimatedSelect';
+import AnimatedMultiSelect from '@/components/ui/AnimatedMultiSelect';
 import { FileUpload } from '@/components/ui/file-upload';
+import LocationPickerMap from '@/components/properties/LocationPickerMapDynamic';
 
 interface PropertyFormProps {
     property?: Property | null;
@@ -48,8 +50,8 @@ const landUseTypes = [
 export default function PropertyForm({ property, onClose, onSuccess }: PropertyFormProps) {
     const queryClient = useQueryClient();
     const { addProperty, updateProperty } = useProperties();
-    const { data: proprietors } = useProprietorsQuery();
-    const { data: allRents } = useRentsQuery();
+    const { data: proprietors, isLoading: propsLoading } = useProprietorsQuery();
+    const { data: allRents, isLoading: rentsLoading } = useRentsQuery();
     const { updateRent, deleteRent } = useRents();
     const { addNotification } = useNotifications();
     const { isAuthenticated } = useAuth();
@@ -58,14 +60,14 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
     const [editingRentId, setEditingRentId] = useState<string | null>(null);
     const [tempRentData, setTempRentData] = useState<Partial<Rent>>({});
     const [editingRent, setEditingRent] = useState<Rent | null>(null);
+    const [unlinkingRentId, setUnlinkingRentId] = useState<string | null>(null);
 
     const [showProprietorModal, setShowProprietorModal] = useState(false);
     const [showRentModal, setShowRentModal] = useState(false);
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState('');
     const [proprietorModalMode, setProprietorModalMode] = useState<'proprietor' | 'tenant'>('proprietor');
-    const autocompleteRef = useRef<google.maps.places.Autocomplete | null>(null);
-    const addressInputRef = useRef<HTMLInputElement>(null);
+    const [isGeocoding, setIsGeocoding] = useState(false);
 
     // Form state
     const [formData, setFormData] = useState({
@@ -76,7 +78,7 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
         lotArea: property?.lotArea || '',
         type: property?.type || 'group_asset',
         status: property?.status || 'holding',
-        landUse: property?.landUse || 'unknown',
+        landUse: property?.landUse ? property.landUse.split(',') : ['unknown'],
         proprietorId: property?.proprietorId || '', // Legacy - kept for compatibility
         proprietorIds: property?.proprietorIds || (property?.proprietorId ? [property.proprietorId] : []), // Multi-select
         tenantId: property?.tenantId || '',
@@ -88,6 +90,9 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
         notes: property?.notes || '',
     });
 
+    const [newImages, setNewImages] = useState<{ file: File; preview: string }[]>([]);
+    const [newGeoMaps, setNewGeoMaps] = useState<{ file: File; preview: string }[]>([]);
+
     const proprietorsList = useMemo(() => (proprietors || []).filter(p => p.code?.startsWith('A')), [proprietors]);
     const tenantsList = useMemo(() => (proprietors || []).filter(p => p.code?.startsWith('T')), [proprietors]);
 
@@ -96,29 +101,55 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
         return allRents.filter(r => r.propertyId === property.id);
     }, [property?.id, allRents]);
 
-    // Initialize Google Places Autocomplete
-    useEffect(() => {
-        if (typeof google !== 'undefined' && addressInputRef.current && !autocompleteRef.current) {
-            autocompleteRef.current = new google.maps.places.Autocomplete(addressInputRef.current, {
-                types: ['address'],
-                componentRestrictions: { country: 'hk' },
-            });
+    const handleGeocode = async () => {
+        if (!formData.address.trim()) {
+            addNotification('請先輸入地址 / Please enter an address first', 'info');
+            return;
+        }
 
-            autocompleteRef.current.addListener('place_changed', () => {
-                const place = autocompleteRef.current?.getPlace();
-                if (place?.geometry?.location) {
-                    setFormData(prev => ({
-                        ...prev,
-                        address: place.formatted_address || '',
-                        location: {
-                            lat: place.geometry!.location!.lat(),
-                            lng: place.geometry!.location!.lng(),
-                            address: place.formatted_address || '',
-                        },
-                    }));
+        setIsGeocoding(true);
+        try {
+            // Append Hong Kong to improve accuracy if not present
+            let searchAddress = formData.address;
+            if (!searchAddress.toLowerCase().includes('hong kong') && !searchAddress.includes('香港')) {
+                searchAddress += ', Hong Kong';
+            }
+
+            const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(searchAddress)}&limit=1`, {
+                headers: {
+                    'Accept-Language': 'zh-TW,zh;q=0.9,en;q=0.8'
                 }
             });
+            const data = await response.json();
+
+            if (data && data.length > 0) {
+                setFormData(prev => ({
+                    ...prev,
+                    location: {
+                        lat: parseFloat(data[0].lat),
+                        lng: parseFloat(data[0].lon),
+                        address: formData.address,
+                    },
+                }));
+                addNotification('定位成功 / Location found', 'update');
+            } else {
+                addNotification('找不到該地址的地點 / Location not found', 'info');
+            }
+        } catch (error) {
+            console.error('Geocoding error:', error);
+            addNotification('定位失敗 / Geocoding failed', 'info');
+        } finally {
+            setIsGeocoding(false);
         }
+    };
+
+    // Cleanup object URLs to prevent memory leaks
+    useEffect(() => {
+        return () => {
+            newImages.forEach(img => URL.revokeObjectURL(img.preview));
+            newGeoMaps.forEach(img => URL.revokeObjectURL(img.preview));
+        };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
@@ -129,41 +160,77 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
         }));
     };
 
-    const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>, type: 'images' | 'geoMaps') => {
+    const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>, type: 'images' | 'geoMaps') => {
         const files = Array.from(e.target.files || []);
         if (files.length === 0) return;
 
-        const validation = validateImageUpload(
-            formData[type],
-            files,
-            type === 'images' ? 'property' : 'geomap'
-        );
+        const currentRemoteLength = formData[type].length;
+        const currentLocalLength = type === 'images' ? newImages.length : newGeoMaps.length;
+        const remainingSlots = (type === 'images' ? 5 : 2) - currentRemoteLength - currentLocalLength;
 
-        if (!validation.valid) {
-            setError(validation.error || 'Invalid upload');
+        if (remainingSlots <= 0) {
+            setError(`最多只能上傳 ${type === 'images' ? 5 : 2} 張圖片 / Maximum ${type === 'images' ? 5 : 2} images allowed`);
             return;
         }
 
-        try {
-            const compressedBlobs = await Promise.all(files.map(f => compressImage(f)));
-            const base64Images = await Promise.all(compressedBlobs.map((blob: Blob) => fileToBase64(blob)));
+        const validFiles = files.slice(0, remainingSlots);
 
-            setFormData(prev => ({
-                ...prev,
-                [type]: [...prev[type], ...base64Images],
-            }));
-            setError('');
-        } catch (err) {
-            console.error('Upload/Compression error:', err);
-            setError('圖片處理失敗 / Failed to process images');
+        const newFiles = validFiles.map(file => ({
+            file,
+            preview: URL.createObjectURL(file)
+        }));
+
+        if (type === 'images') {
+            setNewImages(prev => [...prev, ...newFiles]);
+        } else {
+            setNewGeoMaps(prev => [...prev, ...newFiles]);
         }
     };
 
-    const removeImage = (index: number, type: 'images' | 'geoMaps') => {
-        setFormData(prev => ({
-            ...prev,
-            [type]: prev[type].filter((_, i) => i !== index),
-        }));
+    const removeImage = (index: number, type: 'images' | 'geoMaps', isNew: boolean = false) => {
+        if (isNew) {
+            if (type === 'images') {
+                const img = newImages[index];
+                if (img) URL.revokeObjectURL(img.preview);
+                setNewImages(prev => prev.filter((_, i) => i !== index));
+            } else {
+                const img = newGeoMaps[index];
+                if (img) URL.revokeObjectURL(img.preview);
+                setNewGeoMaps(prev => prev.filter((_, i) => i !== index));
+            }
+        } else {
+            setFormData(prev => ({
+                ...prev,
+                [type]: prev[type].filter((_, i) => i !== index),
+            }));
+        }
+    };
+
+    const processAndUploadFiles = async (filesToUpload: { file: File }[], folder: string): Promise<string[]> => {
+        if (filesToUpload.length === 0) return [];
+
+        const compressedBlobs = await Promise.all(filesToUpload.map(f => compressImage(f.file)));
+
+        const uploadPromises = compressedBlobs.map(async (blob: Blob, i) => {
+            const uploadFormData = new FormData();
+            uploadFormData.append('file', blob, filesToUpload[i].file.name);
+            uploadFormData.append('folder', folder);
+
+            const res = await fetch('/api/upload', {
+                method: 'POST',
+                body: uploadFormData,
+            });
+
+            if (!res.ok) {
+                const error = await res.json();
+                throw new Error(error.error || 'Upload failed');
+            }
+
+            const data = await res.json();
+            return data.url;
+        });
+
+        return Promise.all(uploadPromises);
     };
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -172,22 +239,31 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
         setError('');
 
         try {
+            // First run uploads if there are new files
+            const [uploadedImageUrls, uploadedGeoMapUrls] = await Promise.all([
+                processAndUploadFiles(newImages, 'properties'),
+                processAndUploadFiles(newGeoMaps, 'geomaps')
+            ]);
+
+            const finalImages = [...formData.images, ...uploadedImageUrls];
+            const finalGeoMaps = [...formData.geoMaps, ...uploadedGeoMapUrls];
+
             const propertyData = {
-                name: formData.name,
-                code: formData.code,
-                address: formData.address,
+                name: formData.name.trim(),
+                code: formData.code.trim().toUpperCase(),
+                address: formData.address.trim(),
                 lotIndex: formData.lotIndex,
                 lotArea: formData.lotArea,
                 type: formData.type as Property['type'],
                 status: formData.status as Property['status'],
-                landUse: formData.landUse as Property['landUse'],
+                landUse: formData.landUse.join(',') as Property['landUse'],
                 proprietorId: formData.proprietorId || undefined,
                 tenantId: formData.tenantId || undefined,
-                googleDrivePlanUrl: formData.googleDrivePlanUrl,
+                googleDrivePlanUrl: formData.googleDrivePlanUrl.trim(),
                 hasPlanningPermission: formData.hasPlanningPermission || '',
                 location: formData.location,
-                images: formData.images,
-                geoMaps: formData.geoMaps,
+                images: finalImages,
+                geoMaps: finalGeoMaps,
                 notes: formData.notes,
             };
 
@@ -198,31 +274,24 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                 const updated = await updateProperty(property.id, propertyData);
                 if (!updated) return; // Error already handled in hook
 
-                addNotification(
-                    `Property "${formData.name}" updated at ${timeStr}`,
-                    'update'
-                );
+                addNotification(`Property "${formData.name}" updated at ${timeStr}`, 'update');
             } else {
                 const newId = await addProperty(propertyData);
                 if (!newId) return; // Error already handled in hook
 
-                addNotification(
-                    `Property "${formData.name}" created at ${timeStr}`,
-                    'create'
-                );
+                addNotification(`Property "${formData.name}" created at ${timeStr}`, 'create');
             }
 
-            // Invalidate all relevant queries to ensure data consistency
             queryClient.invalidateQueries({ queryKey: ['properties'] });
             queryClient.invalidateQueries({ queryKey: ['properties-with-relations'] });
-            // Also invalidate the individual property detail query (used by detail pages)
             if (property?.id) {
                 queryClient.invalidateQueries({ queryKey: ['property-with-relations', property.id] });
             }
 
             onSuccess();
-        } catch (err) {
-            setError('Failed to save property');
+        } catch (err: any) {
+            console.error('Submit error:', err);
+            setError(`Save failed: ${err.message || 'Unknown error'}`);
         } finally {
             setSaving(false);
         }
@@ -244,8 +313,17 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
     };
 
     const handleRentCreated = async () => {
-        queryClient.invalidateQueries({ queryKey: ['rents'] });
-        setShowRentModal(false);
+        setSaving(true);
+        try {
+            await queryClient.invalidateQueries({ queryKey: ['rents'] });
+            await queryClient.invalidateQueries({ queryKey: ['properties-with-relations'] });
+            if (property?.id) {
+                await queryClient.invalidateQueries({ queryKey: ['property-with-relations', property.id] });
+            }
+        } finally {
+            setSaving(false);
+            setShowRentModal(false);
+        }
     };
 
     const handleUnlinkProprietor = (idToRemove?: string) => {
@@ -273,17 +351,23 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
         }
     };
 
-    const handleDeleteRent = async (rentId: string) => {
-        if (!window.confirm('確定要刪除此租金記錄嗎？這將斷開與物業的連結。/ Are you sure you want to delete this rent record? This will unlink it from the property.')) {
+    const handleUnlinkRent = async (rentId: string) => {
+        if (!window.confirm('確定要取消與此物業的連結嗎？租務記錄將會保留。/ Are you sure you want to unlink this rent record? The record will be kept.')) {
             return;
         }
 
-        const success = await deleteRent(rentId);
-        if (success) {
-            queryClient.invalidateQueries({ queryKey: ['rents'] });
-            addNotification('租金記錄已刪除 / Rent record deleted', 'delete');
-        } else {
-            setError('Failed to delete rent record');
+        setUnlinkingRentId(rentId);
+        try {
+            const success = await updateRent(rentId, { propertyId: null } as any);
+            if (success) {
+                queryClient.invalidateQueries({ queryKey: ['rents'] });
+                queryClient.invalidateQueries({ queryKey: ['properties-with-relations'] });
+                addNotification('租務記錄已取消連結 / Rent record unlinked', 'update');
+            } else {
+                setError('Failed to unlink rent record');
+            }
+        } finally {
+            setUnlinkingRentId(null);
         }
     };
 
@@ -363,18 +447,18 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                             <label className="block text-sm font-medium text-zinc-700 dark:text-white/80">
                                 圖片 (最多 5 張, 總計 5MB)
                             </label>
-                            <div className="flex flex-wrap gap-3">
+                            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                                 {formData.images.map((img, index) => (
-                                    <div key={index} className="relative group">
+                                    <div key={`remote-img-${index}`} className="relative group aspect-square">
                                         <img
                                             src={img}
                                             alt={`Property ${index + 1}`}
-                                            className="w-20 h-20 object-cover rounded-xl border border-zinc-200 dark:border-white/10"
+                                            className="w-full h-full object-cover rounded-xl border border-zinc-200 dark:border-white/10"
                                         />
                                         <button
                                             type="button"
                                             onClick={() => removeImage(index, 'images')}
-                                            className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 rounded-full flex items-center justify-center text-white opacity-0 group-hover:opacity-100 transition-opacity"
+                                            className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 rounded-full flex items-center justify-center text-white opacity-0 group-hover:opacity-100 transition-opacity z-10 shadow-lg"
                                         >
                                             <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -382,8 +466,29 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                                         </button>
                                     </div>
                                 ))}
-                                {formData.images.length < 5 && (
-                                    <div className="w-full mt-2">
+                                {newImages.map((img, index) => (
+                                    <div key={`local-img-${index}`} className="relative group aspect-square">
+                                        <img
+                                            src={img.preview}
+                                            alt={`New Property ${index + 1}`}
+                                            className="w-full h-full object-cover rounded-xl border border-dashed border-purple-400 opacity-80"
+                                        />
+                                        <div className="absolute inset-0 bg-black/40 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                            <span className="text-white text-xs font-medium">Pending Upload</span>
+                                        </div>
+                                        <button
+                                            type="button"
+                                            onClick={() => removeImage(index, 'images', true)}
+                                            className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 rounded-full flex items-center justify-center text-white opacity-0 group-hover:opacity-100 transition-opacity z-10 shadow-lg"
+                                        >
+                                            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                            </svg>
+                                        </button>
+                                    </div>
+                                ))}
+                                {(formData.images.length + newImages.length) < 5 && (
+                                    <div className="w-full h-full aspect-square relative rounded-xl overflow-hidden hover:bg-zinc-50 dark:hover:bg-white/5 transition-colors">
                                         <FileUpload onChange={(files) => {
                                             if (files.length > 0) {
                                                 handleImageUpload({ target: { files } } as any, 'images');
@@ -399,18 +504,18 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                             <label className="block text-sm font-medium text-zinc-700 dark:text-white/80">
                                 地圖 (最多 2 張)
                             </label>
-                            <div className="flex flex-wrap gap-3">
+                            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                                 {formData.geoMaps.map((img, index) => (
-                                    <div key={index} className="relative group">
+                                    <div key={`remote-geo-${index}`} className="relative group aspect-square">
                                         <img
                                             src={img}
                                             alt={`Geo Map ${index + 1}`}
-                                            className="w-20 h-20 object-cover rounded-xl border border-zinc-200 dark:border-white/10"
+                                            className="w-full h-full object-cover rounded-xl border border-zinc-200 dark:border-white/10"
                                         />
                                         <button
                                             type="button"
                                             onClick={() => removeImage(index, 'geoMaps')}
-                                            className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 rounded-full flex items-center justify-center text-white opacity-0 group-hover:opacity-100 transition-opacity"
+                                            className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 rounded-full flex items-center justify-center text-white opacity-0 group-hover:opacity-100 transition-opacity z-10 shadow-lg"
                                         >
                                             <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -418,8 +523,29 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                                         </button>
                                     </div>
                                 ))}
-                                {formData.geoMaps.length < 2 && (
-                                    <div className="w-full mt-2">
+                                {newGeoMaps.map((img, index) => (
+                                    <div key={`local-geo-${index}`} className="relative group aspect-square">
+                                        <img
+                                            src={img.preview}
+                                            alt={`New Geo Map ${index + 1}`}
+                                            className="w-full h-full object-cover rounded-xl border border-dashed border-purple-400 opacity-80"
+                                        />
+                                        <div className="absolute inset-0 bg-black/40 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                            <span className="text-white text-xs font-medium">Pending Upload</span>
+                                        </div>
+                                        <button
+                                            type="button"
+                                            onClick={() => removeImage(index, 'geoMaps', true)}
+                                            className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 rounded-full flex items-center justify-center text-white opacity-0 group-hover:opacity-100 transition-opacity z-10 shadow-lg"
+                                        >
+                                            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                            </svg>
+                                        </button>
+                                    </div>
+                                ))}
+                                {(formData.geoMaps.length + newGeoMaps.length) < 2 && (
+                                    <div className="w-full h-full aspect-square relative rounded-xl overflow-hidden hover:bg-zinc-50 dark:hover:bg-white/5 transition-colors">
                                         <FileUpload onChange={(files) => {
                                             if (files.length > 0) {
                                                 handleImageUpload({ target: { files } } as any, 'geoMaps');
@@ -459,23 +585,47 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                         </div>
                     </div>
 
-                    {/* Address with Autocomplete */}
+                    {/* Address with Geocoding */}
                     <div className="space-y-2">
                         <label className="block text-sm font-medium text-zinc-700 dark:text-white/80">地址</label>
-                        <input
-                            ref={addressInputRef}
-                            type="text"
-                            name="address"
-                            value={formData.address}
-                            onChange={handleChange}
-                            className="w-full px-4 py-3 bg-zinc-50 dark:bg-white/5 border border-zinc-200 dark:border-white/10 rounded-xl text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-purple-500/50 transition-all"
-                            placeholder="開始輸入以搜尋..."
-                        />
+                        <div className="flex gap-2">
+                            <input
+                                type="text"
+                                name="address"
+                                value={formData.address}
+                                onChange={handleChange}
+                                className="flex-1 px-4 py-3 bg-zinc-50 dark:bg-white/5 border border-zinc-200 dark:border-white/10 rounded-xl text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-purple-500/50 transition-all"
+                                placeholder="輸入地址..."
+                            />
+                            <button
+                                type="button"
+                                onClick={handleGeocode}
+                                disabled={isGeocoding || !formData.address.trim()}
+                                className="px-4 py-3 bg-purple-100 dark:bg-purple-500/20 text-purple-700 dark:text-purple-300 rounded-xl font-medium hover:bg-purple-200 dark:hover:bg-purple-500/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 whitespace-nowrap"
+                            >
+                                {isGeocoding ? (
+                                    <svg className="animate-spin h-4 w-4 text-purple-700 dark:text-purple-300" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                    </svg>
+                                ) : (
+                                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                                    </svg>
+                                )}
+                                自動定位
+                            </button>
+                        </div>
                         {formData.location && (
-                            <p className="text-xs text-zinc-500 dark:text-white/40">
-                                📍 Lat: {formData.location.lat.toFixed(6)}, Lng: {formData.location.lng.toFixed(6)}
+                            <p className="text-xs text-zinc-500 dark:text-white/40 flex items-center gap-1">
+                                <span className="text-emerald-500">✓</span> 已定位: Lat: {formData.location.lat.toFixed(6)}, Lng: {formData.location.lng.toFixed(6)}
                             </p>
                         )}
+                        <LocationPickerMap
+                            location={formData.location}
+                            onChange={(loc) => setFormData(prev => ({ ...prev, location: { ...loc, address: prev.address } }))}
+                        />
                     </div>
 
                     {/* Property Lot Index */}
@@ -515,10 +665,10 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                         </div>
                         <div className="space-y-2">
                             <label className="block text-sm font-medium text-zinc-700 dark:text-white/80">土地用途</label>
-                            <AnimatedSelect
+                            <AnimatedMultiSelect
                                 name="landUse"
-                                value={formData.landUse}
-                                onChange={(value) => handleChange({ target: { name: 'landUse', value } } as any)}
+                                values={formData.landUse}
+                                onChange={(values) => handleChange({ target: { name: 'landUse', value: values } } as any)}
                                 options={landUseTypes}
                                 placeholder="選擇土地用途"
                             />
@@ -785,15 +935,16 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                                     if (selectedRentId && property?.id) {
                                         const success = await updateRent(selectedRentId, { propertyId: property.id });
                                         if (success) {
-                                            queryClient.invalidateQueries({ queryKey: ['rents'] });
+                                            await queryClient.invalidateQueries({ queryKey: ['rents'] });
+                                            await queryClient.invalidateQueries({ queryKey: ['properties-with-relations'] });
                                             addNotification('租金記錄已連結 / Rent record linked', 'update');
                                         }
                                     }
                                 }}
                                 options={[
-                                    { value: '', label: '選擇現有租金記錄以連結...' },
-                                    ...(allRents || [])
-                                        .filter(r => !r.propertyId || r.propertyId === '')
+                                    { value: '', label: rentsLoading ? '載入中...' : '選擇現有租金記錄以連結...' },
+                                    ...((allRents || [])
+                                        .filter(r => !r.propertyId || r.propertyId === '' || r.propertyId === 'null')
                                         .map(r => {
                                             const monthlyRent = r.type === 'rent_out' ? r.rentOutMonthlyRental : r.rentingMonthlyRental;
                                             const tenantName = (proprietors || []).find(p => p.id === r.tenantId)?.name;
@@ -801,7 +952,7 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                                                 value: r.id!,
                                                 label: `${r.type === 'rent_out' ? '收租' : '交租'} - ${tenantName || '未指定'} - $${(monthlyRent || 0).toLocaleString()}/月`
                                             };
-                                        })
+                                        }))
                                 ]}
                                 placeholder="選擇現有租金記錄以連結..."
                             />
@@ -923,13 +1074,19 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                                                     </button>
                                                     <button
                                                         type="button"
-                                                        onClick={() => handleDeleteRent(rent.id!)}
-                                                        className="p-2 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/20 rounded-lg transition-all"
-                                                        title="刪除租金記錄"
+                                                        disabled={unlinkingRentId === rent.id}
+                                                        onClick={() => handleUnlinkRent(rent.id!)}
+                                                        className={`p-2 text-amber-600 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-500/20 rounded-lg transition-all ${unlinkingRentId === rent.id ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                                        title="取消物業連結"
                                                     >
-                                                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                                        </svg>
+                                                        {unlinkingRentId === rent.id ? (
+                                                            <div className="w-4 h-4 border-2 border-amber-500 border-t-transparent rounded-full animate-spin" />
+                                                        ) : (
+                                                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2 2l20 20" />
+                                                            </svg>
+                                                        )}
                                                     </button>
                                                 </div>
                                             </div>

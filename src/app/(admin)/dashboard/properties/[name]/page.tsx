@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
-import { usePropertyWithRelationsQuery, useProprietorsQuery } from '@/hooks/useStorage';
+import { usePropertyWithRelationsByNameQuery, useProprietorsQuery } from '@/hooks/useStorage';
 import type { Property, Proprietor, Rent } from '@/lib/db';
 import {
     ArrowLeft,
@@ -20,8 +20,10 @@ import {
     Map,
     Image as ImageIcon,
 } from 'lucide-react';
-import DOMPurify from 'dompurify';
 import { useLanguage } from '@/components/common/LanguageSwitcher';
+import DOMPurify from 'dompurify';
+import RentDetailsModal from '@/components/properties/RentDetailsModal';
+import { Tooltip } from '@heroui/react';
 
 const statusColors: Record<string, string> = {
     holding: 'bg-emerald-600/80 text-white border-emerald-500/50',
@@ -79,11 +81,14 @@ export default function PropertyDetailsPage() {
     const lang = useLanguage();
     const isZh = lang === 'zh-TW';
     const t = (en: string, zh: string) => isZh ? zh : en;
-    const { data: property, isLoading: loading } = usePropertyWithRelationsQuery(params.id as string);
+    const { data: property, isLoading: loading } = usePropertyWithRelationsByNameQuery(decodeURIComponent(params.name as string));
     const { data: allProprietors = [] } = useProprietorsQuery();
 
-    const proprietor = property?.proprietor || null;
-    const tenant = property?.tenant || null;
+    const activeRentOut = property?.rents?.find((r: Rent) => r.type === 'rent_out' && ['listing', 'renting'].includes(r.rentOutStatus || ''));
+    const activeRenting = property?.rents?.find((r: Rent) => r.type === 'renting');
+
+    const proprietor = property?.proprietor || activeRenting?.proprietor || null;
+    const tenant = property?.tenant || activeRentOut?.tenant || null;
     const rents = property?.rents || [];
     const [currentImageIndex, setCurrentImageIndex] = useState(0);
     const [lightboxImage, setLightboxImage] = useState<string | null>(null);
@@ -235,7 +240,9 @@ export default function PropertyDetailsPage() {
                             </div>
                             <div className="bg-zinc-50 dark:bg-white/5 rounded-xl p-4 border border-zinc-100 dark:border-none">
                                 <p className="text-zinc-400 dark:text-white/40 text-sm">{t('Land Use', '土地用途')}</p>
-                                <p className="text-zinc-900 dark:text-white font-medium mt-1">{landUseLabels[property.landUse] || '暫無。'}</p>
+                                <p className="text-zinc-900 dark:text-white font-medium mt-1">
+                                    {property.landUse ? property.landUse.split(',').map(u => landUseLabels[u.trim()] || u.trim()).join(', ') : '暫無。'}
+                                </p>
                             </div>
                             <div className="bg-zinc-50 dark:bg-white/5 rounded-xl p-4 border border-zinc-100 dark:border-none">
                                 <p className="text-zinc-400 dark:text-white/40 text-sm">{t('Lot Index', '物業地段')}</p>
@@ -360,67 +367,112 @@ export default function PropertyDetailsPage() {
                             {t('Rent History', '租務記錄')}
                         </h2>
                         {rents.length > 0 ? (
-                            <div className="space-y-3">
-                                {rents.map((rent) => {
-                                    const rentNumber = rent.type === 'rent_out' ? (rent.rentOutTenancyNumber || '-') : (rent.rentingNumber || '-');
-                                    const startDate = rent.type === 'rent_out'
-                                        ? (rent.rentOutStartDate || rent.startDate)
-                                        : (rent.rentingStartDate || rent.startDate);
-                                    const endDate = rent.type === 'rent_out'
-                                        ? (rent.rentOutEndDate || rent.endDate)
-                                        : (rent.rentingEndDate || rent.endDate);
-                                    const isExpired = endDate ? new Date(endDate).getTime() < new Date().getTime() : false;
-                                    const monthlyRent = rent.type === 'rent_out'
-                                        ? (rent.rentOutMonthlyRental || rent.amount || 0)
-                                        : (rent.rentingMonthlyRental || rent.amount || 0);
+                            <div className="overflow-x-auto">
+                                <div className="min-w-[800px]">
+                                    {/* Table Header */}
+                                    <div className="grid grid-cols-[1fr_2fr_1.5fr_2fr_1fr] gap-0 pb-3 border-b border-zinc-200 dark:border-white/10 text-xs font-bold text-zinc-900 dark:text-white">
+                                        <div className="pr-4">{t('Number', '編號')}</div>
+                                        <div className="px-4">{t('Property', '物業')}</div>
+                                        <div className="px-4">{t('Tenant', '承租人')}</div>
+                                        <div className="px-4">{t('Lease Term & Location', '租期及地點')}</div>
+                                        <div className="pl-4">{t('Rent', '租金')}</div>
+                                    </div>
+                                    {/* Table Body */}
+                                    <div className="divide-y divide-zinc-200 dark:divide-white/10">
+                                        {rents.map((rent) => {
+                                            const otherParty = rent.type === 'rent_out' ? rent.tenant : rent.proprietor;
+                                            const rentNumber = rent.type === 'rent_out' ? (rent.rentOutTenancyNumber || '-') : (rent.rentingNumber || '-');
 
-                                    return (
-                                        <div
-                                            key={rent.id}
-                                            onClick={() => setSelectedRent(rent)}
-                                            className={`flex items-center justify-between p-3 rounded-xl border transition-all cursor-pointer hover:shadow-md hover:scale-[1.01] ${isExpired
-                                                ? 'bg-red-50 dark:bg-red-500/10 border-red-100 dark:border-red-500/20 hover:border-red-300 dark:hover:border-red-500/40'
-                                                : 'bg-green-50 dark:bg-green-500/10 border-green-100 dark:border-green-500/20 hover:border-green-300 dark:hover:border-green-500/40'
-                                                }`}
-                                        >
-                                            <div className="flex items-center gap-3">
-                                                <div className="px-2.5 py-1.5 rounded-lg bg-purple-100 dark:bg-purple-500/20 border border-purple-200 dark:border-purple-500/30">
-                                                    <span className="text-sm font-bold font-mono text-purple-700 dark:text-purple-300">
-                                                        {rentNumber}
-                                                    </span>
-                                                </div>
-                                                <div>
-                                                    <div className="flex items-center gap-2 flex-wrap">
-                                                        <span className={`px-2 py-0.5 rounded text-xs ${rent.type === 'rent_out' ? 'bg-green-500/20 text-green-600 dark:text-green-400' : 'bg-blue-500/20 text-blue-600 dark:text-blue-400'
-                                                            }`}>
-                                                            {rent.type === 'rent_out' ? '收租' : '交租'}
-                                                        </span>
-                                                        {isExpired && (
-                                                            <span className="px-2 py-0.5 rounded text-xs font-bold bg-red-100 dark:bg-red-500/20 text-red-600 dark:text-red-400 border border-red-200 dark:border-red-500/30">
-                                                                {t('Expired', '已過期')}
-                                                            </span>
-                                                        )}
-                                                        {(() => {
-                                                            const otherParty = rent.tenant || rent.proprietor;
-                                                            return otherParty ? (
-                                                                <span className="text-zinc-700 dark:text-white/80 text-xs font-medium bg-zinc-100 dark:bg-white/10 px-2 py-0.5 rounded">
-                                                                    {otherParty.name}
-                                                                </span>
-                                                            ) : null;
-                                                        })()}
+                                            const startDate = rent.type === 'rent_out'
+                                                ? (rent.rentOutStartDate || rent.startDate)
+                                                : (rent.rentingStartDate || rent.startDate);
+                                            const endDate = rent.type === 'rent_out'
+                                                ? (rent.rentOutEndDate || rent.endDate)
+                                                : (rent.rentingEndDate || rent.endDate);
+
+                                            const formatEnDate = (d: any) => {
+                                                if (!d) return '';
+                                                const date = new Date(d);
+                                                return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+                                            };
+                                            const periods = rent.type === 'rent_out' ? rent.rentOutPeriods : rent.rentingPeriods;
+
+                                            const monthlyRent = rent.type === 'rent_out'
+                                                ? (rent.rentOutMonthlyRental || rent.amount || 0)
+                                                : (rent.rentingMonthlyRental || rent.amount || 0);
+
+                                            return (
+                                                <div
+                                                    key={rent.id}
+                                                    className="grid grid-cols-[1fr_2fr_1.5fr_2fr_1fr] gap-0 hover:bg-zinc-50/50 dark:hover:bg-white/[0.02] transition-colors group items-stretch cursor-pointer"
+                                                    onClick={() => setSelectedRent(rent)}
+                                                >
+                                                    {/* Number */}
+                                                    <div className="py-4 pr-4 flex flex-col justify-center">
+                                                        <div className="text-zinc-700 dark:text-white/80 text-sm">{rentNumber}</div>
+                                                        <div
+                                                            className="text-zinc-500 hover:text-zinc-900 dark:hover:text-white text-xs mt-1 flex items-center cursor-pointer transition-colors w-fit"
+                                                            onClick={() => setSelectedRent(rent)}
+                                                        >
+                                                            <ChevronRight className="w-3 h-3 mr-0.5" /> {t('View', '查看')}
+                                                        </div>
                                                     </div>
-                                                    <p className="text-zinc-500 dark:text-white/50 text-sm mt-1">
-                                                        {startDate ? new Date(startDate).toLocaleDateString() : '-'} - {endDate ? new Date(endDate).toLocaleDateString() : '-'}
-                                                    </p>
+                                                    {/* Property */}
+                                                    <div className="py-4 px-4 border-l border-dashed border-zinc-200 dark:border-white/10 flex flex-col justify-center">
+                                                        <div className="text-zinc-600 dark:text-white/70 text-sm whitespace-pre-wrap">{property.code} {property.name}</div>
+                                                        <div className="text-zinc-900 dark:text-white font-bold text-sm mt-1">{property.lotIndex || '-'}</div>
+                                                    </div>
+                                                    {/* Tenant */}
+                                                    <div className="py-4 px-4 border-l border-dashed border-zinc-200 dark:border-white/10 flex flex-col justify-center">
+                                                        {otherParty ? (
+                                                            <Tooltip
+                                                                content={
+                                                                    <div className="flex flex-col gap-1.5 w-full">
+                                                                        <div className="flex items-center gap-2 mb-1">
+                                                                            <User className="w-4 h-4 text-blue-500" />
+                                                                            <span className="font-bold">{otherParty.name}</span>
+                                                                            <span className="bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-300 px-1.5 py-0.5 rounded text-[10px] ml-auto">{otherParty.code}</span>
+                                                                        </div>
+                                                                        <div className="text-xs text-zinc-500 dark:text-white/60">
+                                                                            英文名稱: <span className="text-zinc-900 dark:text-white text-[10px]">{otherParty.englishName || '-'}</span>
+                                                                        </div>
+                                                                        <div className="text-xs text-zinc-500 dark:text-white/60 flex items-center justify-between">
+                                                                            <span>類型: <span className="text-zinc-900 dark:text-white">{otherParty.type === 'company' ? '公司' : '個人'}</span></span>
+                                                                            <span className="bg-zinc-100 dark:bg-white/10 px-1.5 py-0.5 rounded text-[10px] text-zinc-600 dark:text-white/70">
+                                                                                {otherParty.category === 'group_company' ? '集團公司' :
+                                                                                    otherParty.category === 'joint_venture' ? '合資公司' :
+                                                                                        otherParty.category === 'managed_individual' ? '代管個體' :
+                                                                                            otherParty.category === 'external_landlord' ? '外部業主' : '承租人'}
+                                                                            </span>
+                                                                        </div>
+                                                                    </div>
+                                                                }
+                                                                placement="top"
+                                                                className="bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white p-3 rounded-xl shadow-xl border border-zinc-200 dark:border-white/10 max-w-xs"
+                                                            >
+                                                                <div className="text-sm font-medium text-purple-600 dark:text-purple-400 border-b border-dashed border-purple-300 dark:border-purple-600/50 cursor-pointer w-fit inline-block">
+                                                                    {otherParty.name}
+                                                                </div>
+                                                            </Tooltip>
+                                                        ) : (
+                                                            <div className="text-zinc-600 dark:text-white/70 text-sm">-</div>
+                                                        )}
+                                                    </div>
+                                                    {/* Lease Term */}
+                                                    <div className="py-4 px-4 border-l border-dashed border-zinc-200 dark:border-white/10 flex flex-col justify-center">
+                                                        <div className="text-zinc-600 dark:text-white/70 text-sm">
+                                                            {formatEnDate(startDate)}{startDate && endDate && ' ~ '}{formatEnDate(endDate)}{periods ? `(${periods}個月)` : ''}
+                                                        </div>
+                                                    </div>
+                                                    {/* Rent */}
+                                                    <div className="py-4 pl-4 border-l border-dashed border-zinc-200 dark:border-white/10 flex flex-col justify-center text-left">
+                                                        <div className="text-zinc-800 dark:text-white text-sm whitespace-nowrap">${(monthlyRent as any).toLocaleString()}/月</div>
+                                                    </div>
                                                 </div>
-                                            </div>
-                                            <div className="text-right">
-                                                <p className="text-zinc-900 dark:text-white font-semibold">${(monthlyRent as any).toLocaleString()} /月</p>
-                                                <p className="text-zinc-400 dark:text-white/30 text-[10px]">{rent.location || rent.rentOutAddressDetail || '-'}</p>
-                                            </div>
-                                        </div>
-                                    );
-                                })}
+                                            );
+                                        })}
+                                    </div>
+                                </div>
                             </div>
                         ) : (
                             <EmptyPlaceholder />
@@ -508,92 +560,11 @@ export default function PropertyDetailsPage() {
                 </motion.div>
             </div>
 
-            {/* Rent Detail Popup */}
             {selectedRent && (
-                <motion.div
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                    className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4"
-                    onClick={() => setSelectedRent(null)}
-                >
-                    <motion.div
-                        initial={{ scale: 0.95, opacity: 0 }}
-                        animate={{ scale: 1, opacity: 1 }}
-                        exit={{ scale: 0.95, opacity: 0 }}
-                        className="bg-white dark:bg-zinc-900 rounded-2xl shadow-2xl border border-zinc-200 dark:border-white/10 w-full max-w-lg max-h-[85vh] overflow-y-auto"
-                        onClick={(e) => e.stopPropagation()}
-                    >
-                        <div className="flex items-center justify-between p-5 border-b border-zinc-100 dark:border-white/10">
-                            <div className="flex items-center gap-3">
-                                <div className="px-3 py-2 rounded-xl bg-purple-100 dark:bg-purple-500/20 border border-purple-200 dark:border-purple-500/30">
-                                    <span className="text-base font-bold font-mono text-purple-700 dark:text-purple-300">
-                                        {selectedRent.type === 'rent_out' ? (selectedRent.rentOutTenancyNumber || '-') : (selectedRent.rentingNumber || '-')}
-                                    </span>
-                                </div>
-                                <div>
-                                    <h3 className="text-lg font-semibold text-zinc-900 dark:text-white">
-                                        {t('Rent Details', '租約詳情')}
-                                    </h3>
-                                    <span className={`px-2 py-0.5 rounded text-xs ${selectedRent.type === 'rent_out' ? 'bg-green-500/20 text-green-600 dark:text-green-400' : 'bg-blue-500/20 text-blue-600 dark:text-blue-400'}`}>
-                                        {selectedRent.type === 'rent_out' ? '收租' : '交租'}
-                                    </span>
-                                </div>
-                            </div>
-                            <button
-                                onClick={() => setSelectedRent(null)}
-                                className="p-2 rounded-lg text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-white/10 transition-colors"
-                            >
-                                <X className="w-5 h-5" />
-                            </button>
-                        </div>
-                        <div className="p-5 space-y-1">
-                            {selectedRent.type === 'rent_out' ? (
-                                <>
-                                    <DetailRow label={t('Tenancy Number', '合約號碼')} value={selectedRent.rentOutTenancyNumber} />
-                                    <DetailRow label={t('Monthly Rent', '月租')} value={formatCurrency(selectedRent.rentOutMonthlyRental)} />
-                                    <DetailRow label={t('Listing Price', '放盤價')} value={formatCurrency(selectedRent.rentOutPricing)} />
-                                    <DetailRow label={t('Periods', '期數')} value={selectedRent.rentOutPeriods} />
-                                    <DetailRow label={t('Total Amount', '總額')} value={formatCurrency(selectedRent.rentOutTotalAmount)} />
-                                    <DetailRow label={t('Start Date', '開始日期')} value={formatDate(selectedRent.rentOutStartDate)} />
-                                    <DetailRow label={t('End Date', '結束日期')} value={formatDate(selectedRent.rentOutEndDate)} />
-                                    <DetailRow label={t('Actual End Date', '實際結束日期')} value={formatDate(selectedRent.rentOutActualEndDate)} />
-                                    <DetailRow label={t('Deposit Received', '按金')} value={formatCurrency(selectedRent.rentOutDepositReceived)} />
-                                    <DetailRow label={t('Deposit Receive Date', '按金收取日期')} value={formatDate(selectedRent.rentOutDepositReceiveDate)} />
-                                    <DetailRow label={t('Deposit Return Date', '按金退回日期')} value={formatDate(selectedRent.rentOutDepositReturnDate)} />
-                                    <DetailRow label={t('Deposit Return Amount', '按金退回金額')} value={formatCurrency(selectedRent.rentOutDepositReturnAmount)} />
-                                    <DetailRow label={t('Lessor', '出租人')} value={selectedRent.rentOutLessor} />
-                                    <DetailRow label={t('Address Detail', '地址資料')} value={selectedRent.rentOutAddressDetail} />
-                                    <DetailRow label={t('Status', '狀態')} value={selectedRent.rentOutStatus === 'listing' ? '放盤中' : selectedRent.rentOutStatus === 'renting' ? '出租中' : selectedRent.rentOutStatus === 'completed' ? '已完租' : selectedRent.rentOutStatus} />
-                                    {selectedRent.tenant && <DetailRow label={t('Tenant', '承租人')} value={selectedRent.tenant.name} />}
-                                    {selectedRent.rentOutDescription && (
-                                        <div className="pt-3 mt-2 border-t border-zinc-100 dark:border-white/10">
-                                            <p className="text-xs text-zinc-400 dark:text-white/40 mb-1">{t('Description', '描述')}</p>
-                                            <div className="text-sm text-zinc-700 dark:text-white/80 rich-text-content" dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(selectedRent.rentOutDescription) }} />
-                                        </div>
-                                    )}
-                                </>
-                            ) : (
-                                <>
-                                    <DetailRow label={t('Rent Number', '租約號碼')} value={selectedRent.rentingNumber} />
-                                    <DetailRow label={t('Reference Number', '對方租約號碼')} value={selectedRent.rentingReferenceNumber} />
-                                    <DetailRow label={t('Monthly Rent', '月租')} value={formatCurrency(selectedRent.rentingMonthlyRental)} />
-                                    <DetailRow label={t('Periods', '期數')} value={selectedRent.rentingPeriods} />
-                                    <DetailRow label={t('Start Date', '開日期')} value={formatDate(selectedRent.rentingStartDate)} />
-                                    <DetailRow label={t('End Date', '結束日期')} value={formatDate(selectedRent.rentingEndDate)} />
-                                    <DetailRow label={t('Deposit', '押金')} value={formatCurrency(selectedRent.rentingDeposit)} />
-                                    {selectedRent.proprietor && <DetailRow label={t('Proprietor', '擁有方')} value={selectedRent.proprietor.name} />}
-                                </>
-                            )}
-                            {selectedRent.notes && (
-                                <div className="pt-3 mt-2 border-t border-zinc-100 dark:border-white/10">
-                                    <p className="text-xs text-zinc-400 dark:text-white/40 mb-1">{t('Notes', '備註')}</p>
-                                    <p className="text-sm text-zinc-700 dark:text-white/80">{selectedRent.notes}</p>
-                                </div>
-                            )}
-                        </div>
-                    </motion.div>
-                </motion.div>
+                <RentDetailsModal
+                    rent={selectedRent}
+                    onClose={() => setSelectedRent(null)}
+                />
             )}
 
             {/* Lightbox Overlay */}

@@ -54,7 +54,9 @@ export default function ManagePropertiesPage() {
     }, [propertiesData, searchQuery]);
 
     const sortedProperties = useMemo(() => {
-        return [...filteredProperties].sort((a, b) => a.code.localeCompare(b.code));
+        return [...filteredProperties].sort((a, b) =>
+            (a.code || '').trim().localeCompare((b.code || '').trim(), undefined, { numeric: true, sensitivity: 'base' })
+        );
     }, [filteredProperties]);
 
     const handleEdit = (property: Property) => {
@@ -90,15 +92,6 @@ export default function ManagePropertiesPage() {
                     <h1 className="text-2xl font-bold text-zinc-900 dark:text-white">物業概覽</h1>
                     <p className="text-zinc-500 dark:text-white/50 mt-1">管理所有物業資產</p>
                 </div>
-                <motion.button
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
-                    onClick={() => setShowForm(true)}
-                    className="px-5 py-2.5 bg-gradient-to-r from-purple-600 to-blue-600 rounded-xl text-white font-medium shadow-lg shadow-purple-500/20 hover:shadow-purple-500/30 transition-shadow flex items-center gap-2"
-                >
-                    <Plus className="w-5 h-5" />
-                    新增物業
-                </motion.button>
             </div>
 
             {/* Search */}
@@ -182,7 +175,7 @@ export default function ManagePropertiesPage() {
                                         <td className="p-4 text-right">
                                             <div className="flex items-center justify-end gap-2">
                                                 {/* View */}
-                                                <Link href={`/properties/${property.id}`}>
+                                                <Link href={`/properties/${encodeURIComponent(property.name)}`}>
                                                     <motion.button
                                                         whileHover={{ scale: 1.1 }}
                                                         whileTap={{ scale: 0.9 }}

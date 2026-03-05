@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useEffect, useState, useMemo, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
     Users,
@@ -15,9 +15,24 @@ import {
     Search
 } from 'lucide-react';
 import { useAuth, type User, type UserRole } from '@/contexts/AuthContext';
-import { useDatabase, fetchProperties, fetchProprietors, fetchRents, fetchUserStats } from '@/hooks/useStorage';
-import { BentoCard } from '@/components/layout/BentoGrid';
+import { fetchUserStats } from '@/hooks/useStorage';
+import { supabase } from '@/lib/supabase';
 import type { Property, Proprietor, Rent } from '@/lib/db';
+import Link from 'next/link';
+
+const propertyStatusColors: Record<string, string> = {
+    holding: 'bg-emerald-600 dark:bg-emerald-500/80 text-white',
+    renting: 'bg-blue-500/20 text-blue-400',
+    sold: 'bg-gray-500/20 text-gray-400',
+    suspended: 'bg-red-500/20 text-red-400',
+};
+
+const propertyStatusLabels: Record<string, string> = {
+    holding: '持有中',
+    renting: '出租中',
+    sold: '已售出',
+    suspended: '已暫停',
+};
 
 export default function UsersPage() {
     const { user, registerUser, getUsers, updateUser } = useAuth();
@@ -39,7 +54,63 @@ export default function UsersPage() {
     const [userDataStats, setUserDataStats] = useState<Record<string, { propertyCount: number, proprietorCount: number, rentCount: number }>>({});
     const [isLoadingUsers, setIsLoadingUsers] = useState(false);
     const [expandedUser, setExpandedUser] = useState<string | null>(null);
+    const [expandedUserTab, setExpandedUserTab] = useState<{ userId: string, tab: 'properties' | 'proprietors' | 'rents' } | null>(null);
+    const [expandedTabData, setExpandedTabData] = useState<any[]>([]);
+    const [isLoadingTabData, setIsLoadingTabData] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
+    const activeTabRef = useRef<{ userId: string, tab: string } | null>(null);
+
+    const loadUserData = async (userId: string, tab: 'properties' | 'proprietors' | 'rents') => {
+        activeTabRef.current = { userId, tab };
+        setIsLoadingTabData(true);
+        setExpandedTabData([]);
+        try {
+            const { data, error } = await supabase.from(tab).select('*').eq('created_by', userId).order('created_at', { ascending: false });
+
+            // Prevent race condition: only update state if this response matches the currently active tab
+            if (activeTabRef.current?.userId === userId && activeTabRef.current?.tab === tab) {
+                if (data) {
+                    setExpandedTabData(data);
+                }
+                setIsLoadingTabData(false);
+            }
+        } catch (err) {
+            console.error('Failed to load tab data:', err);
+            if (activeTabRef.current?.userId === userId && activeTabRef.current?.tab === tab) {
+                setIsLoadingTabData(false);
+            }
+        }
+    };
+
+    const handleTabClick = (e: React.MouseEvent, u: User, tab: 'properties' | 'proprietors' | 'rents') => {
+        e.stopPropagation();
+        if (expandedUserTab?.userId === u.id && expandedUserTab?.tab === tab) {
+            setExpandedUserTab(null);
+            setExpandedUser(null);
+        } else {
+            setExpandedUserTab({ userId: u.id, tab });
+            setExpandedUser(u.id);
+            loadUserData(u.id, tab);
+        }
+    };
+
+    const handleRowClick = (u: User) => {
+        if (expandedUser === u.id) {
+            setExpandedUser(null);
+            setExpandedUserTab(null);
+        } else {
+            setExpandedUser(u.id);
+            const stats = userDataStats[u.id];
+            let defaultTab: 'properties' | 'proprietors' | 'rents' = 'properties';
+            if (stats) {
+                if (stats.propertyCount > 0) defaultTab = 'properties';
+                else if (stats.proprietorCount > 0) defaultTab = 'proprietors';
+                else if (stats.rentCount > 0) defaultTab = 'rents';
+            }
+            setExpandedUserTab({ userId: u.id, tab: defaultTab });
+            loadUserData(u.id, defaultTab);
+        }
+    };
 
     // Edit User State
     const [editingUser, setEditingUser] = useState<User | null>(null);
@@ -304,7 +375,7 @@ export default function UsersPage() {
                                 <div key={u.id} className="overflow-hidden bg-white dark:bg-white/5 rounded-2xl border border-zinc-200 dark:border-white/10">
                                     <div
                                         className="p-5 flex items-center justify-between cursor-pointer hover:bg-zinc-50 dark:hover:bg-white/[0.08] transition-colors"
-                                        onClick={() => setExpandedUser(expandedUser === u.id ? null : u.id)}
+                                        onClick={() => handleRowClick(u)}
                                     >
                                         <div className="flex items-center gap-4">
                                             <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-500 flex items-center justify-center text-white font-bold text-lg shadow-lg shadow-indigo-500/20">
@@ -325,44 +396,56 @@ export default function UsersPage() {
                                             </div>
                                         </div>
 
-                                        <div className="flex items-center gap-8">
-                                            <div className="hidden sm:flex gap-6">
-                                                <div className="text-center group">
-                                                    <p className="text-[10px] text-zinc-400 dark:text-white/30 uppercase font-bold tracking-widest mb-1">{t('物業', 'Properties')}</p>
-                                                    <p className="text-xl font-bold text-zinc-900 dark:text-white group-hover:text-indigo-500 transition-colors">
+                                        <div className="flex items-center gap-4 md:gap-8">
+                                            <div className="hidden sm:flex gap-2">
+                                                <button
+                                                    onClick={(e) => handleTabClick(e, u, 'properties')}
+                                                    className={`px-3 py-2 text-center group rounded-xl transition-all border border-transparent ${expandedUserTab?.userId === u.id && expandedUserTab?.tab === 'properties' ? 'bg-indigo-50 dark:bg-indigo-500/10 border-indigo-100 dark:border-indigo-500/20' : 'hover:bg-zinc-100 dark:hover:bg-white/5'}`}
+                                                >
+                                                    <p className={`text-[10px] uppercase font-bold tracking-widest mb-1 ${expandedUserTab?.userId === u.id && expandedUserTab?.tab === 'properties' ? 'text-indigo-500' : 'text-zinc-400 dark:text-white/30'}`}>{t('物業', 'Properties')}</p>
+                                                    <p className={`text-xl font-bold transition-colors ${expandedUserTab?.userId === u.id && expandedUserTab?.tab === 'properties' ? 'text-indigo-600 dark:text-indigo-400' : 'text-zinc-900 dark:text-white group-hover:text-indigo-500'}`}>
                                                         {userDataStats[u.id]?.propertyCount || 0}
                                                     </p>
-                                                </div>
-                                                <div className="text-center group">
-                                                    <p className="text-[10px] text-zinc-400 dark:text-white/30 uppercase font-bold tracking-widest mb-1">{t('業主/租客', 'Owners')}</p>
-                                                    <p className="text-xl font-bold text-zinc-900 dark:text-white group-hover:text-indigo-500 transition-colors">
+                                                </button>
+                                                <button
+                                                    onClick={(e) => handleTabClick(e, u, 'proprietors')}
+                                                    className={`px-3 py-2 text-center group rounded-xl transition-all border border-transparent ${expandedUserTab?.userId === u.id && expandedUserTab?.tab === 'proprietors' ? 'bg-indigo-50 dark:bg-indigo-500/10 border-indigo-100 dark:border-indigo-500/20' : 'hover:bg-zinc-100 dark:hover:bg-white/5'}`}
+                                                >
+                                                    <p className={`text-[10px] uppercase font-bold tracking-widest mb-1 ${expandedUserTab?.userId === u.id && expandedUserTab?.tab === 'proprietors' ? 'text-indigo-500' : 'text-zinc-400 dark:text-white/30'}`}>{t('業主/租客', 'Owners')}</p>
+                                                    <p className={`text-xl font-bold transition-colors ${expandedUserTab?.userId === u.id && expandedUserTab?.tab === 'proprietors' ? 'text-indigo-600 dark:text-indigo-400' : 'text-zinc-900 dark:text-white group-hover:text-indigo-500'}`}>
                                                         {userDataStats[u.id]?.proprietorCount || 0}
                                                     </p>
-                                                </div>
-                                                <div className="text-center group">
-                                                    <p className="text-[10px] text-zinc-400 dark:text-white/30 uppercase font-bold tracking-widest mb-1">{t('租務資料', 'Rents')}</p>
-                                                    <p className="text-xl font-bold text-zinc-900 dark:text-white group-hover:text-indigo-500 transition-colors">
+                                                </button>
+                                                <button
+                                                    onClick={(e) => handleTabClick(e, u, 'rents')}
+                                                    className={`px-3 py-2 text-center group rounded-xl transition-all border border-transparent ${expandedUserTab?.userId === u.id && expandedUserTab?.tab === 'rents' ? 'bg-indigo-50 dark:bg-indigo-500/10 border-indigo-100 dark:border-indigo-500/20' : 'hover:bg-zinc-100 dark:hover:bg-white/5'}`}
+                                                >
+                                                    <p className={`text-[10px] uppercase font-bold tracking-widest mb-1 ${expandedUserTab?.userId === u.id && expandedUserTab?.tab === 'rents' ? 'text-indigo-500' : 'text-zinc-400 dark:text-white/30'}`}>{t('租務資料', 'Rents')}</p>
+                                                    <p className={`text-xl font-bold transition-colors ${expandedUserTab?.userId === u.id && expandedUserTab?.tab === 'rents' ? 'text-indigo-600 dark:text-indigo-400' : 'text-zinc-900 dark:text-white group-hover:text-indigo-500'}`}>
                                                         {userDataStats[u.id]?.rentCount || 0}
                                                     </p>
+                                                </button>
+                                            </div>
+
+                                            <div className="flex items-center gap-2">
+                                                <button
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        setEditingUser(u);
+                                                        setEditRole(u.role);
+                                                        setEditPassword('');
+                                                    }}
+                                                    className="p-2 sm:px-4 sm:py-2 bg-zinc-100 dark:bg-white/5 hover:bg-zinc-200 dark:hover:bg-white/10 text-zinc-700 dark:text-white/70 rounded-xl text-sm font-medium transition-all flex items-center gap-2"
+                                                    title={t('修改資料', 'Edit Info')}
+                                                >
+                                                    <RefreshCw className="w-4 h-4" />
+                                                    <span className="hidden sm:inline">{t('修改', 'Edit')}</span>
+                                                </button>
+                                                <div className="p-2 text-zinc-400">
+                                                    {expandedUser === u.id ? <ChevronDown className="w-5 h-5" /> : <ChevronRight className="w-5 h-5" />}
                                                 </div>
                                             </div>
-                                            {expandedUser === u.id ? <ChevronDown className="w-6 h-6 text-zinc-400" /> : <ChevronRight className="w-6 h-6 text-zinc-400" />}
                                         </div>
-                                    </div>
-
-                                    <div className="px-5 pb-5 flex justify-end gap-2 border-t border-zinc-100 dark:border-white/5 pt-3">
-                                        <button
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                setEditingUser(u);
-                                                setEditRole(u.role);
-                                                setEditPassword('');
-                                            }}
-                                            className="px-4 py-1.5 bg-zinc-100 dark:bg-white/5 hover:bg-zinc-200 dark:hover:bg-white/10 text-zinc-700 dark:text-white/70 rounded-lg text-sm font-medium transition-all flex items-center gap-2"
-                                        >
-                                            <RefreshCw className="w-3.5 h-3.5" />
-                                            {t('修改資料', 'Edit Info')}
-                                        </button>
                                     </div>
 
                                     <AnimatePresence>
@@ -374,9 +457,75 @@ export default function UsersPage() {
                                                 className="border-t border-zinc-100 dark:border-white/5 bg-zinc-50/50 dark:bg-black/20 overflow-hidden"
                                             >
                                                 <div className="p-6">
-                                                    <p className="text-zinc-500 dark:text-white/40 text-sm italic">
-                                                        {t('詳細列表已隱藏以提高性能。請點擊物業編號查看詳情。', 'Detailed list hidden for performance. Please click property code to view details.')}
-                                                    </p>
+                                                    {isLoadingTabData ? (
+                                                        <div className="flex justify-center py-8">
+                                                            <RefreshCw className="w-6 h-6 animate-spin text-indigo-500" />
+                                                        </div>
+                                                    ) : expandedTabData.length === 0 ? (
+                                                        <div className="text-center py-8">
+                                                            <div className="w-12 h-12 rounded-full bg-zinc-100 dark:bg-white/5 flex items-center justify-center mx-auto mb-3">
+                                                                <LayoutList className="w-5 h-5 text-zinc-400" />
+                                                            </div>
+                                                            <p className="text-zinc-500 dark:text-white/40">{t('沒有記錄', 'No records found')}</p>
+                                                        </div>
+                                                    ) : (
+                                                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                                                            {expandedUserTab?.tab === 'properties' && expandedTabData.map(item => (
+                                                                <Link key={item.id} href={`/properties/${encodeURIComponent(item.name)}`}>
+                                                                    <div className="p-4 bg-white dark:bg-zinc-800 rounded-xl border border-zinc-200 dark:border-white/10 shadow-sm hover:shadow-md hover:border-indigo-500/50 transition-all cursor-pointer h-full">
+                                                                        <p className="font-bold text-zinc-900 dark:text-white truncate" title={item.name}>{item.name}</p>
+                                                                        <p className="text-sm text-zinc-500 dark:text-white/50">{item.code || t('無編號', 'No code')}</p>
+                                                                        <div className="mt-3">
+                                                                            <span className={`text-[10px] px-2.5 py-1 font-medium rounded-full ${propertyStatusColors[item.status] || 'bg-zinc-100 dark:bg-white/5 text-zinc-600 dark:text-white/60'}`}>
+                                                                                {propertyStatusLabels[item.status] || item.status || 'Active'}
+                                                                            </span>
+                                                                        </div>
+                                                                    </div>
+                                                                </Link>
+                                                            ))}
+
+                                                            {expandedUserTab?.tab === 'proprietors' && expandedTabData.map(item => (
+                                                                <div key={item.id} className="p-4 bg-white dark:bg-zinc-800 rounded-xl border border-zinc-200 dark:border-white/10 shadow-sm hover:shadow-md transition-shadow">
+                                                                    <p className="font-bold text-zinc-900 dark:text-white truncate" title={item.name}>{item.name}</p>
+                                                                    {item.english_name && <p className="text-sm text-zinc-500 dark:text-white/50 truncate" title={item.english_name}>{item.english_name}</p>}
+                                                                    <div className="mt-3 flex gap-2">
+                                                                        <span className="text-[10px] px-2 py-1 bg-amber-50 dark:bg-amber-500/10 font-medium rounded-md text-amber-600 dark:text-amber-400 border border-amber-200 dark:border-amber-500/20">
+                                                                            {item.type || 'Individual'}
+                                                                        </span>
+                                                                        {item.category && (
+                                                                            <span className="text-[10px] px-2 py-1 bg-blue-50 dark:bg-blue-500/10 font-medium rounded-md text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-500/20">
+                                                                                {item.category}
+                                                                            </span>
+                                                                        )}
+                                                                    </div>
+                                                                </div>
+                                                            ))}
+
+                                                            {expandedUserTab?.tab === 'rents' && expandedTabData.map(item => (
+                                                                <div key={item.id} className="p-4 bg-white dark:bg-zinc-800 rounded-xl border border-zinc-200 dark:border-white/10 shadow-sm hover:shadow-md transition-shadow">
+                                                                    <div className="flex justify-between items-start mb-2">
+                                                                        <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold ${item.type === 'rent_out'
+                                                                            ? 'bg-blue-50 text-blue-600 border border-blue-200 dark:bg-blue-500/10 dark:text-blue-400 dark:border-blue-500/20'
+                                                                            : 'bg-emerald-50 text-emerald-600 border border-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-400 dark:border-emerald-500/20'
+                                                                            }`}>
+                                                                            {item.type === 'rent_out' ? t('收租', 'Rent Out') : t('交租', 'Renting')}
+                                                                        </span>
+                                                                        <span className="text-xs text-zinc-400">
+                                                                            {new Date(item.created_at).toLocaleDateString()}
+                                                                        </span>
+                                                                    </div>
+                                                                    <p className="text-xl font-bold text-zinc-900 dark:text-white my-1 truncate">
+                                                                        ${(item.type === 'rent_out' ? item.rent_out_monthly_rental : item.renting_monthly_rental) || 0}
+                                                                    </p>
+                                                                    {(item.rent_out_tenancy_number || item.renting_number) && (
+                                                                        <p className="text-[11px] text-zinc-500 dark:text-white/40 truncate">
+                                                                            {t('單號: ', 'No: ')}{item.type === 'rent_out' ? item.rent_out_tenancy_number : item.renting_number}
+                                                                        </p>
+                                                                    )}
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    )}
                                                 </div>
                                             </motion.div>
                                         )}

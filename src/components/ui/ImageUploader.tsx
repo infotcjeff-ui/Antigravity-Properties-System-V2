@@ -92,7 +92,7 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
                 )}
             </div>
 
-            <div className={`relative group w-full ${previewUrl ? 'min-h-[200px]' : ''} rounded-2xl overflow-hidden border-2 border-dashed transition-all duration-300
+            <div className={`relative group w-full ${aspectRatio} rounded-2xl overflow-hidden border-2 border-dashed transition-all duration-300
                 ${previewUrl
                     ? 'border-purple-500/50 bg-gray-50 dark:bg-gray-900'
                     : 'border-transparent'
@@ -105,7 +105,7 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
                         }
                     }} />
                 ) : (
-                    <div className="relative w-full h-full min-h-[200px]">
+                    <div className={`relative w-full h-full ${aspectRatio}`}>
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img
                             src={previewUrl}
