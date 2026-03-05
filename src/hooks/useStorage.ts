@@ -1278,3 +1278,16 @@ export function usePropertyWithRelationsByNameQuery(name: string) {
         staleTime: 5 * 60 * 1000,
     });
 }
+
+export function useUsersQuery() {
+    const { getUsers } = useAuth();
+    return useQuery({
+        queryKey: ['users'],
+        queryFn: async () => {
+            const { success, users } = await getUsers();
+            if (!success) throw new Error('Failed to fetch users');
+            return users || [];
+        },
+        staleTime: 10 * 60 * 1000, // 10 minutes
+    });
+}

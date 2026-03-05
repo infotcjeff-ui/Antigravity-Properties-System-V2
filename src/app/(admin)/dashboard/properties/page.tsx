@@ -2,12 +2,12 @@
 
 import { useEffect, useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { usePropertiesQuery, useProperties } from '@/hooks/useStorage';
 import { useQueryClient } from '@tanstack/react-query';
 import type { Property } from '@/lib/db';
-import PropertyForm from '@/components/properties/PropertyForm';
-import { Building2, Plus, Pencil, Trash2, Search, Eye } from 'lucide-react';
 import Link from 'next/link';
+import { useProperties, usePropertiesQuery, useUsersQuery } from '@/hooks/useStorage';
+import PropertyForm from '@/components/properties/PropertyForm';
+import { Building2, Plus, Search, Pencil, Trash2, Eye } from 'lucide-react';
 
 const statusColors: Record<string, string> = {
     holding: 'bg-emerald-600 dark:bg-emerald-500/80 text-white',
@@ -32,7 +32,18 @@ const typeLabels: Record<string, string> = {
 
 export default function ManagePropertiesPage() {
     const queryClient = useQueryClient();
-    const { data: propertiesData, isLoading } = usePropertiesQuery();
+    const { data: qProperties, isLoading: propertiesLoading } = usePropertiesQuery();
+    const { data: users, isLoading: usersLoading } = useUsersQuery();
+    const isLoading = propertiesLoading || usersLoading;
+
+    // Create user lookup map
+    const userMap = useMemo(() => {
+        const map: Record<string, string> = {};
+        users?.forEach(u => {
+            map[u.id] = u.username;
+        });
+        return map;
+    }, [users]);
     const { deleteProperty } = useProperties();
 
     const [searchQuery, setSearchQuery] = useState('');
@@ -42,16 +53,16 @@ export default function ManagePropertiesPage() {
 
     // Filter properties based on search query (client-side for instant feedback)
     const filteredProperties = useMemo(() => {
-        const properties = propertiesData || [];
+        const properties = qProperties || [];
         if (!searchQuery) return properties;
 
         const query = searchQuery.toLowerCase();
-        return properties.filter(p =>
+        return properties.filter((p: Property) =>
             p.name.toLowerCase().includes(query) ||
             p.code.toLowerCase().includes(query) ||
             p.address.toLowerCase().includes(query)
         );
-    }, [propertiesData, searchQuery]);
+    }, [qProperties, searchQuery]);
 
     const sortedProperties = useMemo(() => {
         return [...filteredProperties].sort((a, b) =>
@@ -132,6 +143,7 @@ export default function ManagePropertiesPage() {
                                     <th className="px-4 py-3 text-left text-xs font-medium text-zinc-500 dark:text-white/40 uppercase tracking-wider">編號</th>
                                     <th className="px-4 py-3 text-left text-xs font-medium text-zinc-500 dark:text-white/40 uppercase tracking-wider">類型</th>
                                     <th className="px-4 py-3 text-left text-xs font-medium text-zinc-500 dark:text-white/40 uppercase tracking-wider">狀態</th>
+                                    <th className="px-4 py-3 text-left text-xs font-medium text-zinc-500 dark:text-white/40 uppercase tracking-wider">上載者</th>
                                     <th className="px-4 py-3 text-right text-xs font-medium text-zinc-500 dark:text-white/40 uppercase tracking-wider">操作</th>
                                 </tr>
                             </thead>
@@ -171,6 +183,9 @@ export default function ManagePropertiesPage() {
                                             <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${statusColors[property.status]}`}>
                                                 {statusLabels[property.status]}
                                             </span>
+                                        </td>
+                                        <td className="p-4 text-zinc-600 dark:text-white/70 text-sm">
+                                            {property.createdBy ? (userMap[property.createdBy] || 'Unknown') : '-'}
                                         </td>
                                         <td className="p-4 text-right">
                                             <div className="flex items-center justify-end gap-2">
