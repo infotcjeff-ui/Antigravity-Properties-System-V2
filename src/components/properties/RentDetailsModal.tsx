@@ -16,7 +16,9 @@ interface RentDetailsModalProps {
 function DetailRow({ label, value, tooltipContent }: { label: string; value: any; tooltipContent?: React.ReactNode }) {
     if (value == null || value === '' || value === '-') return null;
 
-    const valueNode = <span className={`text-sm font-medium ${tooltipContent ? 'text-purple-600 dark:text-purple-400 border-b border-dashed border-purple-300 dark:border-purple-600/50 cursor-pointer' : 'text-zinc-900 dark:text-white'} text-right block`}>{String(value)}</span>;
+    const valueNode = <span className={`text-sm font-medium ${tooltipContent ? 'text-purple-600 dark:text-purple-400 border-b border-dashed border-purple-300 dark:border-purple-600/50 cursor-pointer' : 'text-zinc-900 dark:text-white'} text-right block`}>
+        {typeof value === 'string' || typeof value === 'number' ? String(value) : value}
+    </span>;
 
     return (
         <div className="flex justify-between items-start gap-4 py-2 border-b border-zinc-50 dark:border-white/5 last:border-none">
@@ -50,6 +52,19 @@ export default function RentDetailsModal({ rent, property, onClose }: RentDetail
             ? date.toLocaleDateString('zh-TW', { year: 'numeric', month: 'long', day: 'numeric' })
             : date.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
     };
+
+    const endDate = rent.type === 'rent_out' ? rent.rentOutEndDate : rent.rentingEndDate;
+    const isExpired = endDate ? new Date(endDate) < new Date(new Date().setHours(0, 0, 0, 0)) : false;
+
+    let statusValueRentOut: React.ReactNode = rent.rentOutStatus === 'listing' ? '放盤中' : rent.rentOutStatus === 'renting' ? '出租中' : rent.rentOutStatus === 'completed' ? '已完租' : rent.rentOutStatus;
+    if (isExpired) {
+        statusValueRentOut = <span className="text-red-500 font-bold whitespace-nowrap">已過期</span>;
+    }
+
+    let statusValueRenting: React.ReactNode = '生效中';
+    if (isExpired) {
+        statusValueRenting = <span className="text-red-500 font-bold whitespace-nowrap">已過期</span>;
+    }
 
     return (
         <motion.div
@@ -107,7 +122,7 @@ export default function RentDetailsModal({ rent, property, onClose }: RentDetail
                             <DetailRow label={t('Deposit Return Amount', '按金退回金額')} value={formatCurrency(rent.rentOutDepositReturnAmount)} />
                             <DetailRow label={t('Lessor', '出租人')} value={rent.rentOutLessor} />
                             <DetailRow label={t('Address Detail', '地址資料')} value={rent.rentOutAddressDetail} />
-                            <DetailRow label={t('Status', '狀態')} value={rent.rentOutStatus === 'listing' ? '放盤中' : rent.rentOutStatus === 'renting' ? '出租中' : rent.rentOutStatus === 'completed' ? '已完租' : rent.rentOutStatus} />
+                            <DetailRow label={t('Status', '狀態')} value={statusValueRentOut} />
 
                             {property && (
                                 <DetailRow
@@ -173,6 +188,7 @@ export default function RentDetailsModal({ rent, property, onClose }: RentDetail
                             <DetailRow label={t('Start Date', '開始日期')} value={formatDate(rent.rentingStartDate)} />
                             <DetailRow label={t('End Date', '結束日期')} value={formatDate(rent.rentingEndDate)} />
                             <DetailRow label={t('Deposit', '押金')} value={formatCurrency(rent.rentingDeposit)} />
+                            <DetailRow label={t('Status', '狀態')} value={statusValueRenting} />
 
                             {property && (
                                 <DetailRow
