@@ -117,7 +117,8 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
 
             const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(searchAddress)}&limit=1`, {
                 headers: {
-                    'Accept-Language': 'zh-TW,zh;q=0.9,en;q=0.8'
+                    'Accept-Language': 'zh-TW,zh;q=0.9,en;q=0.8',
+                    'User-Agent': 'AntigravityPropSystem/1.0'
                 }
             });
             const data = await response.json();
