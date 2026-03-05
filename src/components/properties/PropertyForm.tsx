@@ -830,11 +830,16 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                                                         </div>
                                                     ) : (
                                                         <>
-                                                            <div className="text-zinc-400 dark:text-white/40">
-                                                                {startDate?.toLocaleDateString()} - {endDate?.toLocaleDateString() || '至今'}
-                                                            </div>
-                                                            <div className="text-zinc-600 dark:text-white/70 truncate" title={location}>
-                                                                {location}
+                                                            <div className="flex flex-col">
+                                                                <div className={`text-xs ${endDate && new Date(endDate) < new Date(new Date().setHours(0, 0, 0, 0)) ? 'text-red-500 font-medium' : 'text-zinc-400 dark:text-white/40'}`}>
+                                                                    {startDate?.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })} - {endDate?.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) || '至今'}
+                                                                    {endDate && new Date(endDate) < new Date(new Date().setHours(0, 0, 0, 0)) && (
+                                                                        <span className="ml-1 text-[10px] px-1 py-0.5 bg-red-100 dark:bg-red-500/20 text-red-600 dark:text-red-400 rounded">已過期</span>
+                                                                    )}
+                                                                </div>
+                                                                <div className="text-zinc-600 dark:text-white/70 truncate text-xs mt-0.5" title={location}>
+                                                                    {location}
+                                                                </div>
                                                             </div>
                                                         </>
                                                     )}
@@ -948,9 +953,12 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                                         .map(r => {
                                             const monthlyRent = r.type === 'rent_out' ? r.rentOutMonthlyRental : r.rentingMonthlyRental;
                                             const tenantName = (proprietors || []).find(p => p.id === r.tenantId)?.name;
+                                            const endDate = r.type === 'rent_out' ? r.rentOutEndDate : (r.rentingEndDate || r.endDate);
+                                            const isExpired = endDate ? new Date(endDate) < new Date(new Date().setHours(0, 0, 0, 0)) : false;
+
                                             return {
                                                 value: r.id!,
-                                                label: `${r.type === 'rent_out' ? '收租' : '交租'} - ${tenantName || '未指定'} - $${(monthlyRent || 0).toLocaleString()}/月`
+                                                label: `${r.type === 'rent_out' ? '收租' : '交租'} - ${tenantName || '未指定'} - $${(monthlyRent || 0).toLocaleString()}/月${isExpired ? ' (已過期)' : ''}`
                                             };
                                         }))
                                 ]}

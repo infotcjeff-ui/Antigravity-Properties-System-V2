@@ -369,6 +369,8 @@ export default function PropertyDetailsPage() {
                                                 ? (rent.rentOutMonthlyRental || rent.amount || 0)
                                                 : (rent.rentingMonthlyRental || rent.amount || 0);
 
+                                            const isExpired = endDate ? new Date(endDate) < new Date(new Date().setHours(0, 0, 0, 0)) : false;
+
                                             return (
                                                 <div
                                                     key={rent.id}
@@ -428,8 +430,9 @@ export default function PropertyDetailsPage() {
                                                     </div>
                                                     {/* Lease Term */}
                                                     <div className="py-4 px-4 border-l border-dashed border-zinc-200 dark:border-white/10 flex flex-col justify-center">
-                                                        <div className="text-zinc-600 dark:text-white/70 text-sm">
+                                                        <div className={`text-sm ${isExpired ? 'text-red-500 font-medium' : 'text-zinc-600 dark:text-white/70'}`}>
                                                             {formatEnDate(startDate)}{startDate && endDate && ' ~ '}{formatEnDate(endDate)}{periods ? `(${periods}個月)` : ''}
+                                                            {isExpired && <span className="ml-1 text-xs px-1.5 py-0.5 bg-red-100 dark:bg-red-500/20 text-red-600 dark:text-red-400 rounded">已過期</span>}
                                                         </div>
                                                     </div>
                                                     {/* Rent */}

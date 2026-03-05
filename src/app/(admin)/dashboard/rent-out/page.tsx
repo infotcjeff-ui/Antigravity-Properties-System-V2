@@ -152,6 +152,8 @@ export default function RentOutPage() {
                                 const monthlyRent = rent.rentOutMonthlyRental || rent.amount || 0;
                                 const status = rent.rentOutStatus || rent.status || 'active';
 
+                                const isExpired = endDate ? new Date(endDate) < new Date(new Date().setHours(0, 0, 0, 0)) : false;
+
                                 return (
                                     <motion.tr
                                         key={rent.id}
@@ -171,21 +173,16 @@ export default function RentOutPage() {
                                         <td className="p-4 text-green-600 dark:text-green-400 font-medium">
                                             + {rent.currency || 'HKD'} {((rent.rentOutMonthlyRental || 0) * (rent.rentOutPeriods || 1)).toLocaleString()}
                                         </td>
-                                        <td className="p-4 text-zinc-500 dark:text-white/50 text-sm">
+                                        <td className={`p-4 text-sm ${isExpired ? 'text-red-500 font-medium' : 'text-zinc-500 dark:text-white/50'}`}>
                                             {startDate ? new Date(startDate).toLocaleDateString() : '-'} - {endDate ? new Date(endDate).toLocaleDateString() : '-'}
                                         </td>
                                         <td className="p-4">
-                                            {(() => {
-                                                const isExpired = endDate ? new Date(endDate).getTime() < new Date().getTime() : false;
-                                                return (
-                                                    <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${isExpired
-                                                        ? 'bg-red-100 dark:bg-red-500/20 text-red-600 dark:text-red-400 border border-red-200 dark:border-red-500/30'
-                                                        : 'bg-green-100 dark:bg-green-500/20 text-green-600 dark:text-green-400 border border-green-200 dark:border-green-500/30'
-                                                        }`}>
-                                                        {isExpired ? '已過期' : status === 'renting' ? '出租中' : status === 'listing' ? '放租中' : status}
-                                                    </span>
-                                                );
-                                            })()}
+                                            <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${isExpired
+                                                ? 'bg-red-100 dark:bg-red-500/20 text-red-600 dark:text-red-400 border border-red-200 dark:border-red-500/30'
+                                                : 'bg-green-100 dark:bg-green-500/20 text-green-600 dark:text-green-400 border border-green-200 dark:border-green-500/30'
+                                                }`}>
+                                                {isExpired ? '已過期' : status === 'renting' ? '出租中' : status === 'listing' ? '放租中' : status}
+                                            </span>
                                         </td>
                                         <td className="p-4" onClick={(e) => e.stopPropagation()}>
                                             <div className="flex items-center gap-2">
