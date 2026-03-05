@@ -43,6 +43,10 @@ export const fetchProperties = async (user?: any, options?: { query?: string }):
             queryBuilder = queryBuilder.or(`name.ilike.%${q}%,code.ilike.%${q}%,address.ilike.%${q}%`);
         }
 
+        if (user && user.role !== 'admin') {
+            queryBuilder = queryBuilder.eq('created_by', user.id);
+        }
+
         const { data, error: sbError } = await queryBuilder
             .order('code', { ascending: true });
 
@@ -82,7 +86,9 @@ export const fetchProprietors = async (user?: any): Promise<Proprietor[]> => {
     try {
         let query = supabase.from('proprietors').select('*');
 
-        // All users can see all proprietors
+        if (user && user.role !== 'admin') {
+            query = query.eq('created_by', user.id);
+        }
 
         const { data, error: sbError } = await query
             .order('name', { ascending: true });
@@ -119,7 +125,9 @@ export const fetchRents = async (user?: any): Promise<Rent[]> => {
     try {
         let query = supabase.from('rents').select('*');
 
-        // All users can see all rents
+        if (user && user.role !== 'admin') {
+            query = query.eq('created_by', user.id);
+        }
 
         const { data, error: sbError } = await query
             .order('created_at', { ascending: false });
@@ -139,7 +147,7 @@ export const fetchRents = async (user?: any): Promise<Rent[]> => {
     }
 };
 
-export const fetchRentsWithRelations = async (options?: { type?: 'renting' | 'rent_out' }): Promise<any[]> => {
+export const fetchRentsWithRelations = async (user?: any, options?: { type?: 'renting' | 'rent_out' }): Promise<any[]> => {
     try {
         // EXCLUDE heavy fields from property join
         const propFields = 'id, name, code, address, type, status, land_use, lot_index, lot_area, location, google_drive_plan_url, has_planning_permission, proprietor_id, tenant_id, created_by, created_at, updated_at, images';
@@ -147,6 +155,10 @@ export const fetchRentsWithRelations = async (options?: { type?: 'renting' | 're
 
         if (options?.type) {
             query = query.eq('type', options.type);
+        }
+
+        if (user && user.role !== 'admin') {
+            query = query.eq('created_by', user.id);
         }
 
         const { data, error } = await query.order('created_at', { ascending: false });
@@ -244,8 +256,31 @@ export const fetchUserStats = async (userId: string) => {
     }
 };
 
-export const fetchDashboardStats = async () => {
+export const fetchDashboardStats = async (user?: any) => {
     try {
+        // Base queries
+        let propertiesQuery = supabase.from('properties').select('*', { count: 'exact', head: true });
+        let proprietorsQuery = supabase.from('proprietors').select('*', { count: 'exact', head: true });
+        let rentsQuery = supabase.from('rents').select('*', { count: 'exact', head: true });
+        let rentsDataQuery = supabase.from('rents').select('type, status, renting_end_date, rent_out_end_date, rent_out_status, renting_monthly_rental, rent_out_monthly_rental, amount, renting_periods, rent_out_periods');
+
+        let holdingQuery = supabase.from('properties').select('*', { count: 'exact', head: true }).eq('status', 'holding');
+        let rentingQuery = supabase.from('properties').select('*', { count: 'exact', head: true }).eq('status', 'renting');
+        let soldQuery = supabase.from('properties').select('*', { count: 'exact', head: true }).eq('status', 'sold');
+        let suspendedQuery = supabase.from('properties').select('*', { count: 'exact', head: true }).eq('status', 'suspended');
+
+        if (user && user.role !== 'admin') {
+            propertiesQuery = propertiesQuery.eq('created_by', user.id);
+            proprietorsQuery = proprietorsQuery.eq('created_by', user.id);
+            rentsQuery = rentsQuery.eq('created_by', user.id);
+            rentsDataQuery = rentsDataQuery.eq('created_by', user.id);
+
+            holdingQuery = holdingQuery.eq('created_by', user.id);
+            rentingQuery = rentingQuery.eq('created_by', user.id);
+            soldQuery = soldQuery.eq('created_by', user.id);
+            suspendedQuery = suspendedQuery.eq('created_by', user.id);
+        }
+
         // Fetch counts in parallel
         const [
             { count: totalProperties },
@@ -253,10 +288,10 @@ export const fetchDashboardStats = async () => {
             { count: totalRents },
             { data: rentsData }
         ] = await Promise.all([
-            supabase.from('properties').select('*', { count: 'exact', head: true }),
-            supabase.from('proprietors').select('*', { count: 'exact', head: true }),
-            supabase.from('rents').select('*', { count: 'exact', head: true }),
-            supabase.from('rents').select('type, status, renting_end_date, rent_out_end_date, rent_out_status, renting_monthly_rental, rent_out_monthly_rental, amount, renting_periods, rent_out_periods')
+            propertiesQuery,
+            proprietorsQuery,
+            rentsQuery,
+            rentsDataQuery
         ]);
 
         // Get property status breakdown
@@ -266,10 +301,10 @@ export const fetchDashboardStats = async () => {
             { count: soldCount },
             { count: suspendedCount }
         ] = await Promise.all([
-            supabase.from('properties').select('*', { count: 'exact', head: true }).eq('status', 'holding'),
-            supabase.from('properties').select('*', { count: 'exact', head: true }).eq('status', 'renting'),
-            supabase.from('properties').select('*', { count: 'exact', head: true }).eq('status', 'sold'),
-            supabase.from('properties').select('*', { count: 'exact', head: true }).eq('status', 'suspended')
+            holdingQuery,
+            rentingQuery,
+            soldQuery,
+            suspendedQuery
         ]);
 
         // Calculate rent statistics from the fetched rent data
@@ -1201,7 +1236,7 @@ export function useRentsWithRelationsQuery(options?: { type?: 'renting' | 'rent_
     const { user } = useAuth();
     return useQuery({
         queryKey: ['rents-with-relations', user?.id, options?.type],
-        queryFn: () => fetchRentsWithRelations(options),
+        queryFn: () => fetchRentsWithRelations(user, options),
         staleTime: 2 * 60 * 1000,
     });
 }
@@ -1210,7 +1245,7 @@ export function useDashboardStatsQuery() {
     const { user } = useAuth();
     return useQuery({
         queryKey: ['dashboard-stats', user?.id],
-        queryFn: fetchDashboardStats,
+        queryFn: () => fetchDashboardStats(user),
         staleTime: 30 * 1000, // 30 seconds
     });
 }
