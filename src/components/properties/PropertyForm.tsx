@@ -109,8 +109,12 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
 
         setIsGeocoding(true);
         try {
-            // Append Hong Kong to improve accuracy if not present
+            // Append Hong Kong to improve accuracy if not present and remove parentheses
             let searchAddress = formData.address;
+
+            // Remove text in parentheses (e.g., "(租車易)") to help OSM find the location
+            searchAddress = searchAddress.replace(/\(.*?\)/g, '').replace(/（.*?）/g, '').trim();
+
             if (!searchAddress.toLowerCase().includes('hong kong') && !searchAddress.includes('香港')) {
                 searchAddress += ', Hong Kong';
             }
@@ -134,7 +138,25 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                 }));
                 addNotification('定位成功 / Location found', 'update');
             } else {
-                addNotification('找不到該地址的地點 / Location not found', 'info');
+                // Try fallback location (Kam Tin) just like the backend script
+                const fallbackRes = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent('Kam Tin, Hong Kong')}&limit=1`, {
+                    headers: { 'User-Agent': 'AntigravityPropSystem/1.0' }
+                });
+                const fallbackData = await fallbackRes.json();
+
+                if (fallbackData && fallbackData.length > 0) {
+                    // Add slight random offset to prevent perfect overlap for multiple properties
+                    const lat = parseFloat(fallbackData[0].lat) + (Math.random() * 0.01 - 0.005);
+                    const lng = parseFloat(fallbackData[0].lon) + (Math.random() * 0.01 - 0.005);
+
+                    setFormData(prev => ({
+                        ...prev,
+                        location: { lat, lng, address: formData.address },
+                    }));
+                    addNotification('找不到精準地址，已定位至錦田 / Exact location not found, defaulted to Kam Tin', 'info');
+                } else {
+                    addNotification('找不到該地址的地點 / Location not found', 'info');
+                }
             }
         } catch (error) {
             console.error('Geocoding error:', error);
