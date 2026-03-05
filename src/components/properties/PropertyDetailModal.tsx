@@ -22,6 +22,7 @@ import { BentoCard } from '@/components/layout/BentoGrid';
 import { useLanguage } from '@/components/common/LanguageSwitcher';
 import RentDetailsModal from '@/components/properties/RentDetailsModal';
 import { Tooltip } from '@heroui/react';
+import SinglePropertyMapDynamic from '@/components/properties/SinglePropertyMapDynamic';
 
 interface PropertyDetailModalProps {
     propertyName: string;
@@ -236,16 +237,9 @@ export default function PropertyDetailModal({ propertyName, onClose }: PropertyD
                                         <Map className="w-4 h-4 text-emerald-500" />
                                         位置資訊
                                     </h4>
-                                    {property.address ? (
+                                    {property.location?.lat && property.location?.lng ? (
                                         <div className="aspect-[16/9] rounded-2xl overflow-hidden bg-white/5">
-                                            <iframe
-                                                width="100%"
-                                                height="100%"
-                                                frameBorder="0"
-                                                style={{ border: 0 }}
-                                                src={`https://www.google.com/maps/embed/v1/place?key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}&q=${encodeURIComponent(property.address)}&zoom=15`}
-                                                allowFullScreen
-                                            />
+                                            <SinglePropertyMapDynamic property={property} />
                                         </div>
                                     ) : (
                                         <div className="h-32 flex items-center justify-center text-zinc-400 text-sm italic">尚未提供地址以顯示地圖</div>

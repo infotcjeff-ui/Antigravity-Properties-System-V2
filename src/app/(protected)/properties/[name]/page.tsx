@@ -23,6 +23,7 @@ import {
 import DOMPurify from 'dompurify';
 import { useLanguage } from '@/components/common/LanguageSwitcher';
 import RentDetailsModal from '@/components/properties/RentDetailsModal';
+import SinglePropertyMapDynamic from '@/components/properties/SinglePropertyMapDynamic';
 import { useAuth } from '@/contexts/AuthContext';
 import { Tooltip } from '@heroui/react';
 
@@ -87,6 +88,7 @@ export default function PropertyDetailsPage() {
     const [lightboxImage, setLightboxImage] = useState<string | null>(null);
     const [selectedRent, setSelectedRent] = useState<Rent | null>(null);
     const [showGeoMaps, setShowGeoMaps] = useState(false);
+    const [imageError, setImageError] = useState(false);
 
     const activeRentOut = property?.rents?.find((r: Rent) => r.type === 'rent_out' && ['listing', 'renting'].includes(r.rentOutStatus || ''));
     const activeRenting = property?.rents?.find((r: Rent) => r.type === 'renting');
@@ -98,12 +100,14 @@ export default function PropertyDetailsPage() {
     const nextImage = () => {
         if (property?.images && property.images.length > 0) {
             setCurrentImageIndex((prev) => (prev + 1) % property.images.length);
+            setImageError(false);
         }
     };
 
     const prevImage = () => {
         if (property?.images && property.images.length > 0) {
             setCurrentImageIndex((prev) => (prev - 1 + property.images.length) % property.images.length);
+            setImageError(false);
         }
     };
 
@@ -152,15 +156,8 @@ export default function PropertyDetailsPage() {
                 animate={{ opacity: 1, y: 0 }}
                 className="relative h-[300px] bg-zinc-100 dark:bg-white/5 rounded-2xl overflow-hidden border border-zinc-200 dark:border-white/10"
             >
-                {property.address ? (
-                    <iframe
-                        width="100%"
-                        height="100%"
-                        frameBorder="0"
-                        style={{ border: 0 }}
-                        src={`https://www.google.com/maps/embed/v1/place?key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}&q=${encodeURIComponent(property.address)}&zoom=15`}
-                        allowFullScreen
-                    />
+                {property.location?.lat && property.location?.lng ? (
+                    <SinglePropertyMapDynamic property={property} />
                 ) : (
                     <div className="w-full h-full flex flex-col items-center justify-center gap-2">
                         <MapPin className="w-16 h-16 text-zinc-300 dark:text-white/15" />
@@ -465,13 +462,14 @@ export default function PropertyDetailsPage() {
                             {t('Gallery', '物業相簿')}
                         </h2>
                         <div className="relative aspect-[4/3] bg-zinc-100 dark:bg-white/5 rounded-xl overflow-hidden border border-zinc-200 dark:border-white/10">
-                            {property.images && property.images.length > 0 ? (
+                            {property.images && property.images.length > 0 && !imageError ? (
                                 <>
                                     <img
                                         src={property.images[currentImageIndex]}
                                         alt={`${property.name} - Image ${currentImageIndex + 1}`}
                                         className="w-full h-full object-cover cursor-pointer"
                                         onClick={() => setLightboxImage(property.images[currentImageIndex])}
+                                        onError={() => setImageError(true)}
                                     />
 
                                     {/* Image Navigation */}
@@ -570,6 +568,7 @@ export default function PropertyDetailsPage() {
                                                 alt={`Geo Map ${idx + 1}`}
                                                 className="rounded-lg cursor-pointer hover:opacity-80 transition-opacity"
                                                 onClick={() => setLightboxImage(map)}
+                                                onError={(e) => { e.currentTarget.style.display = 'none'; }}
                                             />
                                         ))}
                                     </div>

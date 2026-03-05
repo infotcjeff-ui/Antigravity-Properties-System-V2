@@ -24,6 +24,7 @@ import { useLanguage } from '@/components/common/LanguageSwitcher';
 import DOMPurify from 'dompurify';
 import RentDetailsModal from '@/components/properties/RentDetailsModal';
 import { Tooltip } from '@heroui/react';
+import SinglePropertyMapDynamic from '@/components/properties/SinglePropertyMapDynamic';
 
 const statusColors: Record<string, string> = {
     holding: 'bg-emerald-600/80 text-white border-emerald-500/50',
@@ -93,16 +94,19 @@ export default function PropertyDetailsPage() {
     const [currentImageIndex, setCurrentImageIndex] = useState(0);
     const [lightboxImage, setLightboxImage] = useState<string | null>(null);
     const [selectedRent, setSelectedRent] = useState<Rent | null>(null);
+    const [imageError, setImageError] = useState(false);
 
     const nextImage = () => {
         if (property?.images && property.images.length > 0) {
             setCurrentImageIndex((prev) => (prev + 1) % property.images.length);
+            setImageError(false);
         }
     };
 
     const prevImage = () => {
         if (property?.images && property.images.length > 0) {
             setCurrentImageIndex((prev) => (prev - 1 + property.images.length) % property.images.length);
+            setImageError(false);
         }
     };
 
@@ -153,12 +157,13 @@ export default function PropertyDetailsPage() {
                 animate={{ opacity: 1, y: 0 }}
                 className="relative h-[300px] bg-zinc-100 dark:bg-white/5 rounded-2xl overflow-hidden border border-zinc-200 dark:border-white/10"
             >
-                {property.images && property.images.length > 0 ? (
+                {property.images && property.images.length > 0 && !imageError ? (
                     <>
                         <img
                             src={property.images[currentImageIndex]}
                             alt={`${property.name} - Image ${currentImageIndex + 1}`}
                             className="w-full h-full object-contain"
+                            onError={() => setImageError(true)}
                         />
 
                         {/* Image Navigation */}
@@ -493,17 +498,10 @@ export default function PropertyDetailsPage() {
                             <MapPin className="w-5 h-5" />
                             {t('Location', '位置')}
                         </h2>
-                        {property.address ? (
+                        {property.location?.lat && property.location?.lng ? (
                             <>
                                 <div className="aspect-[4/3] rounded-xl overflow-hidden bg-white/5">
-                                    <iframe
-                                        width="100%"
-                                        height="100%"
-                                        frameBorder="0"
-                                        style={{ border: 0 }}
-                                        src={`https://www.google.com/maps/embed/v1/place?key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}&q=${encodeURIComponent(property.address)}&zoom=15`}
-                                        allowFullScreen
-                                    />
+                                    <SinglePropertyMapDynamic property={property} />
                                 </div>
                                 <p className="text-zinc-400 dark:text-white/40 text-xs mt-2">
                                     📍 {property.address}

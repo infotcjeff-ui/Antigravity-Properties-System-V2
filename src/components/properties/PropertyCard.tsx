@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { Building2, MapPin, Eye } from 'lucide-react';
@@ -32,6 +33,8 @@ const typeLabels: Record<string, string> = {
 };
 
 export default function PropertyCard({ property, index = 0 }: PropertyCardProps) {
+    const [imageError, setImageError] = useState(false);
+
     return (
         <Link href={`/properties/${encodeURIComponent(property.name)}`}>
             <motion.div
@@ -43,10 +46,11 @@ export default function PropertyCard({ property, index = 0 }: PropertyCardProps)
             >
                 {/* Image Cover */}
                 <div className="relative h-48 overflow-hidden bg-gradient-to-br from-purple-500/10 to-blue-500/10">
-                    {property.images?.[0] ? (
+                    {property.images?.[0] && !imageError ? (
                         <img
                             src={property.images[0]}
                             alt={property.name}
+                            onError={() => setImageError(true)}
                             className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
                         />
                     ) : (
