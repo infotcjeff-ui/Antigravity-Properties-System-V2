@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import path from 'path';
-import { writeFile, mkdir } from 'fs/promises';
 import { v4 as uuidv4 } from 'uuid';
 import sharp from 'sharp';
+import { createClient } from '@supabase/supabase-js';
 import { verifyRequest } from '@/lib/security';
 
 export async function POST(request: NextRequest) {
@@ -31,14 +30,7 @@ export async function POST(request: NextRequest) {
 
         const buffer = Buffer.from(await file.arrayBuffer());
         const filename = `${uuidv4()}.webp`;
-
-        // Dynamic path resolution
-        const uploadDir = path.join(process.cwd(), 'public', 'uploads', folder);
-
-        // Ensure directory exists
-        await mkdir(uploadDir, { recursive: true });
-
-        const filePath = path.join(uploadDir, filename);
+        const storagePath = `${folder}/${filename}`;
 
         // Process image with sharp
         const processedImageBuffer = await sharp(buffer)
@@ -50,11 +42,32 @@ export async function POST(request: NextRequest) {
             .webp({ quality: 80 })
             .toBuffer();
 
-        // Save to public/uploads/[folder]
-        await writeFile(filePath, processedImageBuffer);
+        // Initialize Supabase Client
+        const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+        const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+        const supabase = createClient(supabaseUrl, supabaseKey);
+
+        // Upload to Supabase Storage 'properties' bucket
+        const { data, error } = await supabase.storage
+            .from('properties')
+            .upload(storagePath, processedImageBuffer, {
+                contentType: 'image/webp',
+                cacheControl: '3600',
+                upsert: false
+            });
+
+        if (error) {
+            console.error('Supabase Storage Upload Error:', error);
+            throw new Error(`Storage error: ${error.message}`);
+        }
+
+        // Get public URL
+        const { data: { publicUrl } } = supabase.storage
+            .from('properties')
+            .getPublicUrl(storagePath);
 
         return NextResponse.json({
-            url: `/uploads/${folder}/${filename}`,
+            url: publicUrl,
             filename
         });
 
@@ -63,6 +76,6 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: err.message }, { status: 403 });
         }
         console.error('Upload API Error:', err);
-        return NextResponse.json({ error: 'Internal server error during upload.' }, { status: 500 });
+        return NextResponse.json({ error: err.message || 'Internal server error during upload.' }, { status: 500 });
     }
 }

@@ -1,6 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import path from 'path';
-import { unlink } from 'fs/promises';
 import { createClient } from '@supabase/supabase-js';
 import { verifyRequest } from '@/lib/security';
 
@@ -15,15 +13,7 @@ export async function DELETE(request: NextRequest) {
             return NextResponse.json({ error: 'Missing file URL' }, { status: 400 });
         }
 
-        // Security: ensure the path stays within public/uploads
-        const sanitized = fileUrl.replace(/^\/uploads\//, '');
-        if (sanitized.includes('..') || sanitized.startsWith('/')) {
-            return NextResponse.json({ error: 'Invalid file path' }, { status: 400 });
-        }
-
-        const filePath = path.join(process.cwd(), 'public', 'uploads', sanitized);
-
-        // Check which properties reference this image
+        // Initialize Supabase
         const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
         const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
         const supabase = createClient(supabaseUrl, supabaseKey);
@@ -49,8 +39,32 @@ export async function DELETE(request: NextRequest) {
             }
         }
 
-        // Delete the file
-        await unlink(filePath);
+        // Extract storage path from the URL
+        // Example: https://project.supabase.co/storage/v1/object/public/properties/folder/uuid.webp -> folder/uuid.webp
+        let storagePath = '';
+        if (fileUrl.includes('/public/properties/')) {
+            storagePath = fileUrl.split('/public/properties/')[1];
+        } else if (fileUrl.startsWith('/uploads/')) {
+            // Legacy local files (will just ignore deletion since Vercel drops them anyway)
+            return NextResponse.json({
+                success: true,
+                affectedProperties,
+                note: 'Legacy local file, skipped storage deletion'
+            });
+        }
+
+        if (storagePath) {
+            const { error } = await supabase.storage
+                .from('properties')
+                .remove([storagePath]);
+
+            if (error) {
+                console.error('Supabase Storage Delete Error:', error);
+                // We still return success for UI so it doesn't get stuck, 
+                // but log the error. Or standard error handling:
+                return NextResponse.json({ error: `Storage delete failed: ${error.message}` }, { status: 500 });
+            }
+        }
 
         return NextResponse.json({
             success: true,
@@ -59,9 +73,6 @@ export async function DELETE(request: NextRequest) {
     } catch (err: any) {
         if (err.message === "Potential attack detected" || err.message === "Bot access denied" || err.message === "Too many requests" || err.message === "Access denied") {
             return NextResponse.json({ error: err.message }, { status: 403 });
-        }
-        if (err.code === 'ENOENT') {
-            return NextResponse.json({ error: 'File not found' }, { status: 404 });
         }
         console.error('Delete upload error:', err);
         return NextResponse.json({ error: 'Failed to delete file' }, { status: 500 });
