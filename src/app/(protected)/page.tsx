@@ -15,7 +15,7 @@ type ViewMode = 'grid' | 'map';
 
 export default function PropertiesPage() {
     const queryClient = useQueryClient();
-    const { data: qProperties, isLoading: qLoading } = usePropertiesQuery();
+    const { data: qProperties, isLoading: qLoading } = usePropertiesQuery({ bypassIsolation: true });
     const { isAuthenticated } = useAuth();
     const [viewMode, setViewMode] = useState<ViewMode>('grid');
     const [searchQuery, setSearchQuery] = useState('');

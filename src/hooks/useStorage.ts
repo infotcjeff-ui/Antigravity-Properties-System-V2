@@ -32,7 +32,7 @@ const toSnake = (obj: any) => {
 
 // ==================== FETCHERS ====================
 
-export const fetchProperties = async (user?: any, options?: { query?: string }): Promise<Property[]> => {
+export const fetchProperties = async (user?: any, options?: { query?: string; bypassIsolation?: boolean }): Promise<Property[]> => {
     try {
         // Select all fields needed for both list and edit views
         const fields = 'id, name, code, address, type, status, land_use, lot_index, lot_area, location, google_drive_plan_url, has_planning_permission, proprietor_id, tenant_id, created_by, created_at, updated_at, images, geo_maps, notes';
@@ -43,7 +43,7 @@ export const fetchProperties = async (user?: any, options?: { query?: string }):
             queryBuilder = queryBuilder.or(`name.ilike.%${q}%,code.ilike.%${q}%,address.ilike.%${q}%`);
         }
 
-        if (user && user.role !== 'admin') {
+        if (user && user.role !== 'admin' && !options?.bypassIsolation) {
             queryBuilder = queryBuilder.eq('created_by', user.id);
         }
 
@@ -535,11 +535,11 @@ export function useProperties() {
     };
 }
 
-export function usePropertiesQuery() {
+export function usePropertiesQuery(options?: { query?: string; bypassIsolation?: boolean }) {
     const { user } = useAuth();
     return useQuery({
-        queryKey: ['properties', user?.id],
-        queryFn: () => fetchProperties(user),
+        queryKey: ['properties', user?.id, options?.bypassIsolation],
+        queryFn: () => fetchProperties(user, options),
         staleTime: 5 * 60 * 1000, // 5 minutes
     });
 }
