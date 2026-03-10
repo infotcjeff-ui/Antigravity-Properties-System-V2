@@ -240,10 +240,10 @@ export default function SettingsPage() {
                         initial={{ opacity: 0, y: -50, x: '-50%' }}
                         animate={{ opacity: 1, y: 0, x: '-50%' }}
                         exit={{ opacity: 0, y: -50, x: '-50%' }}
-                        className={`fixed top-6 left-1/2 z-50 px-6 py-3 ${toastColors[alertType]} text-white rounded-xl shadow-lg flex items-center gap-3`}
+                        className={`fixed top-4 left-1/2 -translate-x-1/2 z-50 px-5 py-2.5 w-[90%] max-w-sm ${toastColors[alertType]} text-white rounded-xl shadow-lg shadow-black/20 flex items-center gap-3 backdrop-blur-sm bg-opacity-90`}
                     >
-                        <Check className="w-5 h-5" />
-                        <span className="font-medium">{alertMessage}</span>
+                        <Check className="w-5 h-5 flex-shrink-0" />
+                        <span className="font-medium text-sm sm:text-base leading-tight">{alertMessage}</span>
                     </motion.div>
                 )}
             </AnimatePresence>
@@ -364,7 +364,8 @@ export default function SettingsPage() {
             </AnimatePresence>
 
             <div>
-                <h1 className="text-2xl font-bold text-zinc-900 dark:text-white">
+                <h1 className="text-2xl font-bold text-zinc-900 dark:text-white flex items-center gap-2">
+                    <Globe className="w-6 h-6 text-purple-500 md:hidden" />
                     {t('系統設定', 'System Settings')}
                 </h1>
                 <p className="text-zinc-500 dark:text-white/50 mt-1">
@@ -697,10 +698,10 @@ export default function SettingsPage() {
 
                                     <button
                                         onClick={() => setSelectMode(true)}
-                                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm text-zinc-600 dark:text-white/60 hover:bg-zinc-200 dark:hover:bg-white/10 border border-zinc-200 dark:border-white/10 transition-all"
+                                        className="flex items-center justify-center gap-2 px-4 py-2 rounded-xl text-sm font-medium text-zinc-600 dark:text-white/70 bg-white dark:bg-white/5 border border-zinc-200 dark:border-white/10 hover:border-purple-300 dark:hover:border-purple-500/30 transition-all w-full sm:w-auto"
                                     >
                                         <CheckSquare className="w-4 h-4" />
-                                        {t('多選模式', 'Multi-Select')}
+                                        {t('多選模式', 'Multi-Select Mode')}
                                     </button>
                                 </div>
                             )}

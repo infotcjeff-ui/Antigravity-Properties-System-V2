@@ -12,7 +12,14 @@ import {
     Eye,
     EyeOff,
     Check,
-    Search
+    Search,
+    Pencil,
+    Trash2,
+    Building2,
+    ArrowUpFromLine,
+    ArrowDownToLine,
+    Network,
+    Settings
 } from 'lucide-react';
 import { useAuth, type User, type UserRole } from '@/contexts/AuthContext';
 import { fetchUserStats } from '@/hooks/useStorage';
@@ -42,12 +49,13 @@ export default function UsersPage() {
     const [alertMessage, setAlertMessage] = useState('');
     const [language, setLanguage] = useState<'zh-TW' | 'en'>('zh-TW');
 
-    // Register User State
     const [newUsername, setNewUsername] = useState('');
+    const [newDisplayName, setNewDisplayName] = useState('');
     const [newPassword, setNewPassword] = useState('');
     const [newUserRole, setNewUserRole] = useState<'admin' | 'user'>('user');
     const [showPassword, setShowPassword] = useState(false);
     const [isRegistering, setIsRegistering] = useState(false);
+    const [isAddModalOpen, setIsAddModalOpen] = useState(false);
 
     // User list and data state
     const [systemUsers, setSystemUsers] = useState<User[]>([]);
@@ -115,6 +123,7 @@ export default function UsersPage() {
     // Edit User State
     const [editingUser, setEditingUser] = useState<User | null>(null);
     const [editPassword, setEditPassword] = useState('');
+    const [editDisplayName, setEditDisplayName] = useState('');
     const [editRole, setEditRole] = useState<UserRole>('user');
     const [isUpdating, setIsUpdating] = useState(false);
     const [showEditPassword, setShowEditPassword] = useState(false);
@@ -166,14 +175,16 @@ export default function UsersPage() {
         }
 
         setIsRegistering(true);
-        const result = await registerUser(newUsername, newPassword, newUserRole);
+        const result = await registerUser(newUsername, newPassword, newUserRole, newDisplayName);
         setIsRegistering(false);
 
         if (result.success) {
             setAlertMessage(t('用戶創建成功', 'User created successfully'));
             setShowAlert(true);
             setNewUsername('');
+            setNewDisplayName('');
             setNewPassword('');
+            setIsAddModalOpen(false);
             loadSystemUsersData(); // Refresh list
             setTimeout(() => setShowAlert(false), 3000);
         } else {
@@ -191,6 +202,9 @@ export default function UsersPage() {
         const updates: any = { role: editRole };
         if (editPassword) {
             updates.password = editPassword;
+        }
+        if (editDisplayName) {
+            updates.displayName = editDisplayName;
         }
 
         const result = await updateUser(editingUser.id, updates);
@@ -210,22 +224,39 @@ export default function UsersPage() {
         }
     };
 
+    const handleDelete = async (id: string) => {
+        if (!window.confirm(t('確定要刪除此帳號嗎？', 'Are you sure you want to delete this account?'))) return;
+
+        try {
+            const { error } = await supabase.from('app_users').delete().eq('id', id);
+            if (error) throw error;
+            setAlertMessage(t('用戶已刪除', 'User deleted successfully'));
+            setShowAlert(true);
+            loadSystemUsersData();
+            setTimeout(() => setShowAlert(false), 3000);
+        } catch (err) {
+            console.error('Delete error:', err);
+            setAlertMessage(t('刪除失敗', 'Delete failed'));
+            setShowAlert(true);
+        }
+    }
+
     const t = (zhTW: string, en: string) => language === 'zh-TW' ? zhTW : en;
 
     const filteredUsers = systemUsers.filter(u =>
-        u.username.toLowerCase().includes(searchQuery.toLowerCase())
+        u.username.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (u.displayName && u.displayName.toLowerCase().includes(searchQuery.toLowerCase()))
     );
 
     return (
         <div className="space-y-6">
-            {/* Alert Toast */}
             <AnimatePresence>
                 {showAlert && (
                     <motion.div
                         initial={{ opacity: 0, y: -50, x: '-50%' }}
                         animate={{ opacity: 1, y: 0, x: '-50%' }}
                         exit={{ opacity: 0, y: -50, x: '-50%' }}
-                        className="fixed top-6 left-1/2 z-50 px-6 py-3 bg-green-500 text-white rounded-xl shadow-lg flex items-center gap-3"
+                        className="fixed top-6 left-1/2 z-50 px-6 py-3 bg-emerald-500 text-white rounded-xl shadow-lg flex items-center gap-3"
                     >
                         <Check className="w-5 h-5" />
                         <span className="font-medium">{alertMessage}</span>
@@ -233,315 +264,328 @@ export default function UsersPage() {
                 )}
             </AnimatePresence>
 
-            <div>
-                <h1 className="text-2xl font-bold text-zinc-900 dark:text-white flex items-center gap-3">
-                    <Users className="w-8 h-8 text-indigo-500" />
-                    {t('帳號管理', 'Account Management')}
-                </h1>
-                <p className="text-zinc-500 dark:text-white/50 mt-1">
-                    {t('管理系統用戶權限及查看用戶創建的資料', 'Manage user permissions and view user-created data')}
-                </p>
+            <div className="flex items-center justify-between">
+                <div>
+                    <h1 className="text-2xl font-bold text-zinc-900 dark:text-white flex items-center gap-3">
+                        <Users className="w-8 h-8 text-indigo-500" />
+                        {t('帳號管理', 'Account Management')}
+                    </h1>
+                    <p className="text-zinc-500 dark:text-white/50 mt-1 hidden sm:block">
+                        {t('管理系統用戶權限及查看用戶創建的資料', 'Manage user permissions and view user-created data')}
+                    </p>
+                </div>
+                <button
+                    onClick={() => setIsAddModalOpen(true)}
+                    className="px-6 py-2.5 bg-indigo-500 hover:bg-indigo-600 text-white rounded-xl font-bold transition-all flex items-center gap-2 shadow-lg shadow-indigo-500/20"
+                >
+                    <UserPlus className="w-5 h-5" />
+                    <span className="hidden sm:inline">{t('新增帳號', 'Create New Account')}</span>
+                </button>
             </div>
 
-            <div className="grid grid-cols-1 gap-6">
-                {/* Create New User Section */}
-                <motion.div
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="p-6 bg-white dark:bg-white/5 rounded-2xl border border-zinc-200 dark:border-white/10"
-                >
-                    <div className="flex items-center gap-4 mb-6">
-                        <div className="w-10 h-10 rounded-xl bg-indigo-500/10 flex items-center justify-center">
-                            <UserPlus className="w-5 h-5 text-indigo-500" />
-                        </div>
-                        <div>
-                            <h2 className="text-lg font-bold text-zinc-900 dark:text-white">
-                                {t('新增帳號', 'Create New Account')}
-                            </h2>
-                            <p className="text-sm text-zinc-500 dark:text-white/40">
-                                {t('為系統新增新的管理員或普通用戶', 'Add a new administrator or standard user')}
-                            </p>
-                        </div>
+            <div className="space-y-4">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                    <div className="flex items-center gap-2">
+                        <LayoutList className="w-5 h-5 text-indigo-500" />
+                        <h3 className="text-lg font-bold text-zinc-900 dark:text-white">
+                            {t('現有用戶', 'Existing Users')}
+                        </h3>
                     </div>
 
-                    <form onSubmit={handleCreateUser} className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                        <div className="space-y-2">
-                            <label className="text-sm font-medium text-zinc-700 dark:text-white/70">
-                                {t('用戶名稱', 'Username')}
-                            </label>
-                            <input
-                                type="text"
-                                value={newUsername}
-                                onChange={(e) => setNewUsername(e.target.value)}
-                                className="w-full px-4 py-2.5 rounded-xl bg-zinc-50 dark:bg-white/5 border border-zinc-200 dark:border-white/10 focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
-                                placeholder={t('輸入用戶名', 'Enter username')}
-                            />
-                        </div>
-                        <div className="space-y-2">
-                            <label className="text-sm font-medium text-zinc-700 dark:text-white/70">
-                                {t('密碼', 'Password')}
-                            </label>
-                            <div className="relative">
-                                <input
-                                    type={showPassword ? 'text' : 'password'}
-                                    value={newPassword}
-                                    onChange={(e) => setNewPassword(e.target.value)}
-                                    className="w-full px-4 py-2.5 rounded-xl bg-zinc-50 dark:bg-white/5 border border-zinc-200 dark:border-white/10 focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
-                                    placeholder={t('輸入密碼', 'Enter password')}
-                                />
-                                <button
-                                    type="button"
-                                    onClick={() => setShowPassword(!showPassword)}
-                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-white/80"
-                                >
-                                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                                </button>
-                            </div>
-                        </div>
-                        <div className="space-y-2">
-                            <label className="text-sm font-medium text-zinc-700 dark:text-white/70">
-                                {t('權限角色', 'Role')}
-                            </label>
-                            <div className="flex gap-2 p-1 bg-zinc-100 dark:bg-white/5 rounded-xl">
-                                <button
-                                    type="button"
-                                    onClick={() => setNewUserRole('user')}
-                                    className={`flex-1 py-1.5 rounded-lg text-xs font-semibold transition-all ${newUserRole === 'user'
-                                        ? 'bg-white dark:bg-white/10 text-indigo-600 dark:text-indigo-400 shadow-sm'
-                                        : 'text-zinc-500'
-                                        }`}
-                                >
-                                    {t('普通用戶', 'Standard User')}
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={() => setNewUserRole('admin')}
-                                    className={`flex-1 py-1.5 rounded-lg text-xs font-semibold transition-all ${newUserRole === 'admin'
-                                        ? 'bg-white dark:bg-white/10 text-indigo-600 dark:text-indigo-400 shadow-sm'
-                                        : 'text-zinc-500'
-                                        }`}
-                                >
-                                    {t('管理員', 'Admin')}
-                                </button>
-                            </div>
-                        </div>
-                        <div className="md:col-span-3 flex justify-end">
-                            <button
-                                type="submit"
-                                disabled={isRegistering}
-                                className="px-6 py-2.5 bg-indigo-500 hover:bg-indigo-600 disabled:opacity-50 text-white rounded-xl font-bold transition-all flex items-center gap-2"
-                            >
-                                {isRegistering ? <RefreshCw className="w-4 h-4 animate-spin" /> : <UserPlus className="w-4 h-4" />}
-                                {t('創建帳號', 'Create Account')}
-                            </button>
-                        </div>
-                    </form>
-                </motion.div>
-
-                {/* User List Section */}
-                <motion.div
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.1 }}
-                    className="space-y-4"
-                >
-                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                        <div className="flex items-center gap-2">
-                            <LayoutList className="w-5 h-5 text-indigo-500" />
-                            <h3 className="text-lg font-bold text-zinc-900 dark:text-white">
-                                {t('現有用戶', 'Existing Users')}
-                            </h3>
-                        </div>
-
-                        <div className="relative max-w-sm w-full">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400" />
-                            <input
-                                type="text"
-                                value={searchQuery}
-                                onChange={(e) => setSearchQuery(e.target.value)}
-                                placeholder={t('搜尋用戶...', 'Search users...')}
-                                className="w-full pl-10 pr-4 py-2 bg-white dark:bg-white/5 border border-zinc-200 dark:border-white/10 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-sm"
-                            />
-                        </div>
+                    <div className="relative max-w-sm w-full">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400" />
+                        <input
+                            type="text"
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            placeholder={t('搜尋用戶...', 'Search users...')}
+                            className="w-full pl-10 pr-4 py-2 bg-white dark:bg-white/5 border border-zinc-200 dark:border-white/10 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-sm"
+                        />
                     </div>
+                </div>
 
-                    {isLoadingUsers ? (
-                        <div className="flex justify-center py-12">
-                            <RefreshCw className="w-8 h-8 animate-spin text-indigo-500" />
+                {isLoadingUsers ? (
+                    <div className="flex justify-center py-12">
+                        <RefreshCw className="w-8 h-8 animate-spin text-indigo-500" />
+                    </div>
+                ) : (
+                    <div className="grid grid-cols-1 gap-4">
+                        {/* Desktop Table View */}
+                        <div className="hidden md:block bg-white dark:bg-white/5 rounded-2xl border border-zinc-200 dark:border-white/10 overflow-hidden">
+                            <table className="w-full">
+                                <thead className="bg-zinc-50 dark:bg-white/5 border-b border-zinc-100 dark:border-white/5">
+                                    <tr className="text-left text-zinc-500 dark:text-white/50 text-xs font-bold uppercase tracking-wider">
+                                        <th className="px-6 py-4">{t('用戶', 'User')}</th>
+                                        <th className="px-6 py-4">{t('權限', 'Role')}</th>
+                                        <th className="px-6 py-4 text-center">{t('數據統計', 'Stats')}</th>
+                                        <th className="px-6 py-4 text-right">{t('操作', 'Actions')}</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-zinc-100 dark:divide-white/5">
+                                    {filteredUsers.map(u => (
+                                        <tr key={u.id} className="hover:bg-zinc-50 dark:hover:bg-white/[0.02] transition-colors">
+                                            <td className="px-6 py-4">
+                                                <div className="flex items-center gap-3">
+                                                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-500 to-purple-500 flex items-center justify-center text-white font-bold text-lg shadow-sm">
+                                                        {(u.displayName || u.username).charAt(0).toUpperCase()}
+                                                    </div>
+                                                    <div>
+                                                        <p className="font-bold text-zinc-900 dark:text-white">{u.displayName || u.username}</p>
+                                                        {u.displayName && <p className="text-[10px] text-zinc-400">@{u.username}</p>}
+                                                    </div>
+                                                </div>
+                                            </td>
+                                            <td className="px-6 py-4">
+                                                <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider ${u.role === 'admin'
+                                                    ? 'bg-amber-500/10 text-amber-500 border border-amber-500/20'
+                                                    : 'bg-indigo-500/10 text-indigo-500 border border-indigo-500/20'
+                                                    }`}>
+                                                    {u.role}
+                                                </span>
+                                            </td>
+                                            <td className="px-6 py-4">
+                                                <div className="flex justify-center gap-4">
+                                                    <div className="text-center">
+                                                        <p className="text-[10px] text-zinc-400 uppercase font-bold">{t('物業', 'Props')}</p>
+                                                        <p className="font-bold dark:text-white">{userDataStats[u.id]?.propertyCount || 0}</p>
+                                                    </div>
+                                                    <div className="text-center">
+                                                        <p className="text-[10px] text-zinc-400 uppercase font-bold">{t('業主', 'Own')}</p>
+                                                        <p className="font-bold dark:text-white">{userDataStats[u.id]?.proprietorCount || 0}</p>
+                                                    </div>
+                                                    <div className="text-center">
+                                                        <p className="text-[10px] text-zinc-400 uppercase font-bold">{t('租務', 'Rent')}</p>
+                                                        <p className="font-bold dark:text-white">{userDataStats[u.id]?.rentCount || 0}</p>
+                                                    </div>
+                                                </div>
+                                            </td>
+                                            <td className="px-6 py-4 text-right">
+                                                <div className="flex justify-end gap-2">
+                                                    <button
+                                                        onClick={() => {
+                                                            setEditingUser(u);
+                                                            setEditRole(u.role);
+                                                            setEditDisplayName(u.displayName || '');
+                                                            setEditPassword('');
+                                                        }}
+                                                        className="p-2 rounded-xl bg-zinc-100 dark:bg-white/5 hover:bg-zinc-200 dark:hover:bg-white/10 text-zinc-700 dark:text-white/70 transition-all"
+                                                        title={t('編輯', 'Edit')}
+                                                    >
+                                                        <Pencil className="w-4 h-4" />
+                                                    </button>
+                                                    <button
+                                                        onClick={() => handleDelete(u.id)}
+                                                        className="p-2 rounded-xl bg-red-50 dark:bg-red-500/10 hover:bg-red-100 dark:hover:bg-red-500/20 text-red-600 dark:text-red-400 transition-all"
+                                                        title={t('刪除', 'Delete')}
+                                                    >
+                                                        <Trash2 className="w-4 h-4" />
+                                                    </button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
                         </div>
-                    ) : (
-                        <div className="grid grid-cols-1 gap-4">
-                            {filteredUsers.map(u => (
-                                <div key={u.id} className="overflow-hidden bg-white dark:bg-white/5 rounded-2xl border border-zinc-200 dark:border-white/10">
-                                    <div
-                                        className="p-5 flex items-center justify-between cursor-pointer hover:bg-zinc-50 dark:hover:bg-white/[0.08] transition-colors"
-                                        onClick={() => handleRowClick(u)}
-                                    >
-                                        <div className="flex items-center gap-4">
-                                            <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-500 flex items-center justify-center text-white font-bold text-lg shadow-lg shadow-indigo-500/20">
-                                                {u.username.charAt(0).toUpperCase()}
+
+                        {/* Mobile Card View */}
+                        <div className="grid grid-cols-1 gap-4 md:hidden">
+                            {filteredUsers.map((u, index) => (
+                                <motion.div
+                                    key={u.id}
+                                    initial={{ opacity: 0, y: 10 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    transition={{ delay: index * 0.05 }}
+                                    className="bg-white dark:bg-white/5 rounded-2xl border border-zinc-200 dark:border-white/10 p-4 space-y-4 shadow-sm"
+                                >
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex items-center gap-3">
+                                            <div className="w-11 h-11 rounded-full bg-gradient-to-br from-indigo-500 to-purple-500 flex items-center justify-center text-white font-bold text-lg shadow-sm">
+                                                {(u.displayName || u.username).charAt(0).toUpperCase()}
                                             </div>
                                             <div>
-                                                <p className="font-bold text-zinc-900 dark:text-white text-lg">{u.username}</p>
-                                                <div className="flex items-center gap-2">
-                                                    <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider ${u.role === 'admin'
-                                                        ? 'bg-amber-500/10 text-amber-500 border border-amber-500/20'
-                                                        : 'bg-indigo-500/10 text-indigo-500 border border-indigo-500/20'
-                                                        }`}>
-                                                        {u.role}
-                                                    </span>
-                                                    <span className="text-zinc-400 dark:text-white/20 text-xs">•</span>
-                                                    <span className="text-zinc-500 dark:text-white/40 text-xs">ID: {u.id.slice(0, 8)}...</span>
-                                                </div>
+                                                <h3 className="font-bold text-zinc-900 dark:text-white">{u.displayName || u.username}</h3>
+                                                {u.displayName && <p className="text-[10px] text-zinc-400">@{u.username}</p>}
                                             </div>
                                         </div>
+                                        <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider ${u.role === 'admin'
+                                            ? 'bg-amber-500/10 text-amber-500 border border-amber-500/20'
+                                            : 'bg-indigo-500/10 text-indigo-500 border border-indigo-500/20'
+                                            }`}>
+                                            {u.role}
+                                        </span>
+                                    </div>
 
-                                        <div className="flex items-center gap-4 md:gap-8">
-                                            <div className="hidden sm:flex gap-2">
-                                                <button
-                                                    onClick={(e) => handleTabClick(e, u, 'properties')}
-                                                    className={`px-3 py-2 text-center group rounded-xl transition-all border border-transparent ${expandedUserTab?.userId === u.id && expandedUserTab?.tab === 'properties' ? 'bg-indigo-50 dark:bg-indigo-500/10 border-indigo-100 dark:border-indigo-500/20' : 'hover:bg-zinc-100 dark:hover:bg-white/5'}`}
-                                                >
-                                                    <p className={`text-[10px] uppercase font-bold tracking-widest mb-1 ${expandedUserTab?.userId === u.id && expandedUserTab?.tab === 'properties' ? 'text-indigo-500' : 'text-zinc-400 dark:text-white/30'}`}>{t('物業', 'Properties')}</p>
-                                                    <p className={`text-xl font-bold transition-colors ${expandedUserTab?.userId === u.id && expandedUserTab?.tab === 'properties' ? 'text-indigo-600 dark:text-indigo-400' : 'text-zinc-900 dark:text-white group-hover:text-indigo-500'}`}>
-                                                        {userDataStats[u.id]?.propertyCount || 0}
-                                                    </p>
-                                                </button>
-                                                <button
-                                                    onClick={(e) => handleTabClick(e, u, 'proprietors')}
-                                                    className={`px-3 py-2 text-center group rounded-xl transition-all border border-transparent ${expandedUserTab?.userId === u.id && expandedUserTab?.tab === 'proprietors' ? 'bg-indigo-50 dark:bg-indigo-500/10 border-indigo-100 dark:border-indigo-500/20' : 'hover:bg-zinc-100 dark:hover:bg-white/5'}`}
-                                                >
-                                                    <p className={`text-[10px] uppercase font-bold tracking-widest mb-1 ${expandedUserTab?.userId === u.id && expandedUserTab?.tab === 'proprietors' ? 'text-indigo-500' : 'text-zinc-400 dark:text-white/30'}`}>{t('業主/租客', 'Owners')}</p>
-                                                    <p className={`text-xl font-bold transition-colors ${expandedUserTab?.userId === u.id && expandedUserTab?.tab === 'proprietors' ? 'text-indigo-600 dark:text-indigo-400' : 'text-zinc-900 dark:text-white group-hover:text-indigo-500'}`}>
-                                                        {userDataStats[u.id]?.proprietorCount || 0}
-                                                    </p>
-                                                </button>
-                                                <button
-                                                    onClick={(e) => handleTabClick(e, u, 'rents')}
-                                                    className={`px-3 py-2 text-center group rounded-xl transition-all border border-transparent ${expandedUserTab?.userId === u.id && expandedUserTab?.tab === 'rents' ? 'bg-indigo-50 dark:bg-indigo-500/10 border-indigo-100 dark:border-indigo-500/20' : 'hover:bg-zinc-100 dark:hover:bg-white/5'}`}
-                                                >
-                                                    <p className={`text-[10px] uppercase font-bold tracking-widest mb-1 ${expandedUserTab?.userId === u.id && expandedUserTab?.tab === 'rents' ? 'text-indigo-500' : 'text-zinc-400 dark:text-white/30'}`}>{t('租務資料', 'Rents')}</p>
-                                                    <p className={`text-xl font-bold transition-colors ${expandedUserTab?.userId === u.id && expandedUserTab?.tab === 'rents' ? 'text-indigo-600 dark:text-indigo-400' : 'text-zinc-900 dark:text-white group-hover:text-indigo-500'}`}>
-                                                        {userDataStats[u.id]?.rentCount || 0}
-                                                    </p>
-                                                </button>
-                                            </div>
-
-                                            <div className="flex items-center gap-2">
-                                                <button
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        setEditingUser(u);
-                                                        setEditRole(u.role);
-                                                        setEditPassword('');
-                                                    }}
-                                                    className="p-2 sm:px-4 sm:py-2 bg-zinc-100 dark:bg-white/5 hover:bg-zinc-200 dark:hover:bg-white/10 text-zinc-700 dark:text-white/70 rounded-xl text-sm font-medium transition-all flex items-center gap-2"
-                                                    title={t('修改資料', 'Edit Info')}
-                                                >
-                                                    <RefreshCw className="w-4 h-4" />
-                                                    <span className="hidden sm:inline">{t('修改', 'Edit')}</span>
-                                                </button>
-                                                <div className="p-2 text-zinc-400">
-                                                    {expandedUser === u.id ? <ChevronDown className="w-5 h-5" /> : <ChevronRight className="w-5 h-5" />}
-                                                </div>
-                                            </div>
+                                    <div className="grid grid-cols-3 gap-3 py-3 border-y border-zinc-100 dark:border-white/5 text-center">
+                                        <div>
+                                            <p className="text-[10px] text-zinc-400 uppercase font-bold mb-1">{t('物業', 'Props')}</p>
+                                            <p className="font-bold dark:text-white">{userDataStats[u.id]?.propertyCount || 0}</p>
+                                        </div>
+                                        <div>
+                                            <p className="text-[10px] text-zinc-400 uppercase font-bold mb-1">{t('業主', 'Own')}</p>
+                                            <p className="font-bold dark:text-white">{userDataStats[u.id]?.proprietorCount || 0}</p>
+                                        </div>
+                                        <div>
+                                            <p className="text-[10px] text-zinc-400 uppercase font-bold mb-1">{t('租務', 'Rent')}</p>
+                                            <p className="font-bold dark:text-white">{userDataStats[u.id]?.rentCount || 0}</p>
                                         </div>
                                     </div>
 
-                                    <AnimatePresence>
-                                        {expandedUser === u.id && (
-                                            <motion.div
-                                                initial={{ height: 0, opacity: 0 }}
-                                                animate={{ height: 'auto', opacity: 1 }}
-                                                exit={{ height: 0, opacity: 0 }}
-                                                className="border-t border-zinc-100 dark:border-white/5 bg-zinc-50/50 dark:bg-black/20 overflow-hidden"
-                                            >
-                                                <div className="p-6">
-                                                    {isLoadingTabData ? (
-                                                        <div className="flex justify-center py-8">
-                                                            <RefreshCw className="w-6 h-6 animate-spin text-indigo-500" />
-                                                        </div>
-                                                    ) : expandedTabData.length === 0 ? (
-                                                        <div className="text-center py-8">
-                                                            <div className="w-12 h-12 rounded-full bg-zinc-100 dark:bg-white/5 flex items-center justify-center mx-auto mb-3">
-                                                                <LayoutList className="w-5 h-5 text-zinc-400" />
-                                                            </div>
-                                                            <p className="text-zinc-500 dark:text-white/40">{t('沒有記錄', 'No records found')}</p>
-                                                        </div>
-                                                    ) : (
-                                                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                                                            {expandedUserTab?.tab === 'properties' && expandedTabData.map(item => (
-                                                                <Link key={item.id} href={`/properties/${encodeURIComponent(item.name)}`}>
-                                                                    <div className="p-4 bg-white dark:bg-zinc-800 rounded-xl border border-zinc-200 dark:border-white/10 shadow-sm hover:shadow-md hover:border-indigo-500/50 transition-all cursor-pointer h-full">
-                                                                        <p className="font-bold text-zinc-900 dark:text-white truncate" title={item.name}>{item.name}</p>
-                                                                        <p className="text-sm text-zinc-500 dark:text-white/50">{item.code || t('無編號', 'No code')}</p>
-                                                                        <div className="mt-3">
-                                                                            <span className={`text-[10px] px-2.5 py-1 font-medium rounded-full ${propertyStatusColors[item.status] || 'bg-zinc-100 dark:bg-white/5 text-zinc-600 dark:text-white/60'}`}>
-                                                                                {propertyStatusLabels[item.status] || item.status || 'Active'}
-                                                                            </span>
-                                                                        </div>
-                                                                    </div>
-                                                                </Link>
-                                                            ))}
-
-                                                            {expandedUserTab?.tab === 'proprietors' && expandedTabData.map(item => (
-                                                                <div key={item.id} className="p-4 bg-white dark:bg-zinc-800 rounded-xl border border-zinc-200 dark:border-white/10 shadow-sm hover:shadow-md transition-shadow">
-                                                                    <p className="font-bold text-zinc-900 dark:text-white truncate" title={item.name}>{item.name}</p>
-                                                                    {item.english_name && <p className="text-sm text-zinc-500 dark:text-white/50 truncate" title={item.english_name}>{item.english_name}</p>}
-                                                                    <div className="mt-3 flex gap-2">
-                                                                        <span className="text-[10px] px-2 py-1 bg-amber-50 dark:bg-amber-500/10 font-medium rounded-md text-amber-600 dark:text-amber-400 border border-amber-200 dark:border-amber-500/20">
-                                                                            {item.type || 'Individual'}
-                                                                        </span>
-                                                                        {item.category && (
-                                                                            <span className="text-[10px] px-2 py-1 bg-blue-50 dark:bg-blue-500/10 font-medium rounded-md text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-500/20">
-                                                                                {item.category}
-                                                                            </span>
-                                                                        )}
-                                                                    </div>
-                                                                </div>
-                                                            ))}
-
-                                                            {expandedUserTab?.tab === 'rents' && expandedTabData.map(item => (
-                                                                <div key={item.id} className="p-4 bg-white dark:bg-zinc-800 rounded-xl border border-zinc-200 dark:border-white/10 shadow-sm hover:shadow-md transition-shadow">
-                                                                    <div className="flex justify-between items-start mb-2">
-                                                                        <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold ${item.type === 'rent_out'
-                                                                            ? 'bg-blue-50 text-blue-600 border border-blue-200 dark:bg-blue-500/10 dark:text-blue-400 dark:border-blue-500/20'
-                                                                            : 'bg-emerald-50 text-emerald-600 border border-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-400 dark:border-emerald-500/20'
-                                                                            }`}>
-                                                                            {item.type === 'rent_out' ? t('收租', 'Rent Out') : t('交租', 'Renting')}
-                                                                        </span>
-                                                                        <span className="text-xs text-zinc-400">
-                                                                            {new Date(item.created_at).toLocaleDateString()}
-                                                                        </span>
-                                                                    </div>
-                                                                    <p className="text-xl font-bold text-zinc-900 dark:text-white my-1 truncate">
-                                                                        ${(item.type === 'rent_out' ? item.rent_out_monthly_rental : item.renting_monthly_rental) || 0}
-                                                                    </p>
-                                                                    {(item.rent_out_tenancy_number || item.renting_number) && (
-                                                                        <p className="text-[11px] text-zinc-500 dark:text-white/40 truncate">
-                                                                            {t('單號: ', 'No: ')}{item.type === 'rent_out' ? item.rent_out_tenancy_number : item.renting_number}
-                                                                        </p>
-                                                                    )}
-                                                                </div>
-                                                            ))}
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            </motion.div>
-                                        )}
-                                    </AnimatePresence>
-                                </div>
+                                    <div className="flex items-center justify-between pt-2">
+                                        <button
+                                            onClick={() => {
+                                                setEditingUser(u);
+                                                setEditRole(u.role);
+                                                setEditDisplayName(u.displayName || '');
+                                                setEditPassword('');
+                                            }}
+                                            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 active:bg-indigo-100 dark:active:bg-indigo-500/20 transition-all text-sm font-semibold"
+                                        >
+                                            <Pencil className="w-4 h-4" />
+                                            {t('編輯資料', 'Edit Info')}
+                                        </button>
+                                        <button
+                                            onClick={() => handleDelete(u.id)}
+                                            className="p-2.5 rounded-xl bg-red-50 dark:bg-red-500/10 text-red-600 dark:text-red-400 active:bg-red-100 dark:active:bg-red-500/20 transition-colors"
+                                        >
+                                            <Trash2 className="w-4 h-4" />
+                                        </button>
+                                    </div>
+                                </motion.div>
                             ))}
-                            {filteredUsers.length === 0 && (
-                                <div className="text-center py-20 bg-zinc-50 dark:bg-white/5 rounded-2xl border border-dashed border-zinc-200 dark:border-white/10">
-                                    <Users className="w-12 h-12 text-zinc-300 dark:text-white/10 mx-auto mb-3" />
-                                    <p className="text-zinc-500 dark:text-white/40">{t('找不到匹配的用戶', 'No matching users found')}</p>
-                                </div>
-                            )}
                         </div>
-                    )}
-                </motion.div>
+                    </div>
+                )}
             </div>
+
+            {/* Add User Modal */}
+            <AnimatePresence>
+                {isAddModalOpen && (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+                        <motion.div
+                            initial={{ opacity: 0, scale: 0.95, y: 20 }}
+                            animate={{ opacity: 1, scale: 1, y: 0 }}
+                            exit={{ opacity: 0, scale: 0.95, y: 20 }}
+                            className="bg-white dark:bg-zinc-900 w-full max-w-md rounded-2xl shadow-2xl border border-zinc-200 dark:border-white/10 overflow-hidden"
+                        >
+                            <div className="p-6 border-b border-zinc-100 dark:border-white/5 flex items-center justify-between bg-zinc-50 dark:bg-white/5">
+                                <div className="flex items-center gap-3">
+                                    <div className="p-2 rounded-xl bg-indigo-500/10 text-indigo-500">
+                                        <UserPlus className="w-5 h-5" />
+                                    </div>
+                                    <h3 className="text-xl font-bold text-zinc-900 dark:text-white">
+                                        {t('新增帳號', 'Create New Account')}
+                                    </h3>
+                                </div>
+                                <button
+                                    onClick={() => setIsAddModalOpen(false)}
+                                    className="p-2 text-zinc-400 hover:text-zinc-600 dark:hover:text-white transition-colors"
+                                >
+                                    <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                    </svg>
+                                </button>
+                            </div>
+
+                            <form onSubmit={handleCreateUser} className="p-6 space-y-5">
+                                <div className="space-y-2">
+                                    <label className="text-sm font-medium text-zinc-700 dark:text-white/70">
+                                        {t('用戶名稱', 'Username')}
+                                    </label>
+                                    <input
+                                        type="text"
+                                        value={newUsername}
+                                        onChange={(e) => setNewUsername(e.target.value)}
+                                        className="w-full px-4 py-2.5 rounded-xl bg-zinc-50 dark:bg-white/5 border border-zinc-200 dark:border-white/10 focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
+                                        placeholder={t('輸入用戶名', 'Enter username')}
+                                    />
+                                </div>
+
+                                <div className="space-y-2">
+                                    <label className="text-sm font-medium text-zinc-700 dark:text-white/70">
+                                        {t('顯示名稱 (簡稱)', 'Display Name (Short)')}
+                                    </label>
+                                    <input
+                                        type="text"
+                                        value={newDisplayName}
+                                        onChange={(e) => setNewDisplayName(e.target.value)}
+                                        className="w-full px-4 py-2.5 rounded-xl bg-zinc-50 dark:bg-white/5 border border-zinc-200 dark:border-white/10 focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
+                                        placeholder={t('輸入顯示名稱', 'Enter display name')}
+                                    />
+                                </div>
+
+                                <div className="space-y-2">
+                                    <label className="text-sm font-medium text-zinc-700 dark:text-white/70">
+                                        {t('密碼', 'Password')}
+                                    </label>
+                                    <div className="relative">
+                                        <input
+                                            type={showPassword ? 'text' : 'password'}
+                                            value={newPassword}
+                                            onChange={(e) => setNewPassword(e.target.value)}
+                                            className="w-full px-4 py-2.5 rounded-xl bg-zinc-50 dark:bg-white/5 border border-zinc-200 dark:border-white/10 focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
+                                            placeholder={t('輸入密碼', 'Enter password')}
+                                        />
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowPassword(!showPassword)}
+                                            className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-white/80"
+                                        >
+                                            {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div className="space-y-2">
+                                    <label className="text-sm font-medium text-zinc-700 dark:text-white/70">
+                                        {t('權限角色', 'Role')}
+                                    </label>
+                                    <div className="flex gap-2 p-1 bg-zinc-100 dark:bg-white/5 rounded-xl">
+                                        <button
+                                            type="button"
+                                            onClick={() => setNewUserRole('user')}
+                                            className={`flex-1 py-1.5 rounded-lg text-xs font-semibold transition-all ${newUserRole === 'user'
+                                                ? 'bg-white dark:bg-white/10 text-indigo-600 dark:text-indigo-400 shadow-sm'
+                                                : 'text-zinc-500'
+                                                }`}
+                                        >
+                                            {t('普通用戶', 'Standard User')}
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => setNewUserRole('admin')}
+                                            className={`flex-1 py-1.5 rounded-lg text-xs font-semibold transition-all ${newUserRole === 'admin'
+                                                ? 'bg-white dark:bg-white/10 text-indigo-600 dark:text-indigo-400 shadow-sm'
+                                                : 'text-zinc-500'
+                                                }`}
+                                        >
+                                            {t('管理員', 'Admin')}
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div className="pt-4 flex gap-3">
+                                    <button
+                                        type="button"
+                                        onClick={() => setIsAddModalOpen(false)}
+                                        className="flex-1 px-4 py-2.5 bg-zinc-100 dark:bg-white/5 text-zinc-700 dark:text-white rounded-xl font-bold hover:bg-zinc-200 dark:hover:bg-white/10 transition-all"
+                                    >
+                                        {t('取消', 'Cancel')}
+                                    </button>
+                                    <button
+                                        type="submit"
+                                        disabled={isRegistering}
+                                        className="flex-[2] px-6 py-2.5 bg-indigo-500 hover:bg-indigo-600 disabled:opacity-50 text-white rounded-xl font-bold transition-all flex items-center justify-center gap-2 min-w-[120px]"
+                                    >
+                                        {isRegistering ? <RefreshCw className="w-4 h-4 animate-spin" /> : <UserPlus className="w-4 h-4" />}
+                                        {t('創建帳號', 'Create Account')}
+                                    </button>
+                                </div>
+                            </form>
+                        </motion.div>
+                    </div>
+                )}
+            </AnimatePresence>
 
             {/* Edit User Modal */}
             <AnimatePresence>
@@ -587,6 +631,19 @@ export default function UsersPage() {
 
                                 <div className="space-y-2">
                                     <label className="text-sm font-medium text-zinc-700 dark:text-white/70">
+                                        {t('顯示名稱 (簡稱)', 'Display Name (Short)')}
+                                    </label>
+                                    <input
+                                        type="text"
+                                        value={editDisplayName}
+                                        onChange={(e) => setEditDisplayName(e.target.value)}
+                                        className="w-full px-4 py-2.5 rounded-xl bg-zinc-50 dark:bg-white/5 border border-zinc-200 dark:border-white/10 focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
+                                        placeholder={t('輸入顯示名稱', 'Enter display name')}
+                                    />
+                                </div>
+
+                                <div className="space-y-2">
+                                    <label className="text-sm font-medium text-zinc-700 dark:text-white/70">
                                         {t('新密碼 (留空則不修改)', 'New Password (Leave blank to keep current)')}
                                     </label>
                                     <div className="relative">
@@ -607,33 +664,35 @@ export default function UsersPage() {
                                     </div>
                                 </div>
 
-                                <div className="space-y-2">
-                                    <label className="text-sm font-medium text-zinc-700 dark:text-white/70">
-                                        {t('權限角色', 'Role')}
-                                    </label>
-                                    <div className="flex gap-2 p-1 bg-zinc-100 dark:bg-white/5 rounded-xl">
-                                        <button
-                                            type="button"
-                                            onClick={() => setEditRole('user')}
-                                            className={`flex-1 py-1.5 rounded-lg text-xs font-semibold transition-all ${editRole === 'user'
-                                                ? 'bg-white dark:bg-white/10 text-indigo-600 dark:text-indigo-400 shadow-sm'
-                                                : 'text-zinc-500'
-                                                }`}
-                                        >
-                                            {t('普通用戶', 'Standard User')}
-                                        </button>
-                                        <button
-                                            type="button"
-                                            onClick={() => setEditRole('admin')}
-                                            className={`flex-1 py-1.5 rounded-lg text-xs font-semibold transition-all ${editRole === 'admin'
-                                                ? 'bg-white dark:bg-white/10 text-indigo-600 dark:text-indigo-400 shadow-sm'
-                                                : 'text-zinc-500'
-                                                }`}
-                                        >
-                                            {t('管理員', 'Admin')}
-                                        </button>
+                                {editingUser.role !== 'admin' && (
+                                    <div className="space-y-2">
+                                        <label className="text-sm font-medium text-zinc-700 dark:text-white/70">
+                                            {t('權限角色', 'Role')}
+                                        </label>
+                                        <div className="flex gap-2 p-1 bg-zinc-100 dark:bg-white/5 rounded-xl">
+                                            <button
+                                                type="button"
+                                                onClick={() => setEditRole('user')}
+                                                className={`flex-1 py-1.5 rounded-lg text-xs font-semibold transition-all ${editRole === 'user'
+                                                    ? 'bg-white dark:bg-white/10 text-indigo-600 dark:text-indigo-400 shadow-sm'
+                                                    : 'text-zinc-500'
+                                                    }`}
+                                            >
+                                                {t('普通用戶', 'Standard User')}
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => setEditRole('admin')}
+                                                className={`flex-1 py-1.5 rounded-lg text-xs font-semibold transition-all ${editRole === 'admin'
+                                                    ? 'bg-white dark:bg-white/10 text-indigo-600 dark:text-indigo-400 shadow-sm'
+                                                    : 'text-zinc-500'
+                                                    }`}
+                                            >
+                                                {t('管理員', 'Admin')}
+                                            </button>
+                                        </div>
                                     </div>
-                                </div>
+                                )}
 
                                 <div className="pt-4 flex gap-3">
                                     <button
@@ -646,7 +705,7 @@ export default function UsersPage() {
                                     <button
                                         type="submit"
                                         disabled={isUpdating}
-                                        className="flex-2 px-6 py-2.5 bg-indigo-500 hover:bg-indigo-600 disabled:opacity-50 text-white rounded-xl font-bold transition-all flex items-center justify-center gap-2 min-w-[120px]"
+                                        className="flex-[2] px-6 py-2.5 bg-indigo-500 hover:bg-indigo-600 disabled:opacity-50 text-white rounded-xl font-bold transition-all flex items-center justify-center gap-2 min-w-[120px]"
                                     >
                                         {isUpdating ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
                                         {t('儲存變更', 'Save Changes')}

@@ -40,7 +40,7 @@ export default function ManagePropertiesPage() {
     const userMap = useMemo(() => {
         const map: Record<string, string> = {};
         users?.forEach(u => {
-            map[u.id] = u.username;
+            map[u.id] = u.displayName || u.username;
         });
         return map;
     }, [users]);
@@ -136,98 +136,163 @@ export default function ManagePropertiesPage() {
                             <p className="text-sm mt-2 opacity-70">新增物業以開始管理</p>
                         </div>
                     ) : (
-                        <table className="w-full">
-                            <thead>
-                                <tr className="text-left text-zinc-500 dark:text-white/50 text-sm border-b border-zinc-100 dark:border-white/5">
-                                    <th className="px-4 py-3 text-left text-xs font-medium text-zinc-500 dark:text-white/40 uppercase tracking-wider">名稱</th>
-                                    <th className="px-4 py-3 text-left text-xs font-medium text-zinc-500 dark:text-white/40 uppercase tracking-wider">編號</th>
-                                    <th className="px-4 py-3 text-left text-xs font-medium text-zinc-500 dark:text-white/40 uppercase tracking-wider">類型</th>
-                                    <th className="px-4 py-3 text-left text-xs font-medium text-zinc-500 dark:text-white/40 uppercase tracking-wider">狀態</th>
-                                    <th className="px-4 py-3 text-left text-xs font-medium text-zinc-500 dark:text-white/40 uppercase tracking-wider">上載者</th>
-                                    <th className="px-4 py-3 text-right text-xs font-medium text-zinc-500 dark:text-white/40 uppercase tracking-wider">操作</th>
-                                </tr>
-                            </thead>
-                            <tbody>
+                        <>
+                            {/* Desktop Table View */}
+                            <table className="w-full hidden md:table">
+                                <thead>
+                                    <tr className="text-left text-zinc-500 dark:text-white/50 text-sm border-b border-zinc-100 dark:border-white/5">
+                                        <th className="px-4 py-3 text-left text-xs font-medium text-zinc-500 dark:text-white/40 uppercase tracking-wider">名稱</th>
+                                        <th className="px-4 py-3 text-left text-xs font-medium text-zinc-500 dark:text-white/40 uppercase tracking-wider">編號</th>
+                                        <th className="px-4 py-3 text-left text-xs font-medium text-zinc-500 dark:text-white/40 uppercase tracking-wider">類型</th>
+                                        <th className="px-4 py-3 text-left text-xs font-medium text-zinc-500 dark:text-white/40 uppercase tracking-wider">狀態</th>
+                                        <th className="px-4 py-3 text-left text-xs font-medium text-zinc-500 dark:text-white/40 uppercase tracking-wider">上載者</th>
+                                        <th className="px-4 py-3 text-right text-xs font-medium text-zinc-500 dark:text-white/40 uppercase tracking-wider">操作</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {sortedProperties.map((property, index) => (
+                                        <motion.tr
+                                            key={property.id}
+                                            initial={{ opacity: 0, y: 10 }}
+                                            animate={{ opacity: 1, y: 0 }}
+                                            transition={{ delay: index * 0.03 }}
+                                            className="border-b border-zinc-100 dark:border-white/5 hover:bg-zinc-50 dark:hover:bg-white/5 transition-colors"
+                                        >
+                                            <td className="p-4">
+                                                <div className="flex items-center gap-3">
+                                                    {property.images?.[0] ? (
+                                                        <img
+                                                            src={property.images[0]}
+                                                            alt={property.name}
+                                                            className="w-10 h-10 rounded-lg object-cover"
+                                                        />
+                                                    ) : (
+                                                        <div className="w-10 h-10 rounded-lg bg-zinc-100 dark:bg-white/5 flex items-center justify-center">
+                                                            <Building2 className="w-5 h-5 text-zinc-400 dark:text-white/30" />
+                                                        </div>
+                                                    )}
+                                                    <div>
+                                                        <p className="text-zinc-900 dark:text-white font-medium">{property.name}</p>
+                                                        {property.address && (
+                                                            <p className="text-zinc-500 dark:text-white/40 text-xs truncate max-w-[200px]">{property.address}</p>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            </td>
+                                            <td className="p-4 text-zinc-600 dark:text-white/70">{property.code}</td>
+                                            <td className="p-4 text-zinc-600 dark:text-white/70">{typeLabels[property.type]}</td>
+                                            <td className="p-4">
+                                                <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${statusColors[property.status]}`}>
+                                                    {statusLabels[property.status]}
+                                                </span>
+                                            </td>
+                                            <td className="p-4 text-zinc-600 dark:text-white/70 text-sm">
+                                                {property.createdBy ? (userMap[property.createdBy] || 'Unknown') : '-'}
+                                            </td>
+                                            <td className="p-4 text-right">
+                                                <div className="flex items-center justify-end gap-2">
+                                                    {/* View */}
+                                                    <Link href={`/properties/${encodeURIComponent(property.name)}`}>
+                                                        <motion.button
+                                                            whileHover={{ scale: 1.1 }}
+                                                            whileTap={{ scale: 0.9 }}
+                                                            className="p-2 rounded-lg text-zinc-400 dark:text-white/50 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-white/10 transition-all"
+                                                            title="查看"
+                                                        >
+                                                            <Eye className="w-4 h-4" />
+                                                        </motion.button>
+                                                    </Link>
+                                                    {/* Edit */}
+                                                    <motion.button
+                                                        whileHover={{ scale: 1.1 }}
+                                                        whileTap={{ scale: 0.9 }}
+                                                        onClick={() => handleEdit(property)}
+                                                        className="p-2 rounded-lg text-zinc-400 dark:text-white/50 hover:text-purple-600 dark:hover:text-purple-400 hover:bg-purple-50 dark:hover:bg-purple-500/10 transition-all"
+                                                        title="編輯"
+                                                    >
+                                                        <Pencil className="w-4 h-4" />
+                                                    </motion.button>
+                                                    {/* Delete */}
+                                                    <motion.button
+                                                        whileHover={{ scale: 1.1 }}
+                                                        whileTap={{ scale: 0.9 }}
+                                                        onClick={() => setDeleteConfirm(property.id!)}
+                                                        className="p-2 rounded-lg text-zinc-400 dark:text-white/50 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10 transition-all"
+                                                        title="刪除"
+                                                    >
+                                                        <Trash2 className="w-4 h-4" />
+                                                    </motion.button>
+                                                </div>
+                                            </td>
+                                        </motion.tr>
+                                    ))}
+                                </tbody>
+                            </table>
+
+                            {/* Mobile Card View */}
+                            <div className="grid grid-cols-1 gap-4 p-4 md:hidden">
                                 {sortedProperties.map((property, index) => (
-                                    <motion.tr
+                                    <motion.div
                                         key={property.id}
                                         initial={{ opacity: 0, y: 10 }}
                                         animate={{ opacity: 1, y: 0 }}
-                                        transition={{ delay: index * 0.03 }}
-                                        className="border-b border-zinc-100 dark:border-white/5 hover:bg-zinc-50 dark:hover:bg-white/5 transition-colors"
+                                        transition={{ delay: index * 0.05 }}
+                                        className="mobile-card space-y-4"
                                     >
-                                        <td className="p-4">
+                                        <div className="flex items-start justify-between">
                                             <div className="flex items-center gap-3">
                                                 {property.images?.[0] ? (
                                                     <img
                                                         src={property.images[0]}
                                                         alt={property.name}
-                                                        className="w-10 h-10 rounded-lg object-cover"
+                                                        className="w-12 h-12 rounded-xl object-cover shadow-sm"
                                                     />
                                                 ) : (
-                                                    <div className="w-10 h-10 rounded-lg bg-zinc-100 dark:bg-white/5 flex items-center justify-center">
-                                                        <Building2 className="w-5 h-5 text-zinc-400 dark:text-white/30" />
+                                                    <div className="w-12 h-12 rounded-xl bg-zinc-100 dark:bg-white/5 flex items-center justify-center border border-zinc-200 dark:border-white/10">
+                                                        <Building2 className="w-6 h-6 text-zinc-400 dark:text-white/30" />
                                                     </div>
                                                 )}
-                                                <div>
-                                                    <p className="text-zinc-900 dark:text-white font-medium">{property.name}</p>
-                                                    {property.address && (
-                                                        <p className="text-zinc-500 dark:text-white/40 text-xs truncate max-w-[200px]">{property.address}</p>
-                                                    )}
+                                                <div className="min-w-0">
+                                                    <h3 className="font-bold text-zinc-900 dark:text-white truncate">{property.name}</h3>
+                                                    <p className="text-xs text-zinc-500 dark:text-white/40 font-mono tracking-tight">{property.code}</p>
                                                 </div>
                                             </div>
-                                        </td>
-                                        <td className="p-4 text-zinc-600 dark:text-white/70">{property.code}</td>
-                                        <td className="p-4 text-zinc-600 dark:text-white/70">{typeLabels[property.type]}</td>
-                                        <td className="p-4">
-                                            <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${statusColors[property.status]}`}>
+                                            <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${statusColors[property.status]}`}>
                                                 {statusLabels[property.status]}
                                             </span>
-                                        </td>
-                                        <td className="p-4 text-zinc-600 dark:text-white/70 text-sm">
-                                            {property.createdBy ? (userMap[property.createdBy] || 'Unknown') : '-'}
-                                        </td>
-                                        <td className="p-4 text-right">
-                                            <div className="flex items-center justify-end gap-2">
-                                                {/* View */}
-                                                <Link href={`/properties/${encodeURIComponent(property.name)}`}>
-                                                    <motion.button
-                                                        whileHover={{ scale: 1.1 }}
-                                                        whileTap={{ scale: 0.9 }}
-                                                        className="p-2 rounded-lg text-zinc-400 dark:text-white/50 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-white/10 transition-all"
-                                                        title="查看"
-                                                    >
-                                                        <Eye className="w-4 h-4" />
-                                                    </motion.button>
-                                                </Link>
-                                                {/* Edit */}
-                                                <motion.button
-                                                    whileHover={{ scale: 1.1 }}
-                                                    whileTap={{ scale: 0.9 }}
-                                                    onClick={() => handleEdit(property)}
-                                                    className="p-2 rounded-lg text-zinc-400 dark:text-white/50 hover:text-purple-600 dark:hover:text-purple-400 hover:bg-purple-50 dark:hover:bg-purple-500/10 transition-all"
-                                                    title="編輯"
-                                                >
-                                                    <Pencil className="w-4 h-4" />
-                                                </motion.button>
-                                                {/* Delete */}
-                                                <motion.button
-                                                    whileHover={{ scale: 1.1 }}
-                                                    whileTap={{ scale: 0.9 }}
-                                                    onClick={() => setDeleteConfirm(property.id!)}
-                                                    className="p-2 rounded-lg text-zinc-400 dark:text-white/50 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10 transition-all"
-                                                    title="刪除"
-                                                >
-                                                    <Trash2 className="w-4 h-4" />
-                                                </motion.button>
+                                        </div>
+
+                                        <div className="grid grid-cols-2 gap-4 py-3 border-y border-zinc-100 dark:border-white/5">
+                                            <div>
+                                                <p className="text-[10px] text-zinc-400 dark:text-white/30 uppercase font-medium">類型</p>
+                                                <p className="text-sm text-zinc-900 dark:text-white font-medium">{typeLabels[property.type]}</p>
                                             </div>
-                                        </td>
-                                    </motion.tr>
+                                            <div>
+                                                <p className="text-[10px] text-zinc-400 dark:text-white/30 uppercase font-medium">上載者</p>
+                                                <p className="text-sm text-zinc-900 dark:text-white font-medium">{property.createdBy ? (userMap[property.createdBy] || 'Unknown') : '-'}</p>
+                                            </div>
+                                        </div>
+
+                                        <div className="flex items-center justify-between pt-2">
+                                            <div className="flex items-center gap-2">
+                                                <Link href={`/properties/${encodeURIComponent(property.name)}`} className="p-2.5 rounded-xl bg-zinc-100 dark:bg-white/5 text-zinc-500 dark:text-white/40 active:bg-zinc-200 dark:active:bg-white/10 transition-colors">
+                                                    <Eye className="w-5 h-5" />
+                                                </Link>
+                                                <button onClick={() => handleEdit(property)} className="p-2.5 rounded-xl bg-purple-50 dark:bg-purple-500/10 text-purple-600 dark:text-purple-400 active:bg-purple-100 dark:active:bg-purple-500/20 transition-colors">
+                                                    <Pencil className="w-5 h-5" />
+                                                </button>
+                                            </div>
+                                            <button onClick={() => setDeleteConfirm(property.id!)} className="p-2.5 rounded-xl bg-red-50 dark:bg-red-500/10 text-red-600 dark:text-red-400 active:bg-red-100 dark:active:bg-red-500/20 transition-colors">
+                                                <Trash2 className="w-5 h-5" />
+                                            </button>
+                                        </div>
+                                    </motion.div>
                                 ))}
-                            </tbody>
-                        </table>
+                            </div>
+                        </>
                     )}
                 </div>
+
             )}
 
             {/* Property Form Modal */}

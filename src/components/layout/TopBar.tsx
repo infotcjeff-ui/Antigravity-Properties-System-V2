@@ -4,7 +4,7 @@ import { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, Bell, Check, Trash2, LayoutDashboard, LogIn, LogOut, Database, Cloud } from 'lucide-react';
+import { Search, Bell, Check, Trash2, LayoutDashboard, LogIn, LogOut, Database, Cloud, Menu, X, Building2, Users, ArrowUpFromLine, ArrowDownToLine, Network, Settings } from 'lucide-react';
 import { useNotifications } from '@/contexts/NotificationContext';
 import ThemeToggle from './ThemeToggle';
 
@@ -12,12 +12,14 @@ interface TopBarProps {
     onSearch?: (query: string) => void;
     placeholder?: string;
     isAuthenticated?: boolean;
+    isAdmin?: boolean;
 }
 
-export default function TopBar({ onSearch, placeholder = '搜尋...', isAuthenticated = false }: TopBarProps) {
+export default function TopBar({ onSearch, placeholder = '搜尋...', isAuthenticated = false, isAdmin = false }: TopBarProps) {
     const router = useRouter();
     const [searchValue, setSearchValue] = useState('');
     const [showNotifications, setShowNotifications] = useState(false);
+    const [showMobileMenu, setShowMobileMenu] = useState(false);
     const notificationRef = useRef<HTMLDivElement>(null);
 
     // Only use notifications if authenticated
@@ -81,8 +83,22 @@ export default function TopBar({ onSearch, placeholder = '搜尋...', isAuthenti
         <motion.div
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
-            className="sticky top-0 z-40 h-16 px-6 flex items-center justify-between bg-white/90 dark:bg-[#0f0f1a]/80 backdrop-blur-xl border-b border-zinc-200 dark:border-white/5 transition-colors duration-300"
+            className={`sticky top-0 z-40 h-16 px-4 md:px-6 flex items-center justify-between transition-all duration-300 ${showMobileMenu ? 'bg-white dark:bg-[#0f0f1a]' : 'bg-white/80 dark:bg-[#0f0f1a]/80 backdrop-blur-xl border-b border-zinc-200 dark:border-white/5'
+                }`}
         >
+            {/* Mobile Menu Toggle */}
+            <div className="flex items-center gap-3 md:hidden">
+                <button
+                    onClick={() => setShowMobileMenu(!showMobileMenu)}
+                    className="p-2 rounded-xl bg-zinc-100 dark:bg-white/5 text-zinc-600 dark:text-white/70"
+                >
+                    {showMobileMenu ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+                </button>
+                {isAdmin && (
+                    <div className="font-bold text-zinc-900 dark:text-white text-sm">Backend</div>
+                )}
+            </div>
+
             {/* Search - Hidden for now */}
             <div className="relative flex-1 max-w-md hidden">
                 <div className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 dark:text-white/30">
@@ -197,15 +213,15 @@ export default function TopBar({ onSearch, placeholder = '搜尋...', isAuthenti
                         </div>
 
 
-                        {/* Dashboard Button */}
-                        <Link href="/dashboard">
+                        {/* Dashboard/Return Button */}
+                        <Link href={isAdmin ? "/" : "/dashboard"}>
                             <motion.button
                                 whileHover={{ scale: 1.02 }}
                                 whileTap={{ scale: 0.98 }}
                                 className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-purple-600 to-blue-600 rounded-xl text-white font-medium shadow-lg shadow-purple-500/20 hover:shadow-purple-500/30 transition-shadow"
                             >
                                 <LayoutDashboard className="w-4 h-4" />
-                                <span className="text-sm">後台管理</span>
+                                <span className="text-sm">{isAdmin ? "返回應用" : "後台管理"}</span>
                             </motion.button>
                         </Link>
 
@@ -234,6 +250,101 @@ export default function TopBar({ onSearch, placeholder = '搜尋...', isAuthenti
                     </Link>
                 )}
             </div>
+
+            {/* Mobile Side Menu */}
+            <AnimatePresence>
+                {showMobileMenu && (
+                    <>
+                        <motion.div
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            onClick={() => setShowMobileMenu(false)}
+                            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[45] md:hidden"
+                        />
+                        <motion.div
+                            initial={{ x: '-100%' }}
+                            animate={{ x: 0 }}
+                            exit={{ x: '-100%' }}
+                            transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+                            className="fixed inset-y-0 left-0 w-[280px] bg-white dark:bg-[#0f0f1a] z-50 md:hidden flex flex-col shadow-2xl overflow-y-auto"
+                        >
+                            <div className="p-6 border-b border-zinc-200 dark:border-white/5 flex items-center justify-between">
+                                <div className="flex items-center gap-3">
+                                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 to-blue-600 flex items-center justify-center text-white font-bold">
+                                        {isAdmin ? 'B' : 'P'}
+                                    </div>
+                                    <span className="font-bold text-zinc-900 dark:text-white">{isAdmin ? 'Backend' : 'PMS'}</span>
+                                </div>
+                                <button onClick={() => setShowMobileMenu(false)} className="p-2 rounded-lg hover:bg-zinc-100 dark:hover:bg-white/5 text-zinc-500">
+                                    <X className="w-6 h-6" />
+                                </button>
+                            </div>
+
+                            <nav className="flex-1 p-4 space-y-1">
+                                {isAdmin ? (
+                                    <>
+                                        <p className="px-4 text-xs font-medium text-zinc-400 dark:text-white/40 uppercase tracking-widest mb-2 mt-4">管理</p>
+                                        <MobileNavItem href="/dashboard" icon={<LayoutDashboard className="w-5 h-5" />} label="總覽" onClick={() => setShowMobileMenu(false)} />
+                                        <MobileNavItem href="/dashboard/properties" icon={<Building2 className="w-5 h-5" />} label="管理物業" onClick={() => setShowMobileMenu(false)} />
+                                        <MobileNavItem href="/dashboard/proprietors" icon={<Users className="w-5 h-5" />} label="管理擁有方" onClick={() => setShowMobileMenu(false)} />
+                                        <MobileNavItem href="/dashboard/tenants" icon={<Users className="w-5 h-5" />} label="管理承租人" onClick={() => setShowMobileMenu(false)} />
+                                        <MobileNavItem href="/dashboard/rent-out" icon={<ArrowUpFromLine className="w-5 h-5" />} label="管理收租" onClick={() => setShowMobileMenu(false)} />
+                                        <MobileNavItem href="/dashboard/renting" icon={<ArrowDownToLine className="w-5 h-5" />} label="管理交租" onClick={() => setShowMobileMenu(false)} />
+                                        <MobileNavItem href="/dashboard/relations" icon={<Network className="w-5 h-5" />} label="管理關聯" onClick={() => setShowMobileMenu(false)} />
+
+                                        <p className="px-4 text-xs font-medium text-zinc-400 dark:text-white/40 uppercase tracking-widest mb-2 mt-6">系統</p>
+                                        <MobileNavItem href="/dashboard/users" icon={<Users className="w-5 h-5" />} label="帳號管理" onClick={() => setShowMobileMenu(false)} />
+                                        <MobileNavItem href="/dashboard/settings" icon={<Settings className="w-5 h-5" />} label="系統設定" onClick={() => setShowMobileMenu(false)} />
+                                    </>
+                                ) : (
+                                    <>
+                                        <MobileNavItem href="/" icon={<Building2 className="w-5 h-5" />} label="物業列表" onClick={() => setShowMobileMenu(false)} />
+                                        {isAuthenticated && (
+                                            <>
+                                                <MobileNavItem href="/proprietors" icon={<Users className="w-5 h-5" />} label="擁有方列表" onClick={() => setShowMobileMenu(false)} />
+                                                <MobileNavItem href="/tenants" icon={<Users className="w-5 h-5" />} label="承租人列表" onClick={() => setShowMobileMenu(false)} />
+                                                <MobileNavItem href="/rent-out" icon={<ArrowUpFromLine className="w-5 h-5" />} label="收租記錄" onClick={() => setShowMobileMenu(false)} />
+                                                <MobileNavItem href="/renting" icon={<ArrowDownToLine className="w-5 h-5" />} label="交租記錄" onClick={() => setShowMobileMenu(false)} />
+                                                <MobileNavItem href="/relations" icon={<Network className="w-5 h-5" />} label="關係圖譜" onClick={() => setShowMobileMenu(false)} />
+                                            </>
+                                        )}
+                                    </>
+                                )}
+                            </nav>
+
+                            <div className="p-4 border-t border-zinc-200 dark:border-white/5 space-y-3">
+                                <ThemeToggle className="w-full justify-start px-4 h-11" showLabel />
+                                {isAuthenticated && (
+                                    <button
+                                        onClick={handleLogout}
+                                        className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10 transition-all font-medium"
+                                    >
+                                        <LogOut className="w-5 h-5" />
+                                        登出系統
+                                    </button>
+                                )}
+                            </div>
+                        </motion.div>
+                    </>
+                )}
+            </AnimatePresence>
         </motion.div>
     );
 }
+
+function MobileNavItem({ href, icon, label, onClick }: { href: string; icon: React.ReactNode; label: string; onClick: () => void }) {
+    return (
+        <Link
+            href={href}
+            onClick={onClick}
+            className="flex items-center gap-4 px-4 py-3.5 rounded-2xl text-zinc-600 dark:text-white/70 hover:bg-zinc-100 dark:hover:bg-white/5 transition-all active:scale-[0.98]"
+        >
+            <div className="p-2 rounded-xl bg-zinc-100 dark:bg-white/5 border border-zinc-200 dark:border-white/10 text-zinc-500 dark:text-white/40 group-hover:text-purple-500 transition-colors">
+                {icon}
+            </div>
+            <span className="font-semibold">{label}</span>
+        </Link>
+    );
+}
+

@@ -81,9 +81,13 @@ export default function ProtectedLayout({
     return (
         <ThemeProvider>
             <NotificationProvider>
-                <div className="min-h-screen bg-background text-foreground transition-colors duration-300">
-                    <Sidebar isAuthenticated={isAuthenticated} />
-                    <div className="ml-[280px]">
+                <div className="min-h-screen bg-background text-foreground transition-colors duration-300 flex flex-col md:flex-row">
+                    {/* Sidebar - Hidden on mobile, fixed on desktop */}
+                    <div className="hidden md:block">
+                        <Sidebar isAuthenticated={isAuthenticated} />
+                    </div>
+
+                    <div className="flex-1 md:ml-[280px] transition-all duration-300">
                         <TopBar
                             isAuthenticated={isAuthenticated}
                             placeholder="搜尋物業..."

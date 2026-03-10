@@ -38,28 +38,60 @@ async function geocodeProperties() {
         try {
             console.log(`\nGeocoding: ${property.name} (${property.address})`);
 
-            let searchAddress = property.address;
+            // Helper to clean address
+            const clean = (addr) => addr.replace(/\(.*?\)/g, '').replace(/（.*?）/g, '').trim();
+            const originalBase = clean(property.address);
 
-            // Remove text in parentheses (e.g., "(租車易)")
-            searchAddress = searchAddress.replace(/\(.*?\)/g, '').replace(/（.*?）/g, '').trim();
+            // Search strategy
+            const searchSteps = [
+                originalFull,
+                originalBase,
+                originalBase.replace(/^(香港|九龍|新界|元朗|屯門|粉嶺|錦田|大埔|坑口|西貢|沙田|葵涌|青衣|荃灣|東涌|愉景灣)/, '').trim(),
+            ].filter(Boolean);
 
-            if (!searchAddress.toLowerCase().includes('hong kong') && !searchAddress.includes('香港')) {
-                searchAddress += ', Hong Kong';
+            const uniqueSteps = [...new Set(searchSteps)];
+            let foundLocation = null;
+
+            // TRY OGCIO ALS FIRST
+            for (const query of uniqueSteps) {
+                try {
+                    console.log(`Searching ALS for: ${query}`);
+                    const url = `https://www.als.ogcio.gov.hk/lookup?q=${encodeURIComponent(query)}&n=1`;
+                    const response = await fetch(url, { headers: { 'Accept': 'application/json' } });
+                    const data = await response.json();
+                    const addr = data?.SuggestedAddress?.[0]?.Address;
+                    if (addr) {
+                        const geo = addr.PremisesAddress?.GeospatialInformation || addr.BuildingAddress?.GeospatialInformation;
+                        if (geo?.Latitude && geo?.Longitude) {
+                            foundLocation = { lat: geo.Latitude, lng: geo.Longitude };
+                            break;
+                        }
+                    }
+                } catch (e) { console.error('ALS search failed', e); }
+                await delay(500);
             }
 
-            console.log(`Searching for: ${searchAddress}`);
-
-            const url = `https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(searchAddress)}`;
-            const response = await fetch(url, {
-                headers: {
-                    'User-Agent': 'AntigravityPropertiesSystem/1.0 (internal script)'
+            // FALLBACK TO NOMINATIM
+            if (!foundLocation) {
+                for (const query of uniqueSteps) {
+                    console.log(`Searching Nominatim for: ${query}`);
+                    const url = `https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=hk&q=${encodeURIComponent(query)}`;
+                    const response = await fetch(url, {
+                        headers: {
+                            'User-Agent': 'AntigravityPropertiesSystem/1.0 (internal script)'
+                        }
+                    });
+                    const data = await response.json();
+                    if (data && data.length > 0) {
+                        foundLocation = { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) };
+                        break;
+                    }
+                    await delay(1000);
                 }
-            });
-            const data = await response.json();
+            }
 
-            if (data && data.length > 0) {
-                const lat = parseFloat(data[0].lat);
-                const lng = parseFloat(data[0].lon);
+            if (foundLocation) {
+                const { lat, lng } = foundLocation;
 
                 console.log(`Found: Lat ${lat}, Lng ${lng}`);
 
@@ -84,10 +116,14 @@ async function geocodeProperties() {
                 }
 
             } else {
-                console.log('No location found for exact address, trying fallback generic area (Kam Tin)...');
+                console.log('No location found for exact address, trying fallback district center...');
 
-                await delay(1500); // respect rate limits before fallback query
-                const fallbackUrl = `https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent('Kam Tin, Hong Kong')}`;
+                // Try to detect district for a better fallback
+                const districts = ['錦田', '元朗', '天水圍', '屯門', '粉嶺', '上水', '大埔', '沙田', '西貢', '中心', '中環', '灣仔', '銅鑼灣', '北角', '柴灣', '尖沙咀', '旺角', '九龍城', '觀塘', '黃大仙', '將軍澳', '荃灣', '葵涌', '青衣'];
+                const detectedDistrict = districts.find(d => property.address.includes(d)) || 'Hong Kong';
+
+                await delay(1500);
+                const fallbackUrl = `https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=hk&q=${encodeURIComponent(detectedDistrict)}`;
 
                 const fallbackRes = await fetch(fallbackUrl, {
                     headers: { 'User-Agent': 'AntigravityPropertiesSystem/1.0 (internal script)' }
@@ -95,11 +131,10 @@ async function geocodeProperties() {
                 const fallbackData = await fallbackRes.json();
 
                 if (fallbackData && fallbackData.length > 0) {
-                    // Add a tiny bit of random jitter so multiple pins at Kam Tin don't perfectly overlap
-                    const lat = parseFloat(fallbackData[0].lat) + (Math.random() * 0.01 - 0.005);
-                    const lng = parseFloat(fallbackData[0].lon) + (Math.random() * 0.01 - 0.005);
+                    const lat = parseFloat(fallbackData[0].lat) + (Math.random() * 0.006 - 0.003);
+                    const lng = parseFloat(fallbackData[0].lon) + (Math.random() * 0.006 - 0.003);
 
-                    console.log(`Fallback Found: Lat ${lat}, Lng ${lng}`);
+                    console.log(`Fallback Found (${detectedDistrict}): Lat ${lat}, Lng ${lng}`);
 
                     const { error: fallbackUpdateError } = await supabase
                         .from('properties')
@@ -130,8 +165,8 @@ async function geocodeProperties() {
             failCount++;
         }
 
-        // Respect Nominatim rate limit: maximum 1 request per second
-        await delay(1500);
+        // Respect Nominatim rate limit
+        await delay(1000);
     }
 
     console.log(`\nGeocoding complete!`);

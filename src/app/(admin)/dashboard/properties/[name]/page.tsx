@@ -465,11 +465,16 @@ export default function PropertyDetailsPage() {
                                                             <div className="text-zinc-600 dark:text-white/70 text-sm">-</div>
                                                         )}
                                                     </div>
-                                                    {/* Lease Term */}
+                                                    {/* Lease Term & Location */}
                                                     <div className="py-4 px-4 border-l border-dashed border-zinc-200 dark:border-white/10 flex flex-col justify-center">
                                                         <div className={`text-sm ${isExpired ? 'text-red-500 font-medium' : 'text-zinc-600 dark:text-white/70'}`}>
                                                             {formatEnDate(startDate)}{startDate && endDate && ' ~ '}{formatEnDate(endDate)}{periods ? `(${periods}個月)` : ''}
-                                                            {isExpired && <span className="ml-1 text-xs px-1.5 py-0.5 bg-red-100 dark:bg-red-500/20 text-red-600 dark:text-red-400 rounded">已過期</span>}
+                                                        </div>
+                                                        <div className="flex items-center gap-2 mt-1">
+                                                            {isExpired && <span className="text-[10px] px-1.5 py-0.5 bg-red-100 dark:bg-red-500/20 text-red-600 dark:text-red-400 rounded font-medium">已過期</span>}
+                                                            <span className="text-xs text-zinc-500 dark:text-white/40 truncate">
+                                                                {rent.type === 'rent_out' ? (rent.location || rent.rentOutAddressDetail) : rent.location}
+                                                            </span>
                                                         </div>
                                                     </div>
                                                     {/* Rent */}

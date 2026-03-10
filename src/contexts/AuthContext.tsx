@@ -9,6 +9,7 @@ export type UserRole = 'admin' | 'user';
 export interface User {
     id: string;
     username: string;
+    displayName?: string;
     role: UserRole;
 }
 
@@ -18,9 +19,9 @@ interface AuthContextType {
     isLoading: boolean;
     login: (username: string, password: string, rememberMe?: boolean) => Promise<{ success: boolean; error?: string }>;
     logout: () => void;
-    registerUser: (username: string, password: string, role: UserRole) => Promise<{ success: boolean; error?: string }>;
+    registerUser: (username: string, password: string, role: UserRole, displayName?: string) => Promise<{ success: boolean; error?: string }>;
     getUsers: () => Promise<{ success: boolean; users?: User[]; error?: string }>;
-    updateUser: (userId: string, updates: { password?: string; role?: UserRole }) => Promise<{ success: boolean; error?: string }>;
+    updateUser: (userId: string, updates: { password?: string; role?: UserRole; displayName?: string }) => Promise<{ success: boolean; error?: string }>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -79,6 +80,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             const userData: User = {
                 id: data.id,
                 username: data.username,
+                displayName: data.display_name,
                 role: data.role as UserRole,
             };
 
@@ -104,12 +106,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const registerUser = useCallback(async (
         username: string,
         password: string,
-        role: UserRole = 'user'
+        role: UserRole = 'user',
+        displayName?: string
     ): Promise<{ success: boolean; error?: string }> => {
         try {
             const { data, error } = await supabase
                 .from('app_users')
-                .insert([{ username, password, role }])
+                .insert([{ username, password, role, display_name: displayName || username }])
                 .select()
                 .single();
 
@@ -125,11 +128,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         try {
             const { data, error } = await supabase
                 .from('app_users')
-                .select('id, username, role')
+                .select('id, username, role, display_name')
                 .order('username', { ascending: true });
 
             if (error) throw error;
-            return { success: true, users: data as User[] };
+            const users = (data || []).map(u => ({
+                id: u.id,
+                username: u.username,
+                role: u.role as UserRole,
+                displayName: u.display_name
+            }));
+            return { success: true, users };
         } catch (err: any) {
             console.error('Fetch users error:', err);
             return { success: false, error: err.message || '獲取用戶失敗' };
@@ -138,12 +147,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const updateUser = useCallback(async (
         userId: string,
-        updates: { password?: string; role?: UserRole }
+        updates: { password?: string; role?: UserRole; displayName?: string }
     ): Promise<{ success: boolean; error?: string }> => {
         try {
+            const dbUpdates: any = { ...updates };
+            if (updates.displayName) {
+                dbUpdates.display_name = updates.displayName;
+                delete dbUpdates.displayName;
+            }
+
             const { error } = await supabase
                 .from('app_users')
-                .update(updates)
+                .update(dbUpdates)
                 .eq('id', userId);
 
             if (error) throw error;

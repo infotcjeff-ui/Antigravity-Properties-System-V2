@@ -15,6 +15,7 @@ const ReactQuill = dynamic(() => import('react-quill-new'), {
 
 interface RentModalProps {
     propertyId?: string;
+    defaultLocation?: string;
     rent?: Rent | null; // For editing existing rent
     onClose: () => void;
     onSuccess: (rentId: string) => void;
@@ -31,7 +32,7 @@ const rentOutStatuses = [
     { value: 'completed', label: '已完租' },
 ];
 
-export default function RentModal({ propertyId, rent, onClose, onSuccess }: RentModalProps) {
+export default function RentModal({ propertyId, defaultLocation, rent, onClose, onSuccess }: RentModalProps) {
     const { addRent, updateRent } = useRents();
     const { getProprietors } = useProprietors();
     const { getProperties } = useProperties();
@@ -56,6 +57,7 @@ export default function RentModal({ propertyId, rent, onClose, onSuccess }: Rent
                 type: rent.type || 'rent_out' as 'rent_out' | 'renting',
                 propertyId: rent.propertyId || propertyId || '',
                 tenantId: rent.tenantId || '',
+                proprietorId: rent.proprietorId || '',
                 // Rent Out Fields
                 rentOutTenancyNumber: rent.rentOutTenancyNumber || '',
                 rentOutPricing: rent.rentOutPricing?.toString() || '',
@@ -70,7 +72,8 @@ export default function RentModal({ propertyId, rent, onClose, onSuccess }: Rent
                 rentOutDepositReturnDate: formatDate(rent.rentOutDepositReturnDate),
                 rentOutDepositReturnAmount: rent.rentOutDepositReturnAmount?.toString() || '',
                 rentOutLessor: rent.rentOutLessor || '',
-                rentOutAddressDetail: rent.rentOutAddressDetail || '',
+                rentOutAddressDetail: rent.rentOutAddressDetail || defaultLocation || '',
+                location: rent.location || rent.rentOutAddressDetail || defaultLocation || '',
                 rentOutStatus: rent.rentOutStatus || 'listing' as 'listing' | 'renting' | 'completed',
                 rentOutDescription: rent.rentOutDescription || '',
                 // Renting Fields
@@ -89,6 +92,7 @@ export default function RentModal({ propertyId, rent, onClose, onSuccess }: Rent
             type: 'rent_out' as 'rent_out' | 'renting',
             propertyId: propertyId || '',
             tenantId: '',
+            proprietorId: '',
             rentOutTenancyNumber: '',
             rentOutPricing: '',
             rentOutMonthlyRental: '',
@@ -102,7 +106,8 @@ export default function RentModal({ propertyId, rent, onClose, onSuccess }: Rent
             rentOutDepositReturnDate: '',
             rentOutDepositReturnAmount: '',
             rentOutLessor: '',
-            rentOutAddressDetail: '',
+            rentOutAddressDetail: defaultLocation || '', // Auto-fill
+            location: defaultLocation || '', // Legacy Auto-fill
             rentOutStatus: 'listing' as 'listing' | 'renting' | 'completed',
             rentOutDescription: '',
             rentingNumber: '',
@@ -153,7 +158,11 @@ export default function RentModal({ propertyId, rent, onClose, onSuccess }: Rent
 
     const handleProprietorCreated = async (id: string) => {
         await loadData();
-        setFormData(prev => ({ ...prev, tenantId: id }));
+        if (formData.type === 'rent_out') {
+            setFormData(prev => ({ ...prev, tenantId: id }));
+        } else {
+            setFormData(prev => ({ ...prev, proprietorId: id }));
+        }
         setShowProprietorModal(false);
     };
 
@@ -166,6 +175,7 @@ export default function RentModal({ propertyId, rent, onClose, onSuccess }: Rent
             const baseData = {
                 propertyId: formData.propertyId,
                 tenantId: formData.tenantId,
+                proprietorId: formData.proprietorId,
                 type: formData.type,
             };
 
@@ -186,14 +196,15 @@ export default function RentModal({ propertyId, rent, onClose, onSuccess }: Rent
                     rentOutDepositReceiveDate: formData.rentOutDepositReceiveDate ? new Date(formData.rentOutDepositReceiveDate) : undefined,
                     rentOutDepositReturnDate: formData.rentOutDepositReturnDate ? new Date(formData.rentOutDepositReturnDate) : undefined,
                     rentOutDepositReturnAmount: parseFloat(formData.rentOutDepositReturnAmount) || undefined,
-                    rentOutLessor: formData.rentOutLessor,
-                    rentOutAddressDetail: formData.rentOutAddressDetail,
+                    rentOutAddressDetail: formData.rentOutAddressDetail || defaultLocation,
+                    location: formData.rentOutAddressDetail || defaultLocation, // Sync to primary address field
                     rentOutStatus: formData.rentOutStatus,
                     rentOutDescription: formData.rentOutDescription,
                 };
             } else {
                 rentData = {
                     ...rentData,
+                    location: formData.location || defaultLocation, // Sync legacy location
                     rentingNumber: formData.rentingNumber,
                     rentingReferenceNumber: formData.rentingReferenceNumber,
                     rentingMonthlyRental: parseFloat(formData.rentingMonthlyRental) || undefined,
@@ -320,7 +331,9 @@ export default function RentModal({ propertyId, rent, onClose, onSuccess }: Rent
                             )}
                         </div>
                         <div className="space-y-2">
-                            <label className={labelClass}>承租人</label>
+                            <label className={labelClass}>
+                                {formData.type === 'rent_out' ? '承租人' : '資產擁有方'}
+                            </label>
                             <div className="flex gap-2">
                                 {loadingData ? (
                                     <div className="flex-1 px-4 py-3 bg-zinc-50 dark:bg-white/5 border border-zinc-200 dark:border-white/10 rounded-xl flex items-center gap-2">
@@ -333,14 +346,16 @@ export default function RentModal({ propertyId, rent, onClose, onSuccess }: Rent
                                     </div>
                                 ) : (
                                     <select
-                                        name="tenantId"
-                                        value={formData.tenantId}
+                                        name={formData.type === 'rent_out' ? 'tenantId' : 'proprietorId'}
+                                        value={formData.type === 'rent_out' ? formData.tenantId : formData.proprietorId}
                                         onChange={handleChange}
                                         className={`${inputClass} flex-1`}
                                     >
-                                        <option value="" className="bg-white dark:bg-[#1a1a2e]">選擇承租人...</option>
+                                        <option value="" className="bg-white dark:bg-[#1a1a2e]">
+                                            {formData.type === 'rent_out' ? '選擇承租人...' : '選擇資產擁有方...'}
+                                        </option>
                                         {proprietors
-                                            .filter(p => p.code?.startsWith('T'))
+                                            .filter(p => formData.type === 'rent_out' ? p.code?.startsWith('T') : !p.code?.startsWith('T'))
                                             .map(p => (
                                                 <option key={p.id} value={p.id} className="bg-white dark:bg-[#1a1a2e]">{p.name}</option>
                                             ))}
@@ -442,7 +457,7 @@ export default function RentModal({ propertyId, rent, onClose, onSuccess }: Rent
                                     <input type="text" name="rentOutLessor" value={formData.rentOutLessor} onChange={handleChange} className={inputClass} placeholder="公司名稱 / 個人名稱" />
                                 </div>
                                 <div className="space-y-2">
-                                    <label className={labelClass}>地址資料</label>
+                                    <label className={labelClass}>租借位置 / 地址</label>
                                     <input type="text" name="rentOutAddressDetail" value={formData.rentOutAddressDetail} onChange={handleChange} className={inputClass} placeholder="詳細地址" />
                                 </div>
                             </div>
@@ -517,9 +532,15 @@ export default function RentModal({ propertyId, rent, onClose, onSuccess }: Rent
                                 </div>
                             </div>
 
-                            <div className="space-y-2">
-                                <label className={labelClass}>押金</label>
-                                <input type="number" name="rentingDeposit" value={formData.rentingDeposit} onChange={handleChange} className={inputClass} placeholder="60000" />
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div className="space-y-2">
+                                    <label className={labelClass}>押金</label>
+                                    <input type="number" name="rentingDeposit" value={formData.rentingDeposit} onChange={handleChange} className={inputClass} placeholder="60000" />
+                                </div>
+                                <div className="space-y-2">
+                                    <label className={labelClass}>租借位置 / 地址</label>
+                                    <input type="text" name="location" value={formData.location} onChange={handleChange} className={inputClass} placeholder="詳細地址" />
+                                </div>
                             </div>
                         </>
                     )}
@@ -558,10 +579,10 @@ export default function RentModal({ propertyId, rent, onClose, onSuccess }: Rent
                 </form>
             </motion.div>
 
-            {/* Proprietor Modal for creating new tenant */}
+            {/* Proprietor Modal for creating new tenant or landlord */}
             {showProprietorModal && (
                 <ProprietorModal
-                    mode="tenant"
+                    mode={formData.type === 'rent_out' ? 'tenant' : 'proprietor'}
                     onClose={() => setShowProprietorModal(false)}
                     onSuccess={handleProprietorCreated}
                 />

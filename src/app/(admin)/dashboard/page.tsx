@@ -92,18 +92,28 @@ export default function DashboardPage() {
     return (
         <div className="space-y-6">
             {/* Page Header */}
-            <div>
-                <h1 className="text-2xl font-bold text-zinc-900 dark:text-white flex items-center gap-3">
-                    {userRole === 'admin' ? '管理儀表板' : '我的儀表板'}
-                    <span className="px-2 py-0.5 bg-blue-500/10 text-blue-400 text-xs font-medium rounded-full border border-blue-500/20">
-                        雲端同步已啟動
-                    </span>
-                </h1>
-                <p className="text-zinc-500 dark:text-white/50 mt-1">
-                    {userRole === 'admin'
-                        ? '完整的系統概覽與管理'
-                        : '您的物業與租賃概覽'}
-                </p>
+            <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-8">
+                <div>
+                    <h1 className="text-4xl font-black text-zinc-900 dark:text-white flex items-center gap-4 tracking-tight">
+                        {userRole === 'admin' ? '管理儀表板' : '我的儀表板'}
+                        <span className="px-3 py-1 bg-blue-500/10 text-blue-500 dark:text-blue-400 text-xs font-bold rounded-full border border-blue-500/20 uppercase tracking-widest animate-pulse">
+                            Live Sync
+                        </span>
+                    </h1>
+                    <p className="text-zinc-500 dark:text-white/40 mt-2 text-lg font-medium">
+                        {userRole === 'admin'
+                            ? '完整的系統概覽與管理'
+                            : '您的物業與租賃概覽'}
+                    </p>
+                </div>
+                <div className="flex items-center gap-2">
+                    <button
+                        onClick={handleSyncData}
+                        className="px-4 py-2 rounded-xl bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 font-bold text-sm hover:scale-105 transition-transform active:scale-95"
+                    >
+                        同步數據
+                    </button>
+                </div>
             </div>
 
             {/* Stats Row */}

@@ -4,6 +4,7 @@ import { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useProprietorsQuery, useProprietors } from '@/hooks/useStorage';
 import { useQueryClient } from '@tanstack/react-query';
+import { Users, ChevronRight, LayoutList, RefreshCw } from 'lucide-react';
 import type { Proprietor } from '@/lib/db';
 import { BentoCard } from '@/components/layout/BentoGrid';
 import ProprietorModal from '@/components/properties/ProprietorModal';
@@ -79,8 +80,11 @@ export default function ProprietorsPage() {
             {/* Page header */}
             <div className="flex items-center justify-between">
                 <div>
-                    <h1 className="text-2xl font-bold text-zinc-900 dark:text-white">管理資產擁有方</h1>
-                    <p className="text-zinc-500 dark:text-white/50 mt-1">管理業主及資產擁有者</p>
+                    <h1 className="text-2xl font-bold text-zinc-900 dark:text-white flex items-center gap-2">
+                        <Users className="w-6 h-6 text-purple-500 md:hidden" />
+                        管理資產擁有方
+                    </h1>
+                    <p className="text-zinc-500 dark:text-white/50 mt-1 hidden sm:block">管理業主及資產擁有者</p>
                 </div>
             </div>
 
@@ -102,7 +106,7 @@ export default function ProprietorsPage() {
             </div>
 
             {/* Search */}
-            <div className="relative max-w-md">
+            <div className="relative w-full md:max-w-md">
                 <div className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 dark:text-white/30">
                     <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
@@ -113,7 +117,7 @@ export default function ProprietorsPage() {
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     placeholder="搜尋擁有方..."
-                    className="w-full pl-10 pr-4 py-2.5 bg-zinc-100 dark:bg-white/5 border border-zinc-200 dark:border-white/10 rounded-xl text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-purple-500/30 transition-all"
+                    className="w-full pl-10 pr-4 py-3 md:py-2.5 bg-white dark:bg-white/5 border border-zinc-200 dark:border-white/10 rounded-xl text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-purple-500/30 transition-all shadow-sm md:shadow-none"
                 />
             </div>
 
@@ -134,61 +138,67 @@ export default function ProprietorsPage() {
                             animate={{ opacity: 1, y: 0 }}
                             transition={{ delay: index * 0.05 }}
                             onClick={() => handleOpenModal(proprietor)}
-                            className="cursor-pointer"
+                            className="mobile-card md:glass-card cursor-pointer group hover:ring-2 hover:ring-purple-500/30 transition-all relative overflow-hidden h-full"
                         >
-                            <BentoCard className="h-full relative overflow-hidden group hover:ring-2 hover:ring-purple-500/30 transition-all">
-                                {/* Type Badges */}
-                                <div className="absolute top-0 right-0 flex flex-col items-end">
-                                    <div className={`px-3 py-1 text-[10px] font-bold uppercase tracking-wider rounded-bl-xl ${proprietor.type === 'company'
-                                        ? 'bg-blue-500/10 text-blue-500'
-                                        : 'bg-amber-500/10 text-amber-500'
-                                        }`}>
-                                        {proprietor.type === 'company' ? '公司' : '個人'}
-                                    </div>
-                                    <div className={`px-3 py-0.5 text-[9px] font-medium uppercase tracking-tighter rounded-bl-lg border-l border-b border-black/5 dark:border-white/5 ${proprietor.category === 'group_company'
-                                        ? 'bg-purple-500/5 text-purple-500'
-                                        : proprietor.category === 'joint_venture'
-                                            ? 'bg-emerald-500/5 text-emerald-500'
-                                            : proprietor.category === 'managed_individual'
-                                                ? 'bg-zinc-500/5 text-zinc-500'
-                                                : 'bg-amber-500/5 text-amber-500'
-                                        }`}>
-                                        {proprietor.category === 'group_company' ? '集團' : proprietor.category === 'joint_venture' ? '合資' : proprietor.category === 'managed_individual' ? '代管' : '外部'}
-                                    </div>
+                            {/* Type Badges */}
+                            <div className="absolute top-0 right-0 flex flex-col items-end z-10">
+                                <div className={`px-3 py-1 text-[10px] font-bold uppercase tracking-wider rounded-bl-xl ${proprietor.type === 'company'
+                                    ? 'bg-blue-500/10 text-blue-500 border-l border-b border-blue-500/10'
+                                    : 'bg-amber-500/10 text-amber-500 border-l border-b border-amber-500/10'
+                                    }`}>
+                                    {proprietor.type === 'company' ? '公司' : '個人'}
                                 </div>
+                                <div className={`px-3 py-0.5 text-[9px] font-medium uppercase tracking-tighter rounded-bl-lg border-l border-b border-black/5 dark:border-white/5 ${proprietor.category === 'group_company'
+                                    ? 'bg-purple-500/5 text-purple-500'
+                                    : proprietor.category === 'joint_venture'
+                                        ? 'bg-emerald-500/5 text-emerald-500'
+                                        : proprietor.category === 'managed_individual'
+                                            ? 'bg-zinc-500/5 text-zinc-500'
+                                            : 'bg-amber-500/5 text-amber-500'
+                                    }`}>
+                                    {proprietor.category === 'group_company' ? '集團' : proprietor.category === 'joint_venture' ? '合資' : proprietor.category === 'managed_individual' ? '代管' : '外部'}
+                                </div>
+                            </div>
 
-                                {/* Delete Button - positioned bottom-right */}
-                                <button
-                                    onClick={() => proprietor.id && handleDelete(proprietor.id)}
-                                    className="absolute bottom-3 right-3 p-2 rounded-lg text-zinc-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 transition-all opacity-0 group-hover:opacity-100"
-                                >
-                                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                    </svg>
-                                </button>
-
-                                <div className="flex items-start pr-16">
-                                    <div className="flex items-center gap-3">
-                                        <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-purple-500 to-blue-500 flex flex-col items-center justify-center text-white font-bold leading-tight flex-shrink-0">
-                                            <span className="text-xs opacity-70">{proprietor.code}</span>
-                                            <span className="text-lg">{proprietor.name.charAt(0).toUpperCase()}</span>
-                                        </div>
-                                        <div className="flex-1 min-w-0">
-                                            <h3 className="text-zinc-900 dark:text-white font-semibold truncate group-hover:text-purple-500 transition-colors">
-                                                {proprietor.shortName || proprietor.name}
-                                            </h3>
-                                            <div className="flex flex-col">
-                                                <p className="text-zinc-500 dark:text-white/50 text-xs truncate">
-                                                    {proprietor.englishName || proprietor.name}
-                                                </p>
-                                                <p className="text-[10px] text-zinc-400 dark:text-white/30 italic">
-                                                    {proprietor.category === 'group_company' ? '集團旗下公司' : proprietor.category === 'joint_venture' ? '合資公司' : proprietor.category === 'managed_individual' ? '代管理的個體' : '出租的業主'}
-                                                </p>
-                                            </div>
+                            <div className="flex items-start pr-12 md:pr-16">
+                                <div className="flex items-center gap-4">
+                                    <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-purple-500 to-indigo-600 flex flex-col items-center justify-center text-white font-bold leading-tight flex-shrink-0 shadow-lg shadow-purple-500/20">
+                                        <span className="text-[10px] opacity-70 mb-0.5">{proprietor.code}</span>
+                                        <span className="text-xl">{proprietor.name.charAt(0).toUpperCase()}</span>
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                        <h3 className="text-zinc-900 dark:text-white font-bold text-lg truncate group-hover:text-purple-500 transition-colors">
+                                            {proprietor.shortName || proprietor.name}
+                                        </h3>
+                                        <div className="flex flex-col space-y-0.5">
+                                            <p className="text-zinc-500 dark:text-white/50 text-[11px] truncate uppercase tracking-wider font-medium">
+                                                {proprietor.englishName || proprietor.name}
+                                            </p>
+                                            <p className="text-[10px] text-purple-500 dark:text-purple-400 font-bold opacity-80">
+                                                {proprietor.category === 'group_company' ? '集團旗下公司' : proprietor.category === 'joint_venture' ? '合資公司' : proprietor.category === 'managed_individual' ? '代管理的個體' : '出租的業主'}
+                                            </p>
                                         </div>
                                     </div>
                                 </div>
-                            </BentoCard>
+                            </div>
+
+                            {/* Mobile visual indicator for expand/click */}
+                            <div className="absolute bottom-3 right-3 md:hidden">
+                                <ChevronRight className="w-5 h-5 text-zinc-300 dark:text-white/10" />
+                            </div>
+
+                            {/* Delete Button - Desktop Only hover */}
+                            <button
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    proprietor.id && handleDelete(proprietor.id);
+                                }}
+                                className="absolute bottom-3 right-3 p-2 rounded-lg text-zinc-300 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 transition-all opacity-0 group-hover:opacity-100 hidden md:block"
+                            >
+                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                </svg>
+                            </button>
                         </motion.div>
                     ))
                 )}

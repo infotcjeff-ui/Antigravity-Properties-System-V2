@@ -19,7 +19,10 @@ import {
     X,
     Map,
     Image as ImageIcon,
+    ChevronDown,
+    ChevronUp,
 } from 'lucide-react';
+import { useRef } from 'react';
 import DOMPurify from 'dompurify';
 import { useLanguage } from '@/components/common/LanguageSwitcher';
 import RentDetailsModal from '@/components/properties/RentDetailsModal';
@@ -89,6 +92,17 @@ export default function PropertyDetailsPage() {
     const [selectedRent, setSelectedRent] = useState<Rent | null>(null);
     const [showGeoMaps, setShowGeoMaps] = useState(false);
     const [imageError, setImageError] = useState(false);
+    const [isNotesExpanded, setIsNotesExpanded] = useState(false);
+    const [showNotesToggle, setShowNotesToggle] = useState(false);
+    const notesRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        if (notesRef.current) {
+            // Check if height exceeds ~2 lines (approx 40-48px depending on font/lineheight)
+            const isOverflowing = notesRef.current.scrollHeight > 48;
+            setShowNotesToggle(isOverflowing);
+        }
+    }, [property?.notes]);
 
     const activeRentOut = property?.rents?.find((r: Rent) => r.type === 'rent_out' && ['listing', 'renting'].includes(r.rentOutStatus || ''));
     const activeRenting = property?.rents?.find((r: Rent) => r.type === 'renting');
@@ -227,13 +241,31 @@ export default function PropertyDetailsPage() {
                         </div>
 
                         {/* Notes Section - always show */}
-                        <div className="mt-6 mb-4 p-[10px] border-l-[3px] border-purple-500 bg-purple-500/5 rounded-r-xl">
+                        <div className="mt-6 mb-4 p-[10px] border-l-[3px] border-purple-500 bg-purple-500/5 rounded-r-xl relative">
                             <p className="text-xs font-semibold text-purple-500 uppercase tracking-wider mb-1">{t('Notes', '備註')}</p>
                             {property.notes ? (
-                                <div
-                                    className="text-zinc-700 dark:text-white/80 text-sm rich-text-content"
-                                    dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(property.notes) }}
-                                />
+                                <div className="relative">
+                                    <div
+                                        ref={notesRef}
+                                        className={`text-zinc-700 dark:text-white/80 text-sm rich-text-content transition-all duration-300 ease-in-out overflow-hidden ${!isNotesExpanded && showNotesToggle ? 'max-h-[48px]' : 'max-h-[2000px]'}`}
+                                        dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(property.notes) }}
+                                    />
+                                    {showNotesToggle && (
+                                        <button
+                                            onClick={() => setIsNotesExpanded(!isNotesExpanded)}
+                                            className="mt-2 text-xs font-bold text-purple-600 dark:text-purple-400 hover:text-purple-700 dark:hover:text-purple-300 transition-colors flex items-center gap-1 cursor-pointer"
+                                        >
+                                            {isNotesExpanded ? (
+                                                <><ChevronUp className="w-3 h-3" /> {t('Show Less', '收起')}</>
+                                            ) : (
+                                                <><ChevronDown className="w-3 h-3" /> {t('Show More', '顯示更多')}</>
+                                            )}
+                                        </button>
+                                    )}
+                                    {!isNotesExpanded && showNotesToggle && (
+                                        <div className="absolute bottom-0 left-0 right-0 h-6 bg-gradient-to-t from-purple-500/[0.03] to-transparent pointer-events-none" />
+                                    )}
+                                </div>
                             ) : (
                                 <p className="text-zinc-400 dark:text-white/30 text-sm text-center py-2">暫無。</p>
                             )}
@@ -428,11 +460,16 @@ export default function PropertyDetailsPage() {
                                                             <div className="text-zinc-600 dark:text-white/70 text-sm">-</div>
                                                         )}
                                                     </div>
-                                                    {/* Lease Term */}
+                                                    {/* Lease Term & Location */}
                                                     <div className="py-4 px-4 border-l border-dashed border-zinc-200 dark:border-white/10 flex flex-col justify-center">
                                                         <div className={`text-sm ${isExpired ? 'text-red-500 font-medium' : 'text-zinc-600 dark:text-white/70'}`}>
                                                             {formatEnDate(startDate)}{startDate && endDate && ' ~ '}{formatEnDate(endDate)}{periods ? `(${periods}個月)` : ''}
-                                                            {isExpired && <span className="ml-1 text-xs px-1.5 py-0.5 bg-red-100 dark:bg-red-500/20 text-red-600 dark:text-red-400 rounded">已過期</span>}
+                                                        </div>
+                                                        <div className="flex items-center gap-2 mt-1">
+                                                            {isExpired && <span className="text-[10px] px-1.5 py-0.5 bg-red-100 dark:bg-red-500/20 text-red-600 dark:text-red-400 rounded font-medium">已過期</span>}
+                                                            <span className="text-xs text-zinc-500 dark:text-white/40 truncate">
+                                                                {rent.type === 'rent_out' ? (rent.location || rent.rentOutAddressDetail) : rent.location}
+                                                            </span>
                                                         </div>
                                                     </div>
                                                     {/* Rent */}

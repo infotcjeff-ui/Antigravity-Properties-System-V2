@@ -93,7 +93,7 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
     const [newImages, setNewImages] = useState<{ file: File; preview: string }[]>([]);
     const [newGeoMaps, setNewGeoMaps] = useState<{ file: File; preview: string }[]>([]);
 
-    const proprietorsList = useMemo(() => (proprietors || []).filter(p => p.code?.startsWith('A')), [proprietors]);
+    const proprietorsList = useMemo(() => (proprietors || []).filter(p => !p.code?.startsWith('T')), [proprietors]);
     const tenantsList = useMemo(() => (proprietors || []).filter(p => p.code?.startsWith('T')), [proprietors]);
 
     const rents = useMemo(() => {
@@ -109,51 +109,83 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
 
         setIsGeocoding(true);
         try {
-            // Append Hong Kong to improve accuracy if not present and remove parentheses
-            let searchAddress = formData.address;
+            // Helper to clean address for various search attempts
+            const clean = (addr: string) => addr.replace(/\(.*?\)/g, '').replace(/（.*?）/g, '').trim();
+            const originalFull = formData.address;
+            const cleanedBase = clean(formData.address);
 
-            // Remove text in parentheses (e.g., "(租車易)") to help OSM find the location
-            searchAddress = searchAddress.replace(/\(.*?\)/g, '').replace(/（.*?）/g, '').trim();
+            // Search strategy: 
+            // 1. Full address (including landmarks in parentheses) -> Best for ALS
+            // 2. Cleaned address -> Good for standard matching
+            // 3. Stripped address (no district prefix)
+            const searchSteps = [
+                originalFull,
+                cleanedBase,
+                cleanedBase.replace(/^(香港|九龍|新界|元朗|屯門|粉嶺|錦田|大埔|坑口|西貢|沙田|葵涌|青衣|荃灣|東涌|愉景灣)/, '').trim(),
+            ].filter(Boolean);
 
-            if (!searchAddress.toLowerCase().includes('hong kong') && !searchAddress.includes('香港')) {
-                searchAddress += ', Hong Kong';
+            const uniqueSteps = [...new Set(searchSteps)];
+            let foundLocation: { lat: number; lng: number } | null = null;
+
+            // TRY OGCIO ALS FIRST (Official HK government address picker)
+            for (const query of uniqueSteps) {
+                try {
+                    const response = await fetch(`/api/geocode?q=${encodeURIComponent(query)}`);
+                    const data = await response.json();
+
+                    if (data?.lat && data?.lng) {
+                        foundLocation = { lat: data.lat, lng: data.lng };
+                        break;
+                    }
+                } catch (e) { console.error('ALS lookup error:', e); }
             }
 
-            const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(searchAddress)}&limit=1`, {
-                headers: {
-                    'Accept-Language': 'zh-TW,zh;q=0.9,en;q=0.8',
-                    'User-Agent': 'AntigravityPropSystem/1.0'
+            // FALLBACK TO NOMINATIM IF ALS FAILS
+            if (!foundLocation) {
+                for (const query of uniqueSteps) {
+                    const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&countrycodes=hk&limit=1`, {
+                        headers: {
+                            'Accept-Language': 'zh-TW,zh;q=0.9,en;q=0.8',
+                            'User-Agent': 'AntigravityPropSystem/1.0'
+                        }
+                    });
+                    const data = await response.json();
+                    if (data && data.length > 0) {
+                        foundLocation = { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) };
+                        break;
+                    }
                 }
-            });
-            const data = await response.json();
+            }
 
-            if (data && data.length > 0) {
+            if (foundLocation) {
                 setFormData(prev => ({
                     ...prev,
                     location: {
-                        lat: parseFloat(data[0].lat),
-                        lng: parseFloat(data[0].lon),
+                        lat: foundLocation!.lat,
+                        lng: foundLocation!.lng,
                         address: formData.address,
                     },
                 }));
                 addNotification('定位成功 / Location found', 'update');
             } else {
-                // Try fallback location (Kam Tin) just like the backend script
-                const fallbackRes = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent('Kam Tin, Hong Kong')}&limit=1`, {
+                // Try to detect district for a better fallback
+                const districts = ['錦田', '元朗', '天水圍', '屯門', '粉嶺', '上水', '大埔', '沙田', '西貢', '中心', '中環', '灣仔', '銅鑼灣', '北角', '柴灣', '尖沙咀', '旺角', '九龍城', '觀塘', '黃大仙', '將軍澳', '荃灣', '葵涌', '青衣'];
+                const detectedDistrict = districts.find(d => formData.address.includes(d)) || 'Hong Kong';
+
+                const fallbackRes = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(detectedDistrict + ', Hong Kong')}&limit=1`, {
                     headers: { 'User-Agent': 'AntigravityPropSystem/1.0' }
                 });
                 const fallbackData = await fallbackRes.json();
 
                 if (fallbackData && fallbackData.length > 0) {
-                    // Add slight random offset to prevent perfect overlap for multiple properties
-                    const lat = parseFloat(fallbackData[0].lat) + (Math.random() * 0.01 - 0.005);
-                    const lng = parseFloat(fallbackData[0].lon) + (Math.random() * 0.01 - 0.005);
+                    const lat = parseFloat(fallbackData[0].lat) + (Math.random() * 0.006 - 0.003);
+                    const lng = parseFloat(fallbackData[0].lon) + (Math.random() * 0.006 - 0.003);
 
                     setFormData(prev => ({
                         ...prev,
                         location: { lat, lng, address: formData.address },
                     }));
-                    addNotification('找不到精準地址，已定位至錦田 / Exact location not found, defaulted to Kam Tin', 'info');
+                    addNotification(`找不到精準地址，已定位至${detectedDistrict} / Exact location not found, defaulted to ${detectedDistrict}`, 'info');
                 } else {
                     addNotification('找不到該地址的地點 / Location not found', 'info');
                 }
@@ -339,6 +371,7 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
         setSaving(true);
         try {
             await queryClient.invalidateQueries({ queryKey: ['rents'] });
+            await queryClient.invalidateQueries({ queryKey: ['rents-with-relations'] });
             await queryClient.invalidateQueries({ queryKey: ['properties-with-relations'] });
             if (property?.id) {
                 await queryClient.invalidateQueries({ queryKey: ['property-with-relations', property.id] });
@@ -773,7 +806,7 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                                     {/* Table Header */}
                                     <div className="grid grid-cols-[50px_1fr_1.5fr_1.8fr_1.2fr_100px] gap-4 px-4 py-3 bg-zinc-50 dark:bg-white/5 text-[10px] font-bold text-zinc-400 dark:text-white/30 uppercase tracking-widest border-b border-zinc-200 dark:border-white/10">
                                         <div>序號</div>
-                                        <div>物業名稱</div>
+                                        <div>業主名稱</div>
                                         <div>承租人</div>
                                         <div>租期及位置</div>
                                         <div className="text-right">每月租金</div>
@@ -792,7 +825,7 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                                         const startDate = rent?.rentOutStartDate ? new Date(rent.rentOutStartDate) : null;
                                         const endDate = rent?.rentOutEndDate ? new Date(rent.rentOutEndDate) : null;
                                         const monthlyRent = rent?.rentOutMonthlyRental || 0;
-                                        const location = rent?.rentOutAddressDetail || '-';
+                                        const location = rent?.location || rent?.rentOutAddressDetail || '-';
 
                                         return (
                                             <div key={propId} className={`grid grid-cols-[50px_1fr_1.5fr_1.8fr_1.2fr_100px] gap-4 px-4 py-4 border-b border-zinc-100 dark:border-white/5 text-sm hover:bg-zinc-50/50 dark:hover:bg-white/[0.01] transition-colors items-center last:border-0 ${isEditing ? 'bg-purple-500/[0.03] ring-1 ring-purple-500/20' : ''}`}>
@@ -802,8 +835,8 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                                                 </div>
 
                                                 {/* Property */}
-                                                <div className="font-medium text-zinc-900 dark:text-white truncate" title={formData.name}>
-                                                    {formData.name}
+                                                <div className="font-medium text-zinc-900 dark:text-white truncate" title={selectedProprietor.name}>
+                                                    {selectedProprietor.name}
                                                 </div>
 
                                                 {/* Tenant */}
@@ -961,9 +994,21 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                                 value=""
                                 onChange={async (selectedRentId) => {
                                     if (selectedRentId && property?.id) {
-                                        const success = await updateRent(selectedRentId, { propertyId: property.id });
+                                        const rentToLink = (allRents || []).find(r => r.id === selectedRentId);
+                                        const updates: Partial<Rent> = { propertyId: property.id };
+
+                                        // Auto-fill location if empty
+                                        if (rentToLink && !rentToLink.location && !rentToLink.rentOutAddressDetail) {
+                                            updates.location = formData.name;
+                                            if (rentToLink.type === 'rent_out') {
+                                                updates.rentOutAddressDetail = formData.name;
+                                            }
+                                        }
+
+                                        const success = await updateRent(selectedRentId, updates);
                                         if (success) {
                                             await queryClient.invalidateQueries({ queryKey: ['rents'] });
+                                            await queryClient.invalidateQueries({ queryKey: ['rents-with-relations'] });
                                             await queryClient.invalidateQueries({ queryKey: ['properties-with-relations'] });
                                             addNotification('租金記錄已連結 / Rent record linked', 'update');
                                         }
@@ -1008,7 +1053,7 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                                     {/* Table Rows */}
                                     {rents.map((rent, index) => {
                                         // Find either the tenant or the proprietor as the other party
-                                        const otherParty = (proprietors || []).find(p => p.id === (rent.tenantId || rent.proprietorId));
+                                        const otherParty = rent.tenant || rent.proprietor || (proprietors || []).find(p => p.id === (rent.tenantId || rent.proprietorId));
 
                                         // Handle both new and legacy rent data formats
                                         const startDate = rent.type === 'rent_out'
@@ -1062,7 +1107,7 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                                                     )}
                                                 </div>
                                                 <div className="text-zinc-600 dark:text-white/70 text-xs leading-relaxed line-clamp-2">
-                                                    {rent.location || rent.rentOutAddressDetail || '-'}
+                                                    {rent.location || rent.rentOutAddressDetail || formData.name || '-'}
                                                 </div>
                                                 <div className="flex flex-col">
                                                     {startDate ? (
@@ -1214,6 +1259,7 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
             {showRentModal && property?.id && (
                 <RentModal
                     propertyId={property.id}
+                    defaultLocation={formData.name}
                     onClose={() => setShowRentModal(false)}
                     onSuccess={handleRentCreated}
                 />
@@ -1223,11 +1269,14 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
             {editingRent && (
                 <RentModal
                     propertyId={property?.id}
+                    defaultLocation={formData.name}
                     rent={editingRent}
                     onClose={() => setEditingRent(null)}
                     onSuccess={() => {
                         setEditingRent(null);
                         queryClient.invalidateQueries({ queryKey: ['rents'] });
+                        queryClient.invalidateQueries({ queryKey: ['rents-with-relations'] });
+                        queryClient.invalidateQueries({ queryKey: ['proprietors'] });
                         addNotification('租金記錄已更新', 'update');
                     }}
                 />

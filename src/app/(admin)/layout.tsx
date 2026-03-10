@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import DashboardSidebar from '@/components/layout/DashboardSidebar';
+import TopBar from '@/components/layout/TopBar';
 import ThemeToggle from '@/components/layout/ThemeToggle';
 
 export default function AdminLayout({
@@ -69,11 +70,18 @@ export default function AdminLayout({
 
     return (
         <div className="min-h-screen bg-white dark:bg-[#0f0f1a]">
-            {/* Dashboard Sidebar */}
-            <DashboardSidebar userRole={userRole} />
+            {/* Dashboard Sidebar - Hidden on mobile, fixed on desktop */}
+            <div className="hidden md:block">
+                <DashboardSidebar userRole={userRole} />
+            </div>
 
-            {/* Main Content */}
-            <div className="ml-[280px]">
+            {/* Main Content - No margin on mobile, fixed margin on desktop */}
+            <div className="flex-1 md:ml-[280px] min-h-screen flex flex-col transition-all duration-300">
+                <TopBar
+                    isAuthenticated={isAuthenticated}
+                    isAdmin={true}
+                    placeholder="搜尋物業..."
+                />
 
                 {/* Content */}
                 <AnimatePresence mode="wait">
