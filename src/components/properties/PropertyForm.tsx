@@ -78,7 +78,7 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
         lotArea: property?.lotArea || '',
         type: property?.type || 'group_asset',
         status: property?.status || 'holding',
-        landUse: property?.landUse ? property.landUse.split(',') : ['unknown'],
+        landUse: property?.landUse ? property.landUse.split(',') : [],
         proprietorId: property?.proprietorId || '', // Legacy - kept for compatibility
         proprietorIds: property?.proprietorIds || (property?.proprietorId ? [property.proprietorId] : []), // Multi-select
         tenantId: property?.tenantId || '',
