@@ -39,6 +39,38 @@ export default function ProtectedLayout({
         checkAuth();
     }, []);
 
+    // Global restrictions for unauthenticated guests
+    useEffect(() => {
+        if (isLoading || isAuthenticated) return;
+
+        const handleContextMenu = (e: MouseEvent) => {
+            e.preventDefault();
+        };
+
+        const handleKeyDown = (e: KeyboardEvent) => {
+            // Block F12
+            if (e.key === 'F12') {
+                e.preventDefault();
+            }
+            // Block Ctrl+Shift+I, Ctrl+Shift+J, Ctrl+Shift+C
+            if (e.ctrlKey && e.shiftKey && (e.key === 'I' || e.key === 'J' || e.key === 'C')) {
+                e.preventDefault();
+            }
+            // Block Ctrl+U (View Source)
+            if (e.ctrlKey && e.key === 'u') {
+                e.preventDefault();
+            }
+        };
+
+        window.addEventListener('contextmenu', handleContextMenu);
+        window.addEventListener('keydown', handleKeyDown);
+
+        return () => {
+            window.removeEventListener('contextmenu', handleContextMenu);
+            window.removeEventListener('keydown', handleKeyDown);
+        };
+    }, [isLoading, isAuthenticated]);
+
     // Public routes that don't require authentication
     const publicRoutes = ['/'];
     const isPublicRoute = publicRoutes.includes(pathname);

@@ -86,8 +86,9 @@ export default function PropertiesPage() {
                         type="text"
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
-                        placeholder="搜尋物業..."
-                        className="w-full pl-10 pr-4 py-2.5 bg-zinc-100 dark:bg-white/5 border border-zinc-200 dark:border-white/10 rounded-xl text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-purple-500/30"
+                        placeholder={isAuthenticated ? "搜尋物業..." : "登入以使用搜尋"}
+                        disabled={!isAuthenticated}
+                        className={`w-full pl-10 pr-4 py-2.5 bg-zinc-100 dark:bg-white/5 border border-zinc-200 dark:border-white/10 rounded-xl text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-purple-500/30 ${!isAuthenticated ? 'opacity-50 cursor-not-allowed' : ''}`}
                     />
                 </div>
 
@@ -95,7 +96,8 @@ export default function PropertiesPage() {
                 <select
                     value={statusFilter}
                     onChange={(e) => setStatusFilter(e.target.value)}
-                    className="px-4 py-2.5 bg-zinc-100 dark:bg-white/5 border border-zinc-200 dark:border-white/10 rounded-xl text-zinc-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500/30"
+                    disabled={!isAuthenticated}
+                    className={`px-4 py-2.5 bg-zinc-100 dark:bg-white/5 border border-zinc-200 dark:border-white/10 rounded-xl text-zinc-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500/30 ${!isAuthenticated ? 'opacity-50 cursor-not-allowed' : ''}`}
                 >
                     <option value="all">所有狀態</option>
                     <option value="holding">持有中</option>
@@ -108,7 +110,8 @@ export default function PropertiesPage() {
                 <select
                     value={typeFilter}
                     onChange={(e) => setTypeFilter(e.target.value)}
-                    className="px-4 py-2.5 bg-zinc-100 dark:bg-white/5 border border-zinc-200 dark:border-white/10 rounded-xl text-zinc-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500/30"
+                    disabled={!isAuthenticated}
+                    className={`px-4 py-2.5 bg-zinc-100 dark:bg-white/5 border border-zinc-200 dark:border-white/10 rounded-xl text-zinc-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500/30 ${!isAuthenticated ? 'opacity-50 cursor-not-allowed' : ''}`}
                 >
                     <option value="all">所有類型</option>
                     <option value="group_asset">集團資產</option>
@@ -130,11 +133,14 @@ export default function PropertiesPage() {
                         <span className="text-sm">網格</span>
                     </button>
                     <button
-                        onClick={() => setViewMode('map')}
+                        onClick={() => isAuthenticated && setViewMode('map')}
                         className={`px-4 py-2 rounded-lg transition-all flex items-center gap-2 ${viewMode === 'map'
                             ? 'bg-purple-500 text-white'
-                            : 'text-zinc-600 dark:text-white/60 hover:text-zinc-900 dark:hover:text-white'
+                            : isAuthenticated
+                                ? 'text-zinc-600 dark:text-white/60 hover:text-zinc-900 dark:hover:text-white'
+                                : 'text-zinc-300 dark:text-white/20 cursor-not-allowed'
                             }`}
+                        title={!isAuthenticated ? '請先登入以使用地圖模式' : ''}
                     >
                         <Map className="w-4 h-4" />
                         <span className="text-sm">地圖</span>

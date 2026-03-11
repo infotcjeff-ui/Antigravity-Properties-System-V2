@@ -158,10 +158,6 @@ export default function LoginPage() {
                         </motion.button>
                     </form>
 
-                    {/* Demo credentials */}
-                    <div className="mt-6 p-3 rounded-xl bg-zinc-50 dark:bg-white/5 border border-zinc-100 dark:border-white/10 text-center">
-                        <p className="text-zinc-400 dark:text-white/40 text-xs">Demo: admin / admin</p>
-                    </div>
                 </div>
             </motion.div>
         </div>

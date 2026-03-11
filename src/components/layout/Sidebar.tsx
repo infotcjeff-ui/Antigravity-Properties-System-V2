@@ -179,7 +179,7 @@ export default function Sidebar({ isAuthenticated = false }: SidebarProps) {
                         <ThemeToggle className="w-full justify-start px-4 h-11" showLabel />
                         <div>
                             <p className="text-zinc-600 dark:text-white/70 text-sm">
-                                🔒 登入以訪問更多功能
+                                🔒 登入以查看所有功能
                             </p>
                             <Link
                                 href="/login"
