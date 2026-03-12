@@ -848,9 +848,9 @@ export function useRents() {
             };
 
             // Mapping Rent fields to DB columns
-            if (updates.propertyId !== undefined) rentData.property_id = updates.propertyId;
-            if (updates.proprietorId !== undefined) rentData.proprietor_id = updates.proprietorId;
-            if (updates.tenantId !== undefined) rentData.tenant_id = updates.tenantId;
+            if (updates.propertyId !== undefined) rentData.property_id = updates.propertyId || null;
+            if (updates.proprietorId !== undefined) rentData.proprietor_id = updates.proprietorId || null;
+            if (updates.tenantId !== undefined) rentData.tenant_id = updates.tenantId || null;
             if (updates.type) rentData.type = updates.type;
             if (updates.status) rentData.status = updates.status;
             if (updates.currency) rentData.currency = updates.currency;
@@ -883,6 +883,13 @@ export function useRents() {
             if (updates.rentingStartDate) rentData.renting_start_date = updates.rentingStartDate;
             if (updates.rentingEndDate) rentData.renting_end_date = updates.rentingEndDate;
             if (updates.rentingDeposit !== undefined) rentData.renting_deposit = updates.rentingDeposit;
+
+            // Convert Date objects to ISO strings for Supabase
+            for (const key of Object.keys(rentData)) {
+                if (rentData[key] instanceof Date) {
+                    rentData[key] = rentData[key].toISOString();
+                }
+            }
 
             const { error: sbError } = await supabase
                 .from('rents')
