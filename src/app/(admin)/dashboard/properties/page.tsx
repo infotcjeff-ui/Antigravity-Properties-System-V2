@@ -8,6 +8,7 @@ import Link from 'next/link';
 import { useProperties, usePropertiesQuery, useUsersQuery } from '@/hooks/useStorage';
 import PropertyForm from '@/components/properties/PropertyForm';
 import { Building2, Plus, Search, Pencil, Trash2, Eye, CheckSquare, Square, UserPlus, X } from 'lucide-react';
+import { useAuth } from '@/contexts/AuthContext';
 import AnimatedSelect from '@/components/ui/AnimatedSelect';
 
 const statusColors: Record<string, string> = {
