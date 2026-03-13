@@ -26,8 +26,12 @@ export default function AdminLayout({
                 if (authData) {
                     const parsed = JSON.parse(authData);
                     if (parsed.isAuthenticated) {
+                        const role = parsed.user?.role || 'client';
+                        setUserRole(role);
+                        if (role !== 'admin') {
+                            router.push('/');
+                        }
                         setIsAuthenticated(true);
-                        setUserRole(parsed.user?.role || 'client');
                     } else {
                         router.push('/login');
                     }

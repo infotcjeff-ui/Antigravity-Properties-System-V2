@@ -45,6 +45,8 @@ export default function ManagePropertiesPage() {
         });
         return map;
     }, [users]);
+    const { user: currentUser } = useAuth();
+    const isAdmin = currentUser?.role === 'admin';
     const { deleteProperty } = useProperties();
 
     const [searchQuery, setSearchQuery] = useState('');
@@ -188,7 +190,10 @@ export default function ManagePropertiesPage() {
                                         <th className="px-4 py-3 text-left text-xs font-medium text-zinc-500 dark:text-white/40 uppercase tracking-wider">編號</th>
                                         <th className="px-4 py-3 text-left text-xs font-medium text-zinc-500 dark:text-white/40 uppercase tracking-wider">類型</th>
                                         <th className="px-4 py-3 text-left text-xs font-medium text-zinc-500 dark:text-white/40 uppercase tracking-wider">狀態</th>
-                                        <th className="px-4 py-3 text-left text-xs font-medium text-zinc-500 dark:text-white/40 uppercase tracking-wider">上載者</th>
+                                        <th className="px-4 py-3 text-left text-xs font-medium text-zinc-500 dark:text-white/40 uppercase tracking-wider">地段面積</th>
+                                        {isAdmin && (
+                                            <th className="px-4 py-3 text-left text-xs font-medium text-zinc-500 dark:text-white/40 uppercase tracking-wider">上載者</th>
+                                        )}
                                         <th className="px-4 py-3 text-right text-xs font-medium text-zinc-500 dark:text-white/40 uppercase tracking-wider">操作</th>
                                     </tr>
                                 </thead>
@@ -241,9 +246,12 @@ export default function ManagePropertiesPage() {
                                                     {statusLabels[property.status]}
                                                 </span>
                                             </td>
-                                            <td className="p-4 text-zinc-600 dark:text-white/70 text-sm">
-                                                {property.createdBy ? (userMap[property.createdBy] || 'Unknown') : '-'}
-                                            </td>
+                                            <td className="p-4 text-zinc-600 dark:text-white/70 text-sm">{property.lotArea || '-'}</td>
+                                            {isAdmin && (
+                                                <td className="p-4 text-zinc-600 dark:text-white/70 text-sm">
+                                                    {property.createdBy ? (userMap[property.createdBy] || 'Unknown') : '-'}
+                                                </td>
+                                            )}
                                             <td className="p-4 text-right">
                                                 <div className="flex items-center justify-end gap-2">
                                                     {/* View */}
@@ -312,20 +320,24 @@ export default function ManagePropertiesPage() {
                                                     <p className="text-xs text-zinc-500 dark:text-white/40 font-mono tracking-tight">{property.code}</p>
                                                 </div>
                                             </div>
-                                            <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${statusColors[property.status]}`}>
-                                                {statusLabels[property.status]}
-                                            </span>
+                                            <div className="flex flex-col items-end gap-2">
+                                                <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${statusColors[property.status]}`}>
+                                                    {statusLabels[property.status]}
+                                                </span>
+                                            </div>
                                         </div>
 
-                                        <div className="grid grid-cols-2 gap-4 py-3 border-y border-zinc-100 dark:border-white/5">
+                                        <div className={`grid ${isAdmin ? 'grid-cols-2' : 'grid-cols-1'} gap-4 py-3 border-y border-zinc-100 dark:border-white/5`}>
                                             <div>
                                                 <p className="text-[10px] text-zinc-400 dark:text-white/30 uppercase font-medium">類型</p>
                                                 <p className="text-sm text-zinc-900 dark:text-white font-medium">{typeLabels[property.type]}</p>
                                             </div>
-                                            <div>
-                                                <p className="text-[10px] text-zinc-400 dark:text-white/30 uppercase font-medium">上載者</p>
-                                                <p className="text-sm text-zinc-900 dark:text-white font-medium">{property.createdBy ? (userMap[property.createdBy] || 'Unknown') : '-'}</p>
-                                            </div>
+                                            {isAdmin && (
+                                                <div>
+                                                    <p className="text-[10px] text-zinc-400 dark:text-white/30 uppercase font-medium">上載者</p>
+                                                    <p className="text-sm text-zinc-900 dark:text-white font-medium">{property.createdBy ? (userMap[property.createdBy] || 'Unknown') : '-'}</p>
+                                                </div>
+                                            )}
                                         </div>
 
                                         <div className="flex items-center justify-between pt-2">
