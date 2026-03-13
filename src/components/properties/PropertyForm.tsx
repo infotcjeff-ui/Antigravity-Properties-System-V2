@@ -853,7 +853,7 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                                                             ))}
                                                         </select>
                                                     ) : (
-                                                        <span className="text-zinc-600 dark:text-white/70">{tenant?.name || '-'}</span>
+                                                        <span className="text-zinc-600 dark:text-white/70">{tenant?.name || (rent?.type === 'renting' ? '(暫缺)' : '-')}</span>
                                                     )}
                                                 </div>
 
@@ -1098,7 +1098,7 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                                                 </div>
                                                 <div className="flex flex-col overflow-hidden">
                                                     <span className="font-semibold text-zinc-900 dark:text-white truncate">
-                                                        {otherParty?.name || '-'}
+                                                        {otherParty?.name || (rent.type === 'renting' ? '(暫缺)' : '-')}
                                                     </span>
                                                     {otherParty?.shortName && (
                                                         <span className="text-[10px] text-zinc-400 dark:text-white/30 truncate uppercase">

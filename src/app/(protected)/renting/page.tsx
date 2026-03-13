@@ -155,7 +155,7 @@ export default function RentingPage() {
                                         className="border-b border-zinc-100 dark:border-white/5 hover:bg-zinc-50 dark:hover:bg-white/5 transition-colors"
                                     >
                                         <td className="p-4 text-zinc-900 dark:text-white font-medium">{property?.name || '-'}</td>
-                                        <td className="p-4 text-zinc-600 dark:text-white/70">{tenant?.name || proprietor?.name || '-'}</td>
+                                        <td className="p-4 text-zinc-600 dark:text-white/70">{tenant?.name || proprietor?.name || '(暫缺)'}</td>
                                         <td className="p-4 text-zinc-900 dark:text-white font-medium">
                                             {rent.currency || 'HKD'} {monthlyRent.toLocaleString()}
                                         </td>

@@ -357,7 +357,7 @@ export default function PropertyDetailModal({ propertyName, onClose }: PropertyD
                                                                     </div>
                                                                 </Tooltip>
                                                             ) : (
-                                                                <div className="text-zinc-600 dark:text-white/70 text-sm">-</div>
+                                                                <div className="text-zinc-600 dark:text-white/70 text-sm">{rent.type === 'renting' ? '(暫缺)' : '-'}</div>
                                                             )}
                                                         </div>
                                                         {/* Lease Term & Location */}
