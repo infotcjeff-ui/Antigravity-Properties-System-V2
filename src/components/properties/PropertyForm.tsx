@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
-import { useProperties, useProprietorsQuery, useRents, useRentsQuery } from '@/hooks/useStorage';
+import { useProperties, useProprietorsQuery, useRents, useRentsQuery, useUsersQuery } from '@/hooks/useStorage';
 import { fileToBase64, validateImageUpload, compressImage } from '@/lib/imageUtils';
 import type { Property, Proprietor, Rent } from '@/lib/db';
 import { useNotifications } from '@/contexts/NotificationContext';
@@ -54,7 +54,9 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
     const { data: allRents, isLoading: rentsLoading } = useRentsQuery();
     const { updateRent, deleteRent } = useRents();
     const { addNotification } = useNotifications();
-    const { isAuthenticated } = useAuth();
+    const { isAuthenticated, user: currentUser } = useAuth();
+    const { data: users, isLoading: usersLoading } = useUsersQuery();
+    const isAdmin = currentUser?.role === 'admin';
 
     // Inline edit state
     const [editingRentId, setEditingRentId] = useState<string | null>(null);
@@ -88,6 +90,7 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
         images: property?.images || [],
         geoMaps: property?.geoMaps || [],
         notes: property?.notes || '',
+        createdBy: property?.createdBy || '',
     });
 
     const [newImages, setNewImages] = useState<{ file: File; preview: string }[]>([]);
@@ -457,6 +460,7 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                 images: finalImages,
                 geoMaps: finalGeoMaps,
                 notes: formData.notes,
+                createdBy: formData.createdBy || undefined,
             };
 
             const now = new Date();
@@ -777,6 +781,29 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                             />
                         </div>
                     </div>
+
+                    {/* Admin only: Uploader (createdBy) selection */}
+                    {isAdmin && (
+                        <div className="space-y-2">
+                            <label className="block text-sm font-medium text-zinc-700 dark:text-white/80">上載者 (Uploader)</label>
+                            <AnimatedSelect
+                                name="createdBy"
+                                value={formData.createdBy || property?.createdBy || ''}
+                                onChange={(value) => setFormData(prev => ({ ...prev, createdBy: value }))}
+                                options={[
+                                    { value: '', label: '使用目前用戶 / Use current user' },
+                                    ...(users || []).map(u => ({
+                                        value: u.id,
+                                        label: u.displayName || u.username
+                                    }))
+                                ]}
+                                placeholder="選擇上載者"
+                            />
+                            <p className="text-[10px] text-zinc-500 dark:text-white/40 italic">
+                                * 只有管理員可以更改上載者 / Only admins can change the uploader
+                            </p>
+                        </div>
+                    )}
 
                     {/* Address with Geocoding */}
                     <div className="space-y-2">

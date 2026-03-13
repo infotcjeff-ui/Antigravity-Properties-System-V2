@@ -441,7 +441,7 @@ export function useProperties() {
                 notes: property.notes,
                 proprietor_id: property.proprietorId,
                 tenant_id: property.tenantId,
-                created_by: user?.id,
+                created_by: property.createdBy || user?.id,
             };
 
             // Remove undefined/null values so Supabase doesn't try to insert them
@@ -480,7 +480,7 @@ export function useProperties() {
                 'lot_index', 'lot_area', 'land_use',
                 'images', 'geo_maps', 'location',
                 'google_drive_plan_url', 'has_planning_permission', 'notes',
-                'proprietor_id', 'tenant_id'
+                'proprietor_id', 'tenant_id', 'created_by'
             ];
             const filtered: any = {};
             Object.keys(updateData).forEach(k => { if (allowed.includes(k)) filtered[k] = updateData[k]; });
