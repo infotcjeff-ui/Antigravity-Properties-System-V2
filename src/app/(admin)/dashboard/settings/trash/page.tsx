@@ -32,7 +32,7 @@ export default function TrashPage() {
     const [isActionLoading, setIsActionLoading] = useState(false);
     const [feedback, setFeedback] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
-    const { fetchTrash, restoreItem, permanentlyDeleteItem, emptyTrash, loading } = useTrash();
+    const { fetchTrash, restoreItem, permanentlyDeleteItem, emptyTrash, loading, error: trashError } = useTrash();
 
     const loadItems = useCallback(async () => {
         const data = await fetchTrash(activeTab);
@@ -159,18 +159,18 @@ export default function TrashPage() {
 
             {/* Feedback Alert */}
             <AnimatePresence>
-                {feedback && (
+                {(feedback || trashError) && (
                     <motion.div
                         initial={{ opacity: 0, y: -20 }}
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0, y: -20 }}
-                        className={`p-4 rounded-xl flex items-center gap-3 border ${feedback.type === 'success'
+                        className={`p-4 rounded-xl flex items-center gap-3 border ${(feedback?.type === 'success')
                                 ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-600 dark:text-emerald-400'
                                 : 'bg-red-500/10 border-red-500/20 text-red-600 dark:text-red-400'
                             }`}
                     >
-                        {feedback.type === 'success' ? <CheckCircle2 className="w-5 h-5" /> : <XCircle className="w-5 h-5" />}
-                        <span className="font-medium text-sm">{feedback.message}</span>
+                        {(feedback?.type === 'success') ? <CheckCircle2 className="w-5 h-5" /> : <XCircle className="w-5 h-5" />}
+                        <span className="font-medium text-sm">{feedback?.message || trashError}</span>
                     </motion.div>
                 )}
             </AnimatePresence>
@@ -183,8 +183,8 @@ export default function TrashPage() {
                             key={tab}
                             onClick={() => setActiveTab(tab)}
                             className={`flex-1 md:flex-none flex items-center justify-center gap-2 px-6 py-2 rounded-lg text-sm font-medium transition-all ${activeTab === tab
-                                    ? 'bg-white dark:bg-zinc-800 text-purple-600 dark:text-white shadow-sm'
-                                    : 'text-zinc-500 dark:text-white/40 hover:text-zinc-900 dark:hover:text-white'
+                                ? 'bg-white dark:bg-zinc-800 text-purple-600 dark:text-white shadow-sm'
+                                : 'text-zinc-500 dark:text-white/40 hover:text-zinc-900 dark:hover:text-white'
                                 }`}
                         >
                             {tab === 'properties' && <Building2 className="w-4 h-4" />}

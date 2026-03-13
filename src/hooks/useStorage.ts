@@ -1248,9 +1248,10 @@ export function useTrash() {
 
             if (sbError) throw sbError;
             return (data || []).map(toCamel);
-        } catch (err) {
-            console.error(`Failed to fetch trash for ${table}:`, err);
-            setError(`Failed to fetch trash for ${table}`);
+        } catch (err: any) {
+            console.error(`Supabase error fetching trash for ${table}:`, err);
+            const detailedError = err?.message || err?.details || JSON.stringify(err);
+            setError(`Failed to fetch trash for ${table}: ${detailedError}`);
             return [];
         } finally {
             setLoading(false);
