@@ -8,7 +8,7 @@ import type { Property } from '@/lib/db';
 import PropertyCard from '@/components/properties/PropertyCard';
 import PropertyMapDynamic from '@/components/properties/PropertyMapDynamic';
 import PropertyForm from '@/components/properties/PropertyForm';
-import { Building2, Grid3X3, Map, Search, Plus } from 'lucide-react';
+import { Building2, Grid3X3, Map, Search, Plus, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 
 type ViewMode = 'grid' | 'map';
@@ -22,6 +22,8 @@ export default function PropertiesPage() {
     const [statusFilter, setStatusFilter] = useState<string>('all');
     const [typeFilter, setTypeFilter] = useState<string>('all');
     const [showPropertyForm, setShowPropertyForm] = useState(false);
+    const [currentPage, setCurrentPage] = useState(1);
+    const ITEMS_PER_PAGE = 12;
 
     const properties = useMemo(() => {
         if (!qProperties) return [];
@@ -53,6 +55,22 @@ export default function PropertiesPage() {
 
         return filtered;
     }, [properties, searchQuery, statusFilter, typeFilter]);
+
+    // Reset pagination when filters change
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [searchQuery, statusFilter, typeFilter]);
+
+    const totalPages = Math.ceil(filteredProperties.length / ITEMS_PER_PAGE);
+    const paginatedProperties = useMemo(() => {
+        const start = (currentPage - 1) * ITEMS_PER_PAGE;
+        return filteredProperties.slice(start, start + ITEMS_PER_PAGE);
+    }, [filteredProperties, currentPage]);
+
+    const handlePageChange = (page: number) => {
+        setCurrentPage(page);
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    };
 
     return (
         <div className="space-y-6">
@@ -158,21 +176,75 @@ export default function PropertiesPage() {
                     />
                 </div>
             ) : viewMode === 'grid' ? (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                    {filteredProperties.length === 0 ? (
-                        <div className="flex flex-col items-center justify-center py-20 text-zinc-400 dark:text-white/20">
-                            <Building2 className="w-16 h-16 mb-4 opacity-50" />
-                            <p className="text-xl font-medium text-zinc-500 dark:text-white/40">未找到物業</p>
-                            <p className="text-sm mt-2 opacity-70">點擊上方按鈕新增物業以開始使用</p>
+                <div className="space-y-10">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                        {paginatedProperties.length === 0 ? (
+                            <div className="flex flex-col items-center justify-center py-20 text-zinc-400 dark:text-white/20 col-span-full">
+                                <Building2 className="w-16 h-16 mb-4 opacity-50" />
+                                <p className="text-xl font-medium text-zinc-500 dark:text-white/40">未找到物業</p>
+                                <p className="text-sm mt-2 opacity-70">點擊上方按鈕新增物業以開始使用</p>
+                            </div>
+                        ) : (
+                            paginatedProperties.map((property, index) => (
+                                <PropertyCard
+                                    key={property.id}
+                                    property={property}
+                                    index={index}
+                                />
+                            ))
+                        )}
+                    </div>
+
+                    {/* Pagination UI */}
+                    {totalPages > 1 && (
+                        <div className="flex items-center justify-center gap-2 pt-4 border-t border-zinc-100 dark:border-white/5">
+                            <button
+                                onClick={() => handlePageChange(Math.max(1, currentPage - 1))}
+                                disabled={currentPage === 1}
+                                className="p-2 rounded-xl border border-zinc-200 dark:border-white/10 text-zinc-600 dark:text-white/60 hover:bg-zinc-100 dark:hover:bg-white/5 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+                            >
+                                <ChevronLeft className="w-5 h-5" />
+                            </button>
+
+                            <div className="flex items-center gap-1.5 mx-2">
+                                {[...Array(totalPages)].map((_, i) => {
+                                    const pageNum = i + 1;
+                                    // Handle many pages - show first, last, and relative to current
+                                    if (
+                                        totalPages > 7 &&
+                                        pageNum !== 1 &&
+                                        pageNum !== totalPages &&
+                                        Math.abs(pageNum - currentPage) > 2
+                                    ) {
+                                        if (Math.abs(pageNum - currentPage) === 3) {
+                                            return <span key={pageNum} className="px-1 text-zinc-400">...</span>;
+                                        }
+                                        return null;
+                                    }
+
+                                    return (
+                                        <button
+                                            key={pageNum}
+                                            onClick={() => handlePageChange(pageNum)}
+                                            className={`min-w-[40px] h-10 rounded-xl font-medium transition-all ${currentPage === pageNum
+                                                ? 'bg-purple-600 text-white shadow-lg shadow-purple-500/20'
+                                                : 'text-zinc-600 dark:text-white/60 hover:bg-zinc-100 dark:hover:bg-white/5'
+                                                }`}
+                                        >
+                                            {pageNum}
+                                        </button>
+                                    );
+                                })}
+                            </div>
+
+                            <button
+                                onClick={() => handlePageChange(Math.min(totalPages, currentPage + 1))}
+                                disabled={currentPage === totalPages}
+                                className="p-2 rounded-xl border border-zinc-200 dark:border-white/10 text-zinc-600 dark:text-white/60 hover:bg-zinc-100 dark:hover:bg-white/5 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+                            >
+                                <ChevronRight className="w-5 h-5" />
+                            </button>
                         </div>
-                    ) : (
-                        filteredProperties.map((property, index) => (
-                            <PropertyCard
-                                key={property.id}
-                                property={property}
-                                index={index}
-                            />
-                        ))
                     )}
                 </div>
             ) : (

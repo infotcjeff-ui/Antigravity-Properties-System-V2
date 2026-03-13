@@ -98,8 +98,145 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
 
     const rents = useMemo(() => {
         if (!property?.id || !allRents) return [];
-        return allRents.filter(r => r.propertyId === property.id);
+        return allRents.filter(r => r.propertyId === property.id)
+            .sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
     }, [property?.id, allRents]);
+
+    const rentOutRents = useMemo(() => rents.filter(r => r.type === 'rent_out'), [rents]);
+    const rentingRents = useMemo(() => rents.filter(r => r.type === 'renting'), [rents]);
+
+    const renderRentTable = (records: Rent[]) => {
+        if (records.length === 0) {
+            return (
+                <div className="p-4 bg-zinc-50 dark:bg-white/5 rounded-xl text-center text-zinc-400 dark:text-white/40 text-sm italic">
+                    尚未有相關記錄
+                </div>
+            );
+        }
+
+        return (
+            <div className="border border-zinc-200 dark:border-white/10 rounded-xl overflow-hidden shadow-sm">
+                <div className="grid grid-cols-[100px_1fr_1.5fr_1.2fr_1fr_90px] gap-4 px-4 py-3 bg-zinc-50/50 dark:bg-white/[0.02] text-xs font-semibold text-zinc-500 dark:text-white/40 uppercase tracking-wider border-b border-zinc-200 dark:border-white/10">
+                    <div className="flex items-center gap-1.5 font-bold">編號</div>
+                    <div className="font-bold">承租人</div>
+                    <div className="font-bold">租借位置</div>
+                    <div className="font-bold">租期</div>
+                    <div className="text-right font-bold">租金/月</div>
+                    <div className="text-center font-bold">操作</div>
+                </div>
+                {records.map((rent) => {
+                    const otherParty = rent.tenant || rent.proprietor || (proprietors || []).find(p => p.id === (rent.tenantId || rent.proprietorId));
+                    const startDate = rent.type === 'rent_out'
+                        ? (rent.rentOutStartDate ? new Date(rent.rentOutStartDate) : null)
+                        : (rent.rentingStartDate ? new Date(rent.rentingStartDate) : (rent.startDate ? new Date(rent.startDate) : null));
+                    const endDate = rent.type === 'rent_out'
+                        ? (rent.rentOutEndDate ? new Date(rent.rentOutEndDate) : null)
+                        : (rent.rentingEndDate ? new Date(rent.rentingEndDate) : (rent.endDate ? new Date(rent.endDate) : null));
+                    const monthlyRent = rent.type === 'rent_out'
+                        ? (rent.rentOutMonthlyRental || rent.amount || 0)
+                        : (rent.rentingMonthlyRental || rent.amount || 0);
+
+                    const months = startDate && endDate
+                        ? Math.round((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24 * 30))
+                        : (rent.type === 'rent_out' ? rent.rentOutPeriods : rent.rentingPeriods) || 0;
+
+                    const contractNumber = rent.type === 'rent_out'
+                        ? (rent.rentOutTenancyNumber || `-`)
+                        : (rent.rentingNumber || `-`);
+
+                    const isExpired = endDate ? endDate < new Date() : false;
+
+                    return (
+                        <div key={rent.id} className={`grid grid-cols-[100px_1fr_1.5fr_1.2fr_1fr_90px] gap-4 px-4 py-4 border-b border-zinc-100 dark:border-white/5 text-sm hover:bg-zinc-50/80 dark:hover:bg-white/[0.02] transition-colors items-center last:border-0 group ${isExpired ? 'bg-red-50/50 dark:bg-red-500/5' : ''}`}>
+                            <div className="flex flex-col gap-1">
+                                <span className="font-mono text-[11px] font-bold text-zinc-400 dark:text-white/30 tracking-tight">{contractNumber}</span>
+                                <div className="flex items-center gap-1 flex-wrap">
+                                    <span className={`text-[10px] px-2 py-0.5 rounded-full w-fit font-bold tracking-wider ${rent.type === 'rent_out'
+                                        ? 'bg-emerald-100 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-200/50 dark:border-emerald-500/20'
+                                        : 'bg-indigo-100 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-200/50 dark:border-indigo-500/20'}`}>
+                                        {rent.type === 'rent_out' ? '收租' : '交租'}
+                                    </span>
+                                    {isExpired && (
+                                        <span className="text-[10px] px-2 py-0.5 rounded-full w-fit font-bold tracking-wider bg-red-100 dark:bg-red-500/20 text-red-600 dark:text-red-400 border border-red-200/50 dark:border-red-500/30">
+                                            已過期
+                                        </span>
+                                    )}
+                                </div>
+                            </div>
+                            <div className="flex flex-col overflow-hidden">
+                                <span className="font-semibold text-zinc-900 dark:text-white truncate">
+                                    {otherParty?.name || (rent.type === 'renting' ? '(暫缺)' : '-')}
+                                </span>
+                                {otherParty?.shortName && (
+                                    <span className="text-[10px] text-zinc-400 dark:text-white/30 truncate uppercase">
+                                        {otherParty.shortName}
+                                    </span>
+                                )}
+                            </div>
+                            <div className="text-zinc-600 dark:text-white/70 text-xs leading-relaxed line-clamp-2">
+                                {rent.location || rent.rentOutAddressDetail || formData.name || '-'}
+                            </div>
+                            <div className="flex flex-col">
+                                {startDate ? (
+                                    <>
+                                        <div className="text-zinc-700 dark:text-white/90 font-medium tabular-nums text-xs">
+                                            {startDate.toLocaleDateString('zh-TW')}
+                                        </div>
+                                        <div className="text-zinc-400 dark:text-white/30 flex items-center gap-1 tabular-nums text-xs">
+                                            <span className="opacity-50">~</span> {endDate ? endDate.toLocaleDateString('zh-TW') : '-'}
+                                        </div>
+                                        <div className="mt-1 flex items-center gap-1">
+                                            <span className="text-[10px] px-1.5 py-0.5 bg-zinc-100 dark:bg-white/10 rounded font-bold text-zinc-500 dark:text-white/40">
+                                                {months}個月
+                                            </span>
+                                        </div>
+                                    </>
+                                ) : (
+                                    <span className="text-zinc-300 dark:text-white/10 italic text-xs">未設定</span>
+                                )}
+                            </div>
+                            <div className="text-right">
+                                <div className="flex flex-col">
+                                    <span className="text-[10px] text-zinc-400 dark:text-white/30 font-bold uppercase tracking-widest">{rent.currency || 'HKD'}</span>
+                                    <span className="text-base font-black text-zinc-900 dark:text-white tabular-nums">
+                                        ${monthlyRent.toLocaleString()}
+                                        <span className="text-[10px] text-zinc-400 dark:text-white/30 ml-1">/月</span>
+                                    </span>
+                                </div>
+                            </div>
+                            <div className="flex items-center justify-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <button
+                                    type="button"
+                                    onClick={() => setEditingRent(rent)}
+                                    className="p-2 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-500/20 rounded-lg transition-all"
+                                    title="更改租金記錄"
+                                >
+                                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                    </svg>
+                                </button>
+                                <button
+                                    type="button"
+                                    disabled={unlinkingRentId === rent.id}
+                                    onClick={() => handleUnlinkRent(rent.id!)}
+                                    className={`p-2 text-amber-600 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-500/20 rounded-lg transition-all ${unlinkingRentId === rent.id ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                    title="取消物業連結"
+                                >
+                                    {unlinkingRentId === rent.id ? (
+                                        <div className="w-4 h-4 border-2 border-amber-500 border-t-transparent rounded-full animate-spin" />
+                                    ) : (
+                                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+                                        </svg>
+                                    )}
+                                </button>
+                            </div>
+                        </div>
+                    );
+                })}
+            </div>
+        );
+    };
 
     const handleGeocode = async () => {
         if (!formData.address.trim()) {
@@ -975,203 +1112,88 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
 
                     {/* Rent Records (only show when editing) */}
                     {property?.id && (
-                        <div className="space-y-3">
+                        <div className="space-y-6">
                             <div className="flex items-center justify-between">
-                                <label className="block text-sm font-medium text-zinc-700 dark:text-white/80">出租記錄</label>
+                                <label className="block text-sm font-bold text-zinc-900 dark:text-white uppercase tracking-wider">租務管理</label>
                                 {isAuthenticated && (
                                     <button
                                         type="button"
                                         onClick={() => setShowRentModal(true)}
-                                        className="px-3 py-1.5 bg-purple-50 dark:bg-purple-500/20 text-purple-600 dark:text-purple-400 rounded-lg hover:bg-purple-100 dark:hover:bg-purple-500/30 transition-colors border border-purple-100 dark:border-none text-sm"
+                                        className="px-4 py-2 bg-gradient-to-r from-purple-600/10 to-blue-600/10 dark:from-purple-500/20 dark:to-blue-500/20 text-purple-600 dark:text-purple-400 rounded-xl hover:from-purple-600/20 hover:to-blue-600/20 transition-all border border-purple-100/50 dark:border-purple-500/30 text-xs font-bold flex items-center gap-2"
                                     >
-                                        + 新增租金
+                                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
+                                        </svg>
+                                        新增租約記錄
                                     </button>
                                 )}
                             </div>
 
                             {/* Select to link existing rent records */}
-                            <AnimatedSelect
-                                value=""
-                                onChange={async (selectedRentId) => {
-                                    if (selectedRentId && property?.id) {
-                                        const rentToLink = (allRents || []).find(r => r.id === selectedRentId);
-                                        const updates: Partial<Rent> = { propertyId: property.id };
+                            <div className="relative group">
+                                <AnimatedSelect
+                                    value=""
+                                    onChange={async (selectedRentId) => {
+                                        if (selectedRentId && property?.id) {
+                                            const rentToLink = (allRents || []).find(r => r.id === selectedRentId);
+                                            const updates: Partial<Rent> = { propertyId: property.id };
 
-                                        // Auto-fill location if empty
-                                        if (rentToLink && !rentToLink.location && !rentToLink.rentOutAddressDetail) {
-                                            updates.location = formData.name;
-                                            if (rentToLink.type === 'rent_out') {
-                                                updates.rentOutAddressDetail = formData.name;
+                                            if (rentToLink && !rentToLink.location && !rentToLink.rentOutAddressDetail) {
+                                                updates.location = formData.name;
+                                                if (rentToLink.type === 'rent_out') {
+                                                    updates.rentOutAddressDetail = formData.name;
+                                                }
+                                            }
+
+                                            const success = await updateRent(selectedRentId, updates);
+                                            if (success) {
+                                                await queryClient.invalidateQueries({ queryKey: ['rents'] });
+                                                await queryClient.invalidateQueries({ queryKey: ['rents-with-relations'] });
+                                                await queryClient.invalidateQueries({ queryKey: ['properties-with-relations'] });
+                                                addNotification('租金記錄已連結 / Rent record linked', 'update');
                                             }
                                         }
+                                    }}
+                                    options={[
+                                        { value: '', label: rentsLoading ? '載入中...' : '選擇現有租金記錄以連結...' },
+                                        ...((allRents || [])
+                                            .filter(r => !r.propertyId || r.propertyId === '' || r.propertyId === 'null')
+                                            .map(r => {
+                                                const monthlyRent = r.type === 'rent_out' ? r.rentOutMonthlyRental : r.rentingMonthlyRental;
+                                                const tenantName = (proprietors || []).find(p => p.id === r.tenantId)?.name;
+                                                const endDate = r.type === 'rent_out' ? r.rentOutEndDate : (r.rentingEndDate || r.endDate);
+                                                const isExpired = endDate ? new Date(endDate) < new Date(new Date().setHours(0, 0, 0, 0)) : false;
 
-                                        const success = await updateRent(selectedRentId, updates);
-                                        if (success) {
-                                            await queryClient.invalidateQueries({ queryKey: ['rents'] });
-                                            await queryClient.invalidateQueries({ queryKey: ['rents-with-relations'] });
-                                            await queryClient.invalidateQueries({ queryKey: ['properties-with-relations'] });
-                                            addNotification('租金記錄已連結 / Rent record linked', 'update');
-                                        }
-                                    }
-                                }}
-                                options={[
-                                    { value: '', label: rentsLoading ? '載入中...' : '選擇現有租金記錄以連結...' },
-                                    ...((allRents || [])
-                                        .filter(r => !r.propertyId || r.propertyId === '' || r.propertyId === 'null')
-                                        .map(r => {
-                                            const monthlyRent = r.type === 'rent_out' ? r.rentOutMonthlyRental : r.rentingMonthlyRental;
-                                            const tenantName = (proprietors || []).find(p => p.id === r.tenantId)?.name;
-                                            const endDate = r.type === 'rent_out' ? r.rentOutEndDate : (r.rentingEndDate || r.endDate);
-                                            const isExpired = endDate ? new Date(endDate) < new Date(new Date().setHours(0, 0, 0, 0)) : false;
+                                                return {
+                                                    value: r.id!,
+                                                    label: `${r.type === 'rent_out' ? '收租' : '交租'} - ${tenantName || '未指定'} - $${(monthlyRent || 0).toLocaleString()}/月${isExpired ? ' (已過期)' : ''}`
+                                                };
+                                            }))
+                                    ]}
+                                    placeholder="選擇現有租金記錄以連結..."
+                                />
+                            </div>
 
-                                            return {
-                                                value: r.id!,
-                                                label: `${r.type === 'rent_out' ? '收租' : '交租'} - ${tenantName || '未指定'} - $${(monthlyRent || 0).toLocaleString()}/月${isExpired ? ' (已過期)' : ''}`
-                                            };
-                                        }))
-                                ]}
-                                placeholder="選擇現有租金記錄以連結..."
-                            />
-
-                            {rents.length === 0 ? (
-                                <div className="p-4 bg-zinc-50 dark:bg-white/5 rounded-xl text-center text-zinc-400 dark:text-white/40 text-sm">
-                                    尚無租金記錄
+                            <div className="space-y-10">
+                                <div>
+                                    <h4 className="text-sm font-bold text-emerald-600 dark:text-emerald-400 mb-4 flex items-center gap-2 px-1">
+                                        <div className="w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]"></div>
+                                        收租記錄 (Rent Out Records)
+                                    </h4>
+                                    {renderRentTable(rentOutRents)}
                                 </div>
-                            ) : (
-                                <div className="border border-zinc-200 dark:border-white/10 rounded-xl overflow-hidden">
-                                    {/* Table Header */}
-                                    <div className="grid grid-cols-[100px_1fr_1.5fr_1.2fr_1fr_90px] gap-4 px-4 py-3 bg-zinc-50 dark:bg-white/5 text-xs font-semibold text-zinc-500 dark:text-white/40 uppercase tracking-wider border-b border-zinc-200 dark:border-white/10 uppercase">
-                                        <div className="flex items-center gap-1.5">
-                                            <span className="w-1 h-1 bg-purple-500 rounded-full"></span>編號
-                                        </div>
-                                        <div>承租人</div>
-                                        <div>租借位置</div>
-                                        <div>租期</div>
-                                        <div className="text-right">租金/月</div>
-                                        <div className="text-center">操作</div>
-                                    </div>
-                                    {/* Table Rows */}
-                                    {rents.map((rent, index) => {
-                                        // Find either the tenant or the proprietor as the other party
-                                        const otherParty = rent.tenant || rent.proprietor || (proprietors || []).find(p => p.id === (rent.tenantId || rent.proprietorId));
 
-                                        // Handle both new and legacy rent data formats
-                                        const startDate = rent.type === 'rent_out'
-                                            ? (rent.rentOutStartDate ? new Date(rent.rentOutStartDate) : null)
-                                            : (rent.rentingStartDate ? new Date(rent.rentingStartDate) : (rent.startDate ? new Date(rent.startDate) : null));
-                                        const endDate = rent.type === 'rent_out'
-                                            ? (rent.rentOutEndDate ? new Date(rent.rentOutEndDate) : null)
-                                            : (rent.rentingEndDate ? new Date(rent.rentingEndDate) : (rent.endDate ? new Date(rent.endDate) : null));
-                                        const monthlyRent = rent.type === 'rent_out'
-                                            ? (rent.rentOutMonthlyRental || rent.amount || 0)
-                                            : (rent.rentingMonthlyRental || rent.amount || 0);
-
-                                        const months = startDate && endDate
-                                            ? Math.round((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24 * 30))
-                                            : (rent.type === 'rent_out' ? rent.rentOutPeriods : rent.rentingPeriods) || 0;
-
-                                        // Use actual contract number instead of auto-generated code
-                                        const contractNumber = rent.type === 'rent_out'
-                                            ? (rent.rentOutTenancyNumber || `-`)
-                                            : (rent.rentingNumber || `-`);
-
-                                        // Check if rent is expired
-                                        const isExpired = endDate ? endDate < new Date() : false;
-
-
-                                        return (
-                                            <div key={rent.id} className={`grid grid-cols-[100px_1fr_1.5fr_1.2fr_1fr_90px] gap-4 px-4 py-4 border-b border-zinc-100 dark:border-white/5 text-sm hover:bg-zinc-50/80 dark:hover:bg-white/[0.02] transition-colors items-center last:border-0 group ${isExpired ? 'bg-red-50/50 dark:bg-red-500/5' : ''}`}>
-                                                <div className="flex flex-col gap-1">
-                                                    <span className="font-mono text-[11px] font-bold text-zinc-400 dark:text-white/30 tracking-tight">{contractNumber}</span>
-                                                    <div className="flex items-center gap-1 flex-wrap">
-                                                        <span className={`text-[10px] px-2 py-0.5 rounded-full w-fit font-bold tracking-wider ${rent.type === 'rent_out'
-                                                            ? 'bg-emerald-100 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-200/50 dark:border-emerald-500/20'
-                                                            : 'bg-indigo-100 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-200/50 dark:border-indigo-500/20'}`}>
-                                                            {rent.type === 'rent_out' ? '收租' : '交租'}
-                                                        </span>
-                                                        {isExpired && (
-                                                            <span className="text-[10px] px-2 py-0.5 rounded-full w-fit font-bold tracking-wider bg-red-100 dark:bg-red-500/20 text-red-600 dark:text-red-400 border border-red-200/50 dark:border-red-500/30">
-                                                                已過期
-                                                            </span>
-                                                        )}
-                                                    </div>
-                                                </div>
-                                                <div className="flex flex-col overflow-hidden">
-                                                    <span className="font-semibold text-zinc-900 dark:text-white truncate">
-                                                        {otherParty?.name || (rent.type === 'renting' ? '(暫缺)' : '-')}
-                                                    </span>
-                                                    {otherParty?.shortName && (
-                                                        <span className="text-[10px] text-zinc-400 dark:text-white/30 truncate uppercase">
-                                                            {otherParty.shortName}
-                                                        </span>
-                                                    )}
-                                                </div>
-                                                <div className="text-zinc-600 dark:text-white/70 text-xs leading-relaxed line-clamp-2">
-                                                    {rent.location || rent.rentOutAddressDetail || formData.name || '-'}
-                                                </div>
-                                                <div className="flex flex-col">
-                                                    {startDate ? (
-                                                        <>
-                                                            <div className="text-zinc-700 dark:text-white/90 font-medium tabular-nums text-xs">
-                                                                {startDate.toLocaleDateString('zh-TW')}
-                                                            </div>
-                                                            <div className="text-zinc-400 dark:text-white/30 flex items-center gap-1 tabular-nums text-xs">
-                                                                <span className="opacity-50">~</span> {endDate ? endDate.toLocaleDateString('zh-TW') : '-'}
-                                                            </div>
-                                                            <div className="mt-1 flex items-center gap-1">
-                                                                <span className="text-[10px] px-1.5 py-0.5 bg-zinc-100 dark:bg-white/10 rounded font-bold text-zinc-500 dark:text-white/40">
-                                                                    {months}個月
-                                                                </span>
-                                                            </div>
-                                                        </>
-                                                    ) : (
-                                                        <span className="text-zinc-300 dark:text-white/10 italic text-xs">未設定</span>
-                                                    )}
-                                                </div>
-                                                <div className="text-right">
-                                                    <div className="flex flex-col">
-                                                        <span className="text-[10px] text-zinc-400 dark:text-white/30 font-bold uppercase tracking-widest">{rent.currency || 'HKD'}</span>
-                                                        <span className="text-base font-black text-zinc-900 dark:text-white tabular-nums">
-                                                            ${monthlyRent.toLocaleString()}
-                                                            <span className="text-[10px] text-zinc-400 dark:text-white/30 ml-1">/月</span>
-                                                        </span>
-                                                    </div>
-                                                </div>
-                                                <div className="flex items-center justify-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => setEditingRent(rent)}
-                                                        className="p-2 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-500/20 rounded-lg transition-all"
-                                                        title="更改租金記錄"
-                                                    >
-                                                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                                                        </svg>
-                                                    </button>
-                                                    <button
-                                                        type="button"
-                                                        disabled={unlinkingRentId === rent.id}
-                                                        onClick={() => handleUnlinkRent(rent.id!)}
-                                                        className={`p-2 text-amber-600 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-500/20 rounded-lg transition-all ${unlinkingRentId === rent.id ? 'opacity-50 cursor-not-allowed' : ''}`}
-                                                        title="取消物業連結"
-                                                    >
-                                                        {unlinkingRentId === rent.id ? (
-                                                            <div className="w-4 h-4 border-2 border-amber-500 border-t-transparent rounded-full animate-spin" />
-                                                        ) : (
-                                                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
-                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2 2l20 20" />
-                                                            </svg>
-                                                        )}
-                                                    </button>
-                                                </div>
-                                            </div>
-                                        );
-                                    })}
+                                <div>
+                                    <h4 className="text-sm font-bold text-indigo-600 dark:text-indigo-400 mb-4 flex items-center gap-2 px-1">
+                                        <div className="w-2 h-2 rounded-full bg-indigo-500 shadow-[0_0_8px_rgba(99,102,241,0.5)]"></div>
+                                        交租記錄 (Renting Records)
+                                    </h4>
+                                    {renderRentTable(rentingRents)}
                                 </div>
-                            )}
+                            </div>
                         </div>
                     )}
+
 
                     {/* Google Drive URL and Planning Permission */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

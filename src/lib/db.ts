@@ -27,6 +27,8 @@ export interface Property {
   createdBy?: string; // UUID of the user who created this record
   createdAt: Date;
   updatedAt: Date;
+  isDeleted?: boolean;
+  deletedAt?: Date;
 
   // Relations
   proprietor?: Proprietor;
@@ -45,6 +47,8 @@ export interface Proprietor {
   createdBy?: string; // UUID of the user who created this record
   createdAt: Date;
   updatedAt: Date;
+  isDeleted?: boolean;
+  deletedAt?: Date;
 }
 
 export interface Rent {
@@ -93,6 +97,8 @@ export interface Rent {
   createdBy?: string; // UUID of the user who created this record
   createdAt: Date;
   updatedAt: Date;
+  isDeleted?: boolean;
+  deletedAt?: Date;
 
   // Relations
   property?: Property;

@@ -15,6 +15,7 @@ import {
     Settings,
     Building2,
     Sun,
+    Trash2,
 } from 'lucide-react';
 import ThemeToggle from './ThemeToggle';
 
@@ -182,6 +183,18 @@ export default function DashboardSidebar({ userRole = 'client' }: DashboardSideb
                                 >
                                     <Settings className="w-5 h-5" />
                                     <span className="font-medium">系統設定</span>
+                                </Link>
+                            </li>
+                            <li>
+                                <Link
+                                    href="/dashboard/settings/trash"
+                                    className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${isActive('/dashboard/settings/trash')
+                                        ? 'bg-purple-500/20 text-purple-700 dark:text-white'
+                                        : 'text-zinc-600 dark:text-white/60 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-white/5'
+                                        }`}
+                                >
+                                    <Trash2 className="w-5 h-5" />
+                                    <span className="font-medium">垃圾桶</span>
                                 </Link>
                             </li>
                         </ul>

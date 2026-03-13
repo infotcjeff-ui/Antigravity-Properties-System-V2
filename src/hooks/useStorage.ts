@@ -43,6 +43,8 @@ export const fetchProperties = async (user?: any, options?: { query?: string; by
             queryBuilder = queryBuilder.or(`name.ilike.%${q}%,code.ilike.%${q}%,address.ilike.%${q}%`);
         }
 
+        queryBuilder = queryBuilder.eq('is_deleted', false);
+
         if (user && user.role !== 'admin' && !options?.bypassIsolation) {
             queryBuilder = queryBuilder.eq('created_by', user.id);
         }
@@ -90,6 +92,8 @@ export const fetchProprietors = async (user?: any): Promise<Proprietor[]> => {
             query = query.eq('created_by', user.id);
         }
 
+        query = query.eq('is_deleted', false);
+
         const { data, error: sbError } = await query
             .order('name', { ascending: true });
 
@@ -129,6 +133,8 @@ export const fetchRents = async (user?: any): Promise<Rent[]> => {
             query = query.eq('created_by', user.id);
         }
 
+        query = query.eq('is_deleted', false);
+
         const { data, error: sbError } = await query
             .order('created_at', { ascending: false });
 
@@ -160,6 +166,8 @@ export const fetchRentsWithRelations = async (user?: any, options?: { type?: 're
         if (user && user.role !== 'admin') {
             query = query.eq('created_by', user.id);
         }
+
+        query = query.eq('is_deleted', false);
 
         const { data, error } = await query.order('created_at', { ascending: false });
 
@@ -196,6 +204,10 @@ export const fetchPropertiesWithRelations = async (user?: any): Promise<Property
             oQuery = oQuery.eq('created_by', user.id);
             rQuery = rQuery.eq('created_by', user.id);
         }
+
+        pQuery = pQuery.eq('is_deleted', false);
+        oQuery = oQuery.eq('is_deleted', false);
+        rQuery = rQuery.eq('is_deleted', false);
 
         const [
             { data: properties },
@@ -236,9 +248,9 @@ export const fetchUserStats = async (userId: string) => {
             { count: proprietorCount },
             { count: rentCount }
         ] = await Promise.all([
-            supabase.from('properties').select('*', { count: 'exact', head: true }).eq('created_by', userId),
-            supabase.from('proprietors').select('*', { count: 'exact', head: true }).eq('created_by', userId),
-            supabase.from('rents').select('*', { count: 'exact', head: true }).eq('created_by', userId)
+            supabase.from('properties').select('*', { count: 'exact', head: true }).eq('created_by', userId).eq('is_deleted', false),
+            supabase.from('proprietors').select('*', { count: 'exact', head: true }).eq('created_by', userId).eq('is_deleted', false),
+            supabase.from('rents').select('*', { count: 'exact', head: true }).eq('created_by', userId).eq('is_deleted', false)
         ]);
 
         return {
@@ -280,6 +292,16 @@ export const fetchDashboardStats = async (user?: any) => {
             soldQuery = soldQuery.eq('created_by', user.id);
             suspendedQuery = suspendedQuery.eq('created_by', user.id);
         }
+
+        propertiesQuery = propertiesQuery.eq('is_deleted', false);
+        proprietorsQuery = proprietorsQuery.eq('is_deleted', false);
+        rentsQuery = rentsQuery.eq('is_deleted', false);
+        rentsDataQuery = rentsDataQuery.eq('is_deleted', false);
+
+        holdingQuery = holdingQuery.eq('is_deleted', false);
+        rentingQuery = rentingQuery.eq('is_deleted', false);
+        soldQuery = soldQuery.eq('is_deleted', false);
+        suspendedQuery = suspendedQuery.eq('is_deleted', false);
 
         // Fetch counts in parallel
         const [
@@ -489,13 +511,13 @@ export function useProperties() {
         try {
             const { error: sbError } = await supabase
                 .from('properties')
-                .delete()
+                .update({ is_deleted: true, deleted_at: new Date().toISOString() })
                 .eq('id', id);
 
             if (sbError) throw sbError;
             return true;
         } catch (err) {
-            setError('Failed to delete property from cloud');
+            setError('Failed to soft delete property from cloud');
             console.error(err);
             return false;
         } finally {
@@ -660,38 +682,15 @@ export function useProprietors() {
         setLoading(true);
         setError(null);
         try {
-            // Nullify FK references in properties before deleting
-            await supabase
-                .from('properties')
-                .update({ proprietor_id: null })
-                .eq('proprietor_id', id);
-
-            await supabase
-                .from('properties')
-                .update({ tenant_id: null })
-                .eq('tenant_id', id);
-
-            // Nullify FK references in rents before deleting
-            await supabase
-                .from('rents')
-                .update({ proprietor_id: null })
-                .eq('proprietor_id', id);
-
-            await supabase
-                .from('rents')
-                .update({ tenant_id: null })
-                .eq('tenant_id', id);
-
-            // Now delete the proprietor
             const { error: sbError } = await supabase
                 .from('proprietors')
-                .delete()
+                .update({ is_deleted: true, deleted_at: new Date().toISOString() })
                 .eq('id', id);
 
             if (sbError) throw sbError;
             return true;
         } catch (err) {
-            setError('Failed to delete proprietor from cloud');
+            setError('Failed to soft delete proprietor from cloud');
             console.error(err);
             return false;
         } finally {
@@ -913,13 +912,13 @@ export function useRents() {
         try {
             const { error: sbError } = await supabase
                 .from('rents')
-                .delete()
+                .update({ is_deleted: true, deleted_at: new Date().toISOString() })
                 .eq('id', id);
 
             if (sbError) throw sbError;
             return true;
         } catch (err) {
-            setError('Failed to delete rent from cloud');
+            setError('Failed to soft delete rent from cloud');
             console.error(err);
             return false;
         } finally {
@@ -1230,6 +1229,104 @@ export function useDatabase() {
         syncLocalToCloud
     };
 }
+
+// ==================== TRASH HOOKS ====================
+
+export function useTrash() {
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+
+    const fetchTrash = useCallback(async (table: 'properties' | 'proprietors' | 'rents') => {
+        setLoading(true);
+        setError(null);
+        try {
+            const { data, error: sbError } = await supabase
+                .from(table)
+                .select('*')
+                .eq('is_deleted', true)
+                .order('deleted_at', { ascending: false });
+
+            if (sbError) throw sbError;
+            return (data || []).map(toCamel);
+        } catch (err) {
+            console.error(`Failed to fetch trash for ${table}:`, err);
+            setError(`Failed to fetch trash for ${table}`);
+            return [];
+        } finally {
+            setLoading(false);
+        }
+    }, []);
+
+    const restoreItem = useCallback(async (table: 'properties' | 'proprietors' | 'rents', id: string) => {
+        setLoading(true);
+        setError(null);
+        try {
+            const { error: sbError } = await supabase
+                .from(table)
+                .update({ is_deleted: false, deleted_at: null })
+                .eq('id', id);
+
+            if (sbError) throw sbError;
+            return true;
+        } catch (err) {
+            console.error(`Failed to restore item ${id} from ${table}:`, err);
+            setError(`Failed to restore item`);
+            return false;
+        } finally {
+            setLoading(false);
+        }
+    }, []);
+
+    const permanentlyDeleteItem = useCallback(async (table: 'properties' | 'proprietors' | 'rents', id: string) => {
+        setLoading(true);
+        setError(null);
+        try {
+            const { error: sbError } = await supabase
+                .from(table)
+                .delete()
+                .eq('id', id);
+
+            if (sbError) throw sbError;
+            return true;
+        } catch (err) {
+            console.error(`Failed to permanently delete item ${id} from ${table}:`, err);
+            setError(`Failed to permanently delete item`);
+            return false;
+        } finally {
+            setLoading(false);
+        }
+    }, []);
+
+    const emptyTrash = useCallback(async (table: 'properties' | 'proprietors' | 'rents') => {
+        setLoading(true);
+        setError(null);
+        try {
+            const { error: sbError } = await supabase
+                .from(table)
+                .delete()
+                .eq('is_deleted', true);
+
+            if (sbError) throw sbError;
+            return true;
+        } catch (err) {
+            console.error(`Failed to empty trash for ${table}:`, err);
+            setError(`Failed to empty trash`);
+            return false;
+        } finally {
+            setLoading(false);
+        }
+    }, []);
+
+    return {
+        loading,
+        error,
+        fetchTrash,
+        restoreItem,
+        permanentlyDeleteItem,
+        emptyTrash
+    };
+}
+
 export function useRentsQuery() {
     const { user } = useAuth();
     return useQuery({
