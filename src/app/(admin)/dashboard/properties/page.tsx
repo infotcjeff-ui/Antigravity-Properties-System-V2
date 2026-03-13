@@ -7,7 +7,8 @@ import type { Property } from '@/lib/db';
 import Link from 'next/link';
 import { useProperties, usePropertiesQuery, useUsersQuery } from '@/hooks/useStorage';
 import PropertyForm from '@/components/properties/PropertyForm';
-import { Building2, Plus, Search, Pencil, Trash2, Eye } from 'lucide-react';
+import { Building2, Plus, Search, Pencil, Trash2, Eye, CheckSquare, Square, UserPlus, X } from 'lucide-react';
+import AnimatedSelect from '@/components/properties/AnimatedSelect';
 
 const statusColors: Record<string, string> = {
     holding: 'bg-emerald-600 dark:bg-emerald-500/80 text-white',
@@ -50,6 +51,10 @@ export default function ManagePropertiesPage() {
     const [showForm, setShowForm] = useState(false);
     const [editingProperty, setEditingProperty] = useState<Property | null>(null);
     const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
+    const [selectedIds, setSelectedIds] = useState<string[]>([]);
+    const [showBulkUploaderModal, setShowBulkUploaderModal] = useState(false);
+    const [selectedBulkUploader, setSelectedBulkUploader] = useState('');
+    const { bulkUpdateProperties } = useProperties();
 
     // Filter properties based on search query (client-side for instant feedback)
     const filteredProperties = useMemo(() => {
@@ -93,6 +98,32 @@ export default function ManagePropertiesPage() {
         queryClient.invalidateQueries({ queryKey: ['properties'] });
         // Force a page refresh as requested by the user
         window.location.reload();
+    };
+
+    const toggleSelect = (id: string) => {
+        setSelectedIds(prev =>
+            prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
+        );
+    };
+
+    const toggleSelectAll = () => {
+        if (selectedIds.length === sortedProperties.length) {
+            setSelectedIds([]);
+        } else {
+            setSelectedIds(sortedProperties.map(p => p.id!));
+        }
+    };
+
+    const handleBulkUploaderUpdate = async () => {
+        if (!selectedBulkUploader || selectedIds.length === 0) return;
+
+        const success = await bulkUpdateProperties(selectedIds, { createdBy: selectedBulkUploader });
+        if (success) {
+            setShowBulkUploaderModal(false);
+            setSelectedIds([]);
+            setSelectedBulkUploader('');
+            queryClient.invalidateQueries({ queryKey: ['properties'] });
+        }
     };
 
     return (
@@ -141,6 +172,18 @@ export default function ManagePropertiesPage() {
                             <table className="w-full hidden md:table">
                                 <thead>
                                     <tr className="text-left text-zinc-500 dark:text-white/50 text-sm border-b border-zinc-100 dark:border-white/5">
+                                        <th className="px-4 py-3">
+                                            <button
+                                                onClick={toggleSelectAll}
+                                                className="text-zinc-400 hover:text-purple-500 transition-colors"
+                                            >
+                                                {selectedIds.length === sortedProperties.length && sortedProperties.length > 0 ? (
+                                                    <CheckSquare className="w-5 h-5 text-purple-500" />
+                                                ) : (
+                                                    <Square className="w-5 h-5" />
+                                                )}
+                                            </button>
+                                        </th>
                                         <th className="px-4 py-3 text-left text-xs font-medium text-zinc-500 dark:text-white/40 uppercase tracking-wider">名稱</th>
                                         <th className="px-4 py-3 text-left text-xs font-medium text-zinc-500 dark:text-white/40 uppercase tracking-wider">編號</th>
                                         <th className="px-4 py-3 text-left text-xs font-medium text-zinc-500 dark:text-white/40 uppercase tracking-wider">類型</th>
@@ -156,8 +199,20 @@ export default function ManagePropertiesPage() {
                                             initial={{ opacity: 0, y: 10 }}
                                             animate={{ opacity: 1, y: 0 }}
                                             transition={{ delay: index * 0.03 }}
-                                            className="border-b border-zinc-100 dark:border-white/5 hover:bg-zinc-50 dark:hover:bg-white/5 transition-colors"
+                                            className={`border-b border-zinc-100 dark:border-white/5 hover:bg-zinc-50 dark:hover:bg-white/5 transition-colors ${selectedIds.includes(property.id!) ? 'bg-purple-50/50 dark:bg-purple-500/5' : ''}`}
                                         >
+                                            <td className="px-4 py-4">
+                                                <button
+                                                    onClick={() => toggleSelect(property.id!)}
+                                                    className="text-zinc-400 hover:text-purple-500 transition-colors"
+                                                >
+                                                    {selectedIds.includes(property.id!) ? (
+                                                        <CheckSquare className="w-5 h-5 text-purple-500" />
+                                                    ) : (
+                                                        <Square className="w-5 h-5" />
+                                                    )}
+                                                </button>
+                                            </td>
                                             <td className="p-4">
                                                 <div className="flex items-center gap-3">
                                                     {property.images?.[0] ? (
@@ -340,6 +395,112 @@ export default function ManagePropertiesPage() {
                                 >
                                     Delete
                                 </button>
+                            </div>
+                        </motion.div>
+                    </>
+                )}
+            </AnimatePresence>
+
+            {/* Bulk Actions Bar */}
+            <AnimatePresence>
+                {selectedIds.length > 0 && (
+                    <motion.div
+                        initial={{ y: 100, opacity: 0 }}
+                        animate={{ y: 0, opacity: 1 }}
+                        exit={{ y: 100, opacity: 0 }}
+                        className="fixed bottom-8 left-1/2 -translate-x-1/2 bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 px-6 py-4 rounded-2xl shadow-2xl z-[50] flex items-center gap-8 border border-white/10 dark:border-zinc-200"
+                    >
+                        <div className="flex items-center gap-3 pr-6 border-r border-white/10 dark:border-zinc-200">
+                            <CheckSquare className="w-5 h-5 text-purple-400 dark:text-purple-600" />
+                            <span className="font-bold whitespace-nowrap">
+                                已選擇 {selectedIds.length} 個物業
+                            </span>
+                        </div>
+
+                        <div className="flex items-center gap-3">
+                            <motion.button
+                                whileHover={{ scale: 1.05 }}
+                                whileTap={{ scale: 0.95 }}
+                                onClick={() => setShowBulkUploaderModal(true)}
+                                className="flex items-center gap-2 px-4 py-2 bg-purple-600 dark:bg-purple-600 text-white rounded-xl hover:bg-purple-700 transition-colors"
+                            >
+                                <UserPlus className="w-4 h-4" />
+                                <span className="text-sm font-medium">更改上載者</span>
+                            </motion.button>
+
+                            <button
+                                onClick={() => setSelectedIds([])}
+                                className="p-2 hover:bg-white/10 dark:hover:bg-zinc-100 rounded-lg transition-colors"
+                                title="取消選擇"
+                            >
+                                <X className="w-5 h-5" />
+                            </button>
+                        </div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+
+            {/* Bulk Uploader Update Modal */}
+            <AnimatePresence>
+                {showBulkUploaderModal && (
+                    <>
+                        <motion.div
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            onClick={() => setShowBulkUploaderModal(false)}
+                            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[60]"
+                        />
+                        <motion.div
+                            initial={{ opacity: 0, scale: 0.95 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            exit={{ opacity: 0, scale: 0.95 }}
+                            className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-md bg-white dark:bg-zinc-900 rounded-3xl border border-zinc-200 dark:border-white/10 p-6 z-[70] shadow-2xl"
+                        >
+                            <div className="flex items-center justify-between mb-6">
+                                <h3 className="text-xl font-bold text-zinc-900 dark:text-white">批量更改上載者</h3>
+                                <button onClick={() => setShowBulkUploaderModal(false)} className="p-2 hover:bg-zinc-100 dark:hover:bg-white/5 rounded-xl transition-colors">
+                                    <X className="w-5 h-5 text-zinc-400" />
+                                </button>
+                            </div>
+
+                            <p className="text-zinc-500 dark:text-white/60 text-sm mb-6 bg-purple-50 dark:bg-purple-500/5 p-4 rounded-2xl border border-purple-100 dark:border-purple-500/10">
+                                您正在為 <span className="font-bold text-purple-600 dark:text-purple-400">{selectedIds.length}</span> 個物業更改上載者。請選擇新的上載者：
+                            </p>
+
+                            <div className="space-y-4">
+                                <div className="space-y-2">
+                                    <label className="block text-sm font-medium text-zinc-700 dark:text-white/80">選擇上載者</label>
+                                    <AnimatedSelect
+                                        name="bulkUploader"
+                                        value={selectedBulkUploader}
+                                        onChange={(value: string) => setSelectedBulkUploader(value)}
+                                        options={[
+                                            { value: '', label: '選擇用戶...' },
+                                            ...(users || []).map(u => ({
+                                                value: u.id,
+                                                label: u.displayName || u.username
+                                            }))
+                                        ]}
+                                        placeholder="選擇新的上載者"
+                                    />
+                                </div>
+
+                                <div className="flex gap-3 pt-4">
+                                    <button
+                                        onClick={() => setShowBulkUploaderModal(false)}
+                                        className="flex-1 px-4 py-2.5 rounded-xl border border-zinc-200 dark:border-white/10 text-zinc-600 dark:text-white/60 hover:bg-zinc-50 dark:hover:bg-white/5 transition-all font-medium"
+                                    >
+                                        取消
+                                    </button>
+                                    <button
+                                        onClick={handleBulkUploaderUpdate}
+                                        disabled={!selectedBulkUploader}
+                                        className="flex-1 px-4 py-2.5 bg-purple-600 text-white rounded-xl font-bold hover:bg-purple-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-purple-500/20"
+                                    >
+                                        確認更改
+                                    </button>
+                                </div>
                             </div>
                         </motion.div>
                     </>

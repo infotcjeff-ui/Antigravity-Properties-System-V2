@@ -525,6 +525,31 @@ export function useProperties() {
         }
     }, []);
 
+    const bulkUpdateProperties = useCallback(async (ids: string[], updates: Partial<Property>): Promise<boolean> => {
+        setLoading(true);
+        setError(null);
+        try {
+            const updateData = toSnake(updates);
+            const allowed = ['status', 'type', 'created_by', 'proprietor_id', 'tenant_id', 'land_use'];
+            const filtered: any = {};
+            Object.keys(updateData).forEach(k => { if (allowed.includes(k)) filtered[k] = updateData[k]; });
+
+            const { error: sbError } = await supabase
+                .from('properties')
+                .update(filtered)
+                .in('id', ids);
+
+            if (sbError) throw sbError;
+            return true;
+        } catch (err: any) {
+            setError('Failed to bulk update properties in cloud');
+            console.error('Bulk Update Properties Error:', err);
+            return false;
+        } finally {
+            setLoading(false);
+        }
+    }, []);
+
     const searchProperties = useCallback(async (query: string): Promise<Property[]> => {
         setLoading(true);
         setError(null);
@@ -552,6 +577,7 @@ export function useProperties() {
         getProperty,
         addProperty,
         updateProperty,
+        bulkUpdateProperties,
         deleteProperty,
         searchProperties
     };
