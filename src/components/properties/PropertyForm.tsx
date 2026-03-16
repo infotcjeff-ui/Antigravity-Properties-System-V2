@@ -464,12 +464,25 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                 body: uploadFormData,
             });
 
-            if (!res.ok) {
-                const error = await res.json();
-                throw new Error(error.error || 'Upload failed');
+            const text = await res.text();
+            let data: { url?: string; error?: string };
+            try {
+                data = JSON.parse(text);
+            } catch {
+                // Server returned HTML (e.g. Vercel error page) instead of JSON
+                const hint = text.trimStart().startsWith('<') 
+                    ? ' 請確認 Vercel 已設定 NEXT_PUBLIC_SUPABASE_URL、NEXT_PUBLIC_SUPABASE_ANON_KEY，且 Supabase Storage 的 properties bucket 已建立。'
+                    : '';
+                throw new Error(`上傳失敗：伺服器回傳非 JSON 格式${hint}`);
             }
 
-            const data = await res.json();
+            if (!res.ok) {
+                throw new Error(data.error || 'Upload failed');
+            }
+
+            if (!data.url) {
+                throw new Error('上傳成功但未取得圖片網址');
+            }
             return data.url;
         });
 
