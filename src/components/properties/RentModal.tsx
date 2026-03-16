@@ -1,10 +1,13 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
-import { useRents, useProprietors, useProperties } from '@/hooks/useStorage';
-import type { Proprietor, Property, Rent } from '@/lib/db';
+import { useRents, useProprietors, useProperties, useSubLandlordsQuery, useCurrentTenantsQuery } from '@/hooks/useStorage';
+import type { Proprietor, Property, Rent, SubLandlord, CurrentTenant } from '@/lib/db';
 import ProprietorModal from '@/components/properties/ProprietorModal';
+import RentOutFormModal from '@/components/properties/RentOutFormModal';
+import { formatNumberWithCommas, parsePriceInput } from '@/lib/formatters';
 import dynamic from 'next/dynamic';
 import 'react-quill-new/dist/quill.snow.css';
 
@@ -33,6 +36,7 @@ const rentOutStatuses = [
 ];
 
 export default function RentModal({ propertyId, defaultLocation, rent, onClose, onSuccess }: RentModalProps) {
+    const queryClient = useQueryClient();
     const { addRent, updateRent } = useRents();
     const { getProprietors } = useProprietors();
     const { getProperties } = useProperties();
@@ -42,6 +46,12 @@ export default function RentModal({ propertyId, defaultLocation, rent, onClose, 
     const [proprietors, setProprietors] = useState<Proprietor[]>([]);
     const [properties, setProperties] = useState<Property[]>([]);
     const [showProprietorModal, setShowProprietorModal] = useState(false);
+    const [showSubLandlordModal, setShowSubLandlordModal] = useState(false);
+    const [showCurrentTenantModal, setShowCurrentTenantModal] = useState(false);
+    const [editSubLandlord, setEditSubLandlord] = useState<SubLandlord | null>(null);
+    const [editCurrentTenant, setEditCurrentTenant] = useState<CurrentTenant | null>(null);
+    const { data: subLandlords = [] } = useSubLandlordsQuery();
+    const { data: currentTenants = [] } = useCurrentTenantsQuery();
 
     const [formData, setFormData] = useState(() => {
         // Helper function to format date for input
@@ -68,6 +78,7 @@ export default function RentModal({ propertyId, defaultLocation, rent, onClose, 
                 rentOutEndDate: formatDate(rent.rentOutEndDate),
                 rentOutActualEndDate: formatDate(rent.rentOutActualEndDate),
                 rentOutDepositReceived: rent.rentOutDepositReceived?.toString() || '',
+                rentOutDepositReceiptNumber: (rent as any).rentOutDepositReceiptNumber || '',
                 rentOutDepositReceiveDate: formatDate(rent.rentOutDepositReceiveDate),
                 rentOutDepositReturnDate: formatDate(rent.rentOutDepositReturnDate),
                 rentOutDepositReturnAmount: rent.rentOutDepositReturnAmount?.toString() || '',
@@ -76,6 +87,19 @@ export default function RentModal({ propertyId, defaultLocation, rent, onClose, 
                 location: rent.location || rent.rentOutAddressDetail || defaultLocation || '',
                 rentOutStatus: rent.rentOutStatus || 'listing' as 'listing' | 'renting' | 'completed',
                 rentOutDescription: rent.rentOutDescription || '',
+                rentOutSubLandlord: (rent as any).rentOutSubLandlord || '',
+                rentOutSubLandlordId: (rent as any).rentOutSubLandlordId || '',
+                rentOutTenants: (() => {
+                    const t = (rent as any).rentOutTenants;
+                    if (Array.isArray(t)) return t;
+                    if (typeof t === 'string') try { return JSON.parse(t); } catch { return []; }
+                    return [];
+                })(),
+                rentOutTenantIds: (() => {
+                    const ids = (rent as any).rentOutTenantIds;
+                    if (Array.isArray(ids)) return ids;
+                    return [];
+                })(),
                 // Renting Fields
                 rentingNumber: rent.rentingNumber || '',
                 rentingReferenceNumber: rent.rentingReferenceNumber || '',
@@ -102,6 +126,7 @@ export default function RentModal({ propertyId, defaultLocation, rent, onClose, 
             rentOutEndDate: '',
             rentOutActualEndDate: '',
             rentOutDepositReceived: '',
+            rentOutDepositReceiptNumber: '',
             rentOutDepositReceiveDate: '',
             rentOutDepositReturnDate: '',
             rentOutDepositReturnAmount: '',
@@ -110,6 +135,10 @@ export default function RentModal({ propertyId, defaultLocation, rent, onClose, 
             location: defaultLocation || '', // Legacy Auto-fill
             rentOutStatus: 'listing' as 'listing' | 'renting' | 'completed',
             rentOutDescription: '',
+            rentOutSubLandlord: '',
+            rentOutSubLandlordId: '',
+            rentOutTenants: [],
+            rentOutTenantIds: [],
             rentingNumber: '',
             rentingReferenceNumber: '',
             rentingMonthlyRental: '',
@@ -156,6 +185,11 @@ export default function RentModal({ propertyId, defaultLocation, rent, onClose, 
         setFormData(prev => ({ ...prev, [name]: value }));
     };
 
+    const handlePriceChange = (name: string, value: string) => {
+        const parsed = parsePriceInput(value);
+        setFormData(prev => ({ ...prev, [name]: parsed }));
+    };
+
     const handleProprietorCreated = async (id: string) => {
         await loadData();
         if (formData.type === 'rent_out') {
@@ -168,6 +202,10 @@ export default function RentModal({ propertyId, defaultLocation, rent, onClose, 
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+        if (formData.type === 'rent_out' && !formData.tenantId) {
+            setError('請按「+ 新增」以新增承租人');
+            return;
+        }
         setSaving(true);
         setError('');
 
@@ -193,6 +231,7 @@ export default function RentModal({ propertyId, defaultLocation, rent, onClose, 
                     rentOutEndDate: formData.rentOutEndDate ? new Date(formData.rentOutEndDate) : undefined,
                     rentOutActualEndDate: formData.rentOutActualEndDate ? new Date(formData.rentOutActualEndDate) : undefined,
                     rentOutDepositReceived: parseFloat(formData.rentOutDepositReceived) || undefined,
+                    rentOutDepositReceiptNumber: formData.rentOutDepositReceiptNumber || undefined,
                     rentOutDepositReceiveDate: formData.rentOutDepositReceiveDate ? new Date(formData.rentOutDepositReceiveDate) : undefined,
                     rentOutDepositReturnDate: formData.rentOutDepositReturnDate ? new Date(formData.rentOutDepositReturnDate) : undefined,
                     rentOutDepositReturnAmount: parseFloat(formData.rentOutDepositReturnAmount) || undefined,
@@ -200,6 +239,12 @@ export default function RentModal({ propertyId, defaultLocation, rent, onClose, 
                     location: formData.rentOutAddressDetail || defaultLocation, // Sync to primary address field
                     rentOutStatus: formData.rentOutStatus,
                     rentOutDescription: formData.rentOutDescription,
+                    rentOutSubLandlord: subLandlords.find(s => s.id === formData.rentOutSubLandlordId)?.name || formData.rentOutSubLandlord || undefined,
+                    rentOutSubLandlordId: formData.rentOutSubLandlordId || undefined,
+                    rentOutTenants: (formData.rentOutTenantIds || []).length > 0
+                        ? (formData.rentOutTenantIds || []).map(id => currentTenants.find(ct => ct.id === id)?.name || id)
+                        : (formData.rentOutTenants || []).filter(Boolean).length > 0 ? formData.rentOutTenants : undefined,
+                    rentOutTenantIds: (formData.rentOutTenantIds || []).length > 0 ? formData.rentOutTenantIds : undefined,
                 };
             } else {
                 rentData = {
@@ -324,9 +369,12 @@ export default function RentModal({ propertyId, defaultLocation, rent, onClose, 
                                     className={inputClass}
                                 >
                                     <option value="" className="bg-white dark:bg-[#1a1a2e]">選擇物業...</option>
-                                    {properties.map(p => (
-                                        <option key={p.id} value={p.id} className="bg-white dark:bg-[#1a1a2e]">{p.name} ({p.code})</option>
-                                    ))}
+                                    {properties
+                                        .slice()
+                                        .sort((a, b) => ((a.name || '').length) - ((b.name || '').length))
+                                        .map(p => (
+                                            <option key={p.id} value={p.id} className="bg-white dark:bg-[#1a1a2e]">{p.name} ({p.code})</option>
+                                        ))}
                                 </select>
                             )}
                         </div>
@@ -334,40 +382,65 @@ export default function RentModal({ propertyId, defaultLocation, rent, onClose, 
                             <label className={labelClass}>
                                 {formData.type === 'rent_out' ? '承租人' : '資產擁有方'}
                             </label>
-                            <div className="flex gap-2">
-                                {loadingData ? (
-                                    <div className="flex-1 px-4 py-3 bg-zinc-50 dark:bg-white/5 border border-zinc-200 dark:border-white/10 rounded-xl flex items-center gap-2">
-                                        <motion.div
-                                            animate={{ opacity: [0.3, 1, 0.3] }}
-                                            transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut" }}
-                                            className="w-4 h-4 rounded-full bg-purple-500"
-                                        />
-                                        <span className="text-zinc-400 dark:text-white/40">載入中...</span>
-                                    </div>
+                            <div className="flex gap-2 items-center">
+                                {formData.type === 'rent_out' ? (
+                                    <>
+                                        <div className={`flex-1 px-4 py-3 rounded-xl border min-h-[44px] flex items-center justify-between gap-2 ${formData.tenantId ? 'bg-zinc-50 dark:bg-white/5 border-zinc-200 dark:border-white/10' : 'bg-zinc-50 dark:bg-white/5 border-zinc-200 dark:border-white/10'}`}>
+                                            {formData.tenantId ? (
+                                                <>
+                                                    <span className="text-zinc-900 dark:text-white font-medium">
+                                                        {proprietors.find(p => p.id === formData.tenantId)?.name || '已選擇'}
+                                                    </span>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setFormData(prev => ({ ...prev, tenantId: '' }))}
+                                                        className="p-1 text-zinc-400 hover:text-red-500 text-xs"
+                                                        title="清除"
+                                                    >
+                                                        ✕
+                                                    </button>
+                                                </>
+                                            ) : (
+                                                <span className="text-zinc-400 dark:text-white/40">請按「+ 新增」以新增承租人</span>
+                                            )}
+                                        </div>
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowProprietorModal(true)}
+                                            className="px-4 py-2 bg-purple-50 dark:bg-purple-500/20 text-purple-600 dark:text-purple-400 rounded-xl hover:bg-purple-100 dark:hover:bg-purple-500/30 border border-purple-100 dark:border-purple-500/30 text-sm font-medium transition-all duration-300 h-[44px] whitespace-nowrap"
+                                        >
+                                            + 新增
+                                        </button>
+                                    </>
                                 ) : (
-                                    <select
-                                        name={formData.type === 'rent_out' ? 'tenantId' : 'proprietorId'}
-                                        value={formData.type === 'rent_out' ? formData.tenantId : formData.proprietorId}
-                                        onChange={handleChange}
-                                        className={`${inputClass} flex-1`}
-                                    >
-                                        <option value="" className="bg-white dark:bg-[#1a1a2e]">
-                                            {formData.type === 'rent_out' ? '選擇承租人...' : '選擇資產擁有方...'}
-                                        </option>
-                                        {proprietors
-                                            .filter(p => formData.type === 'rent_out' ? p.code?.startsWith('T') : !p.code?.startsWith('T'))
-                                            .map(p => (
-                                                <option key={p.id} value={p.id} className="bg-white dark:bg-[#1a1a2e]">{p.name}</option>
-                                            ))}
-                                    </select>
+                                    <>
+                                        {loadingData ? (
+                                            <div className="flex-1 px-4 py-3 bg-zinc-50 dark:bg-white/5 border border-zinc-200 dark:border-white/10 rounded-xl flex items-center gap-2">
+                                                <motion.div animate={{ opacity: [0.3, 1, 0.3] }} transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut" }} className="w-4 h-4 rounded-full bg-purple-500" />
+                                                <span className="text-zinc-400 dark:text-white/40">載入中...</span>
+                                            </div>
+                                        ) : (
+                                            <select
+                                                name="proprietorId"
+                                                value={formData.proprietorId}
+                                                onChange={handleChange}
+                                                className={`${inputClass} flex-1`}
+                                            >
+                                                <option value="" className="bg-white dark:bg-[#1a1a2e]">選擇資產擁有方...</option>
+                                                {proprietors.filter(p => !p.code?.startsWith('T')).sort((a, b) => (a.name?.length || 0) - (b.name?.length || 0)).map(p => (
+                                                    <option key={p.id} value={p.id} className="bg-white dark:bg-[#1a1a2e]">{p.name}</option>
+                                                ))}
+                                            </select>
+                                        )}
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowProprietorModal(true)}
+                                            className="px-4 py-2 bg-purple-50 dark:bg-purple-500/20 text-purple-600 dark:text-purple-400 rounded-xl hover:bg-purple-100 dark:hover:bg-purple-500/30 border border-purple-100 dark:border-purple-500/30 text-sm font-medium transition-all duration-300 h-[42px] whitespace-nowrap"
+                                        >
+                                            + 新增
+                                        </button>
+                                    </>
                                 )}
-                                <button
-                                    type="button"
-                                    onClick={() => setShowProprietorModal(true)}
-                                    className="px-4 py-2 bg-purple-50 dark:bg-purple-500/20 text-purple-600 dark:text-purple-400 rounded-xl hover:bg-purple-100 dark:hover:bg-purple-500/30 transition-all border border-purple-100 dark:border-white/10 text-sm font-medium h-[42px] whitespace-nowrap"
-                                >
-                                    + 新增
-                                </button>
                             </div>
                         </div>
                     </div>
@@ -375,6 +448,95 @@ export default function RentModal({ propertyId, defaultLocation, rent, onClose, 
                     {/* ===== RENT OUT FORM (收租) ===== */}
                     {formData.type === 'rent_out' && (
                         <>
+                            {/* 二房東 & 現時租客 - at top */}
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div className="space-y-2">
+                                    <label className={labelClass}>二房東</label>
+                                    <div className="flex gap-2 items-center">
+                                        <select
+                                            name="rentOutSubLandlordId"
+                                            value={formData.rentOutSubLandlordId}
+                                            onChange={handleChange}
+                                            className={`${inputClass} flex-1`}
+                                        >
+                                            <option value="" className="bg-white dark:bg-[#1a1a2e]">請選擇二房東</option>
+                                            {subLandlords.map(sl => (
+                                                <option key={sl.id} value={sl.id} className="bg-white dark:bg-[#1a1a2e]">{sl.name}</option>
+                                            ))}
+                                        </select>
+                                        {formData.rentOutSubLandlordId && (
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    const sl = subLandlords.find(s => s.id === formData.rentOutSubLandlordId);
+                                                    if (sl) setEditSubLandlord(sl);
+                                                    setShowSubLandlordModal(true);
+                                                }}
+                                                className="p-2 text-zinc-400 hover:text-purple-500 rounded-lg shrink-0"
+                                                title="編輯"
+                                            >
+                                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+                                            </button>
+                                        )}
+                                        <button
+                                            type="button"
+                                            onClick={() => { setEditSubLandlord(null); setShowSubLandlordModal(true); }}
+                                            className="px-4 py-2 bg-purple-50 dark:bg-purple-500/20 text-purple-600 dark:text-purple-400 rounded-xl hover:bg-purple-100 dark:hover:bg-purple-500/30 border border-purple-100 dark:border-purple-500/30 text-sm font-medium transition-all duration-300 h-[44px] whitespace-nowrap"
+                                        >
+                                            + 新增
+                                        </button>
+                                    </div>
+                                    <p className="text-xs text-zinc-400 dark:text-white/40">請按「+ 新增」以新增二房東</p>
+                                </div>
+                                <div className="space-y-2">
+                                    <label className={labelClass}>現時租客</label>
+                                    <div className="flex gap-2 items-center">
+                                        <div className={`${inputClass} flex-1 min-h-[44px] flex flex-wrap items-center gap-2`}>
+                                            {(formData.rentOutTenantIds || []).length > 0 ? (
+                                                <>
+                                                    {(formData.rentOutTenantIds || []).map(id => {
+                                                        const t = currentTenants.find(ct => ct.id === id);
+                                                        return (
+                                                                            <span key={id} className="inline-flex items-center gap-1 px-2 py-1 bg-purple-50 dark:bg-purple-500/20 rounded-lg text-sm">
+                                                                {t?.name || id}
+                                                                <button type="button" onClick={() => { setEditCurrentTenant(t ? { ...t, id } : { id, name: String(id), createdAt: new Date(), updatedAt: new Date() }); setShowCurrentTenantModal(true); }} className="p-0.5 hover:text-purple-500" title="編輯">✎</button>
+                                                                <button type="button" onClick={() => setFormData(prev => ({ ...prev, rentOutTenantIds: (prev.rentOutTenantIds || []).filter(x => x !== id) }))} className="p-0.5 hover:text-red-500">×</button>
+                                                            </span>
+                                                        );
+                                                    })}
+                                                </>
+                                            ) : (
+                                                <span className="text-zinc-400 dark:text-white/40 text-sm">請按「+ 新增租客」以新增</span>
+                                            )}
+                                        </div>
+                                        <button
+                                            type="button"
+                                            onClick={() => { setEditCurrentTenant(null); setShowCurrentTenantModal(true); }}
+                                            className="px-4 py-2 bg-purple-50 dark:bg-purple-500/20 text-purple-600 dark:text-purple-400 rounded-xl hover:bg-purple-100 dark:hover:bg-purple-500/30 border border-purple-100 dark:border-purple-500/30 text-sm font-medium transition-all duration-300 h-[44px] whitespace-nowrap"
+                                        >
+                                            + 新增租客
+                                        </button>
+                                    </div>
+                                    <p className="text-xs text-zinc-400 dark:text-white/40">請按「+ 新增租客」以新增</p>
+                                    {/* Add from existing */}
+                                    {currentTenants.filter(ct => !(formData.rentOutTenantIds || []).includes(ct.id!)).length > 0 && (
+                                        <select
+                                            value=""
+                                            onChange={(e) => {
+                                                const v = e.target.value;
+                                                if (v) setFormData(prev => ({ ...prev, rentOutTenantIds: [...(prev.rentOutTenantIds || []), v] }));
+                                            }}
+                                            className={`${inputClass} mt-1 text-sm`}
+                                        >
+                                            <option value="">從現有租客中加入...</option>
+                                            {currentTenants.filter(ct => !(formData.rentOutTenantIds || []).includes(ct.id!)).map(ct => (
+                                                <option key={ct.id} value={ct.id} className="bg-white dark:bg-[#1a1a2e]">{ct.name}</option>
+                                            ))}
+                                        </select>
+                                    )}
+                                </div>
+                            </div>
+
                             <div className="border-t border-zinc-200 dark:border-white/10 pt-4 mt-4">
                                 <h3 className="text-sm font-semibold text-purple-600 dark:text-purple-400 mb-4">出租合約資料</h3>
                             </div>
@@ -386,14 +548,14 @@ export default function RentModal({ propertyId, defaultLocation, rent, onClose, 
                                 </div>
                                 <div className="space-y-2">
                                     <label className={labelClass}>出租合約放盤價</label>
-                                    <input type="number" name="rentOutPricing" value={formData.rentOutPricing} onChange={handleChange} className={inputClass} placeholder="0" />
+                                    <input type="text" name="rentOutPricing" value={formatNumberWithCommas(formData.rentOutPricing)} onChange={(e) => handlePriceChange('rentOutPricing', e.target.value)} className={inputClass} placeholder="0" />
                                 </div>
                             </div>
 
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div className="space-y-2">
                                     <label className={labelClass}>出租合約月租 *</label>
-                                    <input type="number" name="rentOutMonthlyRental" value={formData.rentOutMonthlyRental} onChange={handleChange} required className={inputClass} placeholder="50000" />
+                                    <input type="text" name="rentOutMonthlyRental" value={formatNumberWithCommas(formData.rentOutMonthlyRental)} onChange={(e) => handlePriceChange('rentOutMonthlyRental', e.target.value)} required className={inputClass} placeholder="50,000" />
                                 </div>
                                 <div className="space-y-2">
                                     <label className={labelClass}>出租合約期數 (月)</label>
@@ -404,9 +566,9 @@ export default function RentModal({ propertyId, defaultLocation, rent, onClose, 
                             <div className="space-y-2">
                                 <label className={labelClass}>出租合約總額</label>
                                 <input
-                                    type="number"
+                                    type="text"
                                     name="rentOutTotalAmount"
-                                    value={formData.rentOutTotalAmount}
+                                    value={formatNumberWithCommas(formData.rentOutTotalAmount)}
                                     readOnly
                                     className={`${inputClass} bg-zinc-100 dark:bg-white/5 cursor-not-allowed opacity-80`}
                                     placeholder="自動計算"
@@ -432,23 +594,26 @@ export default function RentModal({ propertyId, defaultLocation, rent, onClose, 
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div className="space-y-2">
                                     <label className={labelClass}>出租合約按金</label>
-                                    <input type="number" name="rentOutDepositReceived" value={formData.rentOutDepositReceived} onChange={handleChange} className={inputClass} placeholder="100000" />
+                                    <input type="text" name="rentOutDepositReceived" value={formatNumberWithCommas(formData.rentOutDepositReceived)} onChange={(e) => handlePriceChange('rentOutDepositReceived', e.target.value)} className={inputClass} placeholder="100,000" />
                                 </div>
+                                <div className="space-y-2">
+                                    <label className={labelClass}>按金收據號碼</label>
+                                    <input type="text" name="rentOutDepositReceiptNumber" value={formData.rentOutDepositReceiptNumber} onChange={handleChange} className={inputClass} placeholder="請輸入按金收據號碼" />
+                                </div>
+                            </div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div className="space-y-2">
                                     <label className={labelClass}>按金收取日期</label>
                                     <input type="date" name="rentOutDepositReceiveDate" value={formData.rentOutDepositReceiveDate} onChange={handleChange} className={inputClass} />
                                 </div>
-                            </div>
-
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div className="space-y-2">
                                     <label className={labelClass}>按金退回日期</label>
                                     <input type="date" name="rentOutDepositReturnDate" value={formData.rentOutDepositReturnDate} onChange={handleChange} className={inputClass} />
                                 </div>
-                                <div className="space-y-2">
-                                    <label className={labelClass}>按金退回金額</label>
-                                    <input type="number" name="rentOutDepositReturnAmount" value={formData.rentOutDepositReturnAmount} onChange={handleChange} className={inputClass} placeholder="100000" />
-                                </div>
+                            </div>
+                            <div className="space-y-2">
+                                <label className={labelClass}>按金退回金額</label>
+                                <input type="text" name="rentOutDepositReturnAmount" value={formatNumberWithCommas(formData.rentOutDepositReturnAmount)} onChange={(e) => handlePriceChange('rentOutDepositReturnAmount', e.target.value)} className={inputClass} placeholder="100,000" />
                             </div>
 
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -513,7 +678,7 @@ export default function RentModal({ propertyId, defaultLocation, rent, onClose, 
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div className="space-y-2">
                                     <label className={labelClass}>每月租金金額</label>
-                                    <input type="number" name="rentingMonthlyRental" value={formData.rentingMonthlyRental} onChange={handleChange} className={inputClass} placeholder="30000" />
+                                    <input type="text" name="rentingMonthlyRental" value={formatNumberWithCommas(formData.rentingMonthlyRental)} onChange={(e) => handlePriceChange('rentingMonthlyRental', e.target.value)} className={inputClass} placeholder="30,000" />
                                 </div>
                                 <div className="space-y-2">
                                     <label className={labelClass}>租賃期限 (月)</label>
@@ -535,7 +700,7 @@ export default function RentModal({ propertyId, defaultLocation, rent, onClose, 
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div className="space-y-2">
                                     <label className={labelClass}>押金</label>
-                                    <input type="number" name="rentingDeposit" value={formData.rentingDeposit} onChange={handleChange} className={inputClass} placeholder="60000" />
+                                    <input type="text" name="rentingDeposit" value={formatNumberWithCommas(formData.rentingDeposit)} onChange={(e) => handlePriceChange('rentingDeposit', e.target.value)} className={inputClass} placeholder="60,000" />
                                 </div>
                                 <div className="space-y-2">
                                     <label className={labelClass}>租借位置 / 地址</label>
@@ -585,6 +750,34 @@ export default function RentModal({ propertyId, defaultLocation, rent, onClose, 
                     mode={formData.type === 'rent_out' ? 'tenant' : 'proprietor'}
                     onClose={() => setShowProprietorModal(false)}
                     onSuccess={handleProprietorCreated}
+                />
+            )}
+            {/* RentOutFormModal for 二房東 */}
+            {showSubLandlordModal && (
+                <RentOutFormModal
+                    mode="sub_landlord"
+                    editItem={editSubLandlord}
+                    onClose={() => { setShowSubLandlordModal(false); setEditSubLandlord(null); }}
+                    onSuccess={async (id) => {
+                        await queryClient.invalidateQueries({ queryKey: ['sub_landlords'] });
+                        setFormData(prev => ({ ...prev, rentOutSubLandlordId: id }));
+                        setShowSubLandlordModal(false);
+                        setEditSubLandlord(null);
+                    }}
+                />
+            )}
+            {/* RentOutFormModal for 現時租客 */}
+            {showCurrentTenantModal && (
+                <RentOutFormModal
+                    mode="current_tenant"
+                    editItem={editCurrentTenant}
+                    onClose={() => { setShowCurrentTenantModal(false); setEditCurrentTenant(null); }}
+                    onSuccess={async (id) => {
+                        await queryClient.invalidateQueries({ queryKey: ['current_tenants'] });
+                        setFormData(prev => ({ ...prev, rentOutTenantIds: [...(prev.rentOutTenantIds || []), id] }));
+                        setShowCurrentTenantModal(false);
+                        setEditCurrentTenant(null);
+                    }}
                 />
             )}
         </>

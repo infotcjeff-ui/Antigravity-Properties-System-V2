@@ -3,7 +3,7 @@
 import { useCallback, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
-import { db, generateId, type Property, type Proprietor, type Rent } from '@/lib/db';
+import { db, generateId, type Property, type Proprietor, type Rent, type SubLandlord, type CurrentTenant } from '@/lib/db';
 import { useAuth } from '@/contexts/AuthContext';
 
 // Helper to convert snake_case to camelCase
@@ -189,6 +189,58 @@ export const fetchRentsWithRelations = async (user?: any, options?: { type?: 're
             console.error('Failed to fetch rents with relations:', err);
         }
         return [];
+    }
+};
+
+// Admin-only: 二房東 (Sub-landlords)
+export const fetchSubLandlords = async (): Promise<SubLandlord[]> => {
+    try {
+        const { data, error } = await supabase
+            .from('sub_landlords')
+            .select('*')
+            .eq('is_deleted', false)
+            .order('name', { ascending: true });
+        if (error) throw error;
+        return (data || []).map(toCamel) as SubLandlord[];
+    } catch (err: any) {
+        console.error('Failed to fetch sub_landlords:', err);
+        return [];
+    }
+};
+
+export const fetchSubLandlord = async (id: string): Promise<SubLandlord | undefined> => {
+    try {
+        const { data, error } = await supabase.from('sub_landlords').select('*').eq('id', id).single();
+        if (error) throw error;
+        return toCamel(data) as SubLandlord;
+    } catch {
+        return undefined;
+    }
+};
+
+// Admin-only: 現時租客 (Current tenants)
+export const fetchCurrentTenants = async (): Promise<CurrentTenant[]> => {
+    try {
+        const { data, error } = await supabase
+            .from('current_tenants')
+            .select('*')
+            .eq('is_deleted', false)
+            .order('name', { ascending: true });
+        if (error) throw error;
+        return (data || []).map(toCamel) as CurrentTenant[];
+    } catch (err: any) {
+        console.error('Failed to fetch current_tenants:', err);
+        return [];
+    }
+};
+
+export const fetchCurrentTenant = async (id: string): Promise<CurrentTenant | undefined> => {
+    try {
+        const { data, error } = await supabase.from('current_tenants').select('*').eq('id', id).single();
+        if (error) throw error;
+        return toCamel(data) as CurrentTenant;
+    } catch {
+        return undefined;
     }
 };
 
@@ -744,6 +796,143 @@ export function useProprietorsQuery() {
     });
 }
 
+// ==================== SUB-LANDLORD & CURRENT-TENANT HOOKS (Admin) ====================
+
+const rentOutContractToRow = (obj: any): Record<string, any> => {
+    const m: Record<string, any> = {};
+    const map: [string, string][] = [
+        ['tenancyNumber', 'tenancy_number'],
+        ['pricing', 'pricing'],
+        ['monthlyRental', 'monthly_rental'],
+        ['periods', 'periods'],
+        ['totalAmount', 'total_amount'],
+        ['startDate', 'start_date'],
+        ['endDate', 'end_date'],
+        ['actualEndDate', 'actual_end_date'],
+        ['depositReceived', 'deposit_received'],
+        ['depositReceiptNumber', 'deposit_receipt_number'],
+        ['depositReceiveDate', 'deposit_receive_date'],
+        ['depositReturnDate', 'deposit_return_date'],
+        ['depositReturnAmount', 'deposit_return_amount'],
+        ['lessor', 'lessor'],
+        ['addressDetail', 'address_detail'],
+        ['status', 'status'],
+        ['description', 'description'],
+    ];
+    const toDateStr = (v: any) => (v instanceof Date ? v.toISOString().split('T')[0] : v);
+    map.forEach(([k, col]) => {
+        if (obj[k] !== undefined && obj[k] !== '') {
+            const v = obj[k];
+            m[col] = ['startDate', 'endDate', 'actualEndDate', 'depositReceiveDate', 'depositReturnDate'].includes(k) ? toDateStr(v) : v;
+        }
+    });
+    return m;
+};
+
+export function useSubLandlords() {
+    const { user } = useAuth();
+    const addSubLandlord = useCallback(async (item: Omit<SubLandlord, 'id' | 'createdAt' | 'updatedAt'>): Promise<string | null> => {
+        try {
+            const id = generateId();
+            const row: Record<string, any> = {
+                id,
+                name: item.name,
+                created_by: user?.id,
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString(),
+                ...rentOutContractToRow(item),
+            };
+            const { error } = await supabase.from('sub_landlords').insert([row]);
+            if (error) throw error;
+            return id;
+        } catch (err) {
+            console.error(err);
+            return null;
+        }
+    }, [user]);
+    const updateSubLandlord = useCallback(async (id: string, updates: Partial<SubLandlord>): Promise<boolean> => {
+        try {
+            const row: Record<string, any> = { updated_at: new Date().toISOString(), ...rentOutContractToRow(updates) };
+            if (updates.name !== undefined) row.name = updates.name;
+            const { error } = await supabase.from('sub_landlords').update(row).eq('id', id);
+            if (error) throw error;
+            return true;
+        } catch {
+            return false;
+        }
+    }, []);
+    const deleteSubLandlord = useCallback(async (id: string): Promise<boolean> => {
+        try {
+            const { error } = await supabase.from('sub_landlords').update({ is_deleted: true, deleted_at: new Date().toISOString() }).eq('id', id);
+            if (error) throw error;
+            return true;
+        } catch {
+            return false;
+        }
+    }, []);
+    return { addSubLandlord, updateSubLandlord, deleteSubLandlord };
+}
+
+export function useCurrentTenants() {
+    const { user } = useAuth();
+    const addCurrentTenant = useCallback(async (item: Omit<CurrentTenant, 'id' | 'createdAt' | 'updatedAt'>): Promise<string | null> => {
+        try {
+            const id = generateId();
+            const row: Record<string, any> = {
+                id,
+                name: item.name,
+                created_by: user?.id,
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString(),
+                ...rentOutContractToRow(item),
+            };
+            const { error } = await supabase.from('current_tenants').insert([row]);
+            if (error) throw error;
+            return id;
+        } catch (err) {
+            console.error(err);
+            return null;
+        }
+    }, [user]);
+    const updateCurrentTenant = useCallback(async (id: string, updates: Partial<CurrentTenant>): Promise<boolean> => {
+        try {
+            const row: Record<string, any> = { updated_at: new Date().toISOString(), ...rentOutContractToRow(updates) };
+            if (updates.name !== undefined) row.name = updates.name;
+            const { error } = await supabase.from('current_tenants').update(row).eq('id', id);
+            if (error) throw error;
+            return true;
+        } catch {
+            return false;
+        }
+    }, []);
+    const deleteCurrentTenant = useCallback(async (id: string): Promise<boolean> => {
+        try {
+            const { error } = await supabase.from('current_tenants').update({ is_deleted: true, deleted_at: new Date().toISOString() }).eq('id', id);
+            if (error) throw error;
+            return true;
+        } catch {
+            return false;
+        }
+    }, []);
+    return { addCurrentTenant, updateCurrentTenant, deleteCurrentTenant };
+}
+
+export function useSubLandlordsQuery() {
+    return useQuery({
+        queryKey: ['sub_landlords'],
+        queryFn: fetchSubLandlords,
+        staleTime: 2 * 60 * 1000,
+    });
+}
+
+export function useCurrentTenantsQuery() {
+    return useQuery({
+        queryKey: ['current_tenants'],
+        queryFn: fetchCurrentTenants,
+        staleTime: 2 * 60 * 1000,
+    });
+}
+
 // ==================== RENT HOOKS ====================
 
 export function useRents() {
@@ -817,6 +1006,7 @@ export function useRents() {
             if (rent.rentOutEndDate) rentData.rent_out_end_date = rent.rentOutEndDate;
             if (rent.rentOutActualEndDate) rentData.rent_out_actual_end_date = rent.rentOutActualEndDate;
             if (rent.rentOutDepositReceived) rentData.rent_out_deposit_received = rent.rentOutDepositReceived;
+            if ((rent as any).rentOutDepositReceiptNumber) rentData.rent_out_deposit_receipt_number = (rent as any).rentOutDepositReceiptNumber;
             if (rent.rentOutDepositReceiveDate) rentData.rent_out_deposit_receive_date = rent.rentOutDepositReceiveDate;
             if (rent.rentOutDepositReturnDate) rentData.rent_out_deposit_return_date = rent.rentOutDepositReturnDate;
             if (rent.rentOutDepositReturnAmount) rentData.rent_out_deposit_return_amount = rent.rentOutDepositReturnAmount;
@@ -824,6 +1014,10 @@ export function useRents() {
             if (rent.rentOutAddressDetail) rentData.rent_out_address_detail = rent.rentOutAddressDetail;
             if (rent.rentOutStatus) rentData.rent_out_status = rent.rentOutStatus;
             if (rent.rentOutDescription) rentData.rent_out_description = rent.rentOutDescription;
+            if ((rent as any).rentOutSubLandlord) rentData.rent_out_sub_landlord = (rent as any).rentOutSubLandlord;
+            if ((rent as any).rentOutSubLandlordId) rentData.rent_out_sub_landlord_id = (rent as any).rentOutSubLandlordId;
+            if ((rent as any).rentOutTenants?.length) rentData.rent_out_tenants = JSON.stringify((rent as any).rentOutTenants);
+            if ((rent as any).rentOutTenantIds?.length) rentData.rent_out_tenant_ids = (rent as any).rentOutTenantIds;
 
             // Add Renting (交租) fields
             if (rent.rentingNumber) rentData.renting_number = rent.rentingNumber;
@@ -892,6 +1086,7 @@ export function useRents() {
             if (updates.rentOutEndDate) rentData.rent_out_end_date = updates.rentOutEndDate;
             if (updates.rentOutActualEndDate) rentData.rent_out_actual_end_date = updates.rentOutActualEndDate;
             if (updates.rentOutDepositReceived !== undefined) rentData.rent_out_deposit_received = updates.rentOutDepositReceived;
+            if ((updates as any).rentOutDepositReceiptNumber !== undefined) rentData.rent_out_deposit_receipt_number = (updates as any).rentOutDepositReceiptNumber;
             if (updates.rentOutDepositReceiveDate) rentData.rent_out_deposit_receive_date = updates.rentOutDepositReceiveDate;
             if (updates.rentOutDepositReturnDate) rentData.rent_out_deposit_return_date = updates.rentOutDepositReturnDate;
             if (updates.rentOutDepositReturnAmount !== undefined) rentData.rent_out_deposit_return_amount = updates.rentOutDepositReturnAmount;
@@ -899,6 +1094,10 @@ export function useRents() {
             if (updates.rentOutAddressDetail) rentData.rent_out_address_detail = updates.rentOutAddressDetail;
             if (updates.rentOutStatus) rentData.rent_out_status = updates.rentOutStatus;
             if (updates.rentOutDescription) rentData.rent_out_description = updates.rentOutDescription;
+            if ((updates as any).rentOutSubLandlord !== undefined) rentData.rent_out_sub_landlord = (updates as any).rentOutSubLandlord;
+            if ((updates as any).rentOutSubLandlordId !== undefined) rentData.rent_out_sub_landlord_id = (updates as any).rentOutSubLandlordId;
+            if ((updates as any).rentOutTenants !== undefined) rentData.rent_out_tenants = JSON.stringify((updates as any).rentOutTenants);
+            if ((updates as any).rentOutTenantIds !== undefined) rentData.rent_out_tenant_ids = (updates as any).rentOutTenantIds;
 
             // RENTING fields
             if (updates.rentingNumber) rentData.renting_number = updates.rentingNumber;
@@ -1003,16 +1202,15 @@ export function useRelations() {
         setLoading(true);
         setError(null);
         try {
-            const queryFields = user
-                ? '*'
-                : 'id, name, code, address, type, status, land_use, lot_index, lot_area, location, has_planning_permission, proprietor_id, tenant_id, created_by, created_at, updated_at, images, notes';
+            const queryFields = 'id, name, code, address, type, status, land_use, lot_index, lot_area, location, google_drive_plan_url, has_planning_permission, proprietor_id, tenant_id, created_by, created_at, updated_at, images, geo_maps, notes';
 
-            const { data, error: pError } = await supabase
+            const { data: records, error: pError } = await supabase
                 .from('properties')
                 .select(queryFields)
                 .eq('id', propertyId)
-                .single();
-            const property = data as any;
+                .eq('is_deleted', false)
+                .limit(1);
+            const property = (records && records.length > 0) ? records[0] : null;
 
             if (pError || !property) return null;
 
@@ -1046,16 +1244,15 @@ export function useRelations() {
         setLoading(true);
         setError(null);
         try {
-            const queryFields = user
-                ? '*'
-                : 'id, name, code, address, type, status, land_use, lot_index, lot_area, location, has_planning_permission, proprietor_id, tenant_id, created_by, created_at, updated_at, images, notes';
+            const queryFields = 'id, name, code, address, type, status, land_use, lot_index, lot_area, location, google_drive_plan_url, has_planning_permission, proprietor_id, tenant_id, created_by, created_at, updated_at, images, geo_maps, notes';
 
-            const { data, error: pError } = await supabase
+            const { data: records, error: pError } = await supabase
                 .from('properties')
                 .select(queryFields)
                 .eq('name', name)
-                .single();
-            const property = data as any;
+                .eq('is_deleted', false)
+                .limit(1);
+            const property = (records && records.length > 0) ? records[0] : null;
 
             if (pError || !property) return null;
 
@@ -1391,9 +1588,10 @@ export function usePropertiesWithRelationsQuery() {
 }
 
 export function usePropertyWithRelationsQuery(id: string) {
+    const { user } = useAuth();
     const { getPropertyWithRelations } = useRelations();
     return useQuery({
-        queryKey: ['property-with-relations', id],
+        queryKey: ['property-with-relations', id, user?.id],
         queryFn: () => getPropertyWithRelations(id),
         enabled: !!id,
         staleTime: 5 * 60 * 1000,
@@ -1401,9 +1599,10 @@ export function usePropertyWithRelationsQuery(id: string) {
 }
 
 export function usePropertyWithRelationsByNameQuery(name: string) {
+    const { user } = useAuth();
     const { getPropertyWithRelationsByName } = useRelations();
     return useQuery({
-        queryKey: ['property-with-relations-by-name', name],
+        queryKey: ['property-with-relations-by-name', name, user?.id],
         queryFn: () => getPropertyWithRelationsByName(name),
         enabled: !!name,
         staleTime: 5 * 60 * 1000,

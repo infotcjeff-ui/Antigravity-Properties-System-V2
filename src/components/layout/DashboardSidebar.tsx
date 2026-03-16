@@ -154,9 +154,38 @@ export default function DashboardSidebar({ userRole = 'client' }: DashboardSideb
                     ))}
                 </ul>
 
-                {/* Admin-only Settings Section */}
+                {/* Admin-only Section */}
                 {userRole === 'admin' && (
                     <>
+                        <p className="px-4 text-xs text-zinc-400 dark:text-white/40 uppercase tracking-wider mb-3 mt-6 font-medium">
+                            管理 (Admin)
+                        </p>
+                        <ul className="space-y-1">
+                            <li>
+                                <Link
+                                    href="/dashboard/sub-landlords"
+                                    className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${isActive('/dashboard/sub-landlords')
+                                        ? 'bg-purple-500/20 text-purple-700 dark:text-white'
+                                        : 'text-zinc-600 dark:text-white/60 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-white/5'
+                                        }`}
+                                >
+                                    <Building2 className="w-5 h-5" />
+                                    <span className="font-medium">二房東</span>
+                                </Link>
+                            </li>
+                            <li>
+                                <Link
+                                    href="/dashboard/current-tenants"
+                                    className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${isActive('/dashboard/current-tenants')
+                                        ? 'bg-purple-500/20 text-purple-700 dark:text-white'
+                                        : 'text-zinc-600 dark:text-white/60 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-white/5'
+                                        }`}
+                                >
+                                    <Users className="w-5 h-5" />
+                                    <span className="font-medium">現時租客</span>
+                                </Link>
+                            </li>
+                        </ul>
                         <p className="px-4 text-xs text-zinc-400 dark:text-white/40 uppercase tracking-wider mb-3 mt-6 font-medium">
                             設定
                         </p>
@@ -176,7 +205,7 @@ export default function DashboardSidebar({ userRole = 'client' }: DashboardSideb
                             <li>
                                 <Link
                                     href="/dashboard/settings"
-                                    className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${isActive('/dashboard/settings')
+                                    className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${isActive('/dashboard/settings') && !isActive('/dashboard/settings/trash')
                                         ? 'bg-purple-500/20 text-purple-700 dark:text-white'
                                         : 'text-zinc-600 dark:text-white/60 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-white/5'
                                         }`}
@@ -185,6 +214,12 @@ export default function DashboardSidebar({ userRole = 'client' }: DashboardSideb
                                     <span className="font-medium">系統設定</span>
                                 </Link>
                             </li>
+                        </ul>
+
+                        <p className="px-4 text-xs text-zinc-400 dark:text-white/40 uppercase tracking-wider mb-3 mt-6 font-medium">
+                            工具
+                        </p>
+                        <ul className="space-y-1">
                             <li>
                                 <Link
                                     href="/dashboard/settings/trash"

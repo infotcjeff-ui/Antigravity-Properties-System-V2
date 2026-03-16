@@ -28,9 +28,14 @@ export default function AdminLayout({
                     if (parsed.isAuthenticated) {
                         const role = parsed.user?.role || 'client';
                         setUserRole(role);
-                        if (role !== 'admin') {
-                            router.push('/');
+
+                        // Check for admin-only routes
+                        const adminOnlyRoutes = ['/dashboard/users', '/dashboard/settings', '/dashboard/settings/trash', '/dashboard/sub-landlords', '/dashboard/current-tenants'];
+                        if (adminOnlyRoutes.some(route => pathname.startsWith(route)) && role !== 'admin') {
+                            router.push('/dashboard');
+                            return;
                         }
+
                         setIsAuthenticated(true);
                     } else {
                         router.push('/login');

@@ -77,6 +77,7 @@ export interface Rent {
   rentOutEndDate?: Date;               // 出租合約結束日期
   rentOutActualEndDate?: Date;         // 出租合約實際結束日期
   rentOutDepositReceived?: number;     // 出租合約按金
+  rentOutDepositReceiptNumber?: string; // 按金收據號碼
   rentOutDepositReceiveDate?: Date;    // 出租合約按金收取日期
   rentOutDepositReturnDate?: Date;     // 出租合約按金退回日期
   rentOutDepositReturnAmount?: number; // 出租合約按金退回金額
@@ -84,6 +85,10 @@ export interface Rent {
   rentOutAddressDetail?: string;       // 出租合約地址資料
   rentOutStatus?: 'listing' | 'renting' | 'completed'; // 放盤中、出租中、已完租
   rentOutDescription?: string;         // 出租合約描述 (rich text)
+  rentOutSubLandlord?: string;         // 二房東 (legacy display name)
+  rentOutSubLandlordId?: string;      // 二房東 (FK to sub_landlords)
+  rentOutTenants?: string[];          // 現時租客 legacy (names)
+  rentOutTenantIds?: string[];         // 現時租客 (FKs to current_tenants)
 
   // ===== RENTING (交租) Fields =====
   rentingNumber?: string;              // 我方租約號碼
@@ -104,6 +109,62 @@ export interface Rent {
   property?: Property;
   proprietor?: Proprietor;
   tenant?: Proprietor;
+}
+
+/** 二房東 (Sub-landlord) - admin-managed, mirrors rent_out contract fields */
+export interface SubLandlord {
+  id?: string;
+  name: string;
+  tenancyNumber?: string;
+  pricing?: number;
+  monthlyRental?: number;
+  periods?: number;
+  totalAmount?: number;
+  startDate?: Date;
+  endDate?: Date;
+  actualEndDate?: Date;
+  depositReceived?: number;
+  depositReceiptNumber?: string;
+  depositReceiveDate?: Date;
+  depositReturnDate?: Date;
+  depositReturnAmount?: number;
+  lessor?: string;
+  addressDetail?: string;
+  status?: 'listing' | 'renting' | 'completed';
+  description?: string;
+  createdBy?: string;
+  createdAt: Date;
+  updatedAt: Date;
+  isDeleted?: boolean;
+  deletedAt?: Date;
+}
+
+/** 現時租客 (Current tenant) - admin-managed, mirrors rent_out contract fields */
+export interface CurrentTenant {
+  id?: string;
+  name: string;
+  tenancyNumber?: string;
+  pricing?: number;
+  monthlyRental?: number;
+  periods?: number;
+  totalAmount?: number;
+  startDate?: Date;
+  endDate?: Date;
+  actualEndDate?: Date;
+  depositReceived?: number;
+  depositReceiptNumber?: string;
+  depositReceiveDate?: Date;
+  depositReturnDate?: Date;
+  depositReturnAmount?: number;
+  lessor?: string;
+  addressDetail?: string;
+  status?: 'listing' | 'renting' | 'completed';
+  description?: string;
+  createdBy?: string;
+  createdAt: Date;
+  updatedAt: Date;
+  isDeleted?: boolean;
+  deletedAt?: Date;
 }
 
 // Dexie Database Class
