@@ -1,10 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { v4 as uuidv4 } from 'uuid';
-import sharp from 'sharp';
 import { createClient } from '@supabase/supabase-js';
 
-// Ensure Node.js runtime (sharp requires it; Edge would fail)
-export const runtime = 'nodejs';
 export const maxDuration = 60;
 
 export async function POST(request: NextRequest) {
@@ -34,7 +31,7 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: 'No file uploaded' }, { status: 400 });
         }
 
-        // Validate file type (allow empty type from compressed Blob - sharp will validate)
+        // Validate file type (client sends compressorjs output - may have empty type)
         const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/jpg'];
         const type = file.type?.toLowerCase() || '';
         const name = (file as File).name?.toLowerCase() || '';
@@ -50,27 +47,17 @@ export async function POST(request: NextRequest) {
         }
 
         const buffer = Buffer.from(await file.arrayBuffer());
-        const filename = `${uuidv4()}.webp`;
+        const ext = type.includes('webp') ? 'webp' : type.includes('png') ? 'png' : type.includes('gif') ? 'gif' : /\.png$/i.test(name) ? 'png' : /\.webp$/i.test(name) ? 'webp' : /\.gif$/i.test(name) ? 'gif' : 'jpg';
+        const filename = `${uuidv4()}.${ext}`;
         const storagePath = `${folder}/${filename}`;
+        const contentType = `image/${ext === 'jpg' ? 'jpeg' : ext}`;
 
-        // Process image with sharp
-        const processedImageBuffer = await sharp(buffer)
-            .resize({
-                width: 1920,
-                withoutEnlargement: true,
-                fit: 'inside'
-            })
-            .webp({ quality: 80 })
-            .toBuffer();
-
-        // Initialize Supabase Client (env vars already validated above)
+        // Upload directly - client already compresses with compressorjs; no sharp (avoids Vercel serverless issues)
         const supabase = createClient(supabaseUrl!, supabaseKey!);
-
-        // Upload to Supabase Storage 'properties' bucket
-        const { data, error } = await supabase.storage
+        const { error } = await supabase.storage
             .from('properties')
-            .upload(storagePath, processedImageBuffer, {
-                contentType: 'image/webp',
+            .upload(storagePath, buffer, {
+                contentType,
                 cacheControl: '3600',
                 upsert: false
             });
@@ -80,15 +67,11 @@ export async function POST(request: NextRequest) {
             throw new Error(`Storage error: ${error.message}`);
         }
 
-        // Get public URL
         const { data: { publicUrl } } = supabase.storage
             .from('properties')
             .getPublicUrl(storagePath);
 
-        return NextResponse.json({
-            url: publicUrl,
-            filename
-        });
+        return NextResponse.json({ url: publicUrl, filename });
 
     } catch (err: any) {
         if (err?.message === "Potential attack detected" || err?.message === "Bot access denied" || err?.message === "Too many requests" || err?.message === "Access denied") {
