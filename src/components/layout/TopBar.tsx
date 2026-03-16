@@ -222,7 +222,7 @@ export default function TopBar({ onSearch, placeholder = '搜尋...', isAuthenti
                                     className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-purple-600 to-blue-600 rounded-xl text-white font-medium shadow-lg shadow-purple-500/20 hover:shadow-purple-500/30 transition-shadow"
                                 >
                                     <LayoutDashboard className="w-4 h-4" />
-                                    <span className="text-sm">{isAdmin ? "返回應用" : "後台管理"}</span>
+                                    <span className="text-sm">{isAdmin ? "返回前端" : "後台管理"}</span>
                                 </motion.button>
                             </Link>
 

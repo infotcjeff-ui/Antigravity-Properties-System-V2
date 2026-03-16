@@ -4,6 +4,7 @@ import { useState, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { usePropertiesWithRelationsQuery, type PropertyWithRelations } from '@/hooks/useStorage';
 import { useLanguage } from '@/components/common/LanguageSwitcher';
+import { formatLotArea } from '@/lib/formatters';
 
 export default function RelationsPage() {
     const { data: propertiesData, isLoading } = usePropertiesWithRelationsQuery();
@@ -151,13 +152,18 @@ export default function RelationsPage() {
                                             </div>
                                             <div>
                                                 <p className="text-zinc-400 dark:text-white/40">{t('地段面積', 'Lot Area')}</p>
-                                                <p className="text-zinc-700 dark:text-white/80">{property.lotArea || '-'}</p>
+                                                <p className="text-zinc-700 dark:text-white/80">{formatLotArea(property.lotArea)}</p>
                                             </div>
                                             <div>
                                                 <p className="text-zinc-400 dark:text-white/40">{t('土地用途', 'Land Use')}</p>
                                                 <p className="text-zinc-700 dark:text-white/80 capitalize">{
                                                     (() => {
                                                         const labels: Record<string, string> = {
+                                                            agr: t('AGR 農業', 'AGR Agriculture'),
+                                                            ca: t('CA 自然保育區', 'CA Conservation Area'),
+                                                            os: t('OS 露天貯物', 'OS Open Storage'),
+                                                            v: t('V 鄉村式發展', 'V Village Development'),
+                                                            ou: t('OU 其他指定用途', 'OU Other Specified Uses'),
                                                             open_storage: t('露天倉儲', 'Open Storage'),
                                                             residential_a: t('住宅(甲)', 'Residential (A)'),
                                                             residential_c: t('住宅(丙類)', 'Residential (C)'),

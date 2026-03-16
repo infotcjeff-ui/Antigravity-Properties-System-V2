@@ -4,7 +4,8 @@ import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
-import { usePropertyWithRelationsByNameQuery, useProprietorsQuery } from '@/hooks/useStorage';
+import { usePropertyWithRelationsQuery, useProprietorsQuery } from '@/hooks/useStorage';
+import { formatLotArea } from '@/lib/formatters';
 import type { Property, Proprietor, Rent } from '@/lib/db';
 import {
     ArrowLeft,
@@ -48,6 +49,11 @@ const typeLabels: Record<string, string> = {
 };
 
 const landUseLabels: Record<string, string> = {
+    agr: 'AGR 農業',
+    ca: 'CA 自然保育區',
+    os: 'OS 露天貯物',
+    v: 'V 鄉村式發展',
+    ou: 'OU 其他指定用途',
     unknown: '未知',
     open_storage: '露天倉儲',
     residential_a: '住宅(甲)',
@@ -82,7 +88,8 @@ export default function PropertyDetailsPage() {
     const lang = useLanguage();
     const isZh = lang === 'zh-TW';
     const t = (en: string, zh: string) => isZh ? zh : en;
-    const { data: property, isLoading: loading } = usePropertyWithRelationsByNameQuery(decodeURIComponent(params.name as string));
+    const propertyId = params.id as string;
+    const { data: property, isLoading: loading } = usePropertyWithRelationsQuery(propertyId);
     const { data: allProprietors = [] } = useProprietorsQuery();
 
     const activeRentOut = property?.rents?.find((r: Rent) => r.type === 'rent_out' && ['listing', 'renting'].includes(r.rentOutStatus || ''));
@@ -258,7 +265,7 @@ export default function PropertyDetailsPage() {
                             <div className="bg-zinc-50 dark:bg-white/5 rounded-xl p-4 border border-zinc-100 dark:border-none">
                                 <p className="text-zinc-400 dark:text-white/40 text-sm">{t('Lot Area', '地段面積')}</p>
                                 <p className={`font-medium mt-1 ${property.lotArea ? 'text-zinc-900 dark:text-white' : 'text-zinc-400 dark:text-white/30'}`}>
-                                    {property.lotArea || '暫無。'}
+                                    {property.lotArea ? formatLotArea(property.lotArea) : '暫無。'}
                                 </p>
                             </div>
                         </div>

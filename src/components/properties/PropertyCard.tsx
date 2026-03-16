@@ -6,6 +6,8 @@ import { motion } from 'framer-motion';
 import { Building2, MapPin, Eye } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import type { Property } from '@/lib/db';
+import { formatLotArea } from '@/lib/formatters';
+import LotIndexDisplay from '@/components/properties/LotIndexDisplay';
 
 interface PropertyCardProps {
     property: Property;
@@ -115,10 +117,14 @@ export default function PropertyCard({ property, index = 0 }: PropertyCardProps)
                 {(property.lotIndex || property.lotArea) && (
                     <div className="mt-3 pt-3 border-t border-white/5 flex gap-4 text-xs text-white/40">
                         {property.lotIndex && (
-                            <span className={!isAuthenticated ? 'blur-sm' : ''}>地段: <span className="text-white/70">{property.lotIndex}</span></span>
+                            <div className="min-w-0 flex-1 overflow-hidden" title={property.lotIndex}>
+                                <span className={`block truncate ${!isAuthenticated ? 'blur-sm' : ''}`}>
+                                    地段: <LotIndexDisplay lotIndex={property.lotIndex} variant="compact" className="text-white/70" />
+                                </span>
+                            </div>
                         )}
                         {property.lotArea && (
-                            <span className={!isAuthenticated ? 'blur-sm' : ''}>面積: <span className="text-white/70">{property.lotArea}</span></span>
+                            <span className={`shrink-0 ${!isAuthenticated ? 'blur-sm' : ''}`}>面積: <span className="text-white/70">{formatLotArea(property.lotArea)}</span></span>
                         )}
                     </div>
                 )}
@@ -129,7 +135,7 @@ export default function PropertyCard({ property, index = 0 }: PropertyCardProps)
     if (!isAuthenticated) return cardContent;
 
     return (
-        <Link href={`/properties/${encodeURIComponent(property.name)}`}>
+        <Link href={`/properties/${property.id}`}>
             {cardContent}
         </Link>
     );

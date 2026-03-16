@@ -10,6 +10,7 @@ import PropertyForm from '@/components/properties/PropertyForm';
 import { Building2, Plus, Search, Pencil, Trash2, Eye, CheckSquare, Square, UserPlus, X } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import AnimatedSelect from '@/components/ui/AnimatedSelect';
+import { formatLotArea } from '@/lib/formatters';
 
 const statusColors: Record<string, string> = {
     holding: 'bg-emerald-600 dark:bg-emerald-500/80 text-white',
@@ -51,6 +52,8 @@ export default function ManagePropertiesPage() {
     const { deleteProperty } = useProperties();
 
     const [searchQuery, setSearchQuery] = useState('');
+    const [filterType, setFilterType] = useState('');
+    const [filterStatus, setFilterStatus] = useState('');
     const [showForm, setShowForm] = useState(false);
     const [editingProperty, setEditingProperty] = useState<Property | null>(null);
     const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
@@ -59,18 +62,29 @@ export default function ManagePropertiesPage() {
     const [selectedBulkUploader, setSelectedBulkUploader] = useState('');
     const { bulkUpdateProperties } = useProperties();
 
-    // Filter properties based on search query (client-side for instant feedback)
+    // Filter properties based on search query, type, and status (client-side for instant feedback)
     const filteredProperties = useMemo(() => {
-        const properties = qProperties || [];
-        if (!searchQuery) return properties;
+        let properties = qProperties || [];
 
-        const query = searchQuery.toLowerCase();
-        return properties.filter((p: Property) =>
-            p.name.toLowerCase().includes(query) ||
-            p.code.toLowerCase().includes(query) ||
-            p.address.toLowerCase().includes(query)
-        );
-    }, [qProperties, searchQuery]);
+        if (searchQuery) {
+            const query = searchQuery.toLowerCase();
+            properties = properties.filter((p: Property) =>
+                p.name.toLowerCase().includes(query) ||
+                p.code.toLowerCase().includes(query) ||
+                p.address.toLowerCase().includes(query)
+            );
+        }
+
+        if (filterType) {
+            properties = properties.filter((p: Property) => p.type === filterType);
+        }
+
+        if (filterStatus) {
+            properties = properties.filter((p: Property) => p.status === filterStatus);
+        }
+
+        return properties;
+    }, [qProperties, searchQuery, filterType, filterStatus]);
 
     const sortedProperties = useMemo(() => {
         return [...filteredProperties].sort((a, b) =>
@@ -139,18 +153,42 @@ export default function ManagePropertiesPage() {
                 </div>
             </div>
 
-            {/* Search */}
-            <div className="relative max-w-md">
-                <div className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 dark:text-white/30">
-                    <Search className="w-5 h-5" />
+            {/* Search & Filters */}
+            <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center">
+                <div className="relative flex-1 min-w-0 max-w-md">
+                    <div className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 dark:text-white/30">
+                        <Search className="w-5 h-5" />
+                    </div>
+                    <input
+                        type="text"
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        placeholder="搜尋物業名稱 / 編號..."
+                        className="w-full pl-10 pr-4 py-2.5 bg-zinc-100 dark:bg-white/5 border border-zinc-200 dark:border-white/10 rounded-xl text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-purple-500/30 transition-all"
+                    />
                 </div>
-                <input
-                    type="text"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder="搜尋物業..."
-                    className="w-full pl-10 pr-4 py-2.5 bg-zinc-100 dark:bg-white/5 border border-zinc-200 dark:border-white/10 rounded-xl text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-purple-500/30 transition-all"
-                />
+                <select
+                    value={filterType}
+                    onChange={(e) => setFilterType(e.target.value)}
+                    className="px-4 py-2.5 bg-zinc-100 dark:bg-white/5 border border-zinc-200 dark:border-white/10 rounded-xl text-zinc-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/30 transition-all cursor-pointer min-w-[140px]"
+                >
+                    <option value="">全部類型</option>
+                    <option value="group_asset">集團資產</option>
+                    <option value="co_investment">合作投資</option>
+                    <option value="external_lease">外租物業</option>
+                    <option value="managed_asset">代管資產</option>
+                </select>
+                <select
+                    value={filterStatus}
+                    onChange={(e) => setFilterStatus(e.target.value)}
+                    className="px-4 py-2.5 bg-zinc-100 dark:bg-white/5 border border-zinc-200 dark:border-white/10 rounded-xl text-zinc-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/30 transition-all cursor-pointer min-w-[140px]"
+                >
+                    <option value="">全部狀態</option>
+                    <option value="holding">持有中</option>
+                    <option value="renting">出租中</option>
+                    <option value="sold">已售出</option>
+                    <option value="suspended">已暫停</option>
+                </select>
             </div>
 
             {isLoading ? (
@@ -175,18 +213,20 @@ export default function ManagePropertiesPage() {
                             <table className="w-full hidden md:table">
                                 <thead>
                                     <tr className="text-left text-zinc-500 dark:text-white/50 text-sm border-b border-zinc-100 dark:border-white/5">
-                                        <th className="px-4 py-3">
-                                            <button
-                                                onClick={toggleSelectAll}
-                                                className="text-zinc-400 hover:text-purple-500 transition-colors"
-                                            >
-                                                {selectedIds.length === sortedProperties.length && sortedProperties.length > 0 ? (
-                                                    <CheckSquare className="w-5 h-5 text-purple-500" />
-                                                ) : (
-                                                    <Square className="w-5 h-5" />
-                                                )}
-                                            </button>
-                                        </th>
+                                        {isAdmin && (
+                                            <th className="px-4 py-3">
+                                                <button
+                                                    onClick={toggleSelectAll}
+                                                    className="text-zinc-400 hover:text-purple-500 transition-colors"
+                                                >
+                                                    {selectedIds.length === sortedProperties.length && sortedProperties.length > 0 ? (
+                                                        <CheckSquare className="w-5 h-5 text-purple-500" />
+                                                    ) : (
+                                                        <Square className="w-5 h-5" />
+                                                    )}
+                                                </button>
+                                            </th>
+                                        )}
                                         <th className="px-4 py-3 text-left text-xs font-medium text-zinc-500 dark:text-white/40 uppercase tracking-wider">名稱</th>
                                         <th className="px-4 py-3 text-left text-xs font-medium text-zinc-500 dark:text-white/40 uppercase tracking-wider">編號</th>
                                         <th className="px-4 py-3 text-left text-xs font-medium text-zinc-500 dark:text-white/40 uppercase tracking-wider">類型</th>
@@ -207,18 +247,20 @@ export default function ManagePropertiesPage() {
                                             transition={{ delay: index * 0.03 }}
                                             className={`border-b border-zinc-100 dark:border-white/5 hover:bg-zinc-50 dark:hover:bg-white/5 transition-colors ${selectedIds.includes(property.id!) ? 'bg-purple-50/50 dark:bg-purple-500/5' : ''}`}
                                         >
-                                            <td className="px-4 py-4">
-                                                <button
-                                                    onClick={() => toggleSelect(property.id!)}
-                                                    className="text-zinc-400 hover:text-purple-500 transition-colors"
-                                                >
-                                                    {selectedIds.includes(property.id!) ? (
-                                                        <CheckSquare className="w-5 h-5 text-purple-500" />
-                                                    ) : (
-                                                        <Square className="w-5 h-5" />
-                                                    )}
-                                                </button>
-                                            </td>
+                                            {isAdmin && (
+                                                <td className="px-4 py-4">
+                                                    <button
+                                                        onClick={() => toggleSelect(property.id!)}
+                                                        className="text-zinc-400 hover:text-purple-500 transition-colors"
+                                                    >
+                                                        {selectedIds.includes(property.id!) ? (
+                                                            <CheckSquare className="w-5 h-5 text-purple-500" />
+                                                        ) : (
+                                                            <Square className="w-5 h-5" />
+                                                        )}
+                                                    </button>
+                                                </td>
+                                            )}
                                             <td className="p-4">
                                                 <div className="flex items-center gap-3">
                                                     {property.images?.[0] ? (
@@ -247,7 +289,7 @@ export default function ManagePropertiesPage() {
                                                     {statusLabels[property.status]}
                                                 </span>
                                             </td>
-                                            <td className="p-4 text-zinc-600 dark:text-white/70 text-sm">{property.lotArea || '-'}</td>
+                                            <td className="p-4 text-zinc-600 dark:text-white/70 text-sm">{formatLotArea(property.lotArea)}</td>
                                             {isAdmin && (
                                                 <td className="p-4 text-zinc-600 dark:text-white/70 text-sm">
                                                     {property.createdBy ? (userMap[property.createdBy] || 'Unknown') : '-'}
@@ -256,7 +298,7 @@ export default function ManagePropertiesPage() {
                                             <td className="p-4 text-right">
                                                 <div className="flex items-center justify-end gap-2">
                                                     {/* View */}
-                                                    <Link href={`/properties/${encodeURIComponent(property.name)}`}>
+                                                    <Link href={`/properties/${property.id}`}>
                                                         <motion.button
                                                             whileHover={{ scale: 1.1 }}
                                                             whileTap={{ scale: 0.9 }}
@@ -343,7 +385,7 @@ export default function ManagePropertiesPage() {
 
                                         <div className="flex items-center justify-between pt-2">
                                             <div className="flex items-center gap-2">
-                                                <Link href={`/properties/${encodeURIComponent(property.name)}`} className="p-2.5 rounded-xl bg-zinc-100 dark:bg-white/5 text-zinc-500 dark:text-white/40 active:bg-zinc-200 dark:active:bg-white/10 transition-colors">
+                                                <Link href={`/properties/${property.id}`} className="p-2.5 rounded-xl bg-zinc-100 dark:bg-white/5 text-zinc-500 dark:text-white/40 active:bg-zinc-200 dark:active:bg-white/10 transition-colors">
                                                     <Eye className="w-5 h-5" />
                                                 </Link>
                                                 <button onClick={() => handleEdit(property)} className="p-2.5 rounded-xl bg-purple-50 dark:bg-purple-500/10 text-purple-600 dark:text-purple-400 active:bg-purple-100 dark:active:bg-purple-500/20 transition-colors">
@@ -416,7 +458,7 @@ export default function ManagePropertiesPage() {
 
             {/* Bulk Actions Bar */}
             <AnimatePresence>
-                {selectedIds.length > 0 && (
+                {isAdmin && selectedIds.length > 0 && (
                     <motion.div
                         initial={{ y: 100, opacity: 0 }}
                         animate={{ y: 0, opacity: 1 }}

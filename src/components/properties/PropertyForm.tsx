@@ -15,6 +15,7 @@ import AnimatedSelect from '@/components/ui/AnimatedSelect';
 import AnimatedMultiSelect from '@/components/ui/AnimatedMultiSelect';
 import { FileUpload } from '@/components/ui/file-upload';
 import LocationPickerMap from '@/components/properties/LocationPickerMapDynamic';
+import { formatLotAreaForInput, parseLotAreaInput, parseLotEntries as parseLotEntriesFromStr } from '@/lib/formatters';
 
 interface PropertyFormProps {
     property?: Property | null;
@@ -37,14 +38,11 @@ const propertyStatuses = [
 ];
 
 const landUseTypes = [
-    { value: 'unknown', label: '未知' },
-    { value: 'open_storage', label: '露天倉儲' },
-    { value: 'residential_a', label: '住宅(甲)' },
-    { value: 'open_space', label: '開放空間' },
-    { value: 'village_dev', label: '鄉村式發展' },
-    { value: 'conservation_area', label: '保育區' },
-    { value: 'residential_c', label: '住宅(丙類)' },
-    { value: 'recreation_use', label: '休憩用地' },
+    { value: 'agr', label: 'AGR 農業' },
+    { value: 'ca', label: 'CA 自然保育區' },
+    { value: 'os', label: 'OS 露天貯物' },
+    { value: 'v', label: 'V 鄉村式發展' },
+    { value: 'ou', label: 'OU 其他指定用途' },
 ];
 
 export default function PropertyForm({ property, onClose, onSuccess }: PropertyFormProps) {
@@ -58,18 +56,23 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
     const { data: users, isLoading: usersLoading } = useUsersQuery();
     const isAdmin = currentUser?.role === 'admin';
 
-    // Inline edit state
-    const [editingRentId, setEditingRentId] = useState<string | null>(null);
-    const [tempRentData, setTempRentData] = useState<Partial<Rent>>({});
     const [editingRent, setEditingRent] = useState<Rent | null>(null);
     const [unlinkingRentId, setUnlinkingRentId] = useState<string | null>(null);
 
     const [showProprietorModal, setShowProprietorModal] = useState(false);
     const [showRentModal, setShowRentModal] = useState(false);
+    const [createRentForProprietorId, setCreateRentForProprietorId] = useState<string | null>(null);
+    const [showLotAddModal, setShowLotAddModal] = useState(false);
+    const [lotAddMode, setLotAddMode] = useState<'new' | 'old' | null>(null);
+    const [tempLotInput, setTempLotInput] = useState('');
+    const [editingLotIndex, setEditingLotIndex] = useState<number | null>(null);
+    const [editingLotValue, setEditingLotValue] = useState('');
+    const [editingLotType, setEditingLotType] = useState<'new' | 'old'>('new');
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState('');
     const [proprietorModalMode, setProprietorModalMode] = useState<'proprietor' | 'tenant'>('proprietor');
     const [isGeocoding, setIsGeocoding] = useState(false);
+    const [pendingProprietors, setPendingProprietors] = useState<Record<string, Partial<Proprietor>>>({});
 
     // Form state
     const [formData, setFormData] = useState({
@@ -99,6 +102,51 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
     const proprietorsList = useMemo(() => (proprietors || []).filter(p => !p.code?.startsWith('T')), [proprietors]);
     const tenantsList = useMemo(() => (proprietors || []).filter(p => p.code?.startsWith('T')), [proprietors]);
 
+    const serializeLotEntries = (entries: { type: 'new' | 'old'; value: string }[]): string =>
+        entries.map(e => `${e.type === 'new' ? '新' : '舊'}:${e.value}`).join('\n');
+
+    const lotEntries = useMemo(() => parseLotEntriesFromStr(formData.lotIndex), [formData.lotIndex]);
+
+    const appendToLotIndex = (newLot: string, mode: 'new' | 'old') => {
+        const trimmed = newLot.trim();
+        if (!trimmed) return;
+        const entry = { type: mode, value: trimmed };
+        setFormData(prev => ({
+            ...prev,
+            lotIndex: serializeLotEntries([...lotEntries, entry]),
+        }));
+        setShowLotAddModal(false);
+        setLotAddMode(null);
+        setTempLotInput('');
+    };
+
+    const removeLotEntry = (index: number) => {
+        const next = lotEntries.filter((_, i) => i !== index);
+        setFormData(prev => ({ ...prev, lotIndex: serializeLotEntries(next) }));
+    };
+
+    const startEditLotEntry = (index: number) => {
+        const entry = lotEntries[index];
+        if (entry) {
+            setEditingLotIndex(index);
+            setEditingLotValue(entry.value);
+        }
+    };
+
+    const saveEditLotEntry = () => {
+        if (editingLotIndex === null || !editingLotValue.trim()) return;
+        const next = [...lotEntries];
+        next[editingLotIndex] = { type: editingLotType, value: editingLotValue.trim() };
+        setFormData(prev => ({ ...prev, lotIndex: serializeLotEntries(next) }));
+        setEditingLotIndex(null);
+        setEditingLotValue('');
+    };
+
+    const cancelEditLotEntry = () => {
+        setEditingLotIndex(null);
+        setEditingLotValue('');
+    };
+
     const rents = useMemo(() => {
         if (!property?.id || !allRents) return [];
         return allRents.filter(r => r.propertyId === property.id)
@@ -111,7 +159,7 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
     const renderRentTable = (records: Rent[]) => {
         if (records.length === 0) {
             return (
-                <div className="p-4 bg-zinc-50 dark:bg-white/5 rounded-xl text-center text-zinc-400 dark:text-white/40 text-sm italic">
+                <div className="p-6 bg-zinc-50 dark:bg-white/5 rounded-xl text-center text-zinc-600 dark:text-white/60 text-base">
                     尚未有相關記錄
                 </div>
             );
@@ -119,7 +167,7 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
 
         return (
             <div className="border border-zinc-200 dark:border-white/10 rounded-xl overflow-hidden shadow-sm">
-                <div className="grid grid-cols-[100px_1fr_1.5fr_1.2fr_1fr_90px] gap-4 px-4 py-3 bg-zinc-50/50 dark:bg-white/[0.02] text-xs font-semibold text-zinc-500 dark:text-white/40 uppercase tracking-wider border-b border-zinc-200 dark:border-white/10">
+                <div className="grid grid-cols-[100px_1fr_1.5fr_1.2fr_1fr_90px] gap-4 px-4 py-3 bg-zinc-100/80 dark:bg-white/5 text-sm font-semibold text-zinc-700 dark:text-white/80 uppercase tracking-wider border-b border-zinc-200 dark:border-white/10">
                     <div className="flex items-center gap-1.5 font-bold">編號</div>
                     <div className="font-bold">承租人</div>
                     <div className="font-bold">租借位置</div>
@@ -152,7 +200,7 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                     return (
                         <div key={rent.id} className={`grid grid-cols-[100px_1fr_1.5fr_1.2fr_1fr_90px] gap-4 px-4 py-4 border-b border-zinc-100 dark:border-white/5 text-sm hover:bg-zinc-50/80 dark:hover:bg-white/[0.02] transition-colors items-center last:border-0 group ${isExpired ? 'bg-red-50/50 dark:bg-red-500/5' : ''}`}>
                             <div className="flex flex-col gap-1">
-                                <span className="font-mono text-[11px] font-bold text-zinc-400 dark:text-white/30 tracking-tight">{contractNumber}</span>
+                                <span className="font-mono text-xs font-bold text-zinc-600 dark:text-white/70 tracking-tight">{contractNumber}</span>
                                 <div className="flex items-center gap-1 flex-wrap">
                                     <span className={`text-[10px] px-2 py-0.5 rounded-full w-fit font-bold tracking-wider ${rent.type === 'rent_out'
                                         ? 'bg-emerald-100 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-200/50 dark:border-emerald-500/20'
@@ -171,39 +219,39 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                                     {otherParty?.name || (rent.type === 'renting' ? '(暫缺)' : '-')}
                                 </span>
                                 {otherParty?.shortName && (
-                                    <span className="text-[10px] text-zinc-400 dark:text-white/30 truncate uppercase">
+                                    <span className="text-xs text-zinc-500 dark:text-white/50 truncate uppercase">
                                         {otherParty.shortName}
                                     </span>
                                 )}
                             </div>
-                            <div className="text-zinc-600 dark:text-white/70 text-xs leading-relaxed line-clamp-2">
+                            <div className="text-zinc-700 dark:text-white/80 text-sm leading-relaxed line-clamp-2">
                                 {rent.location || rent.rentOutAddressDetail || formData.name || '-'}
                             </div>
                             <div className="flex flex-col">
                                 {startDate ? (
                                     <>
-                                        <div className="text-zinc-700 dark:text-white/90 font-medium tabular-nums text-xs">
+                                        <div className="text-zinc-800 dark:text-white/90 font-medium tabular-nums text-sm">
                                             {startDate.toLocaleDateString('zh-TW')}
                                         </div>
-                                        <div className="text-zinc-400 dark:text-white/30 flex items-center gap-1 tabular-nums text-xs">
-                                            <span className="opacity-50">~</span> {endDate ? endDate.toLocaleDateString('zh-TW') : '-'}
+                                        <div className="text-zinc-600 dark:text-white/60 flex items-center gap-1 tabular-nums text-xs">
+                                            <span>~</span> {endDate ? endDate.toLocaleDateString('zh-TW') : '-'}
                                         </div>
                                         <div className="mt-1 flex items-center gap-1">
-                                            <span className="text-[10px] px-1.5 py-0.5 bg-zinc-100 dark:bg-white/10 rounded font-bold text-zinc-500 dark:text-white/40">
+                                            <span className="text-xs px-2 py-0.5 bg-zinc-100 dark:bg-white/10 rounded font-semibold text-zinc-600 dark:text-white/60">
                                                 {months}個月
                                             </span>
                                         </div>
                                     </>
                                 ) : (
-                                    <span className="text-zinc-300 dark:text-white/10 italic text-xs">未設定</span>
+                                    <span className="text-zinc-500 dark:text-white/40 italic text-sm">未設定</span>
                                 )}
                             </div>
                             <div className="text-right">
-                                <div className="flex flex-col">
-                                    <span className="text-[10px] text-zinc-400 dark:text-white/30 font-bold uppercase tracking-widest">{rent.currency || 'HKD'}</span>
+                                <div className="flex flex-col items-end">
+                                    <span className="text-xs text-zinc-600 dark:text-white/60 font-semibold uppercase tracking-wider">{rent.currency || 'HKD'}</span>
                                     <span className="text-base font-black text-zinc-900 dark:text-white tabular-nums">
                                         ${monthlyRent.toLocaleString()}
-                                        <span className="text-[10px] text-zinc-400 dark:text-white/30 ml-1">/月</span>
+                                        <span className="text-sm text-zinc-600 dark:text-white/60 ml-1 font-medium">/月</span>
                                     </span>
                                 </div>
                             </div>
@@ -493,19 +541,28 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
         }
     };
 
-    const handleProprietorCreated = async (id: string) => {
-        queryClient.invalidateQueries({ queryKey: ['proprietors'] });
+    const handleProprietorCreated = async (id: string, proprietorData?: Partial<Proprietor>) => {
+        if (proprietorData) {
+            setPendingProprietors(prev => ({ ...prev, [id]: proprietorData }));
+        }
+        await queryClient.refetchQueries({ queryKey: ['proprietors'] });
         if (proprietorModalMode === 'tenant') {
             setFormData(prev => ({ ...prev, tenantId: id }));
         } else {
-            // Add to proprietorIds array
             setFormData(prev => ({
                 ...prev,
                 proprietorIds: [...prev.proprietorIds, id],
-                proprietorId: prev.proprietorIds.length === 0 ? id : prev.proprietorId // Keep first as legacy
+                proprietorId: prev.proprietorIds.length === 0 ? id : prev.proprietorId
             }));
         }
         setShowProprietorModal(false);
+        if (proprietorData) {
+            setTimeout(() => setPendingProprietors(prev => {
+                const next = { ...prev };
+                delete next[id];
+                return next;
+            }), 2000);
+        }
     };
 
     const handleRentCreated = async () => {
@@ -565,31 +622,6 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
             }
         } finally {
             setUnlinkingRentId(null);
-        }
-    };
-
-    const handleStartInlineEdit = (propId: string, rent: Rent) => {
-        setEditingRentId(propId);
-        setTempRentData(rent);
-    };
-
-    const handleSaveInlineRent = async (propId: string) => {
-        if (!tempRentData.id) return;
-
-        setSaving(true);
-        try {
-            const success = await updateRent(tempRentData.id, tempRentData);
-            if (success) {
-                queryClient.invalidateQueries({ queryKey: ['rents'] });
-                addNotification('租金資訊已更新 / Rent information updated', 'update');
-                setEditingRentId(null);
-            } else {
-                setError('Failed to update rent');
-            }
-        } catch (err) {
-            setError('Error updating rent');
-        } finally {
-            setSaving(false);
         }
     };
 
@@ -850,15 +882,183 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
 
                     {/* Property Lot Index */}
                     <div className="space-y-2">
-                        <label className="block text-sm font-medium text-zinc-700 dark:text-white/80">物業地段</label>
-                        <input
-                            type="text"
-                            name="lotIndex"
-                            value={formData.lotIndex}
-                            onChange={handleChange}
-                            className="w-full px-4 py-3 bg-zinc-50 dark:bg-white/5 border border-zinc-200 dark:border-white/10 rounded-xl text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-purple-500/50 transition-all"
-                            placeholder="例如: DD120 Lot 123"
-                        />
+                        <div className="flex items-center justify-between">
+                            <label className="block text-sm font-medium text-zinc-700 dark:text-white/80">物業地段</label>
+                            {isAuthenticated && (
+                                <button
+                                    type="button"
+                                    onClick={() => setShowLotAddModal(true)}
+                                    className="px-4 py-2 bg-purple-50 dark:bg-purple-500/20 text-purple-600 dark:text-purple-400 rounded-xl hover:bg-purple-100 dark:hover:bg-purple-500/30 border border-purple-100 dark:border-purple-500/30 text-sm font-medium transition-all duration-300"
+                                >
+                                    + 新增地段
+                                </button>
+                            )}
+                        </div>
+                        <div className="min-h-[48px] px-4 py-3 bg-zinc-50 dark:bg-white/5 border border-zinc-200 dark:border-white/10 rounded-xl space-y-2">
+                            {lotEntries.length === 0 ? (
+                                <p className="text-sm text-zinc-400 dark:text-white/40">尚未新增地段</p>
+                            ) : (
+                                lotEntries.map((entry, i) => (
+                                    <div key={i} className="flex items-center gap-2 flex-wrap">
+                                        {editingLotIndex === i ? (
+                                            <>
+                                                <div className="flex gap-1 shrink-0">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setEditingLotType('new')}
+                                                        className={`px-2 py-0.5 rounded text-xs font-medium ${editingLotType === 'new' ? 'bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 ring-2 ring-emerald-500/50' : 'bg-zinc-200 dark:bg-white/10 text-zinc-500 dark:text-white/50 hover:text-zinc-700 dark:hover:text-white/80'}`}
+                                                    >
+                                                        新
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setEditingLotType('old')}
+                                                        className={`px-2 py-0.5 rounded text-xs font-medium ${editingLotType === 'old' ? 'bg-zinc-300 dark:bg-white/20 text-zinc-700 dark:text-white ring-2 ring-zinc-500/50' : 'bg-zinc-200 dark:bg-white/10 text-zinc-500 dark:text-white/50 hover:text-zinc-700 dark:hover:text-white/80'}`}
+                                                    >
+                                                        舊
+                                                    </button>
+                                                </div>
+                                                <input
+                                                    type="text"
+                                                    value={editingLotValue}
+                                                    onChange={(e) => setEditingLotValue(e.target.value)}
+                                                    className="flex-1 min-w-0 px-3 py-1.5 bg-white dark:bg-white/5 border border-zinc-200 dark:border-white/10 rounded-lg text-sm text-zinc-900 dark:text-white"
+                                                    placeholder="例如: DD 111 LOT 1523, 1539"
+                                                    autoFocus
+                                                />
+                                                <div className="flex gap-1 shrink-0">
+                                                    <button
+                                                        type="button"
+                                                        onClick={saveEditLotEntry}
+                                                        disabled={!editingLotValue.trim()}
+                                                        className="px-3 py-1.5 bg-purple-500 text-white rounded-lg hover:bg-purple-600 disabled:opacity-50 text-xs"
+                                                    >
+                                                        確認
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        onClick={cancelEditLotEntry}
+                                                        className="px-3 py-1.5 text-zinc-500 hover:text-zinc-700 dark:hover:text-white/70 text-xs"
+                                                    >
+                                                        取消
+                                                    </button>
+                                                </div>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <span className={`shrink-0 px-2 py-0.5 rounded text-xs font-medium ${entry.type === 'new' ? 'bg-emerald-500/20 text-emerald-600 dark:text-emerald-400' : 'bg-zinc-200 dark:bg-white/10 text-zinc-600 dark:text-white/70'}`}>
+                                                    {entry.type === 'new' ? '新' : '舊'}
+                                                </span>
+                                                <span className="flex-1 text-sm text-zinc-900 dark:text-white break-all">{entry.value}</span>
+                                                {isAuthenticated && (
+                                                    <div className="flex items-center gap-1 shrink-0">
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => startEditLotEntry(i)}
+                                                            className="p-1 text-zinc-400 hover:text-purple-500 rounded"
+                                                            title="編輯"
+                                                        >
+                                                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => removeLotEntry(i)}
+                                                            className="p-1 text-zinc-400 hover:text-red-500 rounded"
+                                                            title="移除"
+                                                        >
+                                                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                                                        </button>
+                                                    </div>
+                                                )}
+                                            </>
+                                        )}
+                                    </div>
+                                ))
+                            )}
+                        </div>
+                        {/* Lot Add Modal */}
+                        {showLotAddModal && (
+                            <div className="mt-3 p-4 bg-zinc-50 dark:bg-white/5 rounded-xl border border-zinc-200 dark:border-white/10 space-y-3">
+                                <p className="text-sm font-medium text-zinc-700 dark:text-white/80">新增地段</p>
+                                {lotAddMode === null ? (
+                                    <div className="flex gap-2">
+                                        <button
+                                            type="button"
+                                            onClick={() => setLotAddMode('new')}
+                                            className="px-4 py-2 bg-purple-500/20 text-purple-600 dark:text-purple-400 rounded-lg hover:bg-purple-500/30 text-sm"
+                                        >
+                                            新地段
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => setLotAddMode('old')}
+                                            className="px-4 py-2 bg-zinc-200 dark:bg-white/10 text-zinc-700 dark:text-white/80 rounded-lg hover:bg-zinc-300 dark:hover:bg-white/20 text-sm"
+                                        >
+                                            舊地段
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => { setShowLotAddModal(false); setLotAddMode(null); }}
+                                            className="px-4 py-2 text-zinc-500 dark:text-white/50 hover:text-zinc-700 dark:hover:text-white text-sm"
+                                        >
+                                            取消
+                                        </button>
+                                    </div>
+                                ) : lotAddMode === 'new' ? (
+                                    <div className="flex gap-2 items-center">
+                                        <input
+                                            type="text"
+                                            value={tempLotInput}
+                                            onChange={(e) => setTempLotInput(e.target.value)}
+                                            placeholder="例如: DD 111 LOT 1523, 1539"
+                                            className="flex-1 px-3 py-2 bg-white dark:bg-white/5 border border-zinc-200 dark:border-white/10 rounded-lg text-sm text-zinc-900 dark:text-white placeholder-zinc-400"
+                                            autoFocus
+                                        />
+                                        <button
+                                            type="button"
+                                            onClick={() => appendToLotIndex(tempLotInput, 'new')}
+                                            disabled={!tempLotInput.trim()}
+                                            className="px-4 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 disabled:opacity-50 text-sm"
+                                        >
+                                            確認
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => { setLotAddMode(null); setTempLotInput(''); }}
+                                            className="px-4 py-2 text-zinc-500 hover:text-zinc-700 text-sm"
+                                        >
+                                            返回
+                                        </button>
+                                    </div>
+                                ) : (
+                                    <div className="flex gap-2 items-center">
+                                        <input
+                                            type="text"
+                                            value={tempLotInput}
+                                            onChange={(e) => setTempLotInput(e.target.value)}
+                                            placeholder="輸入舊地段，例如: DD 111 LOT 1523, 1539"
+                                            className="flex-1 px-3 py-2 bg-white dark:bg-white/5 border border-zinc-200 dark:border-white/10 rounded-lg text-sm text-zinc-900 dark:text-white placeholder-zinc-400"
+                                            autoFocus
+                                        />
+                                        <button
+                                            type="button"
+                                            onClick={() => appendToLotIndex(tempLotInput, 'old')}
+                                            disabled={!tempLotInput.trim()}
+                                            className="px-4 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 disabled:opacity-50 text-sm"
+                                        >
+                                            確認
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => { setLotAddMode(null); setTempLotInput(''); }}
+                                            className="px-4 py-2 text-zinc-500 hover:text-zinc-700 text-sm"
+                                        >
+                                            返回
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
+                        )}
                     </div>
 
                     {/* Type, Status, Land Use */}
@@ -890,7 +1090,7 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                                 values={formData.landUse}
                                 onChange={(values) => handleChange({ target: { name: 'landUse', value: values } } as any)}
                                 options={landUseTypes}
-                                placeholder="選擇土地用途"
+                                placeholder="請選擇"
                             />
                         </div>
                     </div>
@@ -898,21 +1098,27 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                     {/* Lot Area */}
                     <div className="space-y-2">
                         <label className="block text-sm font-medium text-zinc-700 dark:text-white/80">地段面積</label>
-                        <input
-                            type="text"
-                            name="lotArea"
-                            value={formData.lotArea}
-                            onChange={handleChange}
-                            className="w-full px-4 py-3 bg-zinc-50 dark:bg-white/5 border border-zinc-200 dark:border-white/10 rounded-xl text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-purple-500/50 transition-all"
-                            placeholder="e.g. 27180"
-                        />
+                        <div className="flex items-center gap-2">
+                            <input
+                                type="text"
+                                name="lotArea"
+                                value={formatLotAreaForInput(formData.lotArea)}
+                                onChange={(e) => {
+                                    const raw = parseLotAreaInput(e.target.value);
+                                    setFormData(prev => ({ ...prev, lotArea: raw }));
+                                }}
+                                className="flex-1 px-4 py-3 bg-zinc-50 dark:bg-white/5 border border-zinc-200 dark:border-white/10 rounded-xl text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-purple-500/50 transition-all"
+                                placeholder="e.g. 32,980"
+                            />
+                            <span className="text-sm text-zinc-500 dark:text-white/50 shrink-0">平方英呎</span>
+                        </div>
                     </div>
 
                     {/* Proprietor Section (Multi-Select) */}
                     {property && (
                         <div className="space-y-3">
                             <div className="flex items-center justify-between">
-                                <label className="block text-sm font-medium text-zinc-700 dark:text-white/80">業主</label>
+                                <label className="block text-base font-bold text-zinc-900 dark:text-white uppercase tracking-wider">業主</label>
                                 <div className="flex items-center gap-2">
                                     {formData.proprietorIds.length > 0 && (
                                         <button
@@ -931,7 +1137,7 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                                                 setProprietorModalMode('proprietor');
                                                 setShowProprietorModal(true);
                                             }}
-                                            className="px-3 py-1.5 bg-purple-50 dark:bg-purple-500/20 text-purple-600 dark:text-purple-400 rounded-lg hover:bg-purple-100 dark:hover:bg-purple-500/30 transition-colors border border-purple-100 dark:border-none text-sm"
+                                            className="px-4 py-2 bg-purple-50 dark:bg-purple-500/20 text-purple-600 dark:text-purple-400 rounded-xl hover:bg-purple-100 dark:hover:bg-purple-500/30 border border-purple-100 dark:border-purple-500/30 text-sm font-medium transition-all duration-300"
                                         >
                                             + 新增
                                         </button>
@@ -962,172 +1168,94 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
 
                             {/* Selected Proprietors Display */}
                             {formData.proprietorIds.length === 0 ? (
-                                <div className="p-4 bg-zinc-50 dark:bg-white/5 rounded-xl text-center text-zinc-400 dark:text-white/40 text-sm">
+                                <div className="p-6 bg-zinc-50 dark:bg-white/5 rounded-xl text-center text-zinc-600 dark:text-white/60 text-base">
                                     尚未指定業主
                                 </div>
                             ) : (
                                 <div className="border border-zinc-200 dark:border-white/10 rounded-xl overflow-hidden">
                                     {/* Table Header */}
-                                    <div className="grid grid-cols-[50px_1fr_1.5fr_1.8fr_1.2fr_100px] gap-4 px-4 py-3 bg-zinc-50 dark:bg-white/5 text-[10px] font-bold text-zinc-400 dark:text-white/30 uppercase tracking-widest border-b border-zinc-200 dark:border-white/10">
-                                        <div>序號</div>
+                                    <div className="grid grid-cols-[80px_1.2fr_1.5fr_90px_110px_90px] gap-4 px-4 py-3 bg-zinc-100/80 dark:bg-white/5 text-sm font-semibold text-zinc-700 dark:text-white/80 uppercase tracking-wider border-b border-zinc-200 dark:border-white/10">
+                                        <div>代碼</div>
                                         <div>業主名稱</div>
-                                        <div>承租人</div>
-                                        <div>租期及位置</div>
-                                        <div className="text-right">每月租金</div>
+                                        <div>公司名稱</div>
+                                        <div>擁有方性質</div>
+                                        <div>擁有人類別</div>
                                         <div className="text-center">操作</div>
                                     </div>
                                     {/* Table Rows */}
-                                    {formData.proprietorIds.map((propId, index) => {
-                                        const selectedProprietor = proprietorsList.find(p => p.id === propId);
+                                    {formData.proprietorIds.map((propId) => {
+                                        const selectedProprietor = proprietorsList.find(p => p.id === propId) || (pendingProprietors[propId] as Proprietor | undefined);
                                         const rent = rents.find(r => r.proprietorId === propId);
-                                        const isEditing = editingRentId === propId;
 
-                                        if (!selectedProprietor) return null;
+                                        if (!selectedProprietor?.name && !pendingProprietors[propId]?.name) return null;
 
-                                        // Display data
-                                        const tenant = rent?.tenantId ? proprietors?.find(p => p.id === rent.tenantId) : null;
-                                        const startDate = rent?.rentOutStartDate ? new Date(rent.rentOutStartDate) : null;
-                                        const endDate = rent?.rentOutEndDate ? new Date(rent.rentOutEndDate) : null;
-                                        const monthlyRent = rent?.rentOutMonthlyRental || 0;
-                                        const location = rent?.location || rent?.rentOutAddressDetail || '-';
+                                        const typeLabel = selectedProprietor?.type === 'company' ? '公司' : selectedProprietor?.type === 'individual' ? '個人' : '-';
+                                        const categoryLabel = selectedProprietor?.category === 'group_company' ? '集團公司'
+                                            : selectedProprietor?.category === 'joint_venture' ? '合資公司'
+                                            : selectedProprietor?.category === 'managed_individual' ? '代管個體'
+                                            : selectedProprietor?.category === 'external_landlord' ? '出租的業主'
+                                            : selectedProprietor?.category === 'tenant' ? '承租人'
+                                            : selectedProprietor?.category === 'external_customer' ? '街外客' : '-';
 
                                         return (
-                                            <div key={propId} className={`grid grid-cols-[50px_1fr_1.5fr_1.8fr_1.2fr_100px] gap-4 px-4 py-4 border-b border-zinc-100 dark:border-white/5 text-sm hover:bg-zinc-50/50 dark:hover:bg-white/[0.01] transition-colors items-center last:border-0 ${isEditing ? 'bg-purple-500/[0.03] ring-1 ring-purple-500/20' : ''}`}>
-                                                {/* No. */}
-                                                <div className="text-zinc-400 dark:text-white/20 font-mono text-[11px] font-bold">
-                                                    {String(index + 1).padStart(2, '0')}
+                                            <div key={propId} className="grid grid-cols-[80px_1.2fr_1.5fr_90px_110px_90px] gap-4 px-4 py-4 border-b border-zinc-100 dark:border-white/5 text-sm hover:bg-zinc-50/50 dark:hover:bg-white/[0.01] transition-colors items-center last:border-0">
+                                                {/* 代碼 */}
+                                                <div className="text-zinc-600 dark:text-white/60 font-mono text-sm font-medium">
+                                                    {selectedProprietor?.code || '-'}
                                                 </div>
 
-                                                {/* Property */}
-                                                <div className="font-medium text-zinc-900 dark:text-white truncate" title={selectedProprietor.name}>
-                                                    {selectedProprietor.name}
+                                                {/* 業主名稱 */}
+                                                <div className="font-medium text-zinc-900 dark:text-white truncate text-sm" title={selectedProprietor?.name || ''}>
+                                                    {selectedProprietor?.name || '(載入中...)'}
                                                 </div>
 
-                                                {/* Tenant */}
-                                                <div>
-                                                    {isEditing ? (
-                                                        <select
-                                                            value={tempRentData.tenantId || ''}
-                                                            onChange={(e) => setTempRentData(prev => ({ ...prev, tenantId: e.target.value }))}
-                                                            className="w-full px-2 py-1 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-white/10 rounded-lg text-xs focus:ring-2 focus:ring-purple-500/30 transition-all shadow-sm"
-                                                        >
-                                                            <option value="">選擇承租人...</option>
-                                                            {(proprietors || []).filter(p => p.code?.startsWith('T')).map(p => (
-                                                                <option key={p.id} value={p.id}>{p.name}</option>
-                                                            ))}
-                                                        </select>
-                                                    ) : (
-                                                        <span className="text-zinc-600 dark:text-white/70">{tenant?.name || (rent?.type === 'renting' ? '(暫缺)' : '-')}</span>
-                                                    )}
+                                                {/* 公司名稱 */}
+                                                <div className="text-zinc-700 dark:text-white/80 truncate text-sm" title={selectedProprietor?.shortName || ''}>
+                                                    {selectedProprietor?.shortName || '-'}
                                                 </div>
 
-                                                {/* Term & Location */}
-                                                <div className="text-xs space-y-1">
-                                                    {isEditing ? (
-                                                        <div className="space-y-1">
-                                                            <div className="flex gap-1 items-center">
-                                                                <input
-                                                                    type="date"
-                                                                    value={tempRentData.rentOutStartDate ? new Date(tempRentData.rentOutStartDate).toISOString().split('T')[0] : ''}
-                                                                    onChange={(e) => setTempRentData(prev => ({ ...prev, rentOutStartDate: new Date(e.target.value) }))}
-                                                                    className="w-full px-1 py-0.5 bg-white dark:bg-white/10 border border-zinc-200 dark:border-white/20 rounded-md"
-                                                                />
-                                                                <span>~</span>
-                                                                <input
-                                                                    type="date"
-                                                                    value={tempRentData.rentOutEndDate ? new Date(tempRentData.rentOutEndDate).toISOString().split('T')[0] : ''}
-                                                                    onChange={(e) => setTempRentData(prev => ({ ...prev, rentOutEndDate: new Date(e.target.value) }))}
-                                                                    className="w-full px-1 py-0.5 bg-white dark:bg-white/10 border border-zinc-200 dark:border-white/20 rounded-md"
-                                                                />
-                                                            </div>
-                                                            <input
-                                                                type="text"
-                                                                value={tempRentData.rentOutAddressDetail || ''}
-                                                                onChange={(e) => setTempRentData(prev => ({ ...prev, rentOutAddressDetail: e.target.value }))}
-                                                                placeholder="地點..."
-                                                                className="w-full px-2 py-1 bg-white dark:bg-white/10 border border-zinc-200 dark:border-white/20 rounded-md text-[10px]"
-                                                            />
-                                                        </div>
-                                                    ) : (
-                                                        <>
-                                                            <div className="flex flex-col">
-                                                                <div className={`text-xs ${endDate && new Date(endDate) < new Date(new Date().setHours(0, 0, 0, 0)) ? 'text-red-500 font-medium' : 'text-zinc-400 dark:text-white/40'}`}>
-                                                                    {startDate?.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })} - {endDate?.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) || '至今'}
-                                                                    {endDate && new Date(endDate) < new Date(new Date().setHours(0, 0, 0, 0)) && (
-                                                                        <span className="ml-1 text-[10px] px-1 py-0.5 bg-red-100 dark:bg-red-500/20 text-red-600 dark:text-red-400 rounded">已過期</span>
-                                                                    )}
-                                                                </div>
-                                                                <div className="text-zinc-600 dark:text-white/70 truncate text-xs mt-0.5" title={location}>
-                                                                    {location}
-                                                                </div>
-                                                            </div>
-                                                        </>
-                                                    )}
+                                                {/* 擁有方性質 */}
+                                                <div className="text-zinc-700 dark:text-white/80 text-sm">
+                                                    {typeLabel}
                                                 </div>
 
-                                                {/* Rent */}
-                                                <div className="text-right">
-                                                    {isEditing ? (
-                                                        <div className="flex items-center gap-1 justify-end">
-                                                            <span className="text-[10px] text-zinc-400">$</span>
-                                                            <input
-                                                                type="number"
-                                                                value={tempRentData.rentOutMonthlyRental || 0}
-                                                                onChange={(e) => setTempRentData(prev => ({ ...prev, rentOutMonthlyRental: parseFloat(e.target.value) }))}
-                                                                className="w-20 px-1 py-0.5 bg-white dark:bg-white/10 border border-zinc-200 dark:border-white/20 rounded-md text-right text-xs"
-                                                            />
-                                                        </div>
-                                                    ) : (
-                                                        <span className="font-medium text-zinc-900 dark:text-white">
-                                                            ${monthlyRent.toLocaleString()}
-                                                        </span>
-                                                    )}
+                                                {/* 擁有人類別 */}
+                                                <div className="text-zinc-700 dark:text-white/80 text-sm">
+                                                    {categoryLabel}
                                                 </div>
 
                                                 {/* Actions */}
                                                 <div className="flex items-center justify-center gap-1">
-                                                    {isEditing ? (
-                                                        <>
-                                                            <button
-                                                                type="button"
-                                                                onClick={() => handleSaveInlineRent(propId)}
-                                                                className="p-1 px-2 text-[10px] bg-green-500 text-white rounded-md hover:bg-green-600 transition-colors"
-                                                            >
-                                                                儲存
-                                                            </button>
-                                                            <button
-                                                                type="button"
-                                                                onClick={() => setEditingRentId(null)}
-                                                                className="p-1 px-2 text-[10px] bg-zinc-200 dark:bg-white/10 text-zinc-600 dark:text-white/60 rounded-md hover:bg-zinc-300 dark:hover:bg-white/20 transition-colors"
-                                                            >
-                                                                取消
-                                                            </button>
-                                                        </>
+                                                    {rent ? (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setEditingRent(rent)}
+                                                            className="px-2 py-1 text-xs bg-blue-50 dark:bg-blue-500/20 text-blue-600 dark:text-blue-400 rounded-lg hover:bg-blue-100 dark:hover:bg-blue-500/30 transition-colors border border-blue-100 dark:border-none"
+                                                        >
+                                                            更改
+                                                        </button>
                                                     ) : (
-                                                        <>
-                                                            {rent ? (
-                                                                <button
-                                                                    type="button"
-                                                                    onClick={() => handleStartInlineEdit(propId, rent)}
-                                                                    className="px-2 py-1 text-xs bg-blue-50 dark:bg-blue-500/20 text-blue-600 dark:text-blue-400 rounded-lg hover:bg-blue-100 dark:hover:bg-blue-500/30 transition-colors border border-blue-100 dark:border-none"
-                                                                >
-                                                                    更改
-                                                                </button>
-                                                            ) : (
-                                                                <span className="text-[10px] text-zinc-400">尚未建立租約</span>
-                                                            )}
-                                                            <button
-                                                                type="button"
-                                                                onClick={() => handleUnlinkProprietor(propId)}
-                                                                className="p-1 text-zinc-400 hover:text-red-500 transition-colors"
-                                                                title="移除業主連結"
-                                                            >
-                                                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                                                </svg>
-                                                            </button>
-                                                        </>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setCreateRentForProprietorId(propId)}
+                                                            className="p-1.5 text-zinc-400 hover:text-purple-500 hover:bg-purple-50 dark:hover:bg-purple-500/20 rounded-lg transition-colors"
+                                                            title="建立租約"
+                                                        >
+                                                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                                            </svg>
+                                                        </button>
                                                     )}
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleUnlinkProprietor(propId)}
+                                                        className="p-1 text-zinc-400 hover:text-red-500 transition-colors"
+                                                        title="移除業主連結"
+                                                    >
+                                                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                                        </svg>
+                                                    </button>
                                                 </div>
                                             </div>
                                         );
@@ -1141,12 +1269,12 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                     {property?.id && (
                         <div className="space-y-6">
                             <div className="flex items-center justify-between">
-                                <label className="block text-sm font-bold text-zinc-900 dark:text-white uppercase tracking-wider">租務管理</label>
+                                <label className="block text-base font-bold text-zinc-900 dark:text-white uppercase tracking-wider">租務管理</label>
                                 {isAuthenticated && (
                                     <button
                                         type="button"
                                         onClick={() => setShowRentModal(true)}
-                                        className="px-4 py-2 bg-gradient-to-r from-purple-600/10 to-blue-600/10 dark:from-purple-500/20 dark:to-blue-500/20 text-purple-600 dark:text-purple-400 rounded-xl hover:from-purple-600/20 hover:to-blue-600/20 transition-all border border-purple-100/50 dark:border-purple-500/30 text-xs font-bold flex items-center gap-2"
+                                        className="px-4 py-2 bg-purple-50 dark:bg-purple-500/20 text-purple-600 dark:text-purple-400 rounded-xl hover:bg-purple-100 dark:hover:bg-purple-500/30 border border-purple-100 dark:border-purple-500/30 text-sm font-medium transition-all duration-300 flex items-center gap-2"
                                     >
                                         <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
@@ -1156,8 +1284,8 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                                 )}
                             </div>
 
-                            {/* Select to link existing rent records */}
-                            <div className="relative group">
+                            {/* Select to link existing rent records (hidden) */}
+                            <div className="relative group hidden">
                                 <AnimatedSelect
                                     value=""
                                     onChange={async (selectedRentId) => {
@@ -1184,11 +1312,13 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                                     options={[
                                         { value: '', label: rentsLoading ? '載入中...' : '選擇現有租金記錄以連結...' },
                                         ...((allRents || [])
-                                            .filter(r => !r.propertyId || r.propertyId === '' || r.propertyId === 'null')
+                                            .filter(r => !r.propertyId || r.propertyId === '' || r.propertyId === 'null' || (r as any).propertyId == null)
                                             .map(r => {
                                                 const monthlyRent = r.type === 'rent_out' ? r.rentOutMonthlyRental : r.rentingMonthlyRental;
-                                                const tenantName = (proprietors || []).find(p => p.id === r.tenantId)?.name;
-                                                const endDate = r.type === 'rent_out' ? r.rentOutEndDate : (r.rentingEndDate || r.endDate);
+                                                const tenantName = r.type === 'rent_out'
+                                                    ? (proprietors || []).find(p => p.id === r.tenantId)?.name
+                                                    : (proprietors || []).find(p => p.id === r.proprietorId)?.name;
+                                                const endDate = r.type === 'rent_out' ? r.rentOutEndDate : (r.rentingEndDate || (r as any).endDate);
                                                 const isExpired = endDate ? new Date(endDate) < new Date(new Date().setHours(0, 0, 0, 0)) : false;
 
                                                 return {
@@ -1203,16 +1333,16 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
 
                             <div className="space-y-10">
                                 <div>
-                                    <h4 className="text-sm font-bold text-emerald-600 dark:text-emerald-400 mb-4 flex items-center gap-2 px-1">
-                                        <div className="w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]"></div>
+                                    <h4 className="text-base font-bold text-emerald-700 dark:text-emerald-400 mb-4 flex items-center gap-2 px-1">
+                                        <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]"></div>
                                         收租記錄 (Rent Out Records)
                                     </h4>
                                     {renderRentTable(rentOutRents)}
                                 </div>
 
                                 <div>
-                                    <h4 className="text-sm font-bold text-indigo-600 dark:text-indigo-400 mb-4 flex items-center gap-2 px-1">
-                                        <div className="w-2 h-2 rounded-full bg-indigo-500 shadow-[0_0_8px_rgba(99,102,241,0.5)]"></div>
+                                    <h4 className="text-base font-bold text-indigo-700 dark:text-indigo-400 mb-4 flex items-center gap-2 px-1">
+                                        <div className="w-2.5 h-2.5 rounded-full bg-indigo-500 shadow-[0_0_8px_rgba(99,102,241,0.5)]"></div>
                                         交租記錄 (Renting Records)
                                     </h4>
                                     {renderRentTable(rentingRents)}
@@ -1299,6 +1429,7 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
             {showProprietorModal && (
                 <ProprietorModal
                     mode={proprietorModalMode}
+                    propertyCode={property?.code || formData.code}
                     onClose={() => setShowProprietorModal(false)}
                     onSuccess={handleProprietorCreated}
                 />
@@ -1310,6 +1441,17 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                     propertyId={property.id}
                     defaultLocation={formData.name}
                     onClose={() => setShowRentModal(false)}
+                    onSuccess={handleRentCreated}
+                />
+            )}
+
+            {/* Create rent for proprietor (from 業主 row when no rent yet) */}
+            {createRentForProprietorId && property?.id && (
+                <RentModal
+                    propertyId={property.id}
+                    defaultLocation={formData.name}
+                    initialProprietorId={createRentForProprietorId}
+                    onClose={() => setCreateRentForProprietorId(null)}
                     onSuccess={handleRentCreated}
                 />
             )}

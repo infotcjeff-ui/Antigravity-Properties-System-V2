@@ -16,6 +16,8 @@ import {
     Image as ImageIcon
 } from 'lucide-react';
 import type { Property, Rent } from '@/lib/db';
+import { formatLotArea } from '@/lib/formatters';
+import LotIndexDisplay from '@/components/properties/LotIndexDisplay';
 import { usePropertyWithRelationsByNameQuery } from '@/hooks/useStorage';
 import DOMPurify from 'dompurify';
 import { BentoCard } from '@/components/layout/BentoGrid';
@@ -51,6 +53,11 @@ const typeLabels: Record<string, string> = {
 };
 
 const landUseLabels: Record<string, string> = {
+    agr: 'AGR 農業',
+    ca: 'CA 自然保育區',
+    os: 'OS 露天貯物',
+    v: 'V 鄉村式發展',
+    ou: 'OU 其他指定用途',
     unknown: '未知',
     open_storage: '露天倉儲',
     residential_a: '住宅(甲)',
@@ -324,11 +331,13 @@ export default function PropertyDetailModal({ propertyName, onClose }: PropertyD
                                     </div>
                                     <div className="p-4 bg-zinc-50 dark:bg-white/5 rounded-2xl border border-zinc-100 dark:border-none">
                                         <p className="text-zinc-400 dark:text-white/40 text-xs">物業地段</p>
-                                        <p className="text-zinc-900 dark:text-white font-medium text-sm mt-1">{property.lotIndex || '-'}</p>
+                                        <div className="mt-1">
+                                            <LotIndexDisplay lotIndex={property.lotIndex} />
+                                        </div>
                                     </div>
                                     <div className="p-4 bg-zinc-50 dark:bg-white/5 rounded-2xl border border-zinc-100 dark:border-none">
                                         <p className="text-zinc-400 dark:text-white/40 text-xs">地段面積</p>
-                                        <p className="text-zinc-900 dark:text-white font-medium text-sm mt-1">{property.lotArea || '-'}</p>
+                                        <p className="text-zinc-900 dark:text-white font-medium text-sm mt-1">{formatLotArea(property.lotArea)}</p>
                                     </div>
                                 </div>
                             </div>

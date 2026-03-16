@@ -201,7 +201,7 @@ export default function PropertiesPage() {
                             <button
                                 onClick={() => handlePageChange(Math.max(1, currentPage - 1))}
                                 disabled={currentPage === 1}
-                                className="p-2 rounded-xl border border-zinc-200 dark:border-white/10 text-zinc-600 dark:text-white/60 hover:bg-zinc-100 dark:hover:bg-white/5 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+                                className="p-2 rounded-xl border border-zinc-200 dark:border-white/10 text-zinc-600 dark:text-white/60 hover:bg-zinc-100 dark:hover:bg-white/5 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer transition-all"
                             >
                                 <ChevronLeft className="w-5 h-5" />
                             </button>
@@ -226,7 +226,7 @@ export default function PropertiesPage() {
                                         <button
                                             key={pageNum}
                                             onClick={() => handlePageChange(pageNum)}
-                                            className={`min-w-[40px] h-10 rounded-xl font-medium transition-all ${currentPage === pageNum
+                                            className={`min-w-[40px] h-10 rounded-xl font-medium cursor-pointer transition-all ${currentPage === pageNum
                                                 ? 'bg-purple-600 text-white shadow-lg shadow-purple-500/20'
                                                 : 'text-zinc-600 dark:text-white/60 hover:bg-zinc-100 dark:hover:bg-white/5'
                                                 }`}
@@ -240,7 +240,7 @@ export default function PropertiesPage() {
                             <button
                                 onClick={() => handlePageChange(Math.min(totalPages, currentPage + 1))}
                                 disabled={currentPage === totalPages}
-                                className="p-2 rounded-xl border border-zinc-200 dark:border-white/10 text-zinc-600 dark:text-white/60 hover:bg-zinc-100 dark:hover:bg-white/5 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+                                className="p-2 rounded-xl border border-zinc-200 dark:border-white/10 text-zinc-600 dark:text-white/60 hover:bg-zinc-100 dark:hover:bg-white/5 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer transition-all"
                             >
                                 <ChevronRight className="w-5 h-5" />
                             </button>

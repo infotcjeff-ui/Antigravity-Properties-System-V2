@@ -3,6 +3,7 @@
 import { motion } from 'framer-motion';
 import { X, Building2, User } from 'lucide-react';
 import type { Rent, Property, Proprietor } from '@/lib/db';
+import { formatLotArea } from '@/lib/formatters';
 import { useLanguage } from '@/components/common/LanguageSwitcher';
 import DOMPurify from 'dompurify';
 import { Tooltip } from '@heroui/react';
@@ -139,7 +140,7 @@ export default function RentDetailsModal({ rent, property, onClose }: RentDetail
                                                 地段: <span className="text-zinc-900 dark:text-white">{property.lotIndex || '-'}</span>
                                             </div>
                                             <div className="text-xs text-zinc-500 dark:text-white/60">
-                                                面積: <span className="text-zinc-900 dark:text-white">{property.lotArea || '-'}</span>
+                                                面積: <span className="text-zinc-900 dark:text-white">{formatLotArea(property.lotArea)}</span>
                                             </div>
                                         </div>
                                     }
@@ -205,7 +206,7 @@ export default function RentDetailsModal({ rent, property, onClose }: RentDetail
                                                 地段: <span className="text-zinc-900 dark:text-white">{property.lotIndex || '-'}</span>
                                             </div>
                                             <div className="text-xs text-zinc-500 dark:text-white/60">
-                                                面積: <span className="text-zinc-900 dark:text-white">{property.lotArea || '-'}</span>
+                                                面積: <span className="text-zinc-900 dark:text-white">{formatLotArea(property.lotArea)}</span>
                                             </div>
                                         </div>
                                     }

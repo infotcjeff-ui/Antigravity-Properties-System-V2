@@ -20,6 +20,7 @@ interface RentModalProps {
     propertyId?: string;
     defaultLocation?: string;
     rent?: Rent | null; // For editing existing rent
+    initialProprietorId?: string; // For creating rent for a specific proprietor (業主)
     onClose: () => void;
     onSuccess: (rentId: string) => void;
 }
@@ -35,7 +36,7 @@ const rentOutStatuses = [
     { value: 'completed', label: '已完租' },
 ];
 
-export default function RentModal({ propertyId, defaultLocation, rent, onClose, onSuccess }: RentModalProps) {
+export default function RentModal({ propertyId, defaultLocation, rent, initialProprietorId, onClose, onSuccess }: RentModalProps) {
     const queryClient = useQueryClient();
     const { addRent, updateRent } = useRents();
     const { getProprietors } = useProprietors();
@@ -111,12 +112,12 @@ export default function RentModal({ propertyId, defaultLocation, rent, onClose, 
             };
         }
 
-        // Create mode - empty form
+        // Create mode - empty form (or pre-filled with initialProprietorId)
         return {
             type: 'rent_out' as 'rent_out' | 'renting',
             propertyId: propertyId || '',
             tenantId: '',
-            proprietorId: '',
+            proprietorId: initialProprietorId || '',
             rentOutTenancyNumber: '',
             rentOutPricing: '',
             rentOutMonthlyRental: '',
