@@ -90,14 +90,15 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
         googleDrivePlanUrl: property?.googleDrivePlanUrl || '',
         hasPlanningPermission: property?.hasPlanningPermission || '',
         location: property?.location || null,
-        images: property?.images || [],
-        geoMaps: property?.geoMaps || [],
+        images: property?.images || [], // kept for compatibility, actual display uses orderedImages
+        geoMaps: property?.geoMaps || [], // kept for compatibility, actual display uses orderedGeoMaps
         notes: property?.notes || '',
         createdBy: property?.createdBy || '',
     });
 
-    const [newImages, setNewImages] = useState<{ file: File; preview: string }[]>([]);
-    const [newGeoMaps, setNewGeoMaps] = useState<{ file: File; preview: string }[]>([]);
+    // Unified ordered list: string = URL, object = pending upload
+    const [orderedImages, setOrderedImages] = useState<(string | { file: File; preview: string })[]>([]);
+    const [orderedGeoMaps, setOrderedGeoMaps] = useState<(string | { file: File; preview: string })[]>([]);
 
     const proprietorsList = useMemo(() => (proprietors || []).filter(p => !p.code?.startsWith('T')), [proprietors]);
     const tenantsList = useMemo(() => (proprietors || []).filter(p => p.code?.startsWith('T')), [proprietors]);
@@ -386,13 +387,22 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
         }
     };
 
-    // Cleanup object URLs to prevent memory leaks
+    // Sync ordered media when property loads
     useEffect(() => {
-        return () => {
-            newImages.forEach(img => URL.revokeObjectURL(img.preview));
-            newGeoMaps.forEach(img => URL.revokeObjectURL(img.preview));
-        };
-        // eslint-disable-next-line react-hooks/exhaustive-deps
+        if (property) {
+            setOrderedImages(property.images || []);
+            setOrderedGeoMaps(property.geoMaps || []);
+        }
+    }, [property?.id]);
+
+    // Cleanup object URLs on unmount
+    const orderedImagesRef = useRef(orderedImages);
+    const orderedGeoMapsRef = useRef(orderedGeoMaps);
+    orderedImagesRef.current = orderedImages;
+    orderedGeoMapsRef.current = orderedGeoMaps;
+    useEffect(() => () => {
+        orderedImagesRef.current.forEach(img => typeof img === 'object' && URL.revokeObjectURL(img.preview));
+        orderedGeoMapsRef.current.forEach(img => typeof img === 'object' && URL.revokeObjectURL(img.preview));
     }, []);
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
@@ -407,46 +417,45 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
         const files = Array.from(e.target.files || []);
         if (files.length === 0) return;
 
-        const currentRemoteLength = formData[type].length;
-        const currentLocalLength = type === 'images' ? newImages.length : newGeoMaps.length;
-        const remainingSlots = (type === 'images' ? 5 : 2) - currentRemoteLength - currentLocalLength;
+        const list = type === 'images' ? orderedImages : orderedGeoMaps;
+        const max = type === 'images' ? 5 : 2;
+        const remainingSlots = max - list.length;
 
         if (remainingSlots <= 0) {
-            setError(`最多只能上傳 ${type === 'images' ? 5 : 2} 張圖片 / Maximum ${type === 'images' ? 5 : 2} images allowed`);
+            setError(`最多只能上傳 ${max} 張${type === 'images' ? '圖片' : '地圖'} / Maximum ${max} allowed`);
             return;
         }
 
-        const validFiles = files.slice(0, remainingSlots);
-
-        const newFiles = validFiles.map(file => ({
+        const newItems = files.slice(0, remainingSlots).map(file => ({
             file,
             preview: URL.createObjectURL(file)
         }));
 
         if (type === 'images') {
-            setNewImages(prev => [...prev, ...newFiles]);
+            setOrderedImages(prev => [...prev, ...newItems]);
         } else {
-            setNewGeoMaps(prev => [...prev, ...newFiles]);
+            setOrderedGeoMaps(prev => [...prev, ...newItems]);
         }
     };
 
-    const removeImage = (index: number, type: 'images' | 'geoMaps', isNew: boolean = false) => {
-        if (isNew) {
-            if (type === 'images') {
-                const img = newImages[index];
-                if (img) URL.revokeObjectURL(img.preview);
-                setNewImages(prev => prev.filter((_, i) => i !== index));
-            } else {
-                const img = newGeoMaps[index];
-                if (img) URL.revokeObjectURL(img.preview);
-                setNewGeoMaps(prev => prev.filter((_, i) => i !== index));
-            }
-        } else {
-            setFormData(prev => ({
-                ...prev,
-                [type]: prev[type].filter((_, i) => i !== index),
-            }));
-        }
+    const removeMediaItem = (index: number, type: 'images' | 'geoMaps') => {
+        const setter = type === 'images' ? setOrderedImages : setOrderedGeoMaps;
+        setter(prev => {
+            const item = prev[index];
+            if (typeof item === 'object') URL.revokeObjectURL(item.preview);
+            return prev.filter((_, i) => i !== index);
+        });
+    };
+
+    const moveMediaItem = (type: 'images' | 'geoMaps', fromIndex: number, toIndex: number) => {
+        if (fromIndex === toIndex) return;
+        const setter = type === 'images' ? setOrderedImages : setOrderedGeoMaps;
+        setter(prev => {
+            const arr = [...prev];
+            const [removed] = arr.splice(fromIndex, 1);
+            arr.splice(toIndex, 0, removed);
+            return arr;
+        });
     };
 
     const processAndUploadFiles = async (filesToUpload: { file: File }[], folder: string): Promise<string[]> => {
@@ -495,14 +504,19 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
         setError('');
 
         try {
-            // First run uploads if there are new files
+            // Extract pending (object) items for upload, preserve order
+            const imagePending = orderedImages.filter((x): x is { file: File; preview: string } => typeof x === 'object');
+            const geoPending = orderedGeoMaps.filter((x): x is { file: File; preview: string } => typeof x === 'object');
+
             const [uploadedImageUrls, uploadedGeoMapUrls] = await Promise.all([
-                processAndUploadFiles(newImages, 'properties'),
-                processAndUploadFiles(newGeoMaps, 'geomaps')
+                processAndUploadFiles(imagePending, 'properties'),
+                processAndUploadFiles(geoPending, 'geomaps')
             ]);
 
-            const finalImages = [...formData.images, ...uploadedImageUrls];
-            const finalGeoMaps = [...formData.geoMaps, ...uploadedGeoMapUrls];
+            let imgUrlIdx = 0;
+            let geoUrlIdx = 0;
+            const finalImages = orderedImages.map(x => typeof x === 'string' ? x : uploadedImageUrls[imgUrlIdx++]);
+            const finalGeoMaps = orderedGeoMaps.map(x => typeof x === 'string' ? x : uploadedGeoMapUrls[geoUrlIdx++]);
 
             const propertyData = {
                 name: formData.name.trim(),
@@ -689,17 +703,39 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                             <label className="block text-sm font-medium text-zinc-700 dark:text-white/80">
                                 圖片 (最多 5 張, 總計 5MB)
                             </label>
+                            <p className="text-xs text-zinc-500 dark:text-white/40">第一張會是最新圖片</p>
                             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                                {formData.images.map((img, index) => (
-                                    <div key={`remote-img-${index}`} className="relative group aspect-square">
+                                {orderedImages.map((item, index) => (
+                                    <div
+                                        key={`img-${index}`}
+                                        draggable
+                                        onDragStart={(e) => { e.dataTransfer.setData('text/plain', `images:${index}`); e.dataTransfer.effectAllowed = 'move'; }}
+                                        onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; (e.currentTarget as HTMLElement).classList.add('ring-2', 'ring-purple-500'); }}
+                                        onDragLeave={(e) => { (e.currentTarget as HTMLElement).classList.remove('ring-2', 'ring-purple-500'); }}
+                                        onDrop={(e) => {
+                                            e.preventDefault();
+                                            (e.currentTarget as HTMLElement).classList.remove('ring-2', 'ring-purple-500');
+                                            const raw = e.dataTransfer.getData('text/plain');
+                                            if (raw.startsWith('images:')) {
+                                                const from = parseInt(raw.slice(7), 10);
+                                                if (!isNaN(from) && from !== index) moveMediaItem('images', from, index);
+                                            }
+                                        }}
+                                        className="relative group aspect-square cursor-grab active:cursor-grabbing rounded-xl border border-zinc-200 dark:border-white/10 transition-all"
+                                    >
                                         <img
-                                            src={img}
+                                            src={typeof item === 'string' ? item : item.preview}
                                             alt={`Property ${index + 1}`}
-                                            className="w-full h-full object-cover rounded-xl border border-zinc-200 dark:border-white/10"
+                                            className="w-full h-full object-cover rounded-xl pointer-events-none"
                                         />
+                                        {typeof item === 'object' && (
+                                            <div className="absolute inset-0 bg-black/40 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center pointer-events-none">
+                                                <span className="text-white text-xs font-medium">Pending Upload</span>
+                                            </div>
+                                        )}
                                         <button
                                             type="button"
-                                            onClick={() => removeImage(index, 'images')}
+                                            onClick={() => removeMediaItem(index, 'images')}
                                             className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 rounded-full flex items-center justify-center text-white opacity-0 group-hover:opacity-100 transition-opacity z-10 shadow-lg"
                                         >
                                             <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -708,33 +744,10 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                                         </button>
                                     </div>
                                 ))}
-                                {newImages.map((img, index) => (
-                                    <div key={`local-img-${index}`} className="relative group aspect-square">
-                                        <img
-                                            src={img.preview}
-                                            alt={`New Property ${index + 1}`}
-                                            className="w-full h-full object-cover rounded-xl border border-dashed border-purple-400 opacity-80"
-                                        />
-                                        <div className="absolute inset-0 bg-black/40 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                                            <span className="text-white text-xs font-medium">Pending Upload</span>
-                                        </div>
-                                        <button
-                                            type="button"
-                                            onClick={() => removeImage(index, 'images', true)}
-                                            className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 rounded-full flex items-center justify-center text-white opacity-0 group-hover:opacity-100 transition-opacity z-10 shadow-lg"
-                                        >
-                                            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                                            </svg>
-                                        </button>
-                                    </div>
-                                ))}
-                                {(formData.images.length + newImages.length) < 5 && (
+                                {orderedImages.length < 5 && (
                                     <div className="w-full h-full aspect-square relative rounded-xl overflow-hidden hover:bg-zinc-50 dark:hover:bg-white/5 transition-colors">
                                         <FileUpload onChange={(files) => {
-                                            if (files.length > 0) {
-                                                handleImageUpload({ target: { files } } as any, 'images');
-                                            }
+                                            if (files.length > 0) handleImageUpload({ target: { files } } as any, 'images');
                                         }} />
                                     </div>
                                 )}
@@ -746,17 +759,39 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                             <label className="block text-sm font-medium text-zinc-700 dark:text-white/80">
                                 地圖 (最多 2 張)
                             </label>
+                            <p className="text-xs text-zinc-500 dark:text-white/40">第一張為主要顯示</p>
                             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                                {formData.geoMaps.map((img, index) => (
-                                    <div key={`remote-geo-${index}`} className="relative group aspect-square">
+                                {orderedGeoMaps.map((item, index) => (
+                                    <div
+                                        key={`geo-${index}`}
+                                        draggable
+                                        onDragStart={(e) => { e.dataTransfer.setData('text/plain', `geoMaps:${index}`); e.dataTransfer.effectAllowed = 'move'; }}
+                                        onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; (e.currentTarget as HTMLElement).classList.add('ring-2', 'ring-purple-500'); }}
+                                        onDragLeave={(e) => { (e.currentTarget as HTMLElement).classList.remove('ring-2', 'ring-purple-500'); }}
+                                        onDrop={(e) => {
+                                            e.preventDefault();
+                                            (e.currentTarget as HTMLElement).classList.remove('ring-2', 'ring-purple-500');
+                                            const raw = e.dataTransfer.getData('text/plain');
+                                            if (raw.startsWith('geoMaps:')) {
+                                                const from = parseInt(raw.slice(8), 10);
+                                                if (!isNaN(from) && from !== index) moveMediaItem('geoMaps', from, index);
+                                            }
+                                        }}
+                                        className="relative group aspect-square cursor-grab active:cursor-grabbing rounded-xl border border-zinc-200 dark:border-white/10 transition-all"
+                                    >
                                         <img
-                                            src={img}
+                                            src={typeof item === 'string' ? item : item.preview}
                                             alt={`Geo Map ${index + 1}`}
-                                            className="w-full h-full object-cover rounded-xl border border-zinc-200 dark:border-white/10"
+                                            className="w-full h-full object-cover rounded-xl pointer-events-none"
                                         />
+                                        {typeof item === 'object' && (
+                                            <div className="absolute inset-0 bg-black/40 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center pointer-events-none">
+                                                <span className="text-white text-xs font-medium">Pending Upload</span>
+                                            </div>
+                                        )}
                                         <button
                                             type="button"
-                                            onClick={() => removeImage(index, 'geoMaps')}
+                                            onClick={() => removeMediaItem(index, 'geoMaps')}
                                             className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 rounded-full flex items-center justify-center text-white opacity-0 group-hover:opacity-100 transition-opacity z-10 shadow-lg"
                                         >
                                             <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -765,33 +800,10 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                                         </button>
                                     </div>
                                 ))}
-                                {newGeoMaps.map((img, index) => (
-                                    <div key={`local-geo-${index}`} className="relative group aspect-square">
-                                        <img
-                                            src={img.preview}
-                                            alt={`New Geo Map ${index + 1}`}
-                                            className="w-full h-full object-cover rounded-xl border border-dashed border-purple-400 opacity-80"
-                                        />
-                                        <div className="absolute inset-0 bg-black/40 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                                            <span className="text-white text-xs font-medium">Pending Upload</span>
-                                        </div>
-                                        <button
-                                            type="button"
-                                            onClick={() => removeImage(index, 'geoMaps', true)}
-                                            className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 rounded-full flex items-center justify-center text-white opacity-0 group-hover:opacity-100 transition-opacity z-10 shadow-lg"
-                                        >
-                                            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                                            </svg>
-                                        </button>
-                                    </div>
-                                ))}
-                                {(formData.geoMaps.length + newGeoMaps.length) < 2 && (
+                                {orderedGeoMaps.length < 2 && (
                                     <div className="w-full h-full aspect-square relative rounded-xl overflow-hidden hover:bg-zinc-50 dark:hover:bg-white/5 transition-colors">
                                         <FileUpload onChange={(files) => {
-                                            if (files.length > 0) {
-                                                handleImageUpload({ target: { files } } as any, 'geoMaps');
-                                            }
+                                            if (files.length > 0) handleImageUpload({ target: { files } } as any, 'geoMaps');
                                         }} />
                                     </div>
                                 )}
