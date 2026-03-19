@@ -16,18 +16,25 @@ const ReactQuill = dynamic(() => import('react-quill-new'), {
     loading: () => <div className="h-[150px] w-full bg-zinc-100 dark:bg-white/5 animate-pulse rounded-xl" />
 });
 
+type RentTypeValue = 'rent_out' | 'renting' | 'contract';
+
 interface RentModalProps {
     propertyId?: string;
     defaultLocation?: string;
-    rent?: Rent | null; // For editing existing rent
-    initialProprietorId?: string; // For creating rent for a specific proprietor (業主)
+    /** 預設類型；建立時若傳入 allowedTypes 會受其限制 */
+    defaultType?: RentTypeValue;
+    /** 僅顯示這些類型選項；不傳則顯示全部（收租、交租、合約記錄） */
+    allowedTypes?: RentTypeValue[];
+    rent?: Rent | null;
+    initialProprietorId?: string;
     onClose: () => void;
     onSuccess: (rentId: string) => void;
 }
 
-const rentTypes = [
-    { value: 'rent_out', label: '收租' },
-    { value: 'renting', label: '交租' },
+const allRentTypes = [
+    { value: 'rent_out' as const, label: '收租' },
+    { value: 'renting' as const, label: '交租' },
+    { value: 'contract' as const, label: '合約記錄' },
 ];
 
 const rentOutStatuses = [
@@ -36,7 +43,16 @@ const rentOutStatuses = [
     { value: 'completed', label: '已完租' },
 ];
 
-export default function RentModal({ propertyId, defaultLocation, rent, initialProprietorId, onClose, onSuccess }: RentModalProps) {
+export default function RentModal({
+    propertyId,
+    defaultLocation,
+    defaultType,
+    allowedTypes,
+    rent,
+    initialProprietorId,
+    onClose,
+    onSuccess,
+}: RentModalProps) {
     const queryClient = useQueryClient();
     const { addRent, updateRent } = useRents();
     const { getProprietors } = useProprietors();
@@ -54,8 +70,12 @@ export default function RentModal({ propertyId, defaultLocation, rent, initialPr
     const { data: subLandlords = [] } = useSubLandlordsQuery();
     const { data: currentTenants = [] } = useCurrentTenantsQuery();
 
+    // Determine effective types for the type selector
+    const effectiveTypes = allowedTypes && allowedTypes.length > 0
+        ? allRentTypes.filter(t => allowedTypes.includes(t.value))
+        : allRentTypes;
+
     const [formData, setFormData] = useState(() => {
-        // Helper function to format date for input
         const formatDate = (date: any) => {
             if (!date) return '';
             const d = new Date(date);
@@ -63,13 +83,11 @@ export default function RentModal({ propertyId, defaultLocation, rent, initialPr
         };
 
         if (rent) {
-            // Edit mode - populate with existing data
             return {
-                type: rent.type || 'rent_out' as 'rent_out' | 'renting',
+                type: rent.type as RentTypeValue,
                 propertyId: rent.propertyId || propertyId || '',
                 tenantId: rent.tenantId || '',
                 proprietorId: rent.proprietorId || '',
-                // Rent Out Fields
                 rentOutTenancyNumber: rent.rentOutTenancyNumber || '',
                 rentOutPricing: rent.rentOutPricing?.toString() || '',
                 rentOutMonthlyRental: rent.rentOutMonthlyRental?.toString() || '',
@@ -101,7 +119,6 @@ export default function RentModal({ propertyId, defaultLocation, rent, initialPr
                     if (Array.isArray(ids)) return ids;
                     return [];
                 })(),
-                // Renting Fields
                 rentingNumber: rent.rentingNumber || '',
                 rentingReferenceNumber: rent.rentingReferenceNumber || '',
                 rentingMonthlyRental: rent.rentingMonthlyRental?.toString() || '',
@@ -112,9 +129,14 @@ export default function RentModal({ propertyId, defaultLocation, rent, initialPr
             };
         }
 
-        // Create mode - empty form (or pre-filled with initialProprietorId)
+        // Create mode
+        const allowed = allowedTypes && allowedTypes.length > 0;
+        const initialType = (allowed && defaultType && allowedTypes!.includes(defaultType))
+            ? defaultType
+            : (allowed ? allowedTypes![0] : (defaultType || 'rent_out'));
+
         return {
-            type: 'rent_out' as 'rent_out' | 'renting',
+            type: initialType as RentTypeValue,
             propertyId: propertyId || '',
             tenantId: '',
             proprietorId: initialProprietorId || '',
@@ -132,14 +154,14 @@ export default function RentModal({ propertyId, defaultLocation, rent, initialPr
             rentOutDepositReturnDate: '',
             rentOutDepositReturnAmount: '',
             rentOutLessor: '',
-            rentOutAddressDetail: defaultLocation || '', // Auto-fill
-            location: defaultLocation || '', // Legacy Auto-fill
+            rentOutAddressDetail: defaultLocation || '',
+            location: defaultLocation || '',
             rentOutStatus: 'listing' as 'listing' | 'renting' | 'completed',
             rentOutDescription: '',
             rentOutSubLandlord: '',
             rentOutSubLandlordId: '',
-            rentOutTenants: [],
-            rentOutTenantIds: [],
+            rentOutTenants: [] as string[],
+            rentOutTenantIds: [] as string[],
             rentingNumber: '',
             rentingReferenceNumber: '',
             rentingMonthlyRental: '',
@@ -165,18 +187,15 @@ export default function RentModal({ propertyId, defaultLocation, rent, initialPr
         loadData();
     }, [getProprietors, getProperties]);
 
-    // Auto-calculate rentOutTotalAmount
+    // Auto-calculate rentOutTotalAmount（收租 + 合約記錄 共用）
     useEffect(() => {
-        if (formData.type === 'rent_out') {
+        if (formData.type === 'rent_out' || formData.type === 'contract') {
             const monthly = parseFloat(formData.rentOutMonthlyRental);
             const periods = parseInt(formData.rentOutPeriods);
             const newTotal = (!isNaN(monthly) && !isNaN(periods)) ? (monthly * periods).toString() : '';
 
             if (formData.rentOutTotalAmount !== newTotal) {
-                setFormData(prev => ({
-                    ...prev,
-                    rentOutTotalAmount: newTotal
-                }));
+                setFormData(prev => ({ ...prev, rentOutTotalAmount: newTotal }));
             }
         }
     }, [formData.rentOutMonthlyRental, formData.rentOutPeriods, formData.type, formData.rentOutTotalAmount]);
@@ -205,6 +224,10 @@ export default function RentModal({ propertyId, defaultLocation, rent, initialPr
         e.preventDefault();
         if (formData.type === 'rent_out' && !formData.tenantId) {
             setError('請按「+ 新增」以新增承租人');
+            return;
+        }
+        if (formData.type === 'contract' && !formData.propertyId) {
+            setError('請選擇關聯的物業');
             return;
         }
         setSaving(true);
@@ -237,7 +260,7 @@ export default function RentModal({ propertyId, defaultLocation, rent, initialPr
                     rentOutDepositReturnDate: formData.rentOutDepositReturnDate ? new Date(formData.rentOutDepositReturnDate) : undefined,
                     rentOutDepositReturnAmount: parseFloat(formData.rentOutDepositReturnAmount) || undefined,
                     rentOutAddressDetail: formData.rentOutAddressDetail || defaultLocation,
-                    location: formData.rentOutAddressDetail || defaultLocation, // Sync to primary address field
+                    location: formData.rentOutAddressDetail || defaultLocation,
                     rentOutStatus: formData.rentOutStatus,
                     rentOutDescription: formData.rentOutDescription,
                     rentOutSubLandlord: subLandlords.find(s => s.id === formData.rentOutSubLandlordId)?.name || formData.rentOutSubLandlord || undefined,
@@ -247,10 +270,10 @@ export default function RentModal({ propertyId, defaultLocation, rent, initialPr
                         : (formData.rentOutTenants || []).filter(Boolean).length > 0 ? formData.rentOutTenants : undefined,
                     rentOutTenantIds: (formData.rentOutTenantIds || []).length > 0 ? formData.rentOutTenantIds : undefined,
                 };
-            } else {
+            } else if (formData.type === 'renting') {
                 rentData = {
                     ...rentData,
-                    location: formData.location || defaultLocation, // Sync legacy location
+                    location: formData.location || defaultLocation,
                     rentingNumber: formData.rentingNumber,
                     rentingReferenceNumber: formData.rentingReferenceNumber,
                     rentingMonthlyRental: parseFloat(formData.rentingMonthlyRental) || undefined,
@@ -259,9 +282,37 @@ export default function RentModal({ propertyId, defaultLocation, rent, initialPr
                     rentingEndDate: formData.rentingEndDate ? new Date(formData.rentingEndDate) : undefined,
                     rentingDeposit: parseFloat(formData.rentingDeposit) || undefined,
                 };
+            } else if (formData.type === 'contract') {
+                // 合約記錄：以 rentOut* 欄位儲存
+                rentData = {
+                    ...rentData,
+                    rentOutTenancyNumber: formData.rentOutTenancyNumber,
+                    rentOutPricing: parseFloat(formData.rentOutPricing) || undefined,
+                    rentOutMonthlyRental: parseFloat(formData.rentOutMonthlyRental) || undefined,
+                    rentOutPeriods: parseInt(formData.rentOutPeriods) || undefined,
+                    rentOutTotalAmount: parseFloat(formData.rentOutTotalAmount) || undefined,
+                    rentOutStartDate: formData.rentOutStartDate ? new Date(formData.rentOutStartDate) : undefined,
+                    rentOutEndDate: formData.rentOutEndDate ? new Date(formData.rentOutEndDate) : undefined,
+                    rentOutActualEndDate: formData.rentOutActualEndDate ? new Date(formData.rentOutActualEndDate) : undefined,
+                    rentOutDepositReceived: parseFloat(formData.rentOutDepositReceived) || undefined,
+                    rentOutDepositReceiptNumber: formData.rentOutDepositReceiptNumber || undefined,
+                    rentOutDepositReceiveDate: formData.rentOutDepositReceiveDate ? new Date(formData.rentOutDepositReceiveDate) : undefined,
+                    rentOutDepositReturnDate: formData.rentOutDepositReturnDate ? new Date(formData.rentOutDepositReturnDate) : undefined,
+                    rentOutDepositReturnAmount: parseFloat(formData.rentOutDepositReturnAmount) || undefined,
+                    rentOutAddressDetail: formData.rentOutAddressDetail || defaultLocation,
+                    location: formData.rentOutAddressDetail || defaultLocation,
+                    rentOutStatus: formData.rentOutStatus,
+                    rentOutDescription: formData.rentOutDescription,
+                    rentOutLessor: formData.rentOutLessor || undefined,
+                    rentOutSubLandlord: subLandlords.find(s => s.id === formData.rentOutSubLandlordId)?.name || formData.rentOutSubLandlord || undefined,
+                    rentOutSubLandlordId: formData.rentOutSubLandlordId || undefined,
+                    rentOutTenants: (formData.rentOutTenantIds || []).length > 0
+                        ? (formData.rentOutTenantIds || []).map(id => currentTenants.find(ct => ct.id === id)?.name || id)
+                        : (formData.rentOutTenants || []).filter(Boolean).length > 0 ? formData.rentOutTenants : undefined,
+                    rentOutTenantIds: (formData.rentOutTenantIds || []).length > 0 ? formData.rentOutTenantIds : undefined,
+                };
             }
 
-            // Edit or create based on whether rent prop exists
             if (rent?.id) {
                 const success = await updateRent(rent.id, rentData);
                 if (success) {
@@ -289,6 +340,17 @@ export default function RentModal({ propertyId, defaultLocation, rent, initialPr
     const inputClass = "w-full px-4 py-3 bg-zinc-50 dark:bg-white/5 border border-zinc-200 dark:border-white/10 rounded-xl text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-purple-500/50 transition-all";
     const labelClass = "block text-sm font-medium text-zinc-700 dark:text-white/80 mb-1";
 
+    const getTitle = () => {
+        if (rent) {
+            if (formData.type === 'rent_out') return '編輯出租記錄 (收租)';
+            if (formData.type === 'renting') return '編輯租賃記錄 (交租)';
+            return '編輯合約記錄';
+        }
+        if (formData.type === 'rent_out') return '新增出租記錄 (收租)';
+        if (formData.type === 'renting') return '新增租賃記錄 (交租)';
+        return '新增合約記錄';
+    };
+
     return (
         <>
             {/* Backdrop */}
@@ -310,13 +372,7 @@ export default function RentModal({ propertyId, defaultLocation, rent, initialPr
                 {/* Header */}
                 <div className="flex items-center justify-between p-5 border-b border-zinc-100 dark:border-white/5">
                     <div>
-                        <h2 className="text-lg font-bold text-zinc-900 dark:text-white">
-                            {rent ? (
-                                formData.type === 'rent_out' ? '編輯出租合約 (收租)' : '編輯租賃合約 (交租)'
-                            ) : (
-                                formData.type === 'rent_out' ? '新增出租合約 (收租)' : '新增租賃合約 (交租)'
-                            )}
-                        </h2>
+                        <h2 className="text-lg font-bold text-zinc-900 dark:text-white">{getTitle()}</h2>
                     </div>
                     <button
                         onClick={onClose}
@@ -337,20 +393,25 @@ export default function RentModal({ propertyId, defaultLocation, rent, initialPr
                     )}
 
                     {/* Type Selector */}
-                    <div className="space-y-2">
-                        <label className={labelClass}>類型 *</label>
-                        <select
-                            name="type"
-                            value={formData.type}
-                            onChange={handleChange}
-                            required
-                            className={inputClass}
-                        >
-                            {rentTypes.map(t => (
-                                <option key={t.value} value={t.value} className="bg-white dark:bg-[#1a1a2e]">{t.label}</option>
-                            ))}
-                        </select>
-                    </div>
+                    {effectiveTypes.length > 1 && (
+                        <div className="space-y-2">
+                            <label className={labelClass}>類型 *</label>
+                            <select
+                                name="type"
+                                value={formData.type}
+                                onChange={handleChange}
+                                required
+                                className={inputClass}
+                            >
+                                {effectiveTypes.map(t => (
+                                    <option key={t.value} value={t.value} className="bg-white dark:bg-[#1a1a2e]">{t.label}</option>
+                                ))}
+                            </select>
+                        </div>
+                    )}
+                    {effectiveTypes.length === 1 && (
+                        <input type="hidden" name="type" value={formData.type} />
+                    )}
 
                     {/* Property and Tenant Selection */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -380,13 +441,11 @@ export default function RentModal({ propertyId, defaultLocation, rent, initialPr
                             )}
                         </div>
                         <div className="space-y-2">
-                            <label className={labelClass}>
-                                {formData.type === 'rent_out' ? '承租人' : '資產擁有方'}
-                            </label>
+                            <label className={labelClass}>承租人</label>
                             <div className="flex gap-2 items-center">
-                                {formData.type === 'rent_out' ? (
+                                {(formData.type === 'rent_out' || formData.type === 'renting' || formData.type === 'contract') ? (
                                     <>
-                                        <div className={`flex-1 px-4 py-3 rounded-xl border min-h-[44px] flex items-center justify-between gap-2 ${formData.tenantId ? 'bg-zinc-50 dark:bg-white/5 border-zinc-200 dark:border-white/10' : 'bg-zinc-50 dark:bg-white/5 border-zinc-200 dark:border-white/10'}`}>
+                                        <div className={`flex-1 px-4 py-3 rounded-xl border min-h-[44px] flex items-center justify-between gap-2 bg-zinc-50 dark:bg-white/5 border-zinc-200 dark:border-white/10`}>
                                             {formData.tenantId ? (
                                                 <>
                                                     <span className="text-zinc-900 dark:text-white font-medium">
@@ -413,43 +472,14 @@ export default function RentModal({ propertyId, defaultLocation, rent, initialPr
                                             + 新增
                                         </button>
                                     </>
-                                ) : (
-                                    <>
-                                        {loadingData ? (
-                                            <div className="flex-1 px-4 py-3 bg-zinc-50 dark:bg-white/5 border border-zinc-200 dark:border-white/10 rounded-xl flex items-center gap-2">
-                                                <motion.div animate={{ opacity: [0.3, 1, 0.3] }} transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut" }} className="w-4 h-4 rounded-full bg-purple-500" />
-                                                <span className="text-zinc-400 dark:text-white/40">載入中...</span>
-                                            </div>
-                                        ) : (
-                                            <select
-                                                name="proprietorId"
-                                                value={formData.proprietorId}
-                                                onChange={handleChange}
-                                                className={`${inputClass} flex-1`}
-                                            >
-                                                <option value="" className="bg-white dark:bg-[#1a1a2e]">選擇資產擁有方...</option>
-                                                {proprietors.filter(p => !p.code?.startsWith('T')).sort((a, b) => (a.name?.length || 0) - (b.name?.length || 0)).map(p => (
-                                                    <option key={p.id} value={p.id} className="bg-white dark:bg-[#1a1a2e]">{p.name}</option>
-                                                ))}
-                                            </select>
-                                        )}
-                                        <button
-                                            type="button"
-                                            onClick={() => setShowProprietorModal(true)}
-                                            className="px-4 py-2 bg-purple-50 dark:bg-purple-500/20 text-purple-600 dark:text-purple-400 rounded-xl hover:bg-purple-100 dark:hover:bg-purple-500/30 border border-purple-100 dark:border-purple-500/30 text-sm font-medium transition-all duration-300 h-[42px] whitespace-nowrap"
-                                        >
-                                            + 新增
-                                        </button>
-                                    </>
-                                )}
+                                ) : null}
                             </div>
                         </div>
                     </div>
 
-                    {/* ===== RENT OUT FORM (收租) ===== */}
-                    {formData.type === 'rent_out' && (
+                    {/* ===== 承租人 / 二房東 / 現時租客 — 收租、交租、合約記錄 共用 ===== */}
+                    {(formData.type === 'rent_out' || formData.type === 'renting' || formData.type === 'contract') && (
                         <>
-                            {/* 二房東 & 現時租客 - at top */}
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div className="space-y-2">
                                     <label className={labelClass}>二房東</label>
@@ -498,7 +528,7 @@ export default function RentModal({ propertyId, defaultLocation, rent, initialPr
                                                     {(formData.rentOutTenantIds || []).map(id => {
                                                         const t = currentTenants.find(ct => ct.id === id);
                                                         return (
-                                                                            <span key={id} className="inline-flex items-center gap-1 px-2 py-1 bg-purple-50 dark:bg-purple-500/20 rounded-lg text-sm">
+                                                            <span key={id} className="inline-flex items-center gap-1 px-2 py-1 bg-purple-50 dark:bg-purple-500/20 rounded-lg text-sm">
                                                                 {t?.name || id}
                                                                 <button type="button" onClick={() => { setEditCurrentTenant(t ? { ...t, id } : { id, name: String(id), createdAt: new Date(), updatedAt: new Date() }); setShowCurrentTenantModal(true); }} className="p-0.5 hover:text-purple-500" title="編輯">✎</button>
                                                                 <button type="button" onClick={() => setFormData(prev => ({ ...prev, rentOutTenantIds: (prev.rentOutTenantIds || []).filter(x => x !== id) }))} className="p-0.5 hover:text-red-500">×</button>
@@ -519,7 +549,6 @@ export default function RentModal({ propertyId, defaultLocation, rent, initialPr
                                         </button>
                                     </div>
                                     <p className="text-xs text-zinc-400 dark:text-white/40">請按「+ 新增租客」以新增</p>
-                                    {/* Add from existing */}
                                     {currentTenants.filter(ct => !(formData.rentOutTenantIds || []).includes(ct.id!)).length > 0 && (
                                         <select
                                             value=""
@@ -537,7 +566,12 @@ export default function RentModal({ propertyId, defaultLocation, rent, initialPr
                                     )}
                                 </div>
                             </div>
+                        </>
+                    )}
 
+                    {/* ===== RENT OUT FORM (收租) ===== */}
+                    {formData.type === 'rent_out' && (
+                        <>
                             <div className="border-t border-zinc-200 dark:border-white/10 pt-4 mt-4">
                                 <h3 className="text-sm font-semibold text-purple-600 dark:text-purple-400 mb-4">出租合約資料</h3>
                             </div>
@@ -706,6 +740,129 @@ export default function RentModal({ propertyId, defaultLocation, rent, initialPr
                                 <div className="space-y-2">
                                     <label className={labelClass}>租借位置 / 地址</label>
                                     <input type="text" name="location" value={formData.location} onChange={handleChange} className={inputClass} placeholder="詳細地址" />
+                                </div>
+                            </div>
+                        </>
+                    )}
+
+                    {/* ===== CONTRACT FORM (合約記錄) — 使用出租資料欄位 ===== */}
+                    {formData.type === 'contract' && (
+                        <>
+                            <div className="border-t border-zinc-200 dark:border-white/10 pt-4 mt-4">
+                                <h3 className="text-sm font-semibold text-amber-600 dark:text-amber-400 mb-4">出租合約資料</h3>
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div className="space-y-2">
+                                    <label className={labelClass}>出租合約號碼 *</label>
+                                    <input type="text" name="rentOutTenancyNumber" value={formData.rentOutTenancyNumber} onChange={handleChange} required className={inputClass} placeholder="RO-001" />
+                                </div>
+                                <div className="space-y-2">
+                                    <label className={labelClass}>出租合約放盤價</label>
+                                    <input type="text" name="rentOutPricing" value={formatNumberWithCommas(formData.rentOutPricing)} onChange={(e) => handlePriceChange('rentOutPricing', e.target.value)} className={inputClass} placeholder="0" />
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div className="space-y-2">
+                                    <label className={labelClass}>出租合約月租 *</label>
+                                    <input type="text" name="rentOutMonthlyRental" value={formatNumberWithCommas(formData.rentOutMonthlyRental)} onChange={(e) => handlePriceChange('rentOutMonthlyRental', e.target.value)} required className={inputClass} placeholder="50,000" />
+                                </div>
+                                <div className="space-y-2">
+                                    <label className={labelClass}>出租合約期數 (月)</label>
+                                    <input type="number" name="rentOutPeriods" value={formData.rentOutPeriods} onChange={handleChange} className={inputClass} placeholder="12" />
+                                </div>
+                            </div>
+
+                            <div className="space-y-2">
+                                <label className={labelClass}>出租合約總額</label>
+                                <input
+                                    type="text"
+                                    name="rentOutTotalAmount"
+                                    value={formatNumberWithCommas(formData.rentOutTotalAmount)}
+                                    readOnly
+                                    className={`${inputClass} bg-zinc-100 dark:bg-white/5 cursor-not-allowed opacity-80`}
+                                    placeholder="自動計算"
+                                />
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div className="space-y-2">
+                                    <label className={labelClass}>出租合約開始日期</label>
+                                    <input type="date" name="rentOutStartDate" value={formData.rentOutStartDate} onChange={handleChange} className={inputClass} />
+                                </div>
+                                <div className="space-y-2">
+                                    <label className={labelClass}>出租合約結束日期</label>
+                                    <input type="date" name="rentOutEndDate" value={formData.rentOutEndDate} onChange={handleChange} className={inputClass} />
+                                </div>
+                            </div>
+
+                            <div className="space-y-2">
+                                <label className={labelClass}>出租合約實際結束日期</label>
+                                <input type="date" name="rentOutActualEndDate" value={formData.rentOutActualEndDate} onChange={handleChange} className={inputClass} />
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div className="space-y-2">
+                                    <label className={labelClass}>出租合約按金</label>
+                                    <input type="text" name="rentOutDepositReceived" value={formatNumberWithCommas(formData.rentOutDepositReceived)} onChange={(e) => handlePriceChange('rentOutDepositReceived', e.target.value)} className={inputClass} placeholder="100,000" />
+                                </div>
+                                <div className="space-y-2">
+                                    <label className={labelClass}>按金收據號碼</label>
+                                    <input type="text" name="rentOutDepositReceiptNumber" value={formData.rentOutDepositReceiptNumber} onChange={handleChange} className={inputClass} placeholder="請輸入按金收據號碼" />
+                                </div>
+                            </div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div className="space-y-2">
+                                    <label className={labelClass}>按金收取日期</label>
+                                    <input type="date" name="rentOutDepositReceiveDate" value={formData.rentOutDepositReceiveDate} onChange={handleChange} className={inputClass} />
+                                </div>
+                                <div className="space-y-2">
+                                    <label className={labelClass}>按金退回日期</label>
+                                    <input type="date" name="rentOutDepositReturnDate" value={formData.rentOutDepositReturnDate} onChange={handleChange} className={inputClass} />
+                                </div>
+                            </div>
+                            <div className="space-y-2">
+                                <label className={labelClass}>按金退回金額</label>
+                                <input type="text" name="rentOutDepositReturnAmount" value={formatNumberWithCommas(formData.rentOutDepositReturnAmount)} onChange={(e) => handlePriceChange('rentOutDepositReturnAmount', e.target.value)} className={inputClass} placeholder="100,000" />
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div className="space-y-2">
+                                    <label className={labelClass}>出租合約出租人</label>
+                                    <input type="text" name="rentOutLessor" value={formData.rentOutLessor} onChange={handleChange} className={inputClass} placeholder="公司名稱 / 個人名稱" />
+                                </div>
+                                <div className="space-y-2">
+                                    <label className={labelClass}>租借位置 / 地址</label>
+                                    <input type="text" name="rentOutAddressDetail" value={formData.rentOutAddressDetail} onChange={handleChange} className={inputClass} placeholder="詳細地址" />
+                                </div>
+                            </div>
+
+                            <div className="space-y-2">
+                                <label className={labelClass}>出租合約租務狀態</label>
+                                <select name="rentOutStatus" value={formData.rentOutStatus} onChange={handleChange} className={inputClass}>
+                                    {rentOutStatuses.map(s => (
+                                        <option key={s.value} value={s.value} className="bg-white dark:bg-[#1a1a2e]">{s.label}</option>
+                                    ))}
+                                </select>
+                            </div>
+
+                            <div className="space-y-2">
+                                <label className={labelClass}>出租合約描述</label>
+                                <div className="rich-text-editor">
+                                    <style jsx global>{`
+                                        .rich-text-editor .ql-toolbar { border-radius: 12px 12px 0 0; border-color: var(--border-color); background: var(--bg-color); }
+                                        .rich-text-editor .ql-container { border-radius: 0 0 12px 12px; border-color: var(--border-color); background: var(--bg-color); min-height: 120px; }
+                                        .rich-text-editor .ql-editor { color: inherit; min-height: 100px; }
+                                        :root { --border-color: #e5e7eb; --bg-color: #f9fafb; }
+                                        .dark { --border-color: rgba(255,255,255,0.1); --bg-color: rgba(255,255,255,0.05); }
+                                    `}</style>
+                                    <ReactQuill
+                                        theme="snow"
+                                        value={formData.rentOutDescription}
+                                        onChange={(content) => setFormData(prev => ({ ...prev, rentOutDescription: content }))}
+                                        placeholder="合約描述或備註..."
+                                    />
                                 </div>
                             </div>
                         </>

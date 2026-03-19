@@ -61,6 +61,7 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
 
     const [showProprietorModal, setShowProprietorModal] = useState(false);
     const [showRentModal, setShowRentModal] = useState(false);
+    const [showContractModal, setShowContractModal] = useState(false);
     const [createRentForProprietorId, setCreateRentForProprietorId] = useState<string | null>(null);
     const [showLotAddModal, setShowLotAddModal] = useState(false);
     const [lotAddMode, setLotAddMode] = useState<'new' | 'old' | null>(null);
@@ -156,6 +157,7 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
 
     const rentOutRents = useMemo(() => rents.filter(r => r.type === 'rent_out'), [rents]);
     const rentingRents = useMemo(() => rents.filter(r => r.type === 'renting'), [rents]);
+    const contractRents = useMemo(() => rents.filter(r => r.type === 'contract'), [rents]);
 
     const renderRentTable = (records: Rent[]) => {
         if (records.length === 0) {
@@ -178,23 +180,23 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                 </div>
                 {records.map((rent) => {
                     const otherParty = rent.tenant || rent.proprietor || (proprietors || []).find(p => p.id === (rent.tenantId || rent.proprietorId));
-                    const startDate = rent.type === 'rent_out'
+                    const startDate = rent.type === 'rent_out' || rent.type === 'contract'
                         ? (rent.rentOutStartDate ? new Date(rent.rentOutStartDate) : null)
                         : (rent.rentingStartDate ? new Date(rent.rentingStartDate) : (rent.startDate ? new Date(rent.startDate) : null));
-                    const endDate = rent.type === 'rent_out'
+                    const endDate = rent.type === 'rent_out' || rent.type === 'contract'
                         ? (rent.rentOutEndDate ? new Date(rent.rentOutEndDate) : null)
                         : (rent.rentingEndDate ? new Date(rent.rentingEndDate) : (rent.endDate ? new Date(rent.endDate) : null));
-                    const monthlyRent = rent.type === 'rent_out'
+                    const monthlyRent = rent.type === 'rent_out' || rent.type === 'contract'
                         ? (rent.rentOutMonthlyRental || rent.amount || 0)
                         : (rent.rentingMonthlyRental || rent.amount || 0);
 
                     const months = startDate && endDate
                         ? Math.round((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24 * 30))
-                        : (rent.type === 'rent_out' ? rent.rentOutPeriods : rent.rentingPeriods) || 0;
+                        : (rent.type === 'rent_out' || rent.type === 'contract' ? rent.rentOutPeriods : rent.rentingPeriods) || 0;
 
-                    const contractNumber = rent.type === 'rent_out'
+                    const contractNumber = rent.type === 'rent_out' || rent.type === 'contract'
                         ? (rent.rentOutTenancyNumber || `-`)
-                        : (rent.rentingNumber || `-`);
+                        : (rent.rentingNumber || `*`);
 
                     const isExpired = endDate ? endDate < new Date() : false;
 
@@ -205,8 +207,10 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                                 <div className="flex items-center gap-1 flex-wrap">
                                     <span className={`text-[10px] px-2 py-0.5 rounded-full w-fit font-bold tracking-wider ${rent.type === 'rent_out'
                                         ? 'bg-emerald-100 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-200/50 dark:border-emerald-500/20'
+                                        : rent.type === 'contract'
+                                        ? 'bg-amber-100 dark:bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-200/50 dark:border-amber-500/20'
                                         : 'bg-indigo-100 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-200/50 dark:border-indigo-500/20'}`}>
-                                        {rent.type === 'rent_out' ? '收租' : '交租'}
+                                        {rent.type === 'rent_out' ? '收租' : rent.type === 'contract' ? '合約記錄' : '交租'}
                                     </span>
                                     {isExpired && (
                                         <span className="text-[10px] px-2 py-0.5 rounded-full w-fit font-bold tracking-wider bg-red-100 dark:bg-red-500/20 text-red-600 dark:text-red-400 border border-red-200/50 dark:border-red-500/30">
@@ -217,7 +221,7 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                             </div>
                             <div className="flex flex-col overflow-hidden">
                                 <span className="font-semibold text-zinc-900 dark:text-white truncate">
-                                    {otherParty?.name || (rent.type === 'renting' ? '(暫缺)' : '-')}
+                                    {rent.type === 'contract' ? (rent.rentOutLessor || otherParty?.name || '-') : (otherParty?.name || (rent.type === 'renting' ? '(暫缺)' : '-'))}
                                 </span>
                                 {otherParty?.shortName && (
                                     <span className="text-xs text-zinc-500 dark:text-white/50 truncate uppercase">
@@ -1302,16 +1306,28 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                             <div className="flex items-center justify-between">
                                 <label className="block text-base font-bold text-zinc-900 dark:text-white uppercase tracking-wider">租務管理</label>
                                 {isAuthenticated && (
-                                    <button
-                                        type="button"
-                                        onClick={() => setShowRentModal(true)}
-                                        className="px-4 py-2 bg-purple-50 dark:bg-purple-500/20 text-purple-600 dark:text-purple-400 rounded-xl hover:bg-purple-100 dark:hover:bg-purple-500/30 border border-purple-100 dark:border-purple-500/30 text-sm font-medium transition-all duration-300 flex items-center gap-2"
-                                    >
-                                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
-                                        </svg>
-                                        新增租約記錄
-                                    </button>
+                                    <div className="flex items-center gap-2">
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowContractModal(true)}
+                                            className="px-4 py-2 bg-amber-50 dark:bg-amber-500/20 text-amber-600 dark:text-amber-400 rounded-xl hover:bg-amber-100 dark:hover:bg-amber-500/30 border border-amber-100 dark:border-amber-500/30 text-sm font-medium transition-all duration-300 flex items-center gap-2"
+                                        >
+                                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                            </svg>
+                                            新增合約記錄
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowRentModal(true)}
+                                            className="px-4 py-2 bg-purple-50 dark:bg-purple-500/20 text-purple-600 dark:text-purple-400 rounded-xl hover:bg-purple-100 dark:hover:bg-purple-500/30 border border-purple-100 dark:border-purple-500/30 text-sm font-medium transition-all duration-300 flex items-center gap-2"
+                                        >
+                                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
+                                            </svg>
+                                            新增交/收租記錄
+                                        </button>
+                                    </div>
                                 )}
                             </div>
 
@@ -1377,6 +1393,14 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                                         交租記錄 (Renting Records)
                                     </h4>
                                     {renderRentTable(rentingRents)}
+                                </div>
+
+                                <div>
+                                    <h4 className="text-base font-bold text-amber-700 dark:text-amber-400 mb-4 flex items-center gap-2 px-1">
+                                        <div className="w-2.5 h-2.5 rounded-full bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.5)]"></div>
+                                        合約記錄 (Contract Records)
+                                    </h4>
+                                    {renderRentTable(contractRents)}
                                 </div>
                             </div>
                         </div>
@@ -1471,17 +1495,37 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                 <RentModal
                     propertyId={property.id}
                     defaultLocation={formData.name}
+                    allowedTypes={['rent_out', 'renting']}
                     onClose={() => setShowRentModal(false)}
                     onSuccess={handleRentCreated}
                 />
             )}
 
-            {/* Create rent for proprietor (from 業主 row when no rent yet) */}
+            {/* Contract Modal (新增合約記錄) */}
+            {showContractModal && property?.id && (
+                <RentModal
+                    propertyId={property.id}
+                    defaultLocation={formData.name}
+                    defaultType="contract"
+                    allowedTypes={['contract']}
+                    onClose={() => setShowContractModal(false)}
+                    onSuccess={() => {
+                        setShowContractModal(false);
+                        queryClient.invalidateQueries({ queryKey: ['rents'] });
+                        queryClient.invalidateQueries({ queryKey: ['rents-with-relations'] });
+                        queryClient.invalidateQueries({ queryKey: ['properties-with-relations'] });
+                        addNotification('合約記錄已建立', 'update');
+                    }}
+                />
+            )}
+
+            {/* Create rent for proprietor (from 業主 row when no rent yet) — 僅收租/交租 */}
             {createRentForProprietorId && property?.id && (
                 <RentModal
                     propertyId={property.id}
                     defaultLocation={formData.name}
                     initialProprietorId={createRentForProprietorId}
+                    allowedTypes={['rent_out', 'renting']}
                     onClose={() => setCreateRentForProprietorId(null)}
                     onSuccess={handleRentCreated}
                 />
