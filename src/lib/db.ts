@@ -56,7 +56,7 @@ export interface Rent {
   propertyId: string;
   proprietorId?: string; // Landlord/Owner (optional now)
   tenantId?: string;     // The one renting
-  type: 'renting' | 'rent_out'; // 交租 or 收租
+  type: 'renting' | 'rent_out' | 'contract'; // 交租 or 收租 or 合約記錄
 
   // Legacy fields (kept for backward compatibility)
   location?: string; // 租借位置
@@ -98,6 +98,19 @@ export interface Rent {
   rentingStartDate?: Date;             // 租期開始日期
   rentingEndDate?: Date;               // 租期結束日期
   rentingDeposit?: number;             // 押金
+
+  // ===== CONTRACT (合約記錄) Fields =====
+  contractNumber?: string;             // 合約編號
+  contractType?: 'sale' | 'purchase' | 'management' | 'other'; // 合約類型
+  contractTitle?: string;              // 合約標題
+  contractParties?: string;            // 合約各方
+  contractValue?: number;              // 合約金額
+  contractCurrency?: string;           // 貨幣
+  contractStartDate?: Date;            // 合約開始日期
+  contractEndDate?: Date;              // 合約結束日期
+  contractStatus?: 'active' | 'pending' | 'completed' | 'cancelled' | 'expired';
+  contractDescription?: string;         // 合約描述/備註
+  contractDocumentUrl?: string;        // 合約文件連結
 
   createdBy?: string; // UUID of the user who created this record
   createdAt: Date;

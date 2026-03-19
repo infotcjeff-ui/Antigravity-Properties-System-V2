@@ -23,7 +23,7 @@
     "dashboard": "儀表板",
     "properties": "物業",
     "renting": "交租",
-    "rentOut": "收租",
+    "rentOut": "物业合约记录",
     "proprietors": "資產擁有方",
     "showAll": "關聯表"
   },
@@ -88,7 +88,7 @@
   },
   "rent": {
     "renting": "交租",
-    "rentOut": "收租",
+    "rentOut": "物业合约记录",
     "amount": "金額",
     "period": "期間",
     "status": "狀態",
