@@ -539,7 +539,7 @@ export default function RentModal({ propertyId, defaultLocation, rent, initialPr
                             </div>
 
                             <div className="border-t border-zinc-200 dark:border-white/10 pt-4 mt-4">
-                                <h3 className="text-sm font-semibold text-amber-600 dark:text-amber-400 mb-4">出租合約資料</h3>
+                                <h3 className="text-sm font-semibold text-purple-600 dark:text-purple-400 mb-4">出租合約資料</h3>
                             </div>
 
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

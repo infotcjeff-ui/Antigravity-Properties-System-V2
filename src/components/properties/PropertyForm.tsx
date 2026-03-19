@@ -47,7 +47,7 @@ const landUseTypes = [
 
 export default function PropertyForm({ property, onClose, onSuccess }: PropertyFormProps) {
     const queryClient = useQueryClient();
-    const { addProperty, updateProperty } = useProperties();
+    const { addProperty, updateProperty, error: propertiesError } = useProperties();
     const { data: proprietors, isLoading: propsLoading } = useProprietorsQuery();
     const { data: allRents, isLoading: rentsLoading } = useRentsQuery();
     const { updateRent, deleteRent } = useRents();
@@ -543,12 +543,18 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
 
             if (property?.id) {
                 const updated = await updateProperty(property.id, propertyData);
-                if (!updated) return; // Error already handled in hook
+                if (!updated) {
+                    setError(propertiesError || '儲存失敗，請檢查網路或稍後再試。Save failed.');
+                    return;
+                }
 
                 addNotification(`Property "${formData.name}" updated at ${timeStr}`, 'update');
             } else {
                 const newId = await addProperty(propertyData);
-                if (!newId) return; // Error already handled in hook
+                if (!newId) {
+                    setError(propertiesError || '新增失敗，請檢查網路或稍後再試。Create failed.');
+                    return;
+                }
 
                 addNotification(`Property "${formData.name}" created at ${timeStr}`, 'create');
             }
@@ -690,9 +696,9 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
 
                 {/* Form */}
                 <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6 space-y-6">
-                    {error && (
+                    {(error || propertiesError) && (
                         <div className="p-3 bg-red-500/20 border border-red-500/30 rounded-xl text-red-200 text-sm">
-                            {error}
+                            {error || propertiesError}
                         </div>
                     )}
 
