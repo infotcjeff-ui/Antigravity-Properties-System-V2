@@ -363,7 +363,7 @@ export default function RentModal({
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (formData.type === 'rent_out') {
+        if (formData.type === 'rent_out' || formData.type === 'renting') {
             if (!formData.propertyId) {
                 setError('請選擇物業');
                 return;
@@ -445,8 +445,24 @@ export default function RentModal({
                             : undefined,
                 };
             } else if (formData.type === 'renting') {
+                const paidAmt = parseFloat(formData.rentCollectionAmount);
                 rentData = {
                     ...rentData,
+                    status: 'completed' as const,
+                    amount: !Number.isNaN(paidAmt) ? paidAmt : undefined,
+                    startDate: formData.rentCollectionDate ? new Date(formData.rentCollectionDate) : undefined,
+                    notes: formData.rentCollectionNotes.trim(),
+                    rentCollectionTenantName: formData.rentCollectionTenantName.trim(),
+                    rentCollectionDate: formData.rentCollectionDate ? new Date(formData.rentCollectionDate) : undefined,
+                    rentCollectionAmount: paidAmt,
+                    rentCollectionPaymentMethod: formData.rentCollectionPaymentMethod,
+                    rentCollectionChequeBank: formData.rentCollectionPaymentMethod === 'cheque' ? formData.rentCollectionChequeBank.trim() : undefined,
+                    rentCollectionChequeNumber: formData.rentCollectionPaymentMethod === 'cheque' ? formData.rentCollectionChequeNumber.trim() : undefined,
+                    rentCollectionChequeImage:
+                        (formData.rentCollectionPaymentMethod === 'cheque' || formData.rentCollectionPaymentMethod === 'fps') &&
+                        formData.rentCollectionChequeImage
+                            ? formData.rentCollectionChequeImage
+                            : undefined,
                     location: formData.location || defaultLocation,
                     rentingNumber: formData.rentingNumber,
                     rentingReferenceNumber: formData.rentingReferenceNumber,
@@ -597,7 +613,7 @@ export default function RentModal({
                                         <span className="text-zinc-500 dark:text-white/40 mr-2">📍</span>
                                         {properties.find(p => p.id === formData.propertyId)?.name || 'Loading...'}
                                     </div>
-                                    {formData.type === 'rent_out' && (
+                                    {(formData.type === 'rent_out' || formData.type === 'renting' || formData.type === 'contract') && (
                                         <button
                                             type="button"
                                             onClick={openChildPropertyModal}
@@ -639,7 +655,7 @@ export default function RentModal({
                                             </optgroup>
                                         )}
                                     </select>
-                                    {formData.type === 'rent_out' && (
+                                    {(formData.type === 'rent_out' || formData.type === 'renting' || formData.type === 'contract') && (
                                         <button
                                             type="button"
                                             onClick={openChildPropertyModal}
@@ -650,7 +666,7 @@ export default function RentModal({
                                     )}
                                 </div>
                             )}
-                            {formData.type === 'rent_out' && (
+                            {(formData.type === 'rent_out' || formData.type === 'renting' || formData.type === 'contract') && (
                                 <p className="text-xs text-zinc-400 dark:text-white/40">「+ 子物業」會在主物業下新增一筆子物業，並可立即選用</p>
                             )}
                         </div>
@@ -959,51 +975,157 @@ export default function RentModal({
                     {formData.type === 'renting' && (
                         <>
                             <div className="border-t border-zinc-200 dark:border-white/10 pt-4 mt-4">
-                                <h3 className="text-sm font-semibold text-blue-600 dark:text-blue-400 mb-4">租賃合約資料</h3>
+                                <h3 className="text-sm font-semibold text-blue-600 dark:text-blue-400 mb-4">交租記錄</h3>
                             </div>
 
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div className="space-y-2">
-                                    <label className={labelClass}>我方租約號碼</label>
-                                    <input type="text" name="rentingNumber" value={formData.rentingNumber} onChange={handleChange} className={inputClass} placeholder="RT-001" />
+                                    <label className={labelClass}>租客名稱 *</label>
+                                    <input
+                                        type="text"
+                                        name="rentCollectionTenantName"
+                                        value={formData.rentCollectionTenantName}
+                                        onChange={handleChange}
+                                        required
+                                        className={inputClass}
+                                        placeholder="與收據一致之名稱"
+                                    />
                                 </div>
                                 <div className="space-y-2">
-                                    <label className={labelClass}>對方租約號碼</label>
-                                    <input type="text" name="rentingReferenceNumber" value={formData.rentingReferenceNumber} onChange={handleChange} className={inputClass} placeholder="LL-001" />
-                                </div>
-                            </div>
-
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div className="space-y-2">
-                                    <label className={labelClass}>每月租金金額</label>
-                                    <input type="text" name="rentingMonthlyRental" value={formatNumberWithCommas(formData.rentingMonthlyRental)} onChange={(e) => handlePriceChange('rentingMonthlyRental', e.target.value)} className={inputClass} placeholder="30,000" />
-                                </div>
-                                <div className="space-y-2">
-                                    <label className={labelClass}>租賃期限 (月)</label>
-                                    <input type="number" name="rentingPeriods" value={formData.rentingPeriods} onChange={handleChange} className={inputClass} placeholder="24" />
-                                </div>
-                            </div>
-
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div className="space-y-2">
-                                    <label className={labelClass}>租期開始日期</label>
-                                    <input type="date" name="rentingStartDate" value={formData.rentingStartDate} onChange={handleChange} className={inputClass} />
-                                </div>
-                                <div className="space-y-2">
-                                    <label className={labelClass}>租期結束日期</label>
-                                    <input type="date" name="rentingEndDate" value={formData.rentingEndDate} onChange={handleChange} className={inputClass} />
+                                    <label className={labelClass}>交租日期 *</label>
+                                    <input type="date" name="rentCollectionDate" value={formData.rentCollectionDate} onChange={handleChange} required className={inputClass} />
                                 </div>
                             </div>
 
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div className="space-y-2">
-                                    <label className={labelClass}>押金</label>
-                                    <input type="text" name="rentingDeposit" value={formatNumberWithCommas(formData.rentingDeposit)} onChange={(e) => handlePriceChange('rentingDeposit', e.target.value)} className={inputClass} placeholder="60,000" />
+                                    <label className={labelClass}>繳付金額 *</label>
+                                    <input
+                                        type="text"
+                                        name="rentCollectionAmount"
+                                        value={formatNumberWithCommas(formData.rentCollectionAmount)}
+                                        onChange={(e) => handlePriceChange('rentCollectionAmount', e.target.value)}
+                                        required
+                                        className={inputClass}
+                                        placeholder="30,000"
+                                    />
                                 </div>
                                 <div className="space-y-2">
-                                    <label className={labelClass}>租借位置 / 地址</label>
-                                    <input type="text" name="location" value={formData.location} onChange={handleChange} className={inputClass} placeholder="詳細地址" />
+                                    <label className={labelClass}>付款方式 *</label>
+                                    <select
+                                        name="rentCollectionPaymentMethod"
+                                        value={formData.rentCollectionPaymentMethod}
+                                        onChange={(e) => {
+                                            const v = e.target.value as '' | 'cheque' | 'fps' | 'cash';
+                                            setFormData(prev => ({
+                                                ...prev,
+                                                rentCollectionPaymentMethod: v,
+                                                ...(v === 'cheque'
+                                                    ? {}
+                                                    : v === 'fps'
+                                                        ? { rentCollectionChequeBank: '', rentCollectionChequeNumber: '' }
+                                                        : { rentCollectionChequeBank: '', rentCollectionChequeNumber: '', rentCollectionChequeImage: '' }),
+                                            }));
+                                        }}
+                                        required
+                                        className={inputClass}
+                                    >
+                                        <option value="" className="bg-white dark:bg-[#1a1a2e]">請選擇</option>
+                                        <option value="cheque" className="bg-white dark:bg-[#1a1a2e]">支票</option>
+                                        <option value="fps" className="bg-white dark:bg-[#1a1a2e]">FPS轉帳</option>
+                                        <option value="cash" className="bg-white dark:bg-[#1a1a2e]">現金</option>
+                                    </select>
                                 </div>
+                            </div>
+
+                            {formData.rentCollectionPaymentMethod === 'cheque' && (
+                                <div className="rounded-xl border border-blue-100 dark:border-blue-500/25 bg-blue-50/40 dark:bg-blue-500/10 p-4 space-y-4">
+                                    <p className="text-xs font-medium text-blue-700 dark:text-blue-300">支票資料</p>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <div className="space-y-2">
+                                            <label className={labelClass}>銀行 *</label>
+                                            <input
+                                                type="text"
+                                                name="rentCollectionChequeBank"
+                                                value={formData.rentCollectionChequeBank}
+                                                onChange={handleChange}
+                                                className={inputClass}
+                                                placeholder="例如：匯豐銀行"
+                                            />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <label className={labelClass}>支票號碼 *</label>
+                                            <input
+                                                type="text"
+                                                name="rentCollectionChequeNumber"
+                                                value={formData.rentCollectionChequeNumber}
+                                                onChange={handleChange}
+                                                className={inputClass}
+                                                placeholder="支票號碼"
+                                            />
+                                        </div>
+                                    </div>
+                                    <div className="space-y-2">
+                                        <label className={labelClass}>支票影像（選填）</label>
+                                        <div className="flex flex-wrap items-center gap-3">
+                                            <label className="px-4 py-2 rounded-xl border border-dashed border-zinc-300 dark:border-white/20 text-sm text-blue-600 dark:text-blue-400 cursor-pointer hover:bg-blue-50 dark:hover:bg-blue-500/10 transition-colors">
+                                                上載圖片
+                                                <input type="file" accept="image/*" className="hidden" onChange={onChequeImageChange} />
+                                            </label>
+                                            {formData.rentCollectionChequeImage && (
+                                                <>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setFormData(prev => ({ ...prev, rentCollectionChequeImage: '' }))}
+                                                        className="text-sm text-red-500 hover:underline"
+                                                    >
+                                                        移除
+                                                    </button>
+                                                    <img src={formData.rentCollectionChequeImage} alt="支票預覽" className="h-20 rounded-lg border border-zinc-200 dark:border-white/10 object-contain" />
+                                                </>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {formData.rentCollectionPaymentMethod === 'fps' && (
+                                <div className="rounded-xl border border-blue-100 dark:border-blue-500/25 bg-blue-50/40 dark:bg-blue-500/10 p-4 space-y-4">
+                                    <p className="text-xs font-medium text-blue-700 dark:text-blue-300">FPS 轉帳</p>
+                                    <div className="space-y-2">
+                                        <label className={labelClass}>轉帳證明／截圖（選填）</label>
+                                        <div className="flex flex-wrap items-center gap-3">
+                                            <label className="px-4 py-2 rounded-xl border border-dashed border-zinc-300 dark:border-white/20 text-sm text-blue-600 dark:text-blue-400 cursor-pointer hover:bg-blue-50 dark:hover:bg-blue-500/10 transition-colors">
+                                                上載圖片
+                                                <input type="file" accept="image/*" className="hidden" onChange={onChequeImageChange} />
+                                            </label>
+                                            {formData.rentCollectionChequeImage && (
+                                                <>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setFormData(prev => ({ ...prev, rentCollectionChequeImage: '' }))}
+                                                        className="text-sm text-red-500 hover:underline"
+                                                    >
+                                                        移除
+                                                    </button>
+                                                    <img src={formData.rentCollectionChequeImage} alt="轉帳證明預覽" className="h-20 rounded-lg border border-zinc-200 dark:border-white/10 object-contain" />
+                                                </>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            <div className="space-y-2">
+                                <label className={labelClass}>備註</label>
+                                <textarea
+                                    name="rentCollectionNotes"
+                                    value={formData.rentCollectionNotes}
+                                    onChange={handleChange}
+                                    rows={3}
+                                    className={inputClass}
+                                    placeholder="其他說明…"
+                                />
                             </div>
                         </>
                     )}
