@@ -29,6 +29,8 @@ export interface Property {
   updatedAt: Date;
   isDeleted?: boolean;
   deletedAt?: Date;
+  /** 主物業 id；有值時為子物業 */
+  parentPropertyId?: string;
 
   // Relations
   proprietor?: Proprietor;
@@ -39,11 +41,11 @@ export interface Property {
 export interface Proprietor {
   id?: string;
   name: string;
-  code: string; // Proprietor Code / 擁有方代碼 (A01, A02...)
-  type: 'company' | 'individual'; // Proprietor Property / 擁有方性質
+  code: string; // Proprietor Code / 業主代碼 (A01, A02...)
+  type: 'company' | 'individual'; // Proprietor Property / 業主性質
   category: 'group_company' | 'joint_venture' | 'managed_individual' | 'external_landlord' | 'tenant'; // Proprietor Type / 擁有人類別
-  englishName: string; // Proprietor English Name / 擁有方英文名稱
-  shortName: string; // Proprietor Short Name / 擁有方簡稱
+  englishName: string; // Proprietor English Name / 業主英文名稱
+  shortName: string; // Proprietor Short Name / 業主簡稱
   createdBy?: string; // UUID of the user who created this record
   createdAt: Date;
   updatedAt: Date;
@@ -89,6 +91,16 @@ export interface Rent {
   rentOutSubLandlordId?: string;      // 二房東 (FK to sub_landlords)
   rentOutTenants?: string[];          // 現時租客 legacy (names)
   rentOutTenantIds?: string[];         // 現時租客 (FKs to current_tenants)
+
+  /** 收租記錄（rent_out 簡化表單） */
+  rentCollectionTenantName?: string;
+  rentCollectionDate?: Date;
+  rentCollectionAmount?: number;
+  rentCollectionPaymentMethod?: 'cheque' | 'fps' | 'cash';
+  rentCollectionChequeBank?: string;
+  rentCollectionChequeNumber?: string;
+  /** 支票影像（base64 data URL） */
+  rentCollectionChequeImage?: string;
 
   // ===== RENTING (交租) Fields =====
   rentingNumber?: string;              // 我方租約號碼

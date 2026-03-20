@@ -33,7 +33,7 @@ export default function ProprietorsPage() {
     }, [proprietors, searchQuery]);
 
     const handleDelete = async (id: string) => {
-        if (confirm('您確定要刪除此資產擁有方嗎？')) {
+        if (confirm('您確定要刪除此業主嗎？')) {
             await deleteProprietor(id);
             queryClient.invalidateQueries({ queryKey: ['proprietors'] });
         }
@@ -66,7 +66,7 @@ export default function ProprietorsPage() {
             {/* Page header */}
             <div className="flex items-center justify-between">
                 <div>
-                    <h1 className="text-2xl font-bold text-zinc-900 dark:text-white">管理擁有方</h1>
+                    <h1 className="text-2xl font-bold text-zinc-900 dark:text-white">管理業主</h1>
                     <p className="text-zinc-500 dark:text-white/50 mt-1">管理物業業主與業主資料</p>
                 </div>
                 {isAuthenticated && (
@@ -79,7 +79,7 @@ export default function ProprietorsPage() {
                         <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
                         </svg>
-                        新增擁有方
+                        新增業主
                     </motion.button>
                 )}
             </div>
@@ -89,7 +89,7 @@ export default function ProprietorsPage() {
                 <BentoCard>
                     <div className="flex items-center justify-between">
                         <div>
-                            <p className="text-zinc-500 dark:text-white/50 text-sm">擁有方總數</p>
+                            <p className="text-zinc-500 dark:text-white/50 text-sm">業主總數</p>
                             <p className="text-2xl font-bold text-zinc-900 dark:text-white mt-1">{proprietors.length}</p>
                         </div>
                         <div className="p-3 rounded-xl bg-purple-50 dark:bg-purple-500/20">
@@ -112,7 +112,7 @@ export default function ProprietorsPage() {
                     type="text"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder="搜尋擁有方..."
+                    placeholder="搜尋業主..."
                     className="w-full pl-10 pr-4 py-2.5 bg-zinc-100 dark:bg-white/5 border border-zinc-200 dark:border-white/10 rounded-xl text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-purple-500/30 transition-all"
                 />
             </div>
@@ -124,8 +124,8 @@ export default function ProprietorsPage() {
                         <svg className="w-16 h-16 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
                         </svg>
-                        <p className="text-lg">未找到任何擁有方</p>
-                        <p className="text-sm mt-1">點擊上方按鈕新增資產擁有方以開始使用</p>
+                        <p className="text-lg">未找到任何業主</p>
+                        <p className="text-sm mt-1">點擊上方按鈕新增業主以開始使用</p>
                     </div>
                 ) : (
                     filteredProprietors.map((proprietor, index) => (

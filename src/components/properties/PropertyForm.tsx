@@ -1213,7 +1213,7 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                                         <div>代碼</div>
                                         <div>業主名稱</div>
                                         <div>公司名稱</div>
-                                        <div>擁有方性質</div>
+                                        <div>業主性質</div>
                                         <div>擁有人類別</div>
                                         <div className="text-center">操作</div>
                                     </div>
@@ -1249,7 +1249,7 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                                                     {selectedProprietor?.shortName || '-'}
                                                 </div>
 
-                                                {/* 擁有方性質 */}
+                                                {/* 業主性質 */}
                                                 <div className="text-zinc-700 dark:text-white/80 text-sm">
                                                     {typeLabel}
                                                 </div>

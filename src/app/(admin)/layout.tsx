@@ -30,7 +30,7 @@ export default function AdminLayout({
                         setUserRole(role);
 
                         // Check for admin-only routes
-                        const adminOnlyRoutes = ['/dashboard/users', '/dashboard/settings', '/dashboard/settings/trash', '/dashboard/sub-landlords', '/dashboard/current-tenants'];
+                        const adminOnlyRoutes = ['/dashboard/users', '/dashboard/settings', '/dashboard/settings/trash'];
                         if (adminOnlyRoutes.some(route => pathname.startsWith(route)) && role !== 'admin') {
                             router.push('/dashboard');
                             return;

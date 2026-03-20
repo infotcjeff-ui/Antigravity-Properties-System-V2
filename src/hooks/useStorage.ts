@@ -35,7 +35,7 @@ const toSnake = (obj: any) => {
 export const fetchProperties = async (user?: any, options?: { query?: string; bypassIsolation?: boolean }): Promise<Property[]> => {
     try {
         // Select all fields needed for both list and edit views
-        const fields = 'id, name, code, address, type, status, land_use, lot_index, lot_area, location, google_drive_plan_url, has_planning_permission, proprietor_id, tenant_id, created_by, created_at, updated_at, images, geo_maps, notes';
+        const fields = 'id, name, code, address, type, status, land_use, lot_index, lot_area, location, google_drive_plan_url, has_planning_permission, proprietor_id, tenant_id, parent_property_id, created_by, created_at, updated_at, images, geo_maps, notes';
         let queryBuilder = supabase.from('properties').select(fields);
 
         if (options?.query) {
@@ -153,7 +153,7 @@ export const fetchRents = async (user?: any): Promise<Rent[]> => {
     }
 };
 
-export const fetchRentsWithRelations = async (user?: any, options?: { type?: 'renting' | 'rent_out' }): Promise<any[]> => {
+export const fetchRentsWithRelations = async (user?: any, options?: { type?: 'renting' | 'rent_out' | 'contract' }): Promise<any[]> => {
     try {
         // EXCLUDE heavy fields from property join
         const propFields = 'id, name, code, address, type, status, land_use, lot_index, lot_area, location, google_drive_plan_url, has_planning_permission, proprietor_id, tenant_id, created_by, created_at, updated_at, images';
@@ -493,6 +493,7 @@ export function useProperties() {
                 notes: property.notes,
                 proprietor_id: property.proprietorId,
                 tenant_id: property.tenantId,
+                parent_property_id: property.parentPropertyId,
                 created_by: property.createdBy || user?.id,
             };
 
@@ -532,7 +533,7 @@ export function useProperties() {
                 'lot_index', 'lot_area', 'land_use',
                 'images', 'geo_maps', 'location',
                 'google_drive_plan_url', 'has_planning_permission', 'notes',
-                'proprietor_id', 'tenant_id', 'created_by'
+                'proprietor_id', 'tenant_id', 'parent_property_id', 'created_by'
             ];
             const filtered: any = {};
             Object.keys(updateData).forEach(k => { if (allowed.includes(k)) filtered[k] = updateData[k]; });
@@ -1019,6 +1020,17 @@ export function useRents() {
             if ((rent as any).rentOutTenants?.length) rentData.rent_out_tenants = JSON.stringify((rent as any).rentOutTenants);
             if ((rent as any).rentOutTenantIds?.length) rentData.rent_out_tenant_ids = (rent as any).rentOutTenantIds;
 
+            const rc = rent as any;
+            if (rc.rentCollectionTenantName) rentData.rent_collection_tenant_name = rc.rentCollectionTenantName;
+            if (rc.rentCollectionDate) rentData.rent_collection_date = rc.rentCollectionDate;
+            if (rc.rentCollectionAmount != null && rc.rentCollectionAmount !== '' && !Number.isNaN(Number(rc.rentCollectionAmount))) {
+                rentData.rent_collection_amount = Number(rc.rentCollectionAmount);
+            }
+            if (rc.rentCollectionPaymentMethod) rentData.rent_collection_payment_method = rc.rentCollectionPaymentMethod;
+            if (rc.rentCollectionChequeBank) rentData.rent_collection_cheque_bank = rc.rentCollectionChequeBank;
+            if (rc.rentCollectionChequeNumber) rentData.rent_collection_cheque_number = rc.rentCollectionChequeNumber;
+            if (rc.rentCollectionChequeImage) rentData.rent_collection_cheque_image = rc.rentCollectionChequeImage;
+
             // Add Renting (交租) fields
             if (rent.rentingNumber) rentData.renting_number = rent.rentingNumber;
             if (rent.rentingReferenceNumber) rentData.renting_reference_number = rent.rentingReferenceNumber;
@@ -1071,10 +1083,12 @@ export function useRents() {
             if (updates.proprietorId !== undefined) rentData.proprietor_id = updates.proprietorId || null;
             if (updates.tenantId !== undefined) rentData.tenant_id = updates.tenantId || null;
             if (updates.type) rentData.type = updates.type;
-            if (updates.status) rentData.status = updates.status;
+            if (updates.status !== undefined) rentData.status = updates.status;
             if (updates.currency) rentData.currency = updates.currency;
             if (updates.location) rentData.location = updates.location;
-            if (updates.notes) rentData.notes = updates.notes;
+            if (updates.notes !== undefined) rentData.notes = updates.notes;
+            if (updates.amount !== undefined) rentData.amount = updates.amount;
+            if (updates.startDate !== undefined) rentData.start_date = updates.startDate;
 
             // RENT OUT fields
             if (updates.rentOutTenancyNumber) rentData.rent_out_tenancy_number = updates.rentOutTenancyNumber;
@@ -1098,6 +1112,15 @@ export function useRents() {
             if ((updates as any).rentOutSubLandlordId !== undefined) rentData.rent_out_sub_landlord_id = (updates as any).rentOutSubLandlordId;
             if ((updates as any).rentOutTenants !== undefined) rentData.rent_out_tenants = JSON.stringify((updates as any).rentOutTenants);
             if ((updates as any).rentOutTenantIds !== undefined) rentData.rent_out_tenant_ids = (updates as any).rentOutTenantIds;
+
+            const urc = updates as any;
+            if (urc.rentCollectionTenantName !== undefined) rentData.rent_collection_tenant_name = urc.rentCollectionTenantName || null;
+            if (urc.rentCollectionDate !== undefined) rentData.rent_collection_date = urc.rentCollectionDate || null;
+            if (urc.rentCollectionAmount !== undefined) rentData.rent_collection_amount = urc.rentCollectionAmount;
+            if (urc.rentCollectionPaymentMethod !== undefined) rentData.rent_collection_payment_method = urc.rentCollectionPaymentMethod || null;
+            if (urc.rentCollectionChequeBank !== undefined) rentData.rent_collection_cheque_bank = urc.rentCollectionChequeBank || null;
+            if (urc.rentCollectionChequeNumber !== undefined) rentData.rent_collection_cheque_number = urc.rentCollectionChequeNumber || null;
+            if (urc.rentCollectionChequeImage !== undefined) rentData.rent_collection_cheque_image = urc.rentCollectionChequeImage || null;
 
             // RENTING fields
             if (updates.rentingNumber) rentData.renting_number = updates.rentingNumber;
@@ -1151,7 +1174,7 @@ export function useRents() {
         }
     }, []);
 
-    const getRentsWithRelations = useCallback(async (type?: 'renting' | 'rent_out'): Promise<any[]> => {
+    const getRentsWithRelations = useCallback(async (type?: 'renting' | 'rent_out' | 'contract'): Promise<any[]> => {
         setLoading(true);
         setError(null);
         try {
@@ -1560,7 +1583,7 @@ export function useRentsQuery() {
     });
 }
 
-export function useRentsWithRelationsQuery(options?: { type?: 'renting' | 'rent_out' }) {
+export function useRentsWithRelationsQuery(options?: { type?: 'renting' | 'rent_out' | 'contract' }) {
     const { user } = useAuth();
     return useQuery({
         queryKey: ['rents-with-relations', user?.id, options?.type],

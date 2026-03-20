@@ -57,7 +57,7 @@ export default function RelationsPage() {
             {/* Page header */}
             <div>
                 <h1 className="text-2xl font-bold text-zinc-900 dark:text-white">資料總覽</h1>
-                <p className="text-zinc-500 dark:text-white/50 mt-1">查看物業、擁有方及租金記錄的完整關聯樹狀圖</p>
+                <p className="text-zinc-500 dark:text-white/50 mt-1">查看物業、業主及租金記錄的完整關聯樹狀圖</p>
             </div>
 
             {/* Relation Tree */}
@@ -201,7 +201,7 @@ export default function RelationsPage() {
                                                             </svg>
                                                         </div>
                                                         <div>
-                                                            <p className="text-xs text-orange-600 dark:text-orange-400/70 uppercase">業主 / 資產擁有方</p>
+                                                            <p className="text-xs text-orange-600 dark:text-orange-400/70 uppercase">業主</p>
                                                             <p className="text-zinc-900 dark:text-white font-medium">{property.proprietor.name}</p>
                                                             <div className="flex items-center gap-3 text-zinc-500 dark:text-white/50 text-xs mt-1">
                                                                 <span>{property.proprietor.code}</span>

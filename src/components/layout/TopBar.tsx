@@ -4,7 +4,7 @@ import { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, Bell, Check, Trash2, LayoutDashboard, LogIn, LogOut, Database, Cloud, Menu, X, Building2, Users, ArrowUpFromLine, ArrowDownToLine, Network, Settings } from 'lucide-react';
+import { Search, Bell, Check, Trash2, LayoutDashboard, LogIn, LogOut, Database, Cloud, Menu, X, Building2, Users, ArrowUpFromLine, ArrowDownToLine, Network, Settings, FileText } from 'lucide-react';
 import { useNotifications } from '@/contexts/NotificationContext';
 import ThemeToggle from './ThemeToggle';
 
@@ -289,8 +289,9 @@ export default function TopBar({ onSearch, placeholder = '搜尋...', isAuthenti
                                         <p className="px-4 text-xs font-medium text-zinc-400 dark:text-white/40 uppercase tracking-widest mb-2 mt-4">管理</p>
                                         <MobileNavItem href="/dashboard" icon={<LayoutDashboard className="w-5 h-5" />} label="總覽" onClick={() => setShowMobileMenu(false)} />
                                         <MobileNavItem href="/dashboard/properties" icon={<Building2 className="w-5 h-5" />} label="管理物業" onClick={() => setShowMobileMenu(false)} />
-                                        <MobileNavItem href="/dashboard/proprietors" icon={<Users className="w-5 h-5" />} label="管理擁有方" onClick={() => setShowMobileMenu(false)} />
+                                        <MobileNavItem href="/dashboard/proprietors" icon={<Users className="w-5 h-5" />} label="管理業主" onClick={() => setShowMobileMenu(false)} />
                                         <MobileNavItem href="/dashboard/tenants" icon={<Users className="w-5 h-5" />} label="管理承租人" onClick={() => setShowMobileMenu(false)} />
+                                        <MobileNavItem href="/dashboard/contracts" icon={<FileText className="w-5 h-5" />} label="管理合約" onClick={() => setShowMobileMenu(false)} />
                                         <MobileNavItem href="/dashboard/rent-out" icon={<ArrowUpFromLine className="w-5 h-5" />} label="管理收租" onClick={() => setShowMobileMenu(false)} />
                                         <MobileNavItem href="/dashboard/renting" icon={<ArrowDownToLine className="w-5 h-5" />} label="管理交租" onClick={() => setShowMobileMenu(false)} />
                                         <MobileNavItem href="/dashboard/relations" icon={<Network className="w-5 h-5" />} label="管理關聯" onClick={() => setShowMobileMenu(false)} />
@@ -304,7 +305,7 @@ export default function TopBar({ onSearch, placeholder = '搜尋...', isAuthenti
                                         <MobileNavItem href="/" icon={<Building2 className="w-5 h-5" />} label="物業列表" onClick={() => setShowMobileMenu(false)} />
                                         {isAuthenticated && (
                                             <>
-                                                <MobileNavItem href="/proprietors" icon={<Users className="w-5 h-5" />} label="擁有方列表" onClick={() => setShowMobileMenu(false)} />
+                                                <MobileNavItem href="/proprietors" icon={<Users className="w-5 h-5" />} label="業主列表" onClick={() => setShowMobileMenu(false)} />
                                                 <MobileNavItem href="/tenants" icon={<Users className="w-5 h-5" />} label="承租人列表" onClick={() => setShowMobileMenu(false)} />
                                                 <MobileNavItem href="/rent-out" icon={<ArrowUpFromLine className="w-5 h-5" />} label="收租記錄" onClick={() => setShowMobileMenu(false)} />
                                                 <MobileNavItem href="/renting" icon={<ArrowDownToLine className="w-5 h-5" />} label="交租記錄" onClick={() => setShowMobileMenu(false)} />

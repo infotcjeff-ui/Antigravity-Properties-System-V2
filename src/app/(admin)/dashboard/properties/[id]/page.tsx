@@ -98,10 +98,14 @@ export default function PropertyDetailsPage() {
     const proprietor = property?.proprietor || activeRenting?.proprietor || null;
     const tenant = property?.tenant || activeRentOut?.tenant || null;
     const rents = property?.rents || [];
+    const contractRents = rents.filter((r: Rent) => r.type === 'contract');
+    const rentOutRents = rents.filter((r: Rent) => r.type === 'rent_out');
+    const rentingRents = rents.filter((r: Rent) => r.type === 'renting');
     const [currentImageIndex, setCurrentImageIndex] = useState(0);
     const [lightboxImage, setLightboxImage] = useState<string | null>(null);
     const [selectedRent, setSelectedRent] = useState<Rent | null>(null);
     const [imageError, setImageError] = useState(false);
+    const [rentHistoryTab, setRentHistoryTab] = useState<'rent_out' | 'renting' | 'contract'>('rent_out');
 
     const nextImage = () => {
         if (property?.images && property.images.length > 0) {
@@ -253,7 +257,7 @@ export default function PropertyDetailsPage() {
                             <div className="bg-zinc-50 dark:bg-white/5 rounded-xl p-4 border border-zinc-100 dark:border-none">
                                 <p className="text-zinc-400 dark:text-white/40 text-sm">{t('Land Use', '土地用途')}</p>
                                 <p className="text-zinc-900 dark:text-white font-medium mt-1">
-                                    {property.landUse ? property.landUse.split(',').map(u => landUseLabels[u.trim()] || u.trim()).join(', ') : '暫無。'}
+                                    {property.landUse ? (() => { const parts = property.landUse.split(',').map(u => u.trim()).filter(Boolean); const last = parts[parts.length - 1]; return last ? (landUseLabels[last] || last) : '暫無。'; })() : '暫無。'}
                                 </p>
                             </div>
                             <div className="bg-zinc-50 dark:bg-white/5 rounded-xl p-4 border border-zinc-100 dark:border-none">
@@ -323,13 +327,13 @@ export default function PropertyDetailsPage() {
                         </div>
                     </div>
 
-                    {/* Proprietor and Tenant - always show */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {/* Proprietor & Tenant - always show */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                         {/* Proprietor */}
                         <div className="bg-white dark:bg-white/5 rounded-2xl border border-zinc-200 dark:border-white/10 p-6 shadow-sm dark:shadow-none">
                             <h2 className="text-lg font-semibold text-zinc-900 dark:text-white mb-4 flex items-center gap-2">
                                 <User className="w-5 h-5 text-purple-500" />
-                                {t('Proprietor', '資產擁有方')}
+                                {t('Proprietor', '業主')}
                             </h2>
                             {proprietor ? (
                                 <div className="flex items-center gap-4">
@@ -372,131 +376,118 @@ export default function PropertyDetailsPage() {
                         </div>
                     </div>
 
-                    {/* Rent History - always show */}
+                    {/* Rent History - Tab: 收租 | 交租 | 合約 */}
                     <div className="bg-white dark:bg-white/5 rounded-2xl border border-zinc-200 dark:border-white/10 p-6 shadow-sm dark:shadow-none">
-                        <h2 className="text-lg font-semibold text-zinc-900 dark:text-white mb-4 flex items-center gap-2">
-                            <Calendar className="w-5 h-5" />
-                            {t('Rent History', '租務記錄')}
-                        </h2>
-                        {rents.length > 0 ? (
-                            <div className="overflow-x-auto">
-                                <div className="min-w-[800px]">
-                                    {/* Table Header */}
-                                    <div className="grid grid-cols-[1fr_2fr_1.5fr_2fr_1fr] gap-0 pb-3 border-b border-zinc-200 dark:border-white/10 text-xs font-bold text-zinc-900 dark:text-white">
-                                        <div className="pr-4">{t('Number', '編號')}</div>
-                                        <div className="px-4">{t('Property', '物業')}</div>
-                                        <div className="px-4">{t('Tenant', '承租人')}</div>
-                                        <div className="px-4">{t('Lease Term & Location', '租期及地點')}</div>
-                                        <div className="pl-4">{t('Rent', '租金')}</div>
-                                    </div>
-                                    {/* Table Body */}
-                                    <div className="divide-y divide-zinc-200 dark:divide-white/10">
-                                        {rents.map((rent) => {
-                                            const otherParty = rent.type === 'rent_out' ? rent.tenant : rent.proprietor;
-                                            const rentNumber = rent.type === 'rent_out' ? (rent.rentOutTenancyNumber || '-') : (rent.rentingNumber || '-');
+                        <div className="flex flex-wrap items-center justify-between gap-4 mb-4">
+                            <h2 className="text-lg font-semibold text-zinc-900 dark:text-white flex items-center gap-2">
+                                <Calendar className="w-5 h-5" />
+                                {t('Rent History', '租務記錄')}
+                            </h2>
+                            <div className="flex gap-1 p-1 rounded-xl bg-zinc-100 dark:bg-white/10 w-fit">
+                            {(['rent_out', 'renting', 'contract'] as const).map((tab) => (
+                                <button
+                                    key={tab}
+                                    type="button"
+                                    onClick={() => setRentHistoryTab(tab)}
+                                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${rentHistoryTab === tab
+                                        ? 'bg-white dark:bg-white/15 text-purple-600 dark:text-purple-400 shadow-sm'
+                                        : 'text-zinc-600 dark:text-white/60 hover:text-zinc-900 dark:hover:text-white'}`}
+                                >
+                                    {tab === 'rent_out' ? t('Rent Collection', '收租') : tab === 'renting' ? t('Rent Payment', '交租') : t('Contract Records', '合約')}
+                                </button>
+                            ))}
+                            </div>
+                        </div>
 
-                                            const startDate = rent.type === 'rent_out'
-                                                ? (rent.rentOutStartDate || rent.startDate)
-                                                : (rent.rentingStartDate || rent.startDate);
-                                            const endDate = rent.type === 'rent_out'
-                                                ? (rent.rentOutEndDate || rent.endDate)
-                                                : (rent.rentingEndDate || rent.endDate);
-
-                                            const formatEnDate = (d: any) => {
-                                                if (!d) return '';
-                                                const date = new Date(d);
-                                                return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-                                            };
-                                            const periods = rent.type === 'rent_out' ? rent.rentOutPeriods : rent.rentingPeriods;
-
-                                            const monthlyRent = rent.type === 'rent_out'
-                                                ? (rent.rentOutMonthlyRental || rent.amount || 0)
-                                                : (rent.rentingMonthlyRental || rent.amount || 0);
-
-                                            const isExpired = endDate ? new Date(endDate) < new Date(new Date().setHours(0, 0, 0, 0)) : false;
-
-                                            return (
-                                                <div
-                                                    key={rent.id}
-                                                    className="grid grid-cols-[1fr_2fr_1.5fr_2fr_1fr] gap-0 hover:bg-zinc-50/50 dark:hover:bg-white/[0.02] transition-colors group items-stretch cursor-pointer"
-                                                    onClick={() => setSelectedRent(rent)}
-                                                >
-                                                    {/* Number */}
-                                                    <div className="py-4 pr-4 flex flex-col justify-center">
-                                                        <div className="text-zinc-700 dark:text-white/80 text-sm">{rentNumber}</div>
-                                                        <div
-                                                            className="text-zinc-500 hover:text-zinc-900 dark:hover:text-white text-xs mt-1 flex items-center cursor-pointer transition-colors w-fit"
-                                                            onClick={() => setSelectedRent(rent)}
-                                                        >
-                                                            <ChevronRight className="w-3 h-3 mr-0.5" /> {t('View', '查看')}
+                        {(() => {
+                            const list = rentHistoryTab === 'rent_out' ? rentOutRents : rentHistoryTab === 'renting' ? rentingRents : contractRents;
+                            if (list.length === 0) return <EmptyPlaceholder />;
+                            return (
+                                <div className="overflow-x-auto">
+                                    <div className="min-w-[800px]">
+                                        <div className="grid grid-cols-[1fr_2fr_1.5fr_2fr_1fr] gap-0 pb-3 border-b border-zinc-200 dark:border-white/10 text-xs font-bold text-zinc-900 dark:text-white">
+                                            <div className="pr-4">{t('Number', '編號')}</div>
+                                            <div className="px-4">{t('Property', '物業')}</div>
+                                            <div className="px-4">{t('Tenant', '承租人')}</div>
+                                            <div className="px-4">{t('Lease Term & Location', '租期及地點')}</div>
+                                            <div className="pl-4">{t('Rent', '租金')}</div>
+                                        </div>
+                                        <div className="divide-y divide-zinc-200 dark:divide-white/10">
+                                            {list.map((rent: Rent) => {
+                                                const isRentOutOrContract = rent.type === 'rent_out' || rent.type === 'contract';
+                                                const otherParty = isRentOutOrContract ? rent.tenant : rent.proprietor;
+                                                const rentNumber = isRentOutOrContract ? (rent.rentOutTenancyNumber || '-') : (rent.rentingNumber || '-');
+                                                const startDate = isRentOutOrContract ? (rent.rentOutStartDate || rent.startDate) : (rent.rentingStartDate || rent.startDate);
+                                                const endDate = isRentOutOrContract ? (rent.rentOutEndDate || rent.endDate) : (rent.rentingEndDate || rent.endDate);
+                                                const formatEnDate = (d: any) => d ? new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '';
+                                                const periods = isRentOutOrContract ? rent.rentOutPeriods : rent.rentingPeriods;
+                                                const monthlyRent = isRentOutOrContract ? (rent.rentOutMonthlyRental || rent.amount || 0) : (rent.rentingMonthlyRental || rent.amount || 0);
+                                                const isExpired = endDate ? new Date(endDate) < new Date(new Date().setHours(0, 0, 0, 0)) : false;
+                                                const locationStr = isRentOutOrContract ? (rent.location || (rent as any).rentOutAddressDetail) : rent.location;
+                                                return (
+                                                    <div
+                                                        key={rent.id}
+                                                        className="grid grid-cols-[1fr_2fr_1.5fr_2fr_1fr] gap-0 hover:bg-zinc-50/50 dark:hover:bg-white/[0.02] transition-colors items-stretch cursor-pointer"
+                                                        onClick={() => setSelectedRent(rent)}
+                                                    >
+                                                        <div className="py-4 pr-4 flex flex-col justify-center">
+                                                            <div className="text-zinc-700 dark:text-white/80 text-sm">{rentNumber}</div>
+                                                            <div className="text-zinc-500 hover:text-zinc-900 dark:hover:text-white text-xs mt-1 flex items-center w-fit" onClick={(e) => { e.stopPropagation(); setSelectedRent(rent); }}>
+                                                                <ChevronRight className="w-3 h-3 mr-0.5" /> {t('View', '查看')}
+                                                            </div>
+                                                        </div>
+                                                        <div className="py-4 px-4 border-l border-dashed border-zinc-200 dark:border-white/10 flex flex-col justify-center">
+                                                            <div className="text-zinc-600 dark:text-white/70 text-sm whitespace-pre-wrap">{property.code} {property.name}</div>
+                                                            <div className="text-zinc-900 dark:text-white font-bold text-sm mt-1">{property.lotIndex || '-'}</div>
+                                                        </div>
+                                                        <div className="py-4 px-4 border-l border-dashed border-zinc-200 dark:border-white/10 flex flex-col justify-center">
+                                                            {otherParty ? (
+                                                                <Tooltip
+                                                                    content={
+                                                                        <div className="flex flex-col gap-1.5 w-full">
+                                                                            <div className="flex items-center gap-2 mb-1">
+                                                                                <User className="w-4 h-4 text-blue-500" />
+                                                                                <span className="font-bold">{otherParty.name}</span>
+                                                                                <span className="bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-300 px-1.5 py-0.5 rounded text-[10px] ml-auto">{otherParty.code}</span>
+                                                                            </div>
+                                                                            <div className="text-xs text-zinc-500 dark:text-white/60">英文名稱: <span className="text-zinc-900 dark:text-white text-[10px]">{otherParty.englishName || '-'}</span></div>
+                                                                            <div className="text-xs text-zinc-500 dark:text-white/60 flex items-center justify-between">
+                                                                                <span>類型: <span className="text-zinc-900 dark:text-white">{otherParty.type === 'company' ? '公司' : '個人'}</span></span>
+                                                                                <span className="bg-zinc-100 dark:bg-white/10 px-1.5 py-0.5 rounded text-[10px] text-zinc-600 dark:text-white/70">
+                                                                                    {otherParty.category === 'group_company' ? '集團公司' : otherParty.category === 'joint_venture' ? '合資公司' : otherParty.category === 'managed_individual' ? '代管個體' : otherParty.category === 'external_landlord' ? '外部業主' : '承租人'}
+                                                                                </span>
+                                                                            </div>
+                                                                        </div>
+                                                                    }
+                                                                    placement="top"
+                                                                    className="bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white p-3 rounded-xl shadow-xl border border-zinc-200 dark:border-white/10 max-w-xs"
+                                                                >
+                                                                    <div className="text-sm font-medium text-purple-600 dark:text-purple-400 border-b border-dashed border-purple-300 dark:border-purple-600/50 cursor-pointer w-fit inline-block">{otherParty.name}</div>
+                                                                </Tooltip>
+                                                            ) : (
+                                                                <div className="text-zinc-600 dark:text-white/70 text-sm">-</div>
+                                                            )}
+                                                        </div>
+                                                        <div className="py-4 px-4 border-l border-dashed border-zinc-200 dark:border-white/10 flex flex-col justify-center">
+                                                            <div className={`text-sm ${isExpired ? 'text-red-500 font-medium' : 'text-zinc-600 dark:text-white/70'}`}>
+                                                                {formatEnDate(startDate)}{startDate && endDate && ' ~ '}{formatEnDate(endDate)}{periods ? `(${periods}個月)` : ''}
+                                                            </div>
+                                                            <div className="flex items-center gap-2 mt-1">
+                                                                {isExpired && <span className="text-[10px] px-1.5 py-0.5 bg-red-100 dark:bg-red-500/20 text-red-600 dark:text-red-400 rounded font-medium">已過期</span>}
+                                                                <span className="text-xs text-zinc-500 dark:text-white/40 truncate">{locationStr}</span>
+                                                            </div>
+                                                        </div>
+                                                        <div className="py-4 pl-4 border-l border-dashed border-zinc-200 dark:border-white/10 flex flex-col justify-center text-left">
+                                                            <div className="text-zinc-800 dark:text-white text-sm whitespace-nowrap">${Number(monthlyRent).toLocaleString()}/月</div>
                                                         </div>
                                                     </div>
-                                                    {/* Property */}
-                                                    <div className="py-4 px-4 border-l border-dashed border-zinc-200 dark:border-white/10 flex flex-col justify-center">
-                                                        <div className="text-zinc-600 dark:text-white/70 text-sm whitespace-pre-wrap">{property.code} {property.name}</div>
-                                                        <div className="text-zinc-900 dark:text-white font-bold text-sm mt-1">{property.lotIndex || '-'}</div>
-                                                    </div>
-                                                    {/* Tenant */}
-                                                    <div className="py-4 px-4 border-l border-dashed border-zinc-200 dark:border-white/10 flex flex-col justify-center">
-                                                        {otherParty ? (
-                                                            <Tooltip
-                                                                content={
-                                                                    <div className="flex flex-col gap-1.5 w-full">
-                                                                        <div className="flex items-center gap-2 mb-1">
-                                                                            <User className="w-4 h-4 text-blue-500" />
-                                                                            <span className="font-bold">{otherParty.name}</span>
-                                                                            <span className="bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-300 px-1.5 py-0.5 rounded text-[10px] ml-auto">{otherParty.code}</span>
-                                                                        </div>
-                                                                        <div className="text-xs text-zinc-500 dark:text-white/60">
-                                                                            英文名稱: <span className="text-zinc-900 dark:text-white text-[10px]">{otherParty.englishName || '-'}</span>
-                                                                        </div>
-                                                                        <div className="text-xs text-zinc-500 dark:text-white/60 flex items-center justify-between">
-                                                                            <span>類型: <span className="text-zinc-900 dark:text-white">{otherParty.type === 'company' ? '公司' : '個人'}</span></span>
-                                                                            <span className="bg-zinc-100 dark:bg-white/10 px-1.5 py-0.5 rounded text-[10px] text-zinc-600 dark:text-white/70">
-                                                                                {otherParty.category === 'group_company' ? '集團公司' :
-                                                                                    otherParty.category === 'joint_venture' ? '合資公司' :
-                                                                                        otherParty.category === 'managed_individual' ? '代管個體' :
-                                                                                            otherParty.category === 'external_landlord' ? '外部業主' : '承租人'}
-                                                                            </span>
-                                                                        </div>
-                                                                    </div>
-                                                                }
-                                                                placement="top"
-                                                                className="bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white p-3 rounded-xl shadow-xl border border-zinc-200 dark:border-white/10 max-w-xs"
-                                                            >
-                                                                <div className="text-sm font-medium text-purple-600 dark:text-purple-400 border-b border-dashed border-purple-300 dark:border-purple-600/50 cursor-pointer w-fit inline-block">
-                                                                    {otherParty.name}
-                                                                </div>
-                                                            </Tooltip>
-                                                        ) : (
-                                                            <div className="text-zinc-600 dark:text-white/70 text-sm">-</div>
-                                                        )}
-                                                    </div>
-                                                    {/* Lease Term & Location */}
-                                                    <div className="py-4 px-4 border-l border-dashed border-zinc-200 dark:border-white/10 flex flex-col justify-center">
-                                                        <div className={`text-sm ${isExpired ? 'text-red-500 font-medium' : 'text-zinc-600 dark:text-white/70'}`}>
-                                                            {formatEnDate(startDate)}{startDate && endDate && ' ~ '}{formatEnDate(endDate)}{periods ? `(${periods}個月)` : ''}
-                                                        </div>
-                                                        <div className="flex items-center gap-2 mt-1">
-                                                            {isExpired && <span className="text-[10px] px-1.5 py-0.5 bg-red-100 dark:bg-red-500/20 text-red-600 dark:text-red-400 rounded font-medium">已過期</span>}
-                                                            <span className="text-xs text-zinc-500 dark:text-white/40 truncate">
-                                                                {rent.type === 'rent_out' ? (rent.location || rent.rentOutAddressDetail) : rent.location}
-                                                            </span>
-                                                        </div>
-                                                    </div>
-                                                    {/* Rent */}
-                                                    <div className="py-4 pl-4 border-l border-dashed border-zinc-200 dark:border-white/10 flex flex-col justify-center text-left">
-                                                        <div className="text-zinc-800 dark:text-white text-sm whitespace-nowrap">${(monthlyRent as any).toLocaleString()}/月</div>
-                                                    </div>
-                                                </div>
-                                            );
-                                        })}
+                                                );
+                                            })}
+                                        </div>
                                     </div>
                                 </div>
-                            </div>
-                        ) : (
-                            <EmptyPlaceholder />
-                        )}
+                            );
+                        })()}
                     </div>
                 </motion.div>
 

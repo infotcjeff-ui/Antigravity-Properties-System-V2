@@ -3,12 +3,11 @@
 import { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-    Globe, Check, Sun, Moon, Image as ImageIcon, Trash2, Eye, X,
+    Globe, Check, Image as ImageIcon, Trash2, Eye, X,
     ExternalLink, RefreshCw, AlertTriangle, HardDrive, FolderOpen,
     Github, Cloud, Database, Layers, CheckSquare, Square, XCircle,
     ShieldCheck
 } from 'lucide-react';
-import { useTheme } from '@/contexts/ThemeContext';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter } from 'next/navigation';
@@ -36,7 +35,6 @@ export default function SettingsPage() {
     const [showAlert, setShowAlert] = useState(false);
     const [alertMessage, setAlertMessage] = useState('');
     const [alertType, setAlertType] = useState<'success' | 'error' | 'warning'>('success');
-    const { theme, setTheme } = useTheme();
     const queryClient = useQueryClient();
     const { user } = useAuth();
     const router = useRouter();
@@ -422,36 +420,6 @@ export default function SettingsPage() {
                             </div>
                         </div>
 
-                        {/* Theme Toggle */}
-                        <div className="p-3 rounded-xl bg-zinc-50 dark:bg-white/5">
-                            <div className="flex items-center justify-between mb-3">
-                                <span className="text-zinc-700 dark:text-white/70">
-                                    {t('顯示模式', 'Display Mode')}
-                                </span>
-                            </div>
-                            <div className="flex gap-2">
-                                <button
-                                    onClick={() => setTheme('light')}
-                                    className={`flex-1 py-2.5 px-4 rounded-lg font-medium transition-all flex items-center justify-center gap-2 ${theme === 'light'
-                                        ? 'bg-purple-500 text-white shadow-lg shadow-purple-500/30'
-                                        : 'bg-zinc-100 dark:bg-white/10 text-zinc-600 dark:text-white/60 hover:bg-zinc-200 dark:hover:bg-white/20'
-                                        }`}
-                                >
-                                    <Sun className="w-4 h-4" />
-                                    {t('淺色模式', 'Light')}
-                                </button>
-                                <button
-                                    onClick={() => setTheme('dark')}
-                                    className={`flex-1 py-2.5 px-4 rounded-lg font-medium transition-all flex items-center justify-center gap-2 ${theme === 'dark'
-                                        ? 'bg-purple-500 text-white shadow-lg shadow-purple-500/30'
-                                        : 'bg-zinc-100 dark:bg-white/10 text-zinc-600 dark:text-white/60 hover:bg-zinc-200 dark:hover:bg-white/20'
-                                        }`}
-                                >
-                                    <Moon className="w-4 h-4" />
-                                    {t('深色模式', 'Dark')}
-                                </button>
-                            </div>
-                        </div>
                     </div>
                 </motion.div>
 

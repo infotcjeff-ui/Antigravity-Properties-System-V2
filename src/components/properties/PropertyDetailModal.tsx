@@ -96,6 +96,11 @@ export default function PropertyDetailModal({ propertyName, onClose }: PropertyD
         [property?.rents]
     );
 
+    const contractRents = useMemo(
+        () => (property?.rents || []).filter(r => r.type === 'contract'),
+        [property?.rents]
+    );
+
     const renderRentTable = (records: Rent[]) => {
         if (records.length === 0) {
             return (
@@ -402,6 +407,56 @@ export default function PropertyDetailModal({ propertyName, onClose }: PropertyD
 
                         {/* Rent Records */}
                         <div className="space-y-10">
+                            <div>
+                                <h4 className="flex items-center gap-2 text-lg font-bold text-amber-600 dark:text-amber-400 mb-4 px-1">
+                                    <div className="w-2.5 h-2.5 rounded-full bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.5)]"></div>
+                                    合約記錄 (Contract Records)
+                                </h4>
+                                {contractRents.length === 0 ? (
+                                    <div className="p-8 text-center bg-zinc-50 dark:bg-white/5 rounded-3xl text-zinc-400 dark:text-white/30 italic text-sm border-2 border-dashed border-zinc-200 dark:border-white/5">
+                                        尚未有相關記錄
+                                    </div>
+                                ) : (
+                                    <div className="grid gap-3">
+                                        {contractRents.map((c) => {
+                                            const st = c.rentOutStatus || 'listing';
+                                            const stLabel =
+                                                st === 'renting' ? '出租中' :
+                                                    st === 'listing' ? '放盤中' :
+                                                        st === 'completed' ? '已完租' : String(st);
+                                            const sd = c.rentOutStartDate ? new Date(c.rentOutStartDate).toLocaleDateString() : '-';
+                                            const ed = c.rentOutEndDate ? new Date(c.rentOutEndDate).toLocaleDateString() : '-';
+                                            return (
+                                                <button
+                                                    key={c.id}
+                                                    type="button"
+                                                    onClick={() => setSelectedRent(c)}
+                                                    className="text-left p-4 rounded-2xl border border-amber-200/80 dark:border-amber-500/25 bg-amber-50/50 dark:bg-amber-500/5 hover:bg-amber-50 dark:hover:bg-amber-500/10 transition-colors"
+                                                >
+                                                    <div className="flex items-start justify-between gap-2">
+                                                        <span className="font-mono font-semibold text-zinc-900 dark:text-white text-sm">
+                                                            {c.rentOutTenancyNumber || '—'}
+                                                        </span>
+                                                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-500/20 text-amber-800 dark:text-amber-300 font-medium shrink-0">
+                                                            {stLabel}
+                                                        </span>
+                                                    </div>
+                                                    {c.rentOutLessor ? (
+                                                        <p className="text-xs text-zinc-500 dark:text-white/50 mt-1">{c.rentOutLessor}</p>
+                                                    ) : null}
+                                                    <p className="text-xs text-zinc-400 dark:text-white/40 mt-2">
+                                                        {sd} — {ed}
+                                                        {c.rentOutMonthlyRental != null
+                                                            ? ` · ${c.currency || 'HKD'} ${Number(c.rentOutMonthlyRental).toLocaleString()}/月`
+                                                            : ''}
+                                                    </p>
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+                                )}
+                            </div>
+
                             <div>
                                 <h4 className="flex items-center gap-2 text-lg font-bold text-emerald-600 dark:text-emerald-400 mb-4 px-1">
                                     <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]"></div>

@@ -22,6 +22,7 @@ export default function RentOutPage() {
     const [showRentModal, setShowRentModal] = useState(false);
     const [showContractModal, setShowContractModal] = useState(false);
     const [editingContract, setEditingContract] = useState<Rent | null>(null);
+    const [editingRentOut, setEditingRentOut] = useState<Rent | null>(null);
 
     const statusColors: Record<string, string> = {
         active: 'bg-green-500/20 text-green-400',
@@ -34,7 +35,7 @@ export default function RentOutPage() {
 
     const totalIncome = rents
         .filter(r => r.status === 'active' || r.status === 'completed' || r.rentOutStatus === 'renting')
-        .reduce((sum, r) => sum + (r.rentOutMonthlyRental || r.amount || 0), 0);
+        .reduce((sum, r) => sum + ((r as any).rentCollectionAmount ?? r.rentOutMonthlyRental ?? r.amount ?? 0), 0);
 
     const totalContractValue = contracts
         .filter(c => c.rentOutStatus === 'renting' || c.rentOutStatus === 'listing')
@@ -182,10 +183,10 @@ export default function RentOutPage() {
                         <thead>
                             <tr className="text-left text-zinc-500 dark:text-white/50 text-sm border-b border-zinc-100 dark:border-white/5">
                                 <th className="p-4 font-medium">物業</th>
-                                <th className="p-4 font-medium">租客 / 承租人</th>
-                                <th className="p-4 font-medium">金額</th>
-                                <th className="p-4 font-medium">租約期間</th>
-                                <th className="p-4 font-medium">狀態</th>
+                                <th className="p-4 font-medium">租客名稱</th>
+                                <th className="p-4 font-medium">繳付金額</th>
+                                <th className="p-4 font-medium">交租日期</th>
+                                <th className="p-4 font-medium">付款方式</th>
                                 <th className="p-4 font-medium">操作</th>
                             </tr>
                         </thead>
@@ -194,10 +195,11 @@ export default function RentOutPage() {
                                 const property = properties.get(rent.propertyId);
                                 const proprietor = rent.proprietorId ? proprietors.get(rent.proprietorId) : null;
                                 const tenant = rent.tenantId ? proprietors.get(rent.tenantId) : null;
-                                const startDate = rent.rentOutStartDate || rent.startDate;
-                                const endDate = rent.rentOutEndDate || rent.endDate;
-                                const monthlyRent = rent.rentOutMonthlyRental || rent.amount || 0;
-                                const status = rent.rentOutStatus || rent.status || 'active';
+                                const payDate = (rent as any).rentCollectionDate || rent.startDate;
+                                const paid = (rent as any).rentCollectionAmount ?? rent.amount ?? rent.rentOutMonthlyRental ?? 0;
+                                const tenantDisplay = (rent as any).rentCollectionTenantName || tenant?.name || proprietor?.name || '-';
+                                const payMethod = (rent as any).rentCollectionPaymentMethod as string | undefined;
+                                const payLabel = payMethod === 'cheque' ? '支票' : payMethod === 'fps' ? 'FPS轉帳' : payMethod === 'cash' ? '現金' : '-';
 
                                 return (
                                     <motion.tr
@@ -208,21 +210,22 @@ export default function RentOutPage() {
                                         className="border-b border-zinc-100 dark:border-white/5 hover:bg-zinc-50 dark:hover:bg-white/5 transition-colors"
                                     >
                                         <td className="p-4 text-zinc-900 dark:text-white font-medium">{property?.name || '-'}</td>
-                                        <td className="p-4 text-zinc-600 dark:text-white/70">{tenant?.name || proprietor?.name || '-'}</td>
+                                        <td className="p-4 text-zinc-600 dark:text-white/70">{tenantDisplay}</td>
                                         <td className="p-4 text-green-600 dark:text-green-400 font-medium">
-                                            + {rent.currency || 'HKD'} {monthlyRent.toLocaleString()}
+                                            + {rent.currency || 'HKD'} {Number(paid).toLocaleString()}
                                         </td>
                                         <td className="p-4 text-zinc-500 dark:text-white/50 text-sm">
-                                            {startDate ? new Date(startDate).toLocaleDateString() : '-'} - {endDate ? new Date(endDate).toLocaleDateString() : '-'}
+                                            {payDate ? new Date(payDate).toLocaleDateString() : '-'}
                                         </td>
-                                        <td className="p-4">
-                                            <span className={`px-2.5 py-1 rounded-full text-xs font-medium capitalize ${statusColors[status] || statusColors.active}`}>
-                                                {status === 'active' || status === 'renting' ? '活躍中' : status === 'pending' || status === 'listing' ? '掛牌中' : status === 'completed' ? '已完成' : '已取消'}
-                                            </span>
-                                        </td>
+                                        <td className="p-4 text-zinc-600 dark:text-white/70 text-sm">{payLabel}</td>
                                         <td className="p-4">
                                             <div className="flex items-center gap-2">
-                                                <button className="p-2 rounded-lg text-zinc-400 dark:text-white/50 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-white/10 transition-all">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setEditingRentOut(rent)}
+                                                    className="p-2 rounded-lg text-zinc-400 dark:text-white/50 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-white/10 transition-all"
+                                                    title="編輯"
+                                                >
                                                     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                                                     </svg>
@@ -353,6 +356,21 @@ export default function RentOutPage() {
                         onClose={() => setEditingContract(null)}
                         onSuccess={() => {
                             setEditingContract(null);
+                            handleSuccess();
+                        }}
+                    />
+                )}
+            </AnimatePresence>
+            <AnimatePresence>
+                {editingRentOut && (
+                    <RentModal
+                        defaultType="rent_out"
+                        allowedTypes={['rent_out']}
+                        rent={editingRentOut}
+                        propertyId={editingRentOut.propertyId}
+                        onClose={() => setEditingRentOut(null)}
+                        onSuccess={() => {
+                            setEditingRentOut(null);
                             handleSuccess();
                         }}
                     />

@@ -92,7 +92,7 @@ export default function TrashPage() {
     const getTabLabel = (tab: TabType) => {
         switch (tab) {
             case 'properties': return '物業';
-            case 'proprietors': return '擁有方/承租人';
+            case 'proprietors': return '業主/承租人';
             case 'rents': return '租務記錄';
         }
     };

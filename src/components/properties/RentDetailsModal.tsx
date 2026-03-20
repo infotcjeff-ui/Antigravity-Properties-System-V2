@@ -54,8 +54,10 @@ export default function RentDetailsModal({ rent, property, onClose }: RentDetail
             : date.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
     };
 
-    const endDate = rent.type === 'rent_out' ? rent.rentOutEndDate : rent.rentingEndDate;
+    const endDate = rent.type === 'renting' ? rent.rentingEndDate : rent.rentOutEndDate;
     const isExpired = endDate ? new Date(endDate) < new Date(new Date().setHours(0, 0, 0, 0)) : false;
+
+    const isRentOutLike = rent.type === 'rent_out' || rent.type === 'contract';
 
     let statusValueRentOut: React.ReactNode = rent.rentOutStatus === 'listing' ? '放盤中' : rent.rentOutStatus === 'renting' ? '出租中' : rent.rentOutStatus === 'completed' ? '已完租' : rent.rentOutStatus;
     if (isExpired) {
@@ -86,15 +88,15 @@ export default function RentDetailsModal({ rent, property, onClose }: RentDetail
                     <div className="flex items-center gap-3">
                         <div className="px-3 py-2 rounded-xl bg-purple-100 dark:bg-purple-500/20 border border-purple-200 dark:border-purple-500/30">
                             <span className="text-base font-bold font-mono text-purple-700 dark:text-purple-300">
-                                {rent.type === 'rent_out' ? (rent.rentOutTenancyNumber || '-') : (rent.rentingNumber || '-')}
+                                {isRentOutLike ? (rent.rentOutTenancyNumber || '-') : (rent.rentingNumber || '-')}
                             </span>
                         </div>
                         <div>
                             <h3 className="text-lg font-semibold text-zinc-900 dark:text-white flex items-center gap-2">
-                                {t('Rent Details', '租約詳情')}
+                                {rent.type === 'contract' ? t('Contract Details', '合約詳情') : t('Rent Details', '租約詳情')}
                             </h3>
-                            <span className={`px-2 py-0.5 rounded text-xs mt-1 block w-fit ${rent.type === 'rent_out' ? 'bg-green-500/20 text-green-600 dark:text-green-400' : 'bg-blue-500/20 text-blue-600 dark:text-blue-400'}`}>
-                                {rent.type === 'rent_out' ? t('Rent Out', '收租') : t('Renting', '交租')}
+                            <span className={`px-2 py-0.5 rounded text-xs mt-1 block w-fit ${rent.type === 'contract' ? 'bg-amber-500/20 text-amber-700 dark:text-amber-300' : rent.type === 'rent_out' ? 'bg-green-500/20 text-green-600 dark:text-green-400' : 'bg-blue-500/20 text-blue-600 dark:text-blue-400'}`}>
+                                {rent.type === 'contract' ? t('Contract', '合約記錄') : rent.type === 'rent_out' ? t('Rent Out', '收租') : t('Renting', '交租')}
                             </span>
                         </div>
                     </div>
@@ -107,7 +109,7 @@ export default function RentDetailsModal({ rent, property, onClose }: RentDetail
                 </div>
 
                 <div className="p-5 space-y-1">
-                    {rent.type === 'rent_out' ? (
+                    {isRentOutLike ? (
                         <>
                             <DetailRow label={t('Tenancy Number', '合約號碼')} value={rent.rentOutTenancyNumber} />
                             <DetailRow label={t('Monthly Rent', '月租')} value={formatCurrency(rent.rentOutMonthlyRental)} />
@@ -214,7 +216,7 @@ export default function RentDetailsModal({ rent, property, onClose }: RentDetail
                             )}
                             {rent.proprietor && (
                                 <DetailRow
-                                    label={t('Proprietor', '擁有方')}
+                                    label={t('Proprietor', '業主')}
                                     value={rent.proprietor.name}
                                     tooltipContent={
                                         <div className="flex flex-col gap-1.5 w-full">

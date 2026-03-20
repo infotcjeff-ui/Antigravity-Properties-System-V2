@@ -24,7 +24,7 @@ export default function DashboardPage() {
     const queryClient = useQueryClient();
     const { data: stats, isLoading } = useDashboardStatsQuery();
 
-    const { seedData, clearDatabase, syncLocalToCloud, loading: dbLoading } = useDatabase();
+    const { seedData, clearDatabase, loading: dbLoading } = useDatabase();
 
     const [userRole, setUserRole] = useState<string>('client');
 
@@ -60,11 +60,6 @@ export default function DashboardPage() {
         invalidateAll();
     };
 
-    const handleSyncData = async () => {
-        const result = await syncLocalToCloud();
-        alert(result.message);
-        invalidateAll();
-    };
 
     // Use stats from the query
     const totalProperties = stats?.totalProperties || 0;
@@ -106,14 +101,6 @@ export default function DashboardPage() {
                             : '您的物業與租賃概覽'}
                     </p>
                 </div>
-                <div className="flex items-center gap-2">
-                    <button
-                        onClick={handleSyncData}
-                        className="px-4 py-2 rounded-xl bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 font-bold text-sm hover:scale-105 transition-transform active:scale-95"
-                    >
-                        同步數據
-                    </button>
-                </div>
             </div>
 
             {/* Stats Row */}
@@ -125,7 +112,7 @@ export default function DashboardPage() {
                     gradient="purple"
                 />
                 <StatCard
-                    label="資產擁有方"
+                    label="業主"
                     value={totalProprietors}
                     icon={<Users className="w-6 h-6 text-white" />}
                     gradient="blue"
@@ -245,7 +232,7 @@ export default function DashboardPage() {
                                     <p className="text-zinc-900 dark:text-white font-semibold">{totalProperties} 筆記錄</p>
                                 </div>
                                 <div>
-                                    <p className="text-zinc-500 dark:text-white/50">資產擁有方</p>
+                                    <p className="text-zinc-500 dark:text-white/50">業主</p>
                                     <p className="text-zinc-900 dark:text-white font-semibold">{totalProprietors} 筆記錄</p>
                                 </div>
                                 <div>

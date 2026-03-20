@@ -16,6 +16,7 @@ import {
     Building2,
     Sun,
     Trash2,
+    FileText,
 } from 'lucide-react';
 import ThemeToggle from './ThemeToggle';
 
@@ -41,7 +42,7 @@ const dashboardNavItems: DashboardNavItem[] = [
     },
     {
         label: 'Manage Proprietors',
-        labelZh: '管理擁有方',
+        labelZh: '管理業主',
         href: '/dashboard/proprietors',
         icon: <Users className="w-5 h-5" />,
     },
@@ -50,6 +51,12 @@ const dashboardNavItems: DashboardNavItem[] = [
         labelZh: '管理承租人',
         href: '/dashboard/tenants',
         icon: <Users className="w-5 h-5" />,
+    },
+    {
+        label: 'Manage Contracts',
+        labelZh: '管理合約',
+        href: '/dashboard/contracts',
+        icon: <FileText className="w-5 h-5" />,
     },
     {
         label: 'Manage Rent Out',
@@ -154,38 +161,9 @@ export default function DashboardSidebar({ userRole = 'client' }: DashboardSideb
                     ))}
                 </ul>
 
-                {/* Admin-only Section */}
+                {/* Settings Section */}
                 {userRole === 'admin' && (
                     <>
-                        <p className="px-4 text-xs text-zinc-400 dark:text-white/40 uppercase tracking-wider mb-3 mt-6 font-medium">
-                            管理 (Admin)
-                        </p>
-                        <ul className="space-y-1">
-                            <li>
-                                <Link
-                                    href="/dashboard/sub-landlords"
-                                    className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${isActive('/dashboard/sub-landlords')
-                                        ? 'bg-purple-500/20 text-purple-700 dark:text-white'
-                                        : 'text-zinc-600 dark:text-white/60 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-white/5'
-                                        }`}
-                                >
-                                    <Building2 className="w-5 h-5" />
-                                    <span className="font-medium">二房東</span>
-                                </Link>
-                            </li>
-                            <li>
-                                <Link
-                                    href="/dashboard/current-tenants"
-                                    className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${isActive('/dashboard/current-tenants')
-                                        ? 'bg-purple-500/20 text-purple-700 dark:text-white'
-                                        : 'text-zinc-600 dark:text-white/60 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-white/5'
-                                        }`}
-                                >
-                                    <Users className="w-5 h-5" />
-                                    <span className="font-medium">現時租客</span>
-                                </Link>
-                            </li>
-                        </ul>
                         <p className="px-4 text-xs text-zinc-400 dark:text-white/40 uppercase tracking-wider mb-3 mt-6 font-medium">
                             設定
                         </p>

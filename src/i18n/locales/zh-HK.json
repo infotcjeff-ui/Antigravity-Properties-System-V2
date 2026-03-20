@@ -23,8 +23,8 @@
     "dashboard": "儀表板",
     "properties": "物業",
     "renting": "交租",
-    "rentOut": "物业合约记录",
-    "proprietors": "資產擁有方",
+    "rentOut": "物業合約記錄",
+    "proprietors": "業主",
     "showAll": "關聯表"
   },
   "dashboard": {
@@ -78,7 +78,7 @@
     }
   },
   "proprietor": {
-    "title": "資產擁有方",
+    "title": "業主",
     "addProprietor": "新增業主",
     "name": "名稱",
     "email": "電郵",
@@ -88,7 +88,7 @@
   },
   "rent": {
     "renting": "交租",
-    "rentOut": "物业合约记录",
+    "rentOut": "物業合約記錄",
     "amount": "金額",
     "period": "期間",
     "status": "狀態",
