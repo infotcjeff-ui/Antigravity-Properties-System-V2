@@ -653,6 +653,7 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
             if (success) {
                 queryClient.invalidateQueries({ queryKey: ['rents'] });
                 queryClient.invalidateQueries({ queryKey: ['properties-with-relations'] });
+                queryClient.invalidateQueries({ queryKey: ['sub_landlords'] }); // 刷新二房东列表，因为tenancyNumber可能已更新
                 addNotification('租務記錄已取消連結 / Rent record unlinked', 'update');
             } else {
                 setError('Failed to unlink rent record');

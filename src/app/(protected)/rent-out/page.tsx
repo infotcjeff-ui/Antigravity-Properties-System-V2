@@ -185,7 +185,7 @@ export default function RentOutPage() {
                                 <th className="p-4 font-medium">物業</th>
                                 <th className="p-4 font-medium">租客名稱</th>
                                 <th className="p-4 font-medium">繳付金額</th>
-                                <th className="p-4 font-medium">交租日期</th>
+                                <th className="p-4 font-medium">收租日期</th>
                                 <th className="p-4 font-medium">付款方式</th>
                                 <th className="p-4 font-medium">操作</th>
                             </tr>

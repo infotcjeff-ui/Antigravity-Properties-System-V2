@@ -3,7 +3,8 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
-import { useRents, useProprietors, useProperties, useSubLandlordsQuery, useCurrentTenantsQuery } from '@/hooks/useStorage';
+import { useRents, useProprietors, useProperties, useSubLandlordsQuery, useCurrentTenantsQuery, usePropertiesQuery } from '@/hooks/useStorage';
+import { X } from 'lucide-react';
 import { fileToBase64, compressImage, validateImageUpload } from '@/lib/imageUtils';
 import type { Proprietor, Property, Rent, SubLandlord, CurrentTenant } from '@/lib/db';
 import ProprietorModal from '@/components/properties/ProprietorModal';
@@ -68,12 +69,14 @@ export default function RentModal({
     const [showCurrentTenantModal, setShowCurrentTenantModal] = useState(false);
     const [editSubLandlord, setEditSubLandlord] = useState<SubLandlord | null>(null);
     const [editCurrentTenant, setEditCurrentTenant] = useState<CurrentTenant | null>(null);
+    const [showSubLandlordDetail, setShowSubLandlordDetail] = useState<SubLandlord | null>(null);
     const [showChildPropertyModal, setShowChildPropertyModal] = useState(false);
     const [childPropertySaving, setChildPropertySaving] = useState(false);
     const [childPropertyForm, setChildPropertyForm] = useState({ parentId: '', name: '', code: '' });
     const [childPropertyError, setChildPropertyError] = useState('');
     const { data: subLandlords = [] } = useSubLandlordsQuery();
     const { data: currentTenants = [] } = useCurrentTenantsQuery();
+    const { data: allProperties = [] } = usePropertiesQuery();
 
     // Determine effective types for the type selector
     const effectiveTypes = allowedTypes && allowedTypes.length > 0
@@ -341,6 +344,25 @@ export default function RentModal({
         });
     }, [formData.type, formData.tenantId, proprietors]);
 
+    // Auto-generate rentOutTenancyNumber based on property code and sub-landlord (僅合約記錄)
+    useEffect(() => {
+        if (formData.type !== 'contract') return;
+        if (!formData.propertyId || !formData.rentOutSubLandlordId) return;
+        
+        const property = properties.find(p => p.id === formData.propertyId);
+        const subLandlord = subLandlords.find(sl => sl.id === formData.rentOutSubLandlordId);
+        
+        if (property?.code && subLandlord) {
+            // 格式: 物業編號-二房東合約號碼 (例如: C33-ER033)
+            const newNumber = `${property.code}-${subLandlord.tenancyNumber || 'ER' + subLandlord.id?.slice(0, 4).toUpperCase() || 'NEW'}`;
+            
+            // 只有在用户没有手动输入时才自动生成
+            if (!formData.rentOutTenancyNumber || formData.rentOutTenancyNumber === '') {
+                setFormData(prev => ({ ...prev, rentOutTenancyNumber: newNumber }));
+            }
+        }
+    }, [formData.type, formData.propertyId, formData.rentOutSubLandlordId, formData.rentOutTenancyNumber, properties, subLandlords]);
+
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
         const { name, value } = e.target;
         setFormData(prev => ({ ...prev, [name]: value }));
@@ -368,27 +390,12 @@ export default function RentModal({
                 setError('請選擇物業');
                 return;
             }
-            if (!formData.tenantId) {
-                setError('請選擇承租人');
-                return;
-            }
+            // 業主不是必填，移除验证
             if (!formData.rentCollectionTenantName?.trim()) {
                 setError('請填寫租客名稱');
                 return;
             }
-            if (!formData.rentCollectionDate) {
-                setError('請選擇交租日期');
-                return;
-            }
-            const paid = parseFloat(formData.rentCollectionAmount);
-            if (Number.isNaN(paid) || paid <= 0) {
-                setError('請填寫繳付金額');
-                return;
-            }
-            if (!formData.rentCollectionPaymentMethod) {
-                setError('請選擇付款方式');
-                return;
-            }
+            // 其他字段都不是必填，但如果有选择付款方式为支票，则需要验证支票相关字段
             if (formData.rentCollectionPaymentMethod === 'cheque') {
                 if (!formData.rentCollectionChequeBank?.trim()) {
                     setError('請填寫支票銀行');
@@ -422,7 +429,7 @@ export default function RentModal({
                 rentData = {
                     ...rentData,
                     status: 'completed' as const,
-                    amount: !Number.isNaN(paidAmt) ? paidAmt : undefined,
+                    amount: !Number.isNaN(paidAmt) && paidAmt > 0 ? paidAmt : undefined,
                     startDate: formData.rentCollectionDate ? new Date(formData.rentCollectionDate) : undefined,
                     notes: formData.rentCollectionNotes.trim(),
                     location: formData.rentOutAddressDetail || defaultLocation,
@@ -434,8 +441,8 @@ export default function RentModal({
                     rentOutTenantIds: formData.rentOutTenantId ? [formData.rentOutTenantId] : undefined,
                     rentCollectionTenantName: formData.rentCollectionTenantName.trim(),
                     rentCollectionDate: formData.rentCollectionDate ? new Date(formData.rentCollectionDate) : undefined,
-                    rentCollectionAmount: paidAmt,
-                    rentCollectionPaymentMethod: formData.rentCollectionPaymentMethod,
+                    rentCollectionAmount: !Number.isNaN(paidAmt) && paidAmt > 0 ? paidAmt : undefined,
+                    rentCollectionPaymentMethod: formData.rentCollectionPaymentMethod || undefined,
                     rentCollectionChequeBank: formData.rentCollectionPaymentMethod === 'cheque' ? formData.rentCollectionChequeBank.trim() : undefined,
                     rentCollectionChequeNumber: formData.rentCollectionPaymentMethod === 'cheque' ? formData.rentCollectionChequeNumber.trim() : undefined,
                     rentCollectionChequeImage:
@@ -449,13 +456,13 @@ export default function RentModal({
                 rentData = {
                     ...rentData,
                     status: 'completed' as const,
-                    amount: !Number.isNaN(paidAmt) ? paidAmt : undefined,
+                    amount: !Number.isNaN(paidAmt) && paidAmt > 0 ? paidAmt : undefined,
                     startDate: formData.rentCollectionDate ? new Date(formData.rentCollectionDate) : undefined,
                     notes: formData.rentCollectionNotes.trim(),
                     rentCollectionTenantName: formData.rentCollectionTenantName.trim(),
                     rentCollectionDate: formData.rentCollectionDate ? new Date(formData.rentCollectionDate) : undefined,
-                    rentCollectionAmount: paidAmt,
-                    rentCollectionPaymentMethod: formData.rentCollectionPaymentMethod,
+                    rentCollectionAmount: !Number.isNaN(paidAmt) && paidAmt > 0 ? paidAmt : undefined,
+                    rentCollectionPaymentMethod: formData.rentCollectionPaymentMethod || undefined,
                     rentCollectionChequeBank: formData.rentCollectionPaymentMethod === 'cheque' ? formData.rentCollectionChequeBank.trim() : undefined,
                     rentCollectionChequeNumber: formData.rentCollectionPaymentMethod === 'cheque' ? formData.rentCollectionChequeNumber.trim() : undefined,
                     rentCollectionChequeImage:
@@ -671,7 +678,7 @@ export default function RentModal({
                             )}
                         </div>
                         <div className="space-y-2">
-                            <label className={labelClass}>承租人</label>
+                            <label className={labelClass}>業主</label>
                             <div className="flex gap-2 items-center">
                                 {(formData.type === 'rent_out' || formData.type === 'renting' || formData.type === 'contract') ? (
                                     <>
@@ -681,7 +688,7 @@ export default function RentModal({
                                             onChange={handleChange}
                                             className={`${inputClass} flex-1`}
                                         >
-                                            <option value="" className="bg-white dark:bg-[#1a1a2e]">請選擇承租人</option>
+                                            <option value="" className="bg-white dark:bg-[#1a1a2e]">請選擇業主</option>
                                             {lesseeIndividuals.length > 0 && (
                                                 <optgroup label="個人">
                                                     {lesseeIndividuals.map(p => (
@@ -724,7 +731,7 @@ export default function RentModal({
                                     </>
                                 ) : null}
                             </div>
-                            <p className="text-xs text-zinc-400 dark:text-white/40">請按「+ 新增」以新增承租人</p>
+                            <p className="text-xs text-zinc-400 dark:text-white/40">請按「+ 新增」以新增業主</p>
                         </div>
                     </div>
 
@@ -747,26 +754,45 @@ export default function RentModal({
                                             ))}
                                         </select>
                                         {formData.rentOutSubLandlordId && (
+                                            <div className="flex items-center gap-2">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        const sl = subLandlords.find(s => s.id === formData.rentOutSubLandlordId);
+                                                        if (sl) {
+                                                            setEditSubLandlord(sl);
+                                                            // 设置为添加新物业数据模式
+                                                            setShowSubLandlordModal(true);
+                                                        }
+                                                    }}
+                                                    className="p-2 text-zinc-400 hover:text-purple-500 rounded-lg shrink-0"
+                                                    title="新增二房東資料"
+                                                >
+                                                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        const sl = subLandlords.find(s => s.id === formData.rentOutSubLandlordId);
+                                                        if (sl) {
+                                                            setShowSubLandlordDetail(sl);
+                                                        }
+                                                    }}
+                                                    className="px-3 py-1.5 text-sm text-purple-600 dark:text-purple-400 hover:bg-purple-50 dark:hover:bg-purple-500/20 rounded-lg border border-purple-200 dark:border-purple-500/30 transition-all"
+                                                >
+                                                    二房東資料
+                                                </button>
+                                            </div>
+                                        )}
+                                        {!formData.rentOutSubLandlordId && (
                                             <button
                                                 type="button"
-                                                onClick={() => {
-                                                    const sl = subLandlords.find(s => s.id === formData.rentOutSubLandlordId);
-                                                    if (sl) setEditSubLandlord(sl);
-                                                    setShowSubLandlordModal(true);
-                                                }}
-                                                className="p-2 text-zinc-400 hover:text-purple-500 rounded-lg shrink-0"
-                                                title="編輯"
+                                                onClick={() => { setEditSubLandlord(null); setShowSubLandlordModal(true); }}
+                                                className="px-4 py-2 bg-purple-50 dark:bg-purple-500/20 text-purple-600 dark:text-purple-400 rounded-xl hover:bg-purple-100 dark:hover:bg-purple-500/30 border border-purple-100 dark:border-purple-500/30 text-sm font-medium transition-all duration-300 h-[44px] whitespace-nowrap"
                                             >
-                                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+                                                + 新增
                                             </button>
                                         )}
-                                        <button
-                                            type="button"
-                                            onClick={() => { setEditSubLandlord(null); setShowSubLandlordModal(true); }}
-                                            className="px-4 py-2 bg-purple-50 dark:bg-purple-500/20 text-purple-600 dark:text-purple-400 rounded-xl hover:bg-purple-100 dark:hover:bg-purple-500/30 border border-purple-100 dark:border-purple-500/30 text-sm font-medium transition-all duration-300 h-[44px] whitespace-nowrap"
-                                        >
-                                            + 新增
-                                        </button>
                                     </div>
                                     <p className="text-xs text-zinc-400 dark:text-white/40">請按「+ 新增」以新增二房東</p>
                                 </div>
@@ -833,26 +859,25 @@ export default function RentModal({
                                     />
                                 </div>
                                 <div className="space-y-2">
-                                    <label className={labelClass}>交租日期 *</label>
-                                    <input type="date" name="rentCollectionDate" value={formData.rentCollectionDate} onChange={handleChange} required className={inputClass} />
+                                    <label className={labelClass}>收租日期</label>
+                                    <input type="date" name="rentCollectionDate" value={formData.rentCollectionDate} onChange={handleChange} className={inputClass} />
                                 </div>
                             </div>
 
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div className="space-y-2">
-                                    <label className={labelClass}>繳付金額 *</label>
+                                    <label className={labelClass}>繳付金額</label>
                                     <input
                                         type="text"
                                         name="rentCollectionAmount"
                                         value={formatNumberWithCommas(formData.rentCollectionAmount)}
                                         onChange={(e) => handlePriceChange('rentCollectionAmount', e.target.value)}
-                                        required
                                         className={inputClass}
                                         placeholder="50,000"
                                     />
                                 </div>
                                 <div className="space-y-2">
-                                    <label className={labelClass}>付款方式 *</label>
+                                    <label className={labelClass}>付款方式</label>
                                     <select
                                         name="rentCollectionPaymentMethod"
                                         value={formData.rentCollectionPaymentMethod}
@@ -868,7 +893,6 @@ export default function RentModal({
                                                         : { rentCollectionChequeBank: '', rentCollectionChequeNumber: '', rentCollectionChequeImage: '' }),
                                             }));
                                         }}
-                                        required
                                         className={inputClass}
                                     >
                                         <option value="" className="bg-white dark:bg-[#1a1a2e]">請選擇</option>
@@ -992,26 +1016,25 @@ export default function RentModal({
                                     />
                                 </div>
                                 <div className="space-y-2">
-                                    <label className={labelClass}>交租日期 *</label>
-                                    <input type="date" name="rentCollectionDate" value={formData.rentCollectionDate} onChange={handleChange} required className={inputClass} />
+                                    <label className={labelClass}>交租日期</label>
+                                    <input type="date" name="rentCollectionDate" value={formData.rentCollectionDate} onChange={handleChange} className={inputClass} />
                                 </div>
                             </div>
 
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div className="space-y-2">
-                                    <label className={labelClass}>繳付金額 *</label>
+                                    <label className={labelClass}>繳付金額</label>
                                     <input
                                         type="text"
                                         name="rentCollectionAmount"
                                         value={formatNumberWithCommas(formData.rentCollectionAmount)}
                                         onChange={(e) => handlePriceChange('rentCollectionAmount', e.target.value)}
-                                        required
                                         className={inputClass}
                                         placeholder="30,000"
                                     />
                                 </div>
                                 <div className="space-y-2">
-                                    <label className={labelClass}>付款方式 *</label>
+                                    <label className={labelClass}>付款方式</label>
                                     <select
                                         name="rentCollectionPaymentMethod"
                                         value={formData.rentCollectionPaymentMethod}
@@ -1027,7 +1050,6 @@ export default function RentModal({
                                                         : { rentCollectionChequeBank: '', rentCollectionChequeNumber: '', rentCollectionChequeImage: '' }),
                                             }));
                                         }}
-                                        required
                                         className={inputClass}
                                     >
                                         <option value="" className="bg-white dark:bg-[#1a1a2e]">請選擇</option>
@@ -1377,6 +1399,8 @@ export default function RentModal({
                 <RentOutFormModal
                     mode="sub_landlord"
                     editItem={editSubLandlord}
+                    isAddPropertyData={!!editSubLandlord && !!formData.propertyId}
+                    currentPropertyCode={formData.propertyId ? properties.find(p => p.id === formData.propertyId)?.code : undefined}
                     onClose={() => { setShowSubLandlordModal(false); setEditSubLandlord(null); }}
                     onSuccess={async (id) => {
                         await queryClient.invalidateQueries({ queryKey: ['sub_landlords'] });
@@ -1400,6 +1424,188 @@ export default function RentModal({
                     }}
                 />
             )}
+            {/* SubLandlord Detail Modal */}
+            {showSubLandlordDetail && (
+                <SubLandlordDetailModal
+                    subLandlord={showSubLandlordDetail}
+                    allProperties={allProperties}
+                    onClose={() => setShowSubLandlordDetail(null)}
+                    onEdit={() => {
+                        setEditSubLandlord(showSubLandlordDetail);
+                        setShowSubLandlordDetail(null);
+                        setShowSubLandlordModal(true);
+                    }}
+                />
+            )}
+        </>
+    );
+}
+
+// Sub-landlord Detail Modal Component
+function SubLandlordDetailModal({ 
+    subLandlord, 
+    allProperties,
+    onClose,
+    onEdit 
+}: { 
+    subLandlord: SubLandlord; 
+    allProperties: Property[];
+    onClose: () => void;
+    onEdit: () => void;
+}) {
+    const relatedProperties = useMemo(() => {
+        if (!subLandlord.tenancyNumber) return [];
+        
+        const parts = subLandlord.tenancyNumber.split(',').map(p => p.trim());
+        const propertyCodes = new Set<string>();
+        
+        parts.forEach(part => {
+            const firstDashIndex = part.indexOf('-');
+            if (firstDashIndex > 0) {
+                const afterDash = part.substring(firstDashIndex + 1);
+                if (afterDash.match(/^[A-Z]{2,3}\d+$/)) {
+                    propertyCodes.add(part.substring(0, firstDashIndex));
+                } else {
+                    propertyCodes.add(part);
+                }
+            } else {
+                propertyCodes.add(part);
+            }
+        });
+        
+        return allProperties.filter(p => {
+            if (!p.code) return false;
+            return propertyCodes.has(p.code) || 
+                   Array.from(propertyCodes).some(code => {
+                       return p.code === code || (code.length <= 4 && p.code.startsWith(code + '-'));
+                   });
+        });
+    }, [subLandlord.tenancyNumber, allProperties]);
+
+    const formatDate = (date: any) => {
+        if (!date) return '—';
+        return new Date(date).toLocaleDateString('zh-HK');
+    };
+
+    const formatNumber = (num: any) => {
+        if (!num) return '—';
+        return new Intl.NumberFormat('zh-HK').format(num);
+    };
+
+    return (
+        <>
+            <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                onClick={onClose}
+                className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[70]"
+            />
+            <motion.div
+                initial={{ opacity: 0, scale: 0.95, y: 20 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.95, y: 20 }}
+                className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-4xl max-h-[90vh] overflow-hidden bg-white dark:bg-[#1a1a2e] rounded-2xl border border-zinc-200 dark:border-white/10 shadow-2xl z-[70] flex flex-col"
+            >
+                <div className="flex items-center justify-between p-5 border-b border-zinc-100 dark:border-white/5 shrink-0">
+                    <div>
+                        <h2 className="text-lg font-bold text-zinc-900 dark:text-white">二房東詳細資料</h2>
+                        <p className="text-sm text-zinc-500 dark:text-white/50 mt-1">{subLandlord.name}</p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <button
+                            onClick={onEdit}
+                            className="px-4 py-2 bg-purple-500 text-white rounded-xl hover:bg-purple-600 text-sm font-medium transition-all"
+                        >
+                            編輯
+                        </button>
+                        <button
+                            onClick={onClose}
+                            className="p-2 rounded-lg text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-white/10 transition-all"
+                        >
+                            <X className="w-5 h-5" />
+                        </button>
+                    </div>
+                </div>
+                <div className="p-5 space-y-6 overflow-y-auto flex-1">
+                    <div>
+                        <h3 className="text-sm font-semibold text-zinc-700 dark:text-white/80 mb-3">基本資料</h3>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <p className="text-xs text-zinc-500 dark:text-white/50 mb-1">名稱</p>
+                                <p className="text-sm font-medium text-zinc-900 dark:text-white">{subLandlord.name}</p>
+                            </div>
+                            <div>
+                                <p className="text-xs text-zinc-500 dark:text-white/50 mb-1">出租號碼</p>
+                                <p className="text-sm font-medium text-zinc-900 dark:text-white">{subLandlord.tenancyNumber || '—'}</p>
+                            </div>
+                            <div>
+                                <p className="text-xs text-zinc-500 dark:text-white/50 mb-1">出租月租</p>
+                                <p className="text-sm font-medium text-zinc-900 dark:text-white">
+                                    {subLandlord.monthlyRental ? `$${formatNumber(subLandlord.monthlyRental)}` : '—'}
+                                </p>
+                            </div>
+                            <div>
+                                <p className="text-xs text-zinc-500 dark:text-white/50 mb-1">出租期數</p>
+                                <p className="text-sm font-medium text-zinc-900 dark:text-white">
+                                    {subLandlord.periods ? `${subLandlord.periods} 月` : '—'}
+                                </p>
+                            </div>
+                            <div>
+                                <p className="text-xs text-zinc-500 dark:text-white/50 mb-1">出租總額</p>
+                                <p className="text-sm font-medium text-zinc-900 dark:text-white">
+                                    {subLandlord.totalAmount ? `$${formatNumber(subLandlord.totalAmount)}` : '—'}
+                                </p>
+                            </div>
+                            <div>
+                                <p className="text-xs text-zinc-500 dark:text-white/50 mb-1">租務狀態</p>
+                                <p className="text-sm font-medium text-zinc-900 dark:text-white">
+                                    {subLandlord.status === 'listing' ? '放盤中' : 
+                                     subLandlord.status === 'renting' ? '出租中' : 
+                                     subLandlord.status === 'completed' ? '已完租' : '—'}
+                                </p>
+                            </div>
+                            <div>
+                                <p className="text-xs text-zinc-500 dark:text-white/50 mb-1">開始日期</p>
+                                <p className="text-sm font-medium text-zinc-900 dark:text-white">{formatDate(subLandlord.startDate)}</p>
+                            </div>
+                            <div>
+                                <p className="text-xs text-zinc-500 dark:text-white/50 mb-1">結束日期</p>
+                                <p className="text-sm font-medium text-zinc-900 dark:text-white">{formatDate(subLandlord.endDate)}</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div>
+                        <h3 className="text-sm font-semibold text-zinc-700 dark:text-white/80 mb-3">
+                            關聯物業 ({relatedProperties.length})
+                        </h3>
+                        {relatedProperties.length === 0 ? (
+                            <p className="text-sm text-zinc-500 dark:text-white/50">暫無關聯物業</p>
+                        ) : (
+                            <div className="space-y-2">
+                                {relatedProperties.map(property => (
+                                    <div
+                                        key={property.id}
+                                        className="p-3 rounded-xl bg-zinc-50 dark:bg-white/5 border border-zinc-200 dark:border-white/10"
+                                    >
+                                        <div className="flex items-center justify-between">
+                                            <div>
+                                                <p className="text-sm font-medium text-zinc-900 dark:text-white">
+                                                    {property.name}
+                                                </p>
+                                                <p className="text-xs text-zinc-500 dark:text-white/50 mt-1">
+                                                    {property.code} • {property.address}
+                                                </p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                </div>
+            </motion.div>
         </>
     );
 }

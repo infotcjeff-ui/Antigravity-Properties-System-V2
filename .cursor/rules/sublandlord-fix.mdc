@@ -1,0 +1,39 @@
+---
+description: 二房東與物業關聯修復工具
+alwaysApply: true
+---
+
+# 二房東與物業關聯修復
+
+當用戶要求移除二房東與物業的關聯時，直接執行修復腳本。
+
+## 修復腳本
+
+**位置**: `scripts/fix-sublandlord-direct.js`
+
+**運行方式**:
+```bash
+node scripts/fix-sublandlord-direct.js
+```
+
+**命令行參數**:
+- `--property <編號>` - 指定要移除的物業編號（默認: A01-P001）
+- `--name <名稱>` - 指定二房東名稱（默認: 泊車易管理有限公司）
+
+**示例**:
+```bash
+node scripts/fix-sublandlord-direct.js --property A01-P001 --name 泊車易管理有限公司
+node scripts/fix-sublandlord-direct.js --name 某某公司
+```
+
+## 常見修復需求
+
+- 移除 A01-P001 與「泊車易管理有限公司」的關聯
+
+## 內部邏輯
+
+腳本會：
+1. 讀取 `.env.local` 中的 Supabase 配置
+2. 在 `sub_landlords` 表中查找匹配的二房東
+3. 從 `tenancy_number` 字段中移除指定的物業編號
+4. 更新數據庫

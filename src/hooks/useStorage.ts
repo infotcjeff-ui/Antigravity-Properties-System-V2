@@ -1070,10 +1070,118 @@ export function useRents() {
         }
     }, []);
 
+    // 辅助函数：从二房东的tenancyNumber中移除指定物业编号
+    const removePropertyFromSubLandlordTenancyNumber = useCallback(async (
+        subLandlordId: string,
+        propertyCode: string
+    ): Promise<void> => {
+        try {
+            const subLandlord = await fetchSubLandlord(subLandlordId);
+            if (!subLandlord || !subLandlord.tenancyNumber) return;
+            
+            // 从tenancyNumber中移除该物业编号
+            const parts = subLandlord.tenancyNumber.split(',').map(p => p.trim());
+            const filteredParts = parts.filter(part => {
+                // 标准化比较：去除空格并转换为统一格式
+                const normalizedPart = part.trim();
+                const normalizedPropertyCode = propertyCode.trim();
+                
+                // 1. 首先检查是否完全匹配（如 A01-P001 === A01-P001）
+                if (normalizedPart === normalizedPropertyCode) {
+                    return false; // 完全匹配，需要移除
+                }
+                
+                // 2. 检查propertyCode是否是part的前缀（如 A01-P001 匹配 A01-P001-xxx）
+                if (normalizedPart.startsWith(normalizedPropertyCode + '-')) {
+                    return false; // propertyCode是前缀，需要移除
+                }
+                
+                // 3. 检查part是否是propertyCode的前缀（如 A01 匹配 A01-P001）
+                if (normalizedPropertyCode.startsWith(normalizedPart + '-')) {
+                    return false; // part是propertyCode的前缀，需要移除
+                }
+                
+                // 4. 检查是否是后缀格式（如 C33-ER033），如果是，只比较前缀部分
+                const firstDashIndex = normalizedPart.indexOf('-');
+                const propertyFirstDash = normalizedPropertyCode.indexOf('-');
+                
+                if (firstDashIndex > 0) {
+                    const afterDash = normalizedPart.substring(firstDashIndex + 1);
+                    // 如果是后缀格式（2-3个大写字母+数字，如ER033）
+                    if (afterDash.match(/^[A-Z]{2,3}\d+$/)) {
+                        const partCode = normalizedPart.substring(0, firstDashIndex);
+                        // 如果propertyCode也是短格式（如C33），直接比较
+                        if (propertyFirstDash === -1) {
+                            return partCode !== normalizedPropertyCode;
+                        }
+                        // 如果propertyCode是完整格式（如A01-P001），检查前缀
+                        const propertyPrefix = normalizedPropertyCode.substring(0, propertyFirstDash);
+                        return partCode !== propertyPrefix;
+                    } else {
+                        // 不是后缀格式，可能是完整物业编号（如A01-P001）
+                        // 检查propertyCode是否是part的前缀，或part是否是propertyCode的前缀
+                        if (propertyFirstDash > 0) {
+                            const propertyPrefix = normalizedPropertyCode.substring(0, propertyFirstDash);
+                            const partPrefix = normalizedPart.substring(0, firstDashIndex);
+                            // 如果前缀相同，说明是同一个物业的不同子物业，需要移除
+                            if (partPrefix === propertyPrefix) {
+                                return false;
+                            }
+                        }
+                    }
+                }
+                
+                // 5. 如果propertyCode没有"-"，检查part的前缀是否匹配
+                if (propertyFirstDash === -1 && firstDashIndex > 0) {
+                    const partPrefix = normalizedPart.substring(0, firstDashIndex);
+                    if (partPrefix === normalizedPropertyCode) {
+                        return false; // 前缀匹配，需要移除
+                    }
+                }
+                
+                // 6. 其他情况，保留该部分
+                return true;
+            });
+            
+            // 更新二房东的tenancyNumber
+            const newTenancyNumber = filteredParts.join(', ').trim();
+            if (newTenancyNumber !== subLandlord.tenancyNumber && newTenancyNumber !== '') {
+                const { error } = await supabase
+                    .from('sub_landlords')
+                    .update({ 
+                        tenancy_number: newTenancyNumber || null,
+                        updated_at: new Date().toISOString()
+                    })
+                    .eq('id', subLandlordId);
+                if (error) throw error;
+            } else if (newTenancyNumber === '') {
+                // 如果所有物业都被移除，清空tenancyNumber
+                const { error } = await supabase
+                    .from('sub_landlords')
+                    .update({ 
+                        tenancy_number: null,
+                        updated_at: new Date().toISOString()
+                    })
+                    .eq('id', subLandlordId);
+                if (error) throw error;
+            }
+        } catch (err) {
+            console.error('Failed to update sub-landlord tenancy number:', err);
+        }
+    }, []);
+
     const updateRent = useCallback(async (id: string, updates: Partial<Rent>): Promise<boolean> => {
         setLoading(true);
         setError(null);
         try {
+            // 如果需要移除propertyId或rentOutSubLandlordId，先获取原始记录信息
+            let originalRent: Rent | null = null;
+            if (updates.propertyId === null || updates.propertyId === undefined || 
+                (updates as any).rentOutSubLandlordId === null || (updates as any).rentOutSubLandlordId === '') {
+                const allRents = await fetchRents();
+                originalRent = allRents.find(r => r.id === id) || null;
+            }
+            
             const rentData: any = {
                 updated_at: new Date().toISOString(),
             };
@@ -1144,6 +1252,27 @@ export function useRents() {
                 .eq('id', id);
 
             if (sbError) throw sbError;
+            
+            // 如果移除了propertyId或rentOutSubLandlordId，需要同步更新二房东的tenancyNumber
+            if (originalRent && originalRent.propertyId && (originalRent as any).rentOutSubLandlordId) {
+                const propertyIdRemoved = updates.propertyId === null || updates.propertyId === undefined || updates.propertyId === '';
+                const subLandlordIdRemoved = (updates as any).rentOutSubLandlordId === null || 
+                                            (updates as any).rentOutSubLandlordId === '' || 
+                                            (updates as any).rentOutSubLandlordId === undefined;
+                
+                if (propertyIdRemoved || subLandlordIdRemoved) {
+                    // 获取物业编号
+                    const property = await fetchProperty(originalRent.propertyId);
+                    if (property?.code) {
+                        // 从二房东的tenancyNumber中移除该物业编号
+                        await removePropertyFromSubLandlordTenancyNumber(
+                            (originalRent as any).rentOutSubLandlordId,
+                            property.code
+                        );
+                    }
+                }
+            }
+            
             return true;
         } catch (err) {
             setError('Failed to update rent in cloud');
@@ -1158,12 +1287,28 @@ export function useRents() {
         setLoading(true);
         setError(null);
         try {
+            // 删除前获取租金记录信息，以便更新二房东的tenancyNumber
+            const allRents = await fetchRents();
+            const rentToDelete = allRents.find(r => r.id === id);
+            
             const { error: sbError } = await supabase
                 .from('rents')
                 .update({ is_deleted: true, deleted_at: new Date().toISOString() })
                 .eq('id', id);
 
             if (sbError) throw sbError;
+            
+            // 如果删除的租金记录关联了二房东和物业，需要从二房东的tenancyNumber中移除该物业编号
+            if (rentToDelete && rentToDelete.propertyId && (rentToDelete as any).rentOutSubLandlordId) {
+                const property = await fetchProperty(rentToDelete.propertyId);
+                if (property?.code) {
+                    await removePropertyFromSubLandlordTenancyNumber(
+                        (rentToDelete as any).rentOutSubLandlordId,
+                        property.code
+                    );
+                }
+            }
+            
             return true;
         } catch (err) {
             setError('Failed to soft delete rent from cloud');
