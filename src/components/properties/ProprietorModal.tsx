@@ -9,13 +9,14 @@ interface ProprietorModalProps {
     onSuccess: (proprietorId: string, proprietorData?: Partial<Proprietor>) => void;
     mode?: 'proprietor' | 'tenant';
     initialData?: Proprietor | null;
-    propertyCode?: string; // 當前物業編號，用於產生擁有方代碼
+    propertyCode?: string; // 當前物業編號，用於產生業主代碼
+    initialEditing?: boolean; // 控制初始是否為編輯模式
 }
 
-export default function ProprietorModal({ onClose, onSuccess, mode = 'proprietor', initialData, propertyCode }: ProprietorModalProps) {
+export default function ProprietorModal({ onClose, onSuccess, mode = 'proprietor', initialData, propertyCode, initialEditing }: ProprietorModalProps) {
     const { getProprietors, addProprietor, updateProprietor, loading } = useProprietors();
     const [saving, setSaving] = useState(false);
-    const [isEditing, setIsEditing] = useState(!initialData);
+    const [isEditing, setIsEditing] = useState(initialEditing !== undefined ? initialEditing : !initialData);
     const [error, setError] = useState('');
     const [existingTenants, setExistingTenants] = useState<Proprietor[]>([]);
     const [showTenantList, setShowTenantList] = useState(false);
@@ -31,7 +32,7 @@ export default function ProprietorModal({ onClose, onSuccess, mode = 'proprietor
         description: (initialData as any)?.description || '',
     });
 
-    // 擁有方代碼/承租人編號: 業主用propertyCode或自動產生；承租人用placeholder不預填
+    // 業主代碼/承租人編號: 業主用propertyCode或自動產生；承租人用placeholder不預填
     useEffect(() => {
         if (initialData) return;
 
@@ -155,14 +156,6 @@ export default function ProprietorModal({ onClose, onSuccess, mode = 'proprietor
                                 : (mode === 'tenant' ? '新增承租人' : '新增業主')
                             }
                         </h2>
-                        {initialData && !isEditing && (
-                            <button
-                                onClick={() => setIsEditing(true)}
-                                className="px-3 py-1 text-xs font-medium bg-purple-500/10 text-purple-500 border border-purple-500/20 rounded-lg hover:bg-purple-500/20 transition-all"
-                            >
-                                編輯
-                            </button>
-                        )}
                     </div>
                     <button
                         onClick={onClose}
@@ -298,11 +291,11 @@ export default function ProprietorModal({ onClose, onSuccess, mode = 'proprietor
                                 </div>
                             </div>
 
-                            {/* Row 2: 擁有方代碼 * | BR Number */}
+                            {/* Row 2: 業主代碼 * | BR Number */}
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div className="space-y-2">
                                     <label className="block text-sm font-medium text-zinc-700 dark:text-white/80">
-                                        {mode === 'tenant' ? '承租人編號 *' : '擁有方代碼 *'}
+                                        {mode === 'tenant' ? '承租人編號 *' : '業主代碼 *'}
                                     </label>
                                     <input
                                         type="text"
@@ -329,11 +322,11 @@ export default function ProprietorModal({ onClose, onSuccess, mode = 'proprietor
                                 </div>
                             </div>
 
-                            {/* Row 3: 擁有方性質 | 擁有人類別 */}
+                            {/* Row 3: 業主性質 | 擁有人類別 */}
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div className="space-y-2">
                                     <label className="block text-sm font-medium text-zinc-700 dark:text-white/80">
-                                        {mode === 'tenant' ? '性質' : '擁有方性質'}
+                                        {mode === 'tenant' ? '性質' : '業主性質'}
                                     </label>
                                     <AnimatedSelect
                                         name="type"
