@@ -30,7 +30,7 @@ export default function RentOutPage() {
     const [showModal, setShowModal] = useState(false);
     const [showPropertyModal, setShowPropertyModal] = useState(false);
     const [selectedRent, setSelectedRent] = useState<Rent | null>(null);
-    const [selectedProperty, setSelectedProperty] = useState<string | null>(null);
+    const [propertyDetailTarget, setPropertyDetailTarget] = useState<{ id?: string; name: string } | null>(null);
     const [filterPaymentMethod, setFilterPaymentMethod] = useState<RentPaymentMethodFilterValue>('');
     const [filterRentOutStatus, setFilterRentOutStatus] = useState<RentOutStatusFilterValue>('');
     const { deleteRent } = useRents();
@@ -228,8 +228,12 @@ export default function RentOutPage() {
                                                 animate={{ opacity: 1, y: 0 }}
                                                 transition={{ delay: index * 0.05 }}
                                                 onClick={() => {
-                                                    if (property?.name) {
-                                                        setSelectedProperty(property.name);
+                                                    const pid = rent.propertyId || rent.property?.id;
+                                                    if (pid || property?.name) {
+                                                        setPropertyDetailTarget({
+                                                            id: pid || undefined,
+                                                            name: property?.name || '物業',
+                                                        });
                                                         setShowPropertyModal(true);
                                                     }
                                                 }}
@@ -304,8 +308,12 @@ export default function RentOutPage() {
                                         animate={{ opacity: 1, y: 0 }}
                                         transition={{ delay: index * 0.05 }}
                                         onClick={() => {
-                                            if (property?.name) {
-                                                setSelectedProperty(property.name);
+                                            const pid = rent.propertyId || rent.property?.id;
+                                            if (pid || property?.name) {
+                                                setPropertyDetailTarget({
+                                                    id: pid || undefined,
+                                                    name: property?.name || '物業',
+                                                });
                                                 setShowPropertyModal(true);
                                             }
                                         }}
@@ -416,12 +424,13 @@ export default function RentOutPage() {
             </AnimatePresence>
 
             <AnimatePresence>
-                {showPropertyModal && selectedProperty && (
+                {showPropertyModal && propertyDetailTarget && (
                     <PropertyDetailModal
-                        propertyName={selectedProperty}
+                        propertyId={propertyDetailTarget.id}
+                        propertyName={propertyDetailTarget.name}
                         onClose={() => {
                             setShowPropertyModal(false);
-                            setSelectedProperty(null);
+                            setPropertyDetailTarget(null);
                         }}
                     />
                 )}

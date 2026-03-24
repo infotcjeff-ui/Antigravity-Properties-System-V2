@@ -214,27 +214,27 @@ export default function RentDetailsModal({ rent, property, onClose }: RentDetail
                                     }
                                 />
                             )}
-                            {rent.proprietor && (
+                            {(rent.proprietor || rent.tenant) && (
                                 <DetailRow
                                     label={t('Proprietor', '業主')}
-                                    value={rent.proprietor.name}
+                                    value={(rent.proprietor || rent.tenant)?.name}
                                     tooltipContent={
                                         <div className="flex flex-col gap-1.5 w-full">
                                             <div className="flex items-center gap-2 mb-1">
                                                 <User className="w-4 h-4 text-emerald-500" />
-                                                <span className="font-bold">{rent.proprietor.name}</span>
-                                                <span className="bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 px-1.5 py-0.5 rounded text-[10px] ml-auto">{rent.proprietor.code}</span>
+                                                <span className="font-bold">{(rent.proprietor || rent.tenant)?.name}</span>
+                                                <span className="bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 px-1.5 py-0.5 rounded text-[10px] ml-auto">{(rent.proprietor || rent.tenant)?.code}</span>
                                             </div>
                                             <div className="text-xs text-zinc-500 dark:text-white/60">
-                                                英文名稱: <span className="text-zinc-900 dark:text-white text-[10px]">{rent.proprietor.englishName || '-'}</span>
+                                                英文名稱: <span className="text-zinc-900 dark:text-white text-[10px]">{(rent.proprietor || rent.tenant)?.englishName || '-'}</span>
                                             </div>
                                             <div className="text-xs text-zinc-500 dark:text-white/60 flex items-center justify-between">
-                                                <span>類型: <span className="text-zinc-900 dark:text-white">{rent.proprietor.type === 'company' ? '公司' : '個人'}</span></span>
+                                                <span>類型: <span className="text-zinc-900 dark:text-white">{(rent.proprietor || rent.tenant)?.type === 'company' ? '公司' : '個人'}</span></span>
                                                 <span className="bg-zinc-100 dark:bg-white/10 px-1.5 py-0.5 rounded text-[10px] text-zinc-600 dark:text-white/70">
-                                                    {rent.proprietor.category === 'group_company' ? '集團公司' :
-                                                        rent.proprietor.category === 'joint_venture' ? '合資公司' :
-                                                            rent.proprietor.category === 'managed_individual' ? '代管個體' :
-                                                                rent.proprietor.category === 'external_landlord' ? '外部業主' : '承租人'}
+                                                    {(rent.proprietor || rent.tenant)?.category === 'group_company' ? '集團公司' :
+                                                        (rent.proprietor || rent.tenant)?.category === 'joint_venture' ? '合資公司' :
+                                                            (rent.proprietor || rent.tenant)?.category === 'managed_individual' ? '代管個體' :
+                                                                (rent.proprietor || rent.tenant)?.category === 'external_landlord' ? '外部業主' : '承租人'}
                                                 </span>
                                             </div>
                                         </div>

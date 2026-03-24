@@ -403,14 +403,18 @@ export default function PropertyDetailsPage() {
                                         <div className="grid grid-cols-[1fr_2fr_1.5fr_2fr_1fr] gap-0 pb-3 border-b border-zinc-200 dark:border-white/10 text-xs font-bold text-zinc-900 dark:text-white">
                                             <div className="pr-4">{t('Number', '編號')}</div>
                                             <div className="px-4">{t('Property', '物業')}</div>
-                                            <div className="px-4">{t('Tenant', '承租人')}</div>
+                                            <div className="px-4">
+                                                {rentHistoryTab === 'renting' ? t('Proprietor', '業主') : t('Tenant', '承租人')}
+                                            </div>
                                             <div className="px-4">{t('Lease Term & Location', '租期及地點')}</div>
                                             <div className="pl-4">{t('Rent', '租金')}</div>
                                         </div>
                                         <div className="divide-y divide-zinc-200 dark:divide-white/10">
                                             {list.map((rent: Rent) => {
                                                 const isRentOutOrContract = rent.type === 'rent_out' || rent.type === 'contract';
-                                                const otherParty = isRentOutOrContract ? rent.tenant : rent.proprietor;
+                                                const otherParty = isRentOutOrContract
+                                                    ? rent.tenant
+                                                    : (rent.proprietor || rent.tenant);
                                                 const rentNumber = isRentOutOrContract ? (rent.rentOutTenancyNumber || '-') : (rent.rentingNumber || '-');
                                                 const startDate = isRentOutOrContract ? (rent.rentOutStartDate || rent.startDate) : (rent.rentingStartDate || rent.startDate);
                                                 const endDate = isRentOutOrContract ? (rent.rentOutEndDate || rent.endDate) : (rent.rentingEndDate || rent.endDate);

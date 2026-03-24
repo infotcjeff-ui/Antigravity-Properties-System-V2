@@ -28,6 +28,49 @@ const toSnake = (obj: any) => {
     return newObj;
 };
 
+const extractMissingColumnFromError = (err: unknown): string | null => {
+    const message = (err as { message?: string } | null)?.message || '';
+    const match = message.match(/Could not find the '([^']+)' column/i);
+    return match?.[1] || null;
+};
+
+const withSchemaFallbackInsert = async (
+    table: string,
+    payload: Record<string, unknown>,
+    maxRetries = 8,
+): Promise<{ data: unknown; error: unknown }> => {
+    const attemptPayload = { ...payload };
+    for (let i = 0; i <= maxRetries; i++) {
+        const result = await supabase.from(table).insert([attemptPayload]);
+        if (!result.error) return result as { data: unknown; error: unknown };
+        const missingColumn = extractMissingColumnFromError(result.error);
+        if (!missingColumn || !(missingColumn in attemptPayload)) {
+            return result as { data: unknown; error: unknown };
+        }
+        delete attemptPayload[missingColumn];
+    }
+    return { data: null, error: new Error('Insert failed after schema fallback retries') };
+};
+
+const withSchemaFallbackUpdate = async (
+    table: string,
+    id: string,
+    payload: Record<string, unknown>,
+    maxRetries = 8,
+): Promise<{ data: unknown; error: unknown }> => {
+    const attemptPayload = { ...payload };
+    for (let i = 0; i <= maxRetries; i++) {
+        const result = await supabase.from(table).update(attemptPayload).eq('id', id);
+        if (!result.error) return result as { data: unknown; error: unknown };
+        const missingColumn = extractMissingColumnFromError(result.error);
+        if (!missingColumn || !(missingColumn in attemptPayload)) {
+            return result as { data: unknown; error: unknown };
+        }
+        delete attemptPayload[missingColumn];
+    }
+    return { data: null, error: new Error('Update failed after schema fallback retries') };
+};
+
 // ==================== PROPERTY HOOKS ====================
 
 // ==================== FETCHERS ====================
@@ -1052,9 +1095,7 @@ export function useRents() {
                 Object.entries(rentData).filter(([_, v]) => v !== undefined)
             );
 
-            const { error: sbError } = await supabase
-                .from('rents')
-                .insert([cleanRentData]);
+            const { error: sbError } = await withSchemaFallbackInsert('rents', cleanRentData);
 
             if (sbError) throw sbError;
             return id;
@@ -1247,10 +1288,7 @@ export function useRents() {
                 }
             }
 
-            const { error: sbError } = await supabase
-                .from('rents')
-                .update(rentData)
-                .eq('id', id);
+            const { error: sbError } = await withSchemaFallbackUpdate('rents', id, rentData);
 
             if (sbError) throw sbError;
             
@@ -1392,7 +1430,11 @@ export function useRelations() {
             ] = await Promise.all([
                 camelProperty.proprietorId ? supabase.from('proprietors').select('*').eq('id', camelProperty.proprietorId).single() : { data: null },
                 camelProperty.tenantId ? supabase.from('proprietors').select('*').eq('id', camelProperty.tenantId).single() : { data: null },
-                supabase.from('rents').select('*, proprietor:proprietors!proprietor_id(*), tenant:proprietors!tenant_id(*)').eq('property_id', propertyId)
+                supabase
+                    .from('rents')
+                    .select('*, proprietor:proprietors!proprietor_id(*), tenant:proprietors!tenant_id(*)')
+                    .eq('property_id', propertyId)
+                    .eq('is_deleted', false)
             ]);
 
             return {
@@ -1413,12 +1455,15 @@ export function useRelations() {
         setLoading(true);
         setError(null);
         try {
+            const trimmedName = name.trim();
+            if (!trimmedName) return null;
+
             const queryFields = 'id, name, code, address, type, status, land_use, lot_index, lot_area, location, google_drive_plan_url, has_planning_permission, proprietor_id, tenant_id, created_by, created_at, updated_at, images, geo_maps, notes';
 
             const { data: records, error: pError } = await supabase
                 .from('properties')
                 .select(queryFields)
-                .eq('name', name)
+                .eq('name', trimmedName)
                 .eq('is_deleted', false)
                 .limit(1);
             const property = (records && records.length > 0) ? records[0] : null;
@@ -1434,7 +1479,11 @@ export function useRelations() {
             ] = await Promise.all([
                 camelProperty.proprietorId ? supabase.from('proprietors').select('*').eq('id', camelProperty.proprietorId).single() : { data: null },
                 camelProperty.tenantId ? supabase.from('proprietors').select('*').eq('id', camelProperty.tenantId).single() : { data: null },
-                supabase.from('rents').select('*, proprietor:proprietors!proprietor_id(*), tenant:proprietors!tenant_id(*)').eq('property_id', property.id)
+                supabase
+                    .from('rents')
+                    .select('*, proprietor:proprietors!proprietor_id(*), tenant:proprietors!tenant_id(*)')
+                    .eq('property_id', property.id)
+                    .eq('is_deleted', false)
             ]);
 
             return {

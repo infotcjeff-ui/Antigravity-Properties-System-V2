@@ -1,0 +1,13 @@
+fix: PropertyDetailModal load by propertyId + RentModal form layout improvements
+
+- PropertyDetailModal: add optional propertyId prop; when available, use
+  usePropertyWithRelationsQuery(id) to avoid wrong-property 取错笔 bug when
+  multiple properties share the same name; fall back to name-based query
+- rent-out / renting / contracts pages: pass rent.propertyId when opening
+  the property detail modal so the correct property and its rent records
+  (contracts / rent-out / renting) are shown
+- RentModal: put select + button on same row (flex-nowrap + w-auto); move
+  sub-landlord / current-tenant block to the right column of the property
+  grid so they sit side-by-side on desktop
+- useStorage: trim name in getPropertyWithRelationsByName to reduce
+  false-negative matches from surrounding whitespace

@@ -18,7 +18,7 @@ import {
 import type { Property, Rent } from '@/lib/db';
 import { formatLotArea } from '@/lib/formatters';
 import LotIndexDisplay from '@/components/properties/LotIndexDisplay';
-import { usePropertyWithRelationsByNameQuery } from '@/hooks/useStorage';
+import { usePropertyWithRelationsByNameQuery, usePropertyWithRelationsQuery } from '@/hooks/useStorage';
 import DOMPurify from 'dompurify';
 import { BentoCard } from '@/components/layout/BentoGrid';
 import { useLanguage } from '@/components/common/LanguageSwitcher';
@@ -27,7 +27,10 @@ import { Tooltip } from '@heroui/react';
 import SinglePropertyMapDynamic from '@/components/properties/SinglePropertyMapDynamic';
 
 interface PropertyDetailModalProps {
+    /** 顯示用／無 ID 時後備查詢 */
     propertyName: string;
+    /** 有則優先：與列表租約的 property_id 一致，避免同名物業取錯筆導致租約列表為空 */
+    propertyId?: string;
     onClose: () => void;
 }
 
@@ -78,11 +81,16 @@ function DetailRow({ label, value }: { label: string; value: any }) {
     );
 }
 
-export default function PropertyDetailModal({ propertyName, onClose }: PropertyDetailModalProps) {
+export default function PropertyDetailModal({ propertyName, propertyId, onClose }: PropertyDetailModalProps) {
     const lang = useLanguage();
     const isZh = lang === 'zh-TW';
     const t = (en: string, zh: string) => isZh ? zh : en;
-    const { data: property, isLoading } = usePropertyWithRelationsByNameQuery(propertyName);
+    const { data: propertyById, isLoading: loadingById } = usePropertyWithRelationsQuery(propertyId ?? '');
+    const { data: propertyByName, isLoading: loadingByName } = usePropertyWithRelationsByNameQuery(
+        propertyId ? '' : propertyName
+    );
+    const property = propertyId ? propertyById : propertyByName;
+    const isLoading = propertyId ? loadingById : loadingByName;
     const [currentImageIndex, setCurrentImageIndex] = useState(0);
     const [selectedRent, setSelectedRent] = useState<Rent | null>(null);
 
@@ -256,7 +264,7 @@ export default function PropertyDetailModal({ propertyName, onClose }: PropertyD
                         </div>
                         <div>
                             <h2 className="text-xl font-bold text-zinc-900 dark:text-white">物業詳情</h2>
-                            <p className="text-sm text-zinc-500 dark:text-white/50">{propertyName}</p>
+                            <p className="text-sm text-zinc-500 dark:text-white/50">{property?.name ?? propertyName}</p>
                         </div>
                     </div>
                     <button

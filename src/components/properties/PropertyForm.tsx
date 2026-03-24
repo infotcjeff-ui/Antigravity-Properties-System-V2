@@ -158,6 +158,11 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
     const rentOutRents = useMemo(() => rents.filter(r => r.type === 'rent_out'), [rents]);
     const rentingRents = useMemo(() => rents.filter(r => r.type === 'renting'), [rents]);
     const contractRents = useMemo(() => rents.filter(r => r.type === 'contract'), [rents]);
+    const latestContract = useMemo(() => contractRents[0], [contractRents]);
+    const hasContractRecord = contractRents.length > 0;
+    const contractOwnerId = latestContract?.tenantId || '';
+    const contractSubLandlordId = (latestContract as any)?.rentOutSubLandlordId || '';
+    const contractCurrentTenantId = latestContract?.rentOutTenantIds?.[0] || '';
 
     const renderRentTable = (records: Rent[]) => {
         if (records.length === 0) {
@@ -1270,7 +1275,7 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                                                         >
                                                             更改
                                                         </button>
-                                                    ) : (
+                                                    ) : hasContractRecord ? (
                                                         <button
                                                             type="button"
                                                             onClick={() => setCreateRentForProprietorId(propId)}
@@ -1281,7 +1286,7 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                                                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                                                             </svg>
                                                         </button>
-                                                    )}
+                                                    ) : null}
                                                     <button
                                                         type="button"
                                                         onClick={() => handleUnlinkProprietor(propId)}
@@ -1318,19 +1323,24 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                                             </svg>
                                             新增合約記錄
                                         </button>
-                                        <button
-                                            type="button"
-                                            onClick={() => setShowRentModal(true)}
-                                            className="px-4 py-2 bg-purple-50 dark:bg-purple-500/20 text-purple-600 dark:text-purple-400 rounded-xl hover:bg-purple-100 dark:hover:bg-purple-500/30 border border-purple-100 dark:border-purple-500/30 text-sm font-medium transition-all duration-300 flex items-center gap-2"
-                                        >
-                                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
-                                            </svg>
-                                            新增交/收租記錄
-                                        </button>
+                                        {hasContractRecord && (
+                                            <button
+                                                type="button"
+                                                onClick={() => setShowRentModal(true)}
+                                                className="px-4 py-2 bg-purple-50 dark:bg-purple-500/20 text-purple-600 dark:text-purple-400 rounded-xl hover:bg-purple-100 dark:hover:bg-purple-500/30 border border-purple-100 dark:border-purple-500/30 text-sm font-medium transition-all duration-300 flex items-center gap-2"
+                                            >
+                                                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
+                                                </svg>
+                                                新增交/收租記錄
+                                            </button>
+                                        )}
                                     </div>
                                 )}
                             </div>
+                            {!hasContractRecord && (
+                                <p className="text-xs text-amber-600 dark:text-amber-400">請先新增第一個合約記錄，之後才可新增交／收租記錄。</p>
+                            )}
 
                             {/* Select to link existing rent records (hidden) */}
                             <div className="relative group hidden">
@@ -1497,6 +1507,9 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                     propertyId={property.id}
                     defaultLocation={formData.name}
                     allowedTypes={['rent_out', 'renting']}
+                    presetTenantId={contractOwnerId}
+                    presetSubLandlordId={contractSubLandlordId}
+                    presetCurrentTenantId={contractCurrentTenantId}
                     onClose={() => setShowRentModal(false)}
                     onSuccess={handleRentCreated}
                 />
@@ -1527,6 +1540,9 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                     defaultLocation={formData.name}
                     initialProprietorId={createRentForProprietorId}
                     allowedTypes={['rent_out', 'renting']}
+                    presetTenantId={contractOwnerId}
+                    presetSubLandlordId={contractSubLandlordId}
+                    presetCurrentTenantId={contractCurrentTenantId}
                     onClose={() => setCreateRentForProprietorId(null)}
                     onSuccess={handleRentCreated}
                 />

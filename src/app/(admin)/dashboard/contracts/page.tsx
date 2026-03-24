@@ -18,7 +18,7 @@ export default function ContractsPage() {
     const [showModal, setShowModal] = useState(false);
     const [selectedContract, setSelectedContract] = useState<Rent | null>(null);
     const [showPropertyModal, setShowPropertyModal] = useState(false);
-    const [selectedPropertyName, setSelectedPropertyName] = useState<string | null>(null);
+    const [propertyDetailTarget, setPropertyDetailTarget] = useState<{ id?: string; name: string } | null>(null);
 
     const statusColors: Record<string, string> = {
         active: 'bg-green-500/20 text-green-400',
@@ -164,8 +164,12 @@ export default function ContractsPage() {
                                                 animate={{ opacity: 1, y: 0 }}
                                                 transition={{ delay: index * 0.04 }}
                                                 onClick={() => {
-                                                    if (property?.name) {
-                                                        setSelectedPropertyName(property.name);
+                                                    const pid = contract.propertyId || property?.id;
+                                                    if (pid || property?.name) {
+                                                        setPropertyDetailTarget({
+                                                            id: pid || undefined,
+                                                            name: property?.name || '物業',
+                                                        });
                                                         setShowPropertyModal(true);
                                                     }
                                                 }}
@@ -245,8 +249,12 @@ export default function ContractsPage() {
                                         animate={{ opacity: 1, y: 0 }}
                                         transition={{ delay: index * 0.04 }}
                                         onClick={() => {
-                                            if (property?.name) {
-                                                setSelectedPropertyName(property.name);
+                                            const pid = contract.propertyId || property?.id;
+                                            if (pid || property?.name) {
+                                                setPropertyDetailTarget({
+                                                    id: pid || undefined,
+                                                    name: property?.name || '物業',
+                                                });
                                                 setShowPropertyModal(true);
                                             }
                                         }}
@@ -322,12 +330,13 @@ export default function ContractsPage() {
             </AnimatePresence>
 
             <AnimatePresence>
-                {showPropertyModal && selectedPropertyName && (
+                {showPropertyModal && propertyDetailTarget && (
                     <PropertyDetailModal
-                        propertyName={selectedPropertyName}
+                        propertyId={propertyDetailTarget.id}
+                        propertyName={propertyDetailTarget.name}
                         onClose={() => {
                             setShowPropertyModal(false);
-                            setSelectedPropertyName(null);
+                            setPropertyDetailTarget(null);
                         }}
                     />
                 )}
