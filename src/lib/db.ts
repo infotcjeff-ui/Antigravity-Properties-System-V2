@@ -94,6 +94,7 @@ export interface Rent {
 
   /** 收租記錄（rent_out 簡化表單） */
   rentCollectionTenantName?: string;
+  /** 收／交租記錄期間開始（與 startDate 同步寫入簡化表單） */
   rentCollectionDate?: Date;
   rentCollectionAmount?: number;
   rentCollectionPaymentMethod?: 'cheque' | 'fps' | 'cash';

@@ -287,18 +287,18 @@ export default function TopBar({ onSearch, placeholder = '搜尋...', isAuthenti
                                 {isAdmin ? (
                                     <>
                                         <p className="px-4 text-xs font-medium text-zinc-400 dark:text-white/40 uppercase tracking-widest mb-2 mt-4">管理</p>
-                                        <MobileNavItem href="/dashboard" icon={<LayoutDashboard className="w-5 h-5" />} label="總覽" onClick={() => setShowMobileMenu(false)} />
-                                        <MobileNavItem href="/dashboard/properties" icon={<Building2 className="w-5 h-5" />} label="管理物業" onClick={() => setShowMobileMenu(false)} />
-                                        <MobileNavItem href="/dashboard/proprietors" icon={<Users className="w-5 h-5" />} label="管理業主" onClick={() => setShowMobileMenu(false)} />
-                                        <MobileNavItem href="/dashboard/tenants" icon={<Users className="w-5 h-5" />} label="管理承租人" onClick={() => setShowMobileMenu(false)} />
-                                        <MobileNavItem href="/dashboard/contracts" icon={<FileText className="w-5 h-5" />} label="管理合約" onClick={() => setShowMobileMenu(false)} />
-                                        <MobileNavItem href="/dashboard/rent-out" icon={<ArrowUpFromLine className="w-5 h-5" />} label="管理收租" onClick={() => setShowMobileMenu(false)} />
-                                        <MobileNavItem href="/dashboard/renting" icon={<ArrowDownToLine className="w-5 h-5" />} label="管理交租" onClick={() => setShowMobileMenu(false)} />
-                                        <MobileNavItem href="/dashboard/relations" icon={<Network className="w-5 h-5" />} label="管理關聯" onClick={() => setShowMobileMenu(false)} />
+                                        <MobileNavItem href="/dashboard" icon={<LayoutDashboard className="w-6 h-6" />} label="總覽" onClick={() => setShowMobileMenu(false)} />
+                                        <MobileNavItem href="/dashboard/properties" icon={<Building2 className="w-6 h-6" />} label="管理物業" onClick={() => setShowMobileMenu(false)} />
+                                        <MobileNavItem href="/dashboard/proprietors" icon={<Users className="w-6 h-6" />} label="管理業主" onClick={() => setShowMobileMenu(false)} />
+                                        <MobileNavItem href="/dashboard/tenants" icon={<Users className="w-6 h-6" />} label="管理承租人" onClick={() => setShowMobileMenu(false)} />
+                                        <MobileNavItem href="/dashboard/contracts" icon={<FileText className="w-6 h-6" />} label="管理合約" onClick={() => setShowMobileMenu(false)} />
+                                        <MobileNavItem href="/dashboard/rent-out" icon={<ArrowUpFromLine className="w-6 h-6" />} label="管理收租" onClick={() => setShowMobileMenu(false)} />
+                                        <MobileNavItem href="/dashboard/renting" icon={<ArrowDownToLine className="w-6 h-6" />} label="管理交租" onClick={() => setShowMobileMenu(false)} />
+                                        <MobileNavItem href="/dashboard/relations" icon={<Network className="w-6 h-6" />} label="管理關聯" onClick={() => setShowMobileMenu(false)} />
 
                                         <p className="px-4 text-xs font-medium text-zinc-400 dark:text-white/40 uppercase tracking-widest mb-2 mt-6">系統</p>
-                                        <MobileNavItem href="/dashboard/users" icon={<Users className="w-5 h-5" />} label="帳號管理" onClick={() => setShowMobileMenu(false)} />
-                                        <MobileNavItem href="/dashboard/settings" icon={<Settings className="w-5 h-5" />} label="系統設定" onClick={() => setShowMobileMenu(false)} />
+                                        <MobileNavItem href="/dashboard/users" icon={<Users className="w-6 h-6" />} label="帳號管理" onClick={() => setShowMobileMenu(false)} />
+                                        <MobileNavItem href="/dashboard/settings" icon={<Settings className="w-6 h-6" />} label="系統設定" onClick={() => setShowMobileMenu(false)} />
                                     </>
                                 ) : (
                                     <>
@@ -346,7 +346,7 @@ function MobileNavItem({ href, icon, label, onClick }: { href: string; icon: Rea
             <div className="p-2 rounded-xl bg-zinc-100 dark:bg-white/5 border border-zinc-200 dark:border-white/10 text-zinc-500 dark:text-white/40 group-hover:text-purple-500 transition-colors">
                 {icon}
             </div>
-            <span className="font-semibold">{label}</span>
+            <span className="font-semibold text-lg tracking-tight leading-snug">{label}</span>
         </Link>
     );
 }

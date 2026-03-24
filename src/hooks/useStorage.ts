@@ -1197,6 +1197,7 @@ export function useRents() {
             if (updates.notes !== undefined) rentData.notes = updates.notes;
             if (updates.amount !== undefined) rentData.amount = updates.amount;
             if (updates.startDate !== undefined) rentData.start_date = updates.startDate;
+            if (updates.endDate !== undefined) rentData.end_date = updates.endDate;
 
             // RENT OUT fields
             if (updates.rentOutTenancyNumber) rentData.rent_out_tenancy_number = updates.rentOutTenancyNumber;

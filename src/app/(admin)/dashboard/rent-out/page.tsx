@@ -1,14 +1,27 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useRentsWithRelationsQuery, useRents } from '@/hooks/useStorage';
 import { useQueryClient } from '@tanstack/react-query';
 import { Calendar, DollarSign, User, Building2, Pencil, Trash2, ChevronRight, LayoutList, TrendingUp } from 'lucide-react';
 import type { Rent } from '@/lib/db';
+import {
+    formatDateRangeDMY,
+    getRentOutListStatusKey,
+    hasRentCollectionPaidAmount,
+    isPeriodEndExpired,
+    labelRentCollectionPaymentMethod,
+    matchesRentPaymentMethodFilter,
+    type RentPaymentMethodFilterValue,
+    type RentOutStatusFilterValue,
+} from '@/lib/rentPaymentDisplay';
 import { BentoCard } from '@/components/layout/BentoGrid';
 import RentModal from '@/components/properties/RentModal';
 import PropertyDetailModal from '@/components/properties/PropertyDetailModal';
+
+const filterSelectClass =
+    'mt-1 block w-full min-w-[160px] rounded-xl border border-zinc-200 dark:border-white/10 bg-white dark:bg-[#1a1a2e] px-3 py-2 text-sm text-zinc-900 dark:text-white';
 
 export default function RentOutPage() {
     const queryClient = useQueryClient();
@@ -18,6 +31,8 @@ export default function RentOutPage() {
     const [showPropertyModal, setShowPropertyModal] = useState(false);
     const [selectedRent, setSelectedRent] = useState<Rent | null>(null);
     const [selectedProperty, setSelectedProperty] = useState<string | null>(null);
+    const [filterPaymentMethod, setFilterPaymentMethod] = useState<RentPaymentMethodFilterValue>('');
+    const [filterRentOutStatus, setFilterRentOutStatus] = useState<RentOutStatusFilterValue>('');
     const { deleteRent } = useRents();
 
     const handleDelete = async (e: React.MouseEvent, id: string) => {
@@ -35,6 +50,14 @@ export default function RentOutPage() {
     const totalIncome = rents
         .filter(r => r.status === 'active' || r.status === 'completed' || r.rentOutStatus === 'renting')
         .reduce((sum, r) => sum + ((r.rentOutMonthlyRental || r.amount || 0) * (r.rentOutPeriods || 1)), 0);
+
+    const filteredRents = useMemo(() => {
+        return rents.filter(r => {
+            if (!matchesRentPaymentMethodFilter(r, filterPaymentMethod)) return false;
+            if (filterRentOutStatus && getRentOutListStatusKey(r) !== filterRentOutStatus) return false;
+            return true;
+        });
+    }, [rents, filterPaymentMethod, filterRentOutStatus]);
 
     if (isLoading) {
         return (
@@ -134,6 +157,44 @@ export default function RentOutPage() {
                     </div>
                 ) : (
                     <>
+                        <div className="glass-card p-4 flex flex-col sm:flex-row flex-wrap gap-4 sm:items-end">
+                            <div className="flex-1 min-w-[160px]">
+                                <label className="text-xs font-medium text-zinc-500 dark:text-white/50">付款方式</label>
+                                <select
+                                    value={filterPaymentMethod}
+                                    onChange={e => setFilterPaymentMethod(e.target.value as RentPaymentMethodFilterValue)}
+                                    className={filterSelectClass}
+                                >
+                                    <option value="">全部</option>
+                                    <option value="none">未選擇</option>
+                                    <option value="cheque">支票</option>
+                                    <option value="fps">FPS轉帳</option>
+                                    <option value="cash">現金</option>
+                                </select>
+                            </div>
+                            <div className="flex-1 min-w-[160px]">
+                                <label className="text-xs font-medium text-zinc-500 dark:text-white/50">狀態</label>
+                                <select
+                                    value={filterRentOutStatus}
+                                    onChange={e => setFilterRentOutStatus(e.target.value as RentOutStatusFilterValue)}
+                                    className={filterSelectClass}
+                                >
+                                    <option value="">全部</option>
+                                    <option value="expired">已過期</option>
+                                    <option value="renting">出租中</option>
+                                    <option value="listing">放租中</option>
+                                    <option value="other">其他</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        {filteredRents.length === 0 ? (
+                            <div className="glass-card flex flex-col items-center justify-center py-16 text-zinc-500 dark:text-white/45">
+                                <p className="text-lg font-medium">沒有符合篩選條件的記錄</p>
+                                <p className="text-sm mt-1">請調整「付款方式」或「狀態」篩選</p>
+                            </div>
+                        ) : (
+                            <>
                         {/* Desktop Table View */}
                         <div className="hidden md:block glass-card overflow-hidden">
                             <table className="w-full">
@@ -141,21 +202,24 @@ export default function RentOutPage() {
                                     <tr className="text-left text-zinc-500 dark:text-white/50 text-sm border-b border-zinc-100 dark:border-white/5">
                                         <th className="p-4 font-medium">物業</th>
                                         <th className="p-4 font-medium">租客</th>
-                                        <th className="p-4 font-medium">金額</th>
+                                        <th className="p-4 font-medium">繳付金額</th>
+                                        <th className="p-4 font-medium">付款方式</th>
                                         <th className="p-4 font-medium">租約期間</th>
                                         <th className="p-4 font-medium">租務狀態</th>
                                         <th className="p-4 font-medium">操作</th>
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {rents.map((rent: any, index) => {
+                                    {filteredRents.map((rent: any, index) => {
                                         const property = rent.property;
                                         const proprietor = rent.proprietor;
                                         const tenant = rent.tenant;
-                                        const startDate = rent.rentOutStartDate || rent.startDate;
-                                        const endDate = rent.rentOutEndDate || rent.endDate;
+                                        const startDate = rent.rentCollectionDate || rent.rentOutStartDate || rent.startDate;
+                                        const endDate = rent.endDate || rent.rentOutEndDate;
                                         const status = rent.rentOutStatus || rent.status || 'active';
-                                        const isExpired = endDate ? new Date(endDate) < new Date(new Date().setHours(0, 0, 0, 0)) : false;
+                                        const isExpired = isPeriodEndExpired(endDate);
+                                        const payFilled = hasRentCollectionPaidAmount(rent);
+                                        const payMethod = labelRentCollectionPaymentMethod(rent.rentCollectionPaymentMethod);
 
                                         return (
                                             <motion.tr
@@ -174,10 +238,17 @@ export default function RentOutPage() {
                                                 <td className="p-4 text-zinc-900 dark:text-white font-medium">{property?.name || '-'}</td>
                                                 <td className="p-4 text-zinc-600 dark:text-white/70">{tenant?.name || proprietor?.name || '-'}</td>
                                                 <td className="p-4 text-green-600 dark:text-green-400 font-medium">
-                                                    + {rent.currency || 'HKD'} {((rent.rentOutMonthlyRental || 0) * (rent.rentOutPeriods || 1)).toLocaleString()}
+                                                    {payFilled ? (
+                                                        <>+ {rent.currency || 'HKD'} {Number(rent.rentCollectionAmount).toLocaleString()}</>
+                                                    ) : (
+                                                        <span className="text-zinc-400 dark:text-white/40">—</span>
+                                                    )}
+                                                </td>
+                                                <td className="p-4 text-zinc-600 dark:text-white/70 text-sm">
+                                                    {payMethod}
                                                 </td>
                                                 <td className={`p-4 text-sm ${isExpired ? 'text-red-500 font-medium' : 'text-zinc-500 dark:text-white/50'}`}>
-                                                    {startDate ? new Date(startDate).toLocaleDateString() : '-'} - {endDate ? new Date(endDate).toLocaleDateString() : '-'}
+                                                    {formatDateRangeDMY(startDate, endDate)}
                                                 </td>
                                                 <td className="p-4">
                                                     <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${isExpired
@@ -215,14 +286,16 @@ export default function RentOutPage() {
 
                         {/* Mobile Card View */}
                         <div className="grid grid-cols-1 gap-4 md:hidden">
-                            {rents.map((rent: any, index) => {
+                            {filteredRents.map((rent: any, index) => {
                                 const property = rent.property;
                                 const proprietor = rent.proprietor;
                                 const tenant = rent.tenant;
-                                const startDate = rent.rentOutStartDate || rent.startDate;
-                                const endDate = rent.rentOutEndDate || rent.endDate;
+                                const startDate = rent.rentCollectionDate || rent.rentOutStartDate || rent.startDate;
+                                const endDate = rent.endDate || rent.rentOutEndDate;
                                 const status = rent.rentOutStatus || rent.status || 'active';
-                                const isExpired = endDate ? new Date(endDate) < new Date(new Date().setHours(0, 0, 0, 0)) : false;
+                                const isExpired = isPeriodEndExpired(endDate);
+                                const payFilled = hasRentCollectionPaidAmount(rent);
+                                const payMethod = labelRentCollectionPaymentMethod(rent.rentCollectionPaymentMethod);
 
                                 return (
                                     <motion.div
@@ -251,10 +324,13 @@ export default function RentOutPage() {
                                                     </div>
                                                 </div>
                                             </div>
-                                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${isExpired
-                                                ? 'bg-red-100 dark:bg-red-500/20 text-red-600 dark:text-red-400'
-                                                : 'bg-green-100 dark:bg-green-500/20 text-green-600 dark:text-green-400'
-                                                }`}>
+                                            <span
+                                                className={`px-2 py-0.5 rounded-full text-[10px] font-bold tracking-wider border ${
+                                                    isExpired
+                                                        ? 'bg-red-100 dark:bg-red-500/20 text-red-600 dark:text-red-400 border-red-200 dark:border-red-500/30'
+                                                        : 'bg-green-100 dark:bg-green-500/20 text-green-600 dark:text-green-400 border-green-200 dark:border-green-500/30'
+                                                }`}
+                                            >
                                                 {isExpired ? '已過期' : status === 'renting' ? '出租中' : '放租中'}
                                             </span>
                                         </div>
@@ -263,27 +339,37 @@ export default function RentOutPage() {
                                             <div>
                                                 <div className="flex items-center gap-1.5 mb-1">
                                                     <DollarSign className="w-3 h-3 text-emerald-500" />
-                                                    <p className="text-[10px] text-zinc-400 uppercase font-bold tracking-wider">應收金總額</p>
+                                                    <p className="text-[10px] text-zinc-400 uppercase font-bold tracking-wider">繳付金額</p>
                                                 </div>
                                                 <p className="font-bold text-emerald-600 dark:text-emerald-400">
-                                                    {rent.currency || 'HKD'} {((rent.rentOutMonthlyRental || 0) * (rent.rentOutPeriods || 1)).toLocaleString()}
+                                                    {payFilled ? (
+                                                        <>+ {rent.currency || 'HKD'} {Number(rent.rentCollectionAmount).toLocaleString()}</>
+                                                    ) : (
+                                                        <span className="text-zinc-400 dark:text-white/40">—</span>
+                                                    )}
                                                 </p>
                                             </div>
                                             <div>
                                                 <div className="flex items-center gap-1.5 mb-1">
                                                     <Calendar className="w-3 h-3 text-blue-500" />
-                                                    <p className="text-[10px] text-zinc-400 uppercase font-bold tracking-wider">租期到期</p>
+                                                    <p className="text-[10px] text-zinc-400 uppercase font-bold tracking-wider">付款方式</p>
                                                 </div>
-                                                <p className={`font-bold ${isExpired ? 'text-red-500' : 'text-zinc-900 dark:text-white'}`}>
-                                                    {endDate ? new Date(endDate).toLocaleDateString() : '-'}
+                                                <p className="font-bold text-sm text-zinc-900 dark:text-white">
+                                                    {payMethod}
+                                                </p>
+                                            </div>
+                                            <div className="col-span-2">
+                                                <div className="flex items-center gap-1.5 mb-1">
+                                                    <Calendar className="w-3 h-3 text-blue-500" />
+                                                    <p className="text-[10px] text-zinc-400 uppercase font-bold tracking-wider">租約期間</p>
+                                                </div>
+                                                <p className={`font-bold text-sm ${isExpired ? 'text-red-500' : 'text-zinc-900 dark:text-white'}`}>
+                                                    {formatDateRangeDMY(startDate, endDate)}
                                                 </p>
                                             </div>
                                         </div>
 
-                                        <div className="flex items-center justify-between pt-1">
-                                            <div className="text-[10px] text-zinc-400 italic">
-                                                {startDate ? new Date(startDate).toLocaleDateString() : '-'} 起租
-                                            </div>
+                                        <div className="flex items-center justify-end pt-1">
                                             <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
                                                 <button
                                                     onClick={() => {
@@ -306,6 +392,8 @@ export default function RentOutPage() {
                                 );
                             })}
                         </div>
+                            </>
+                        )}
                     </>
                 )}
             </div>

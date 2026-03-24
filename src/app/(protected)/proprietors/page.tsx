@@ -67,7 +67,7 @@ export default function ProprietorsPage() {
             <div className="flex items-center justify-between">
                 <div>
                     <h1 className="text-2xl font-bold text-zinc-900 dark:text-white">管理業主</h1>
-                    <p className="text-zinc-500 dark:text-white/50 mt-1">管理物業業主與業主資料</p>
+                    <p className="text-sm text-zinc-500 dark:text-white/50 mt-1">管理物業業主與業主資料</p>
                 </div>
                 {isAuthenticated && (
                     <motion.button
@@ -136,21 +136,21 @@ export default function ProprietorsPage() {
                             transition={{ delay: index * 0.05 }}
                         >
                             <BentoCard className="h-full relative overflow-hidden group">
-                                {/* Type Badges */}
-                                <div className="absolute top-0 right-0 flex flex-col items-end">
-                                    <div className={`px-3 py-1 text-[10px] font-bold uppercase tracking-wider rounded-bl-xl ${proprietor.type === 'company'
-                                        ? 'bg-blue-500/10 text-blue-500'
-                                        : 'bg-amber-500/10 text-amber-500'
+                                {/* Type Badges — 同一行 */}
+                                <div className="absolute top-3 right-3 z-10 flex flex-row flex-nowrap items-center gap-2">
+                                    <div className={`px-2 py-1 text-[10px] sm:text-xs font-bold rounded-lg ${proprietor.type === 'company'
+                                        ? 'bg-blue-500/10 text-blue-500 ring-1 ring-blue-500/20'
+                                        : 'bg-amber-500/10 text-amber-500 ring-1 ring-amber-500/20'
                                         }`}>
                                         {proprietor.type === 'company' ? '公司' : '個人'}
                                     </div>
-                                    <div className={`px-3 py-0.5 text-[9px] font-medium uppercase tracking-tighter rounded-bl-lg border-l border-b border-black/5 dark:border-white/5 ${proprietor.category === 'group_company'
-                                        ? 'bg-purple-500/5 text-purple-500'
+                                    <div className={`px-2 py-1 text-[10px] sm:text-xs font-semibold rounded-lg ${proprietor.category === 'group_company'
+                                        ? 'bg-purple-500/10 text-purple-500 ring-1 ring-purple-500/20'
                                         : proprietor.category === 'joint_venture'
-                                            ? 'bg-emerald-500/5 text-emerald-500'
+                                            ? 'bg-emerald-500/10 text-emerald-500 ring-1 ring-emerald-500/20'
                                             : proprietor.category === 'managed_individual'
-                                                ? 'bg-zinc-500/5 text-zinc-500'
-                                                : 'bg-amber-500/5 text-amber-500'
+                                                ? 'bg-zinc-500/10 text-zinc-500 ring-1 ring-zinc-500/20'
+                                                : 'bg-amber-500/10 text-amber-500 ring-1 ring-amber-500/20'
                                         }`}>
                                         {proprietor.category === 'group_company' ? '集團' : proprietor.category === 'joint_venture' ? '合資' : proprietor.category === 'managed_individual' ? '代管' : '外部'}
                                     </div>
@@ -158,12 +158,12 @@ export default function ProprietorsPage() {
 
                                 <div className="flex items-start justify-between">
                                     <div className="flex items-center gap-3">
-                                        <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-purple-500 to-blue-500 flex flex-col items-center justify-center text-white font-bold leading-tight">
-                                            <span className="text-xs opacity-70">{proprietor.code}</span>
-                                            <span className="text-lg">{proprietor.name.charAt(0).toUpperCase()}</span>
+                                        <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-lg sm:rounded-xl bg-gradient-to-br from-purple-500 to-blue-500 flex flex-col items-center justify-center text-white font-bold leading-tight">
+                                            <span className="text-[8px] sm:text-[10px] opacity-70 truncate max-w-[2.5rem]">{proprietor.code}</span>
+                                            <span className="text-sm sm:text-base">{proprietor.name.charAt(0).toUpperCase()}</span>
                                         </div>
                                         <div className="flex-1 min-w-0">
-                                            <h3 className="text-zinc-900 dark:text-white font-semibold truncate group-hover:text-purple-500 transition-colors">
+                                            <h3 className="text-sm text-zinc-900 dark:text-white font-semibold truncate group-hover:text-purple-500 transition-colors">
                                                 {proprietor.shortName || proprietor.name}
                                             </h3>
                                             <div className="flex flex-col">

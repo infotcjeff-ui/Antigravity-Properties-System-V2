@@ -135,7 +135,8 @@ export default function RentModal({
                 rentingEndDate: formatDate(rent.rentingEndDate),
                 rentingDeposit: rent.rentingDeposit?.toString() || '',
                 rentCollectionTenantName: (rent as any).rentCollectionTenantName || '',
-                rentCollectionDate: formatDate((rent as any).rentCollectionDate),
+                rentCollectionDate: formatDate((rent as any).rentCollectionDate || rent.startDate),
+                rentCollectionEndDate: formatDate(rent.endDate),
                 rentCollectionAmount: (rent as any).rentCollectionAmount != null ? String((rent as any).rentCollectionAmount) : '',
                 rentCollectionPaymentMethod: ((rent as any).rentCollectionPaymentMethod || '') as '' | 'cheque' | 'fps' | 'cash',
                 rentCollectionChequeBank: (rent as any).rentCollectionChequeBank || '',
@@ -187,6 +188,7 @@ export default function RentModal({
             rentingDeposit: '',
             rentCollectionTenantName: '',
             rentCollectionDate: '',
+            rentCollectionEndDate: '',
             rentCollectionAmount: '',
             rentCollectionPaymentMethod: '' as '' | 'cheque' | 'fps' | 'cash',
             rentCollectionChequeBank: '',
@@ -425,12 +427,15 @@ export default function RentModal({
             let rentData: any = { ...baseData };
 
             if (formData.type === 'rent_out') {
-                const paidAmt = parseFloat(formData.rentCollectionAmount);
+                const paidRaw = String(formData.rentCollectionAmount || '').replace(/,/g, '').trim();
+                const paidAmt = parseFloat(paidRaw);
+                const hasPaidAmount = paidRaw !== '' && !Number.isNaN(paidAmt);
                 rentData = {
                     ...rentData,
-                    status: 'completed' as const,
-                    amount: !Number.isNaN(paidAmt) && paidAmt > 0 ? paidAmt : undefined,
+                    status: (hasPaidAmount ? 'completed' : 'pending') as const,
+                    amount: hasPaidAmount ? paidAmt : undefined,
                     startDate: formData.rentCollectionDate ? new Date(formData.rentCollectionDate) : undefined,
+                    endDate: formData.rentCollectionEndDate ? new Date(formData.rentCollectionEndDate) : undefined,
                     notes: formData.rentCollectionNotes.trim(),
                     location: formData.rentOutAddressDetail || defaultLocation,
                     rentOutSubLandlord: subLandlords.find(s => s.id === formData.rentOutSubLandlordId)?.name || formData.rentOutSubLandlord || undefined,
@@ -441,7 +446,7 @@ export default function RentModal({
                     rentOutTenantIds: formData.rentOutTenantId ? [formData.rentOutTenantId] : undefined,
                     rentCollectionTenantName: formData.rentCollectionTenantName.trim(),
                     rentCollectionDate: formData.rentCollectionDate ? new Date(formData.rentCollectionDate) : undefined,
-                    rentCollectionAmount: !Number.isNaN(paidAmt) && paidAmt > 0 ? paidAmt : undefined,
+                    rentCollectionAmount: hasPaidAmount ? paidAmt : null,
                     rentCollectionPaymentMethod: formData.rentCollectionPaymentMethod || undefined,
                     rentCollectionChequeBank: formData.rentCollectionPaymentMethod === 'cheque' ? formData.rentCollectionChequeBank.trim() : undefined,
                     rentCollectionChequeNumber: formData.rentCollectionPaymentMethod === 'cheque' ? formData.rentCollectionChequeNumber.trim() : undefined,
@@ -452,16 +457,19 @@ export default function RentModal({
                             : undefined,
                 };
             } else if (formData.type === 'renting') {
-                const paidAmt = parseFloat(formData.rentCollectionAmount);
+                const paidRaw = String(formData.rentCollectionAmount || '').replace(/,/g, '').trim();
+                const paidAmt = parseFloat(paidRaw);
+                const hasPaidAmount = paidRaw !== '' && !Number.isNaN(paidAmt);
                 rentData = {
                     ...rentData,
-                    status: 'completed' as const,
-                    amount: !Number.isNaN(paidAmt) && paidAmt > 0 ? paidAmt : undefined,
+                    status: (hasPaidAmount ? 'completed' : 'pending') as const,
+                    amount: hasPaidAmount ? paidAmt : undefined,
                     startDate: formData.rentCollectionDate ? new Date(formData.rentCollectionDate) : undefined,
+                    endDate: formData.rentCollectionEndDate ? new Date(formData.rentCollectionEndDate) : undefined,
                     notes: formData.rentCollectionNotes.trim(),
                     rentCollectionTenantName: formData.rentCollectionTenantName.trim(),
                     rentCollectionDate: formData.rentCollectionDate ? new Date(formData.rentCollectionDate) : undefined,
-                    rentCollectionAmount: !Number.isNaN(paidAmt) && paidAmt > 0 ? paidAmt : undefined,
+                    rentCollectionAmount: hasPaidAmount ? paidAmt : null,
                     rentCollectionPaymentMethod: formData.rentCollectionPaymentMethod || undefined,
                     rentCollectionChequeBank: formData.rentCollectionPaymentMethod === 'cheque' ? formData.rentCollectionChequeBank.trim() : undefined,
                     rentCollectionChequeNumber: formData.rentCollectionPaymentMethod === 'cheque' ? formData.rentCollectionChequeNumber.trim() : undefined,
@@ -845,7 +853,7 @@ export default function RentModal({
                                 <h3 className="text-sm font-semibold text-purple-600 dark:text-purple-400 mb-4">收租記錄</h3>
                             </div>
 
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div className="space-y-4">
                                 <div className="space-y-2">
                                     <label className={labelClass}>租客名稱 *</label>
                                     <input
@@ -859,8 +867,19 @@ export default function RentModal({
                                     />
                                 </div>
                                 <div className="space-y-2">
-                                    <label className={labelClass}>收租日期</label>
-                                    <input type="date" name="rentCollectionDate" value={formData.rentCollectionDate} onChange={handleChange} className={inputClass} />
+                                    <label className={labelClass}>收租日期（日／月／年 至 日／月／年）</label>
+                                    <p className="text-xs text-zinc-500 dark:text-white/45 mb-2">請分別選擇開始與結束日期；列表將以 dd/mm/yyyy 顯示。</p>
+                                    <div className="flex flex-col sm:flex-row gap-3 sm:items-end">
+                                        <div className="flex-1 space-y-1">
+                                            <span className="text-xs text-zinc-500 dark:text-white/50">開始</span>
+                                            <input type="date" name="rentCollectionDate" value={formData.rentCollectionDate} onChange={handleChange} className={inputClass} />
+                                        </div>
+                                        <span className="hidden sm:inline text-zinc-400 dark:text-white/40 pb-3 shrink-0">至</span>
+                                        <div className="flex-1 space-y-1">
+                                            <span className="text-xs text-zinc-500 dark:text-white/50">結束</span>
+                                            <input type="date" name="rentCollectionEndDate" value={formData.rentCollectionEndDate} onChange={handleChange} className={inputClass} />
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
 
@@ -1002,7 +1021,7 @@ export default function RentModal({
                                 <h3 className="text-sm font-semibold text-blue-600 dark:text-blue-400 mb-4">交租記錄</h3>
                             </div>
 
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div className="space-y-4">
                                 <div className="space-y-2">
                                     <label className={labelClass}>租客名稱 *</label>
                                     <input
@@ -1016,8 +1035,19 @@ export default function RentModal({
                                     />
                                 </div>
                                 <div className="space-y-2">
-                                    <label className={labelClass}>交租日期</label>
-                                    <input type="date" name="rentCollectionDate" value={formData.rentCollectionDate} onChange={handleChange} className={inputClass} />
+                                    <label className={labelClass}>交租日期（日／月／年 至 日／月／年）</label>
+                                    <p className="text-xs text-zinc-500 dark:text-white/45 mb-2">請分別選擇開始與結束日期；列表將以 dd/mm/yyyy 顯示。</p>
+                                    <div className="flex flex-col sm:flex-row gap-3 sm:items-end">
+                                        <div className="flex-1 space-y-1">
+                                            <span className="text-xs text-zinc-500 dark:text-white/50">開始</span>
+                                            <input type="date" name="rentCollectionDate" value={formData.rentCollectionDate} onChange={handleChange} className={inputClass} />
+                                        </div>
+                                        <span className="hidden sm:inline text-zinc-400 dark:text-white/40 pb-3 shrink-0">至</span>
+                                        <div className="flex-1 space-y-1">
+                                            <span className="text-xs text-zinc-500 dark:text-white/50">結束</span>
+                                            <input type="date" name="rentCollectionEndDate" value={formData.rentCollectionEndDate} onChange={handleChange} className={inputClass} />
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
 

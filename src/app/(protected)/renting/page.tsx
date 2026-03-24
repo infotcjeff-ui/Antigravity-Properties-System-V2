@@ -1,17 +1,46 @@
 'use client';
 
-import { useEffect, useState, useCallback, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { useRentsQuery, usePropertiesQuery, useProprietorsQuery } from '@/hooks/useStorage';
-import type { Rent, Property, Proprietor } from '@/lib/db';
+import {
+    formatDateRangeDMY,
+    getRentingListStatus,
+    hasRentCollectionPaidAmount,
+    labelRentCollectionPaymentMethod,
+    matchesRentPaymentMethodFilter,
+    type RentPaymentMethodFilterValue,
+} from '@/lib/rentPaymentDisplay';
 import { BentoCard } from '@/components/layout/BentoGrid';
 import { useAuth } from '@/contexts/AuthContext';
+
+type RentingStatusFilter = '' | 'expired' | 'completed' | 'processing';
+
+const rentingStatusBadgeClass: Record<Exclude<RentingStatusFilter, ''>, string> = {
+    expired:
+        'bg-red-100 dark:bg-red-500/20 text-red-600 dark:text-red-400 border border-red-200 dark:border-red-500/30',
+    completed:
+        'bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-500/30',
+    processing:
+        'bg-amber-100 dark:bg-amber-500/15 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-500/25',
+};
+
+const rentingStatusLabel: Record<Exclude<RentingStatusFilter, ''>, string> = {
+    expired: '已過期',
+    completed: '已完成',
+    processing: '處理中',
+};
+
+const filterSelectClass =
+    'mt-1 block w-full min-w-[160px] rounded-xl border border-zinc-200 dark:border-white/10 bg-white dark:bg-[#1a1a2e] px-3 py-2 text-sm text-zinc-900 dark:text-white';
 
 export default function RentingPage() {
     const { data: allRents, isLoading: rentsLoading } = useRentsQuery();
     const { data: qProperties, isLoading: propsLoading } = usePropertiesQuery();
     const { data: qProprietors, isLoading: ownersLoading } = useProprietorsQuery();
     const { isAuthenticated } = useAuth();
+    const [filterPaymentMethod, setFilterPaymentMethod] = useState<RentPaymentMethodFilterValue>('');
+    const [filterRentingStatus, setFilterRentingStatus] = useState<RentingStatusFilter>('');
 
     const rents = useMemo(() => (allRents || []).filter(r => r.type === 'renting'), [allRents]);
     const properties = useMemo(() => new Map((qProperties || []).map(p => [p.id!, p])), [qProperties]);
@@ -19,12 +48,13 @@ export default function RentingPage() {
 
     const loading = rentsLoading || propsLoading || ownersLoading;
 
-    const statusColors: Record<string, string> = {
-        active: 'bg-green-500/20 text-green-400',
-        pending: 'bg-yellow-500/20 text-yellow-400',
-        completed: 'bg-blue-500/20 text-blue-400',
-        cancelled: 'bg-red-500/20 text-red-400',
-    };
+    const filteredRents = useMemo(() => {
+        return rents.filter(r => {
+            if (!matchesRentPaymentMethodFilter(r, filterPaymentMethod)) return false;
+            if (filterRentingStatus && getRentingListStatus(r) !== filterRentingStatus) return false;
+            return true;
+        });
+    }, [rents, filterPaymentMethod, filterRentingStatus]);
 
     if (loading) {
         return (
@@ -83,9 +113,9 @@ export default function RentingPage() {
                 <BentoCard>
                     <div className="flex items-center justify-between">
                         <div>
-                            <p className="text-zinc-500 dark:text-white/50 text-sm">活躍租約</p>
+                            <p className="text-zinc-500 dark:text-white/50 text-sm">已完成（已填繳付金額）</p>
                             <p className="text-2xl font-bold text-zinc-900 dark:text-white mt-1">
-                                {rents.filter(r => r.status === 'active').length}
+                                {rents.filter(r => getRentingListStatus(r) === 'completed').length}
                             </p>
                         </div>
                         <div className="p-3 rounded-xl bg-green-50 dark:bg-green-500/20">
@@ -98,9 +128,9 @@ export default function RentingPage() {
                 <BentoCard>
                     <div className="flex items-center justify-between">
                         <div>
-                            <p className="text-zinc-500 dark:text-white/50 text-sm">待處理</p>
+                            <p className="text-zinc-500 dark:text-white/50 text-sm">處理中（未過期且繳付空白）</p>
                             <p className="text-2xl font-bold text-zinc-900 dark:text-white mt-1">
-                                {rents.filter(r => r.status === 'pending').length}
+                                {rents.filter(r => getRentingListStatus(r) === 'processing').length}
                             </p>
                         </div>
                         <div className="p-3 rounded-xl bg-yellow-50 dark:bg-yellow-500/20">
@@ -113,9 +143,9 @@ export default function RentingPage() {
             </div>
 
             {/* Rent List */}
-            <div className="glass-card overflow-hidden">
+            <div className="space-y-4">
                 {rents.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center py-16 text-zinc-400 dark:text-white/40">
+                    <div className="glass-card overflow-hidden flex flex-col items-center justify-center py-16 text-zinc-400 dark:text-white/40">
                         <svg className="w-16 h-16 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
                         </svg>
@@ -123,28 +153,68 @@ export default function RentingPage() {
                         <p className="text-sm mt-1">新增您的第一筆交租記錄以開始管理</p>
                     </div>
                 ) : (
+                    <>
+                        <div className="glass-card p-4 flex flex-col sm:flex-row flex-wrap gap-4 sm:items-end">
+                            <div className="flex-1 min-w-[160px]">
+                                <label className="text-xs font-medium text-zinc-500 dark:text-white/50">付款方式</label>
+                                <select
+                                    value={filterPaymentMethod}
+                                    onChange={e => setFilterPaymentMethod(e.target.value as RentPaymentMethodFilterValue)}
+                                    className={filterSelectClass}
+                                >
+                                    <option value="">全部</option>
+                                    <option value="none">未選擇</option>
+                                    <option value="cheque">支票</option>
+                                    <option value="fps">FPS轉帳</option>
+                                    <option value="cash">現金</option>
+                                </select>
+                            </div>
+                            <div className="flex-1 min-w-[160px]">
+                                <label className="text-xs font-medium text-zinc-500 dark:text-white/50">狀態</label>
+                                <select
+                                    value={filterRentingStatus}
+                                    onChange={e => setFilterRentingStatus(e.target.value as RentingStatusFilter)}
+                                    className={filterSelectClass}
+                                >
+                                    <option value="">全部</option>
+                                    <option value="processing">處理中</option>
+                                    <option value="completed">已完成</option>
+                                    <option value="expired">已過期</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        {filteredRents.length === 0 ? (
+                            <div className="glass-card flex flex-col items-center justify-center py-16 text-zinc-500 dark:text-white/45">
+                                <p className="text-lg font-medium">沒有符合篩選條件的記錄</p>
+                                <p className="text-sm mt-1">請調整「付款方式」或「狀態」篩選</p>
+                            </div>
+                        ) : (
+                    <div className="glass-card overflow-hidden">
                     <table className="w-full">
                         <thead>
                             <tr className="text-left text-zinc-500 dark:text-white/50 text-sm border-b border-zinc-100 dark:border-white/5">
                                 <th className="p-4 font-medium">物業</th>
-                                <th className="p-4 font-medium">業主 / 業主資料</th>
-                                <th className="p-4 font-medium">金額</th>
-                                <th className="p-4 font-medium">租約期間</th>
-                                <th className="p-4 font-medium">狀態</th>
+                                <th className="p-4 font-medium">租客</th>
+                                <th className="p-4 font-medium">繳付金額</th>
+                                <th className="p-4 font-medium">付款方式</th>
+                                <th className="p-4 font-medium">交租期間</th>
+                                <th className="p-4 font-medium">租務狀態</th>
                                 <th className="p-4 font-medium">操作</th>
                             </tr>
                         </thead>
                         <tbody>
-                            {rents.map((rent, index) => {
+                            {filteredRents.map((rent, index) => {
                                 const property = properties.get(rent.propertyId);
                                 const proprietor = rent.proprietorId ? proprietors.get(rent.proprietorId) : null;
                                 const tenant = rent.tenantId ? proprietors.get(rent.tenantId) : null;
 
-                                // Handle both new and legacy rent data formats
-                                const startDate = rent.rentingStartDate || rent.startDate;
-                                const endDate = rent.rentingEndDate || rent.endDate;
-                                const monthlyRent = rent.rentingMonthlyRental || rent.amount || 0;
-                                const status = rent.status || 'active';
+                                const periodStart = rent.rentCollectionDate || rent.rentingStartDate || rent.startDate;
+                                const periodEnd = rent.endDate || rent.rentingEndDate;
+                                const payDone = hasRentCollectionPaidAmount(rent);
+                                const rowStatus = getRentingListStatus(rent);
+                                const isExpiredRow = rowStatus === 'expired';
+                                const payMethod = labelRentCollectionPaymentMethod(rent.rentCollectionPaymentMethod);
 
                                 return (
                                     <motion.tr
@@ -155,16 +225,29 @@ export default function RentingPage() {
                                         className="border-b border-zinc-100 dark:border-white/5 hover:bg-zinc-50 dark:hover:bg-white/5 transition-colors"
                                     >
                                         <td className="p-4 text-zinc-900 dark:text-white font-medium">{property?.name || '-'}</td>
-                                        <td className="p-4 text-zinc-600 dark:text-white/70">{tenant?.name || proprietor?.name || '(暫缺)'}</td>
+                                        <td className="p-4 text-zinc-600 dark:text-white/70">{tenantDisplay}</td>
                                         <td className="p-4 text-zinc-900 dark:text-white font-medium">
-                                            {rent.currency || 'HKD'} {monthlyRent.toLocaleString()}
+                                            {payDone
+                                                ? `${rent.currency || 'HKD'} ${Number(rent.rentCollectionAmount).toLocaleString()}`
+                                                : '—'}
                                         </td>
-                                        <td className="p-4 text-zinc-500 dark:text-white/50 text-sm">
-                                            {startDate ? new Date(startDate).toLocaleDateString() : '-'} - {endDate ? new Date(endDate).toLocaleDateString() : '-'}
+                                        <td className="p-4 text-zinc-600 dark:text-white/70 text-sm">
+                                            {payMethod}
+                                        </td>
+                                        <td
+                                            className={`p-4 text-sm font-medium ${
+                                                isExpiredRow
+                                                    ? 'text-red-600 dark:text-red-400'
+                                                    : 'text-zinc-500 dark:text-white/50'
+                                            }`}
+                                        >
+                                            {formatDateRangeDMY(periodStart, periodEnd)}
                                         </td>
                                         <td className="p-4">
-                                            <span className={`px-2.5 py-1 rounded-full text-xs font-medium capitalize ${statusColors[status] || statusColors.active}`}>
-                                                {status === 'active' ? '活躍中' : status === 'pending' ? '待處理' : status === 'completed' ? '已完成' : '已取消'}
+                                            <span
+                                                className={`px-2.5 py-1 rounded-full text-xs font-medium ${rentingStatusBadgeClass[rowStatus]}`}
+                                            >
+                                                {rentingStatusLabel[rowStatus]}
                                             </span>
                                         </td>
                                         <td className="p-4">
@@ -183,6 +266,9 @@ export default function RentingPage() {
                             })}
                         </tbody>
                     </table>
+                    </div>
+                        )}
+                    </>
                 )}
             </div>
         </div>
