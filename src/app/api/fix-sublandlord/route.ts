@@ -59,8 +59,8 @@ export async function POST(request: NextRequest) {
       const currentTenancyNumber = subLandlord.tenancy_number;
       
       // 移除目标物业编号
-      const parts = currentTenancyNumber.split(',').map(p => p.trim());
-      const filteredParts = parts.filter(part => {
+      const parts = currentTenancyNumber.split(',').map((p: string) => p.trim());
+      const filteredParts = parts.filter((part: string) => {
         const normalizedPart = part.trim();
         const normalizedPropertyCode = targetPropertyCode.trim();
         

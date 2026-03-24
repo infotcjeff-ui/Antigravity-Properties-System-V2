@@ -432,7 +432,7 @@ export default function RentModal({
                 const hasPaidAmount = paidRaw !== '' && !Number.isNaN(paidAmt);
                 rentData = {
                     ...rentData,
-                    status: (hasPaidAmount ? 'completed' : 'pending') as const,
+                    status: hasPaidAmount ? ('completed' as const) : ('pending' as const),
                     amount: hasPaidAmount ? paidAmt : undefined,
                     startDate: formData.rentCollectionDate ? new Date(formData.rentCollectionDate) : undefined,
                     endDate: formData.rentCollectionEndDate ? new Date(formData.rentCollectionEndDate) : undefined,
@@ -462,7 +462,7 @@ export default function RentModal({
                 const hasPaidAmount = paidRaw !== '' && !Number.isNaN(paidAmt);
                 rentData = {
                     ...rentData,
-                    status: (hasPaidAmount ? 'completed' : 'pending') as const,
+                    status: hasPaidAmount ? ('completed' as const) : ('pending' as const),
                     amount: hasPaidAmount ? paidAmt : undefined,
                     startDate: formData.rentCollectionDate ? new Date(formData.rentCollectionDate) : undefined,
                     endDate: formData.rentCollectionEndDate ? new Date(formData.rentCollectionEndDate) : undefined,

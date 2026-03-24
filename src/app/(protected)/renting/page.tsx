@@ -206,8 +206,11 @@ export default function RentingPage() {
                         <tbody>
                             {filteredRents.map((rent, index) => {
                                 const property = properties.get(rent.propertyId);
-                                const proprietor = rent.proprietorId ? proprietors.get(rent.proprietorId) : null;
                                 const tenant = rent.tenantId ? proprietors.get(rent.tenantId) : null;
+                                const tenantDisplay =
+                                    (rent.rentCollectionTenantName && String(rent.rentCollectionTenantName).trim()) ||
+                                    tenant?.name ||
+                                    '—';
 
                                 const periodStart = rent.rentCollectionDate || rent.rentingStartDate || rent.startDate;
                                 const periodEnd = rent.endDate || rent.rentingEndDate;
