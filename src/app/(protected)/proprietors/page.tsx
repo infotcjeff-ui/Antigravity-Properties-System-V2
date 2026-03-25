@@ -17,7 +17,7 @@ export default function ProprietorsPage() {
     const [showModal, setShowModal] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
 
-    const proprietors = useMemo(() => (qProprietors || []).filter(p => p.category !== 'tenant'), [qProprietors]);
+    const proprietors = useMemo(() => (qProprietors || []).filter(p => !p.code?.startsWith('T')), [qProprietors]);
 
     const filteredProprietors = useMemo(() => {
         if (!searchQuery) return proprietors;
@@ -166,14 +166,9 @@ export default function ProprietorsPage() {
                                             <h3 className="text-sm text-zinc-900 dark:text-white font-semibold truncate group-hover:text-purple-500 transition-colors">
                                                 {proprietor.shortName || proprietor.name}
                                             </h3>
-                                            <div className="flex flex-col">
-                                                <p className="text-zinc-500 dark:text-white/50 text-xs truncate">
-                                                    {proprietor.englishName || proprietor.name}
-                                                </p>
-                                                <p className="text-[10px] text-zinc-400 dark:text-white/30 italic">
-                                                    {proprietor.category === 'group_company' ? '集團旗下公司' : proprietor.category === 'joint_venture' ? '合資公司' : proprietor.category === 'managed_individual' ? '代管理的個體' : '出租的業主'}
-                                                </p>
-                                            </div>
+                                            <p className="text-zinc-500 dark:text-white/50 text-xs truncate">
+                                                {proprietor.englishName || proprietor.name}
+                                            </p>
                                         </div>
                                     </div>
                                     {isAuthenticated && (

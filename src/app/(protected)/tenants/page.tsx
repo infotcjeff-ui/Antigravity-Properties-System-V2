@@ -16,7 +16,7 @@ export default function TenantsPage() {
     const [showModal, setShowModal] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
 
-    const tenants = useMemo(() => (qProprietors || []).filter(p => p.category === 'tenant'), [qProprietors]);
+    const tenants = useMemo(() => (qProprietors || []).filter(p => p.code?.startsWith('T')), [qProprietors]);
 
     const filteredTenants = useMemo(() => {
         if (!searchQuery) return tenants;

@@ -51,3 +51,54 @@ export function parseLotEntries(lotIndex: string | null | undefined): { type: 'n
         return { type: 'new' as const, value: t }; // legacy: treat as 新
     }).filter(e => e.value);
 }
+
+/** 比對名稱是否重複：去頭尾空白、合併連續空白、英文不分大小寫 */
+export function normalizeDuplicateName(name: string): string {
+    return name.trim().replace(/\s+/g, ' ').toLowerCase();
+}
+
+/**
+ * 依顯示名稱去重（與管理業主列表一致，避免下拉出現同名多筆）。
+ * 保留排序較前的一筆：名稱 → 代碼 → id。
+ */
+/**
+ * 合併業主與承租人（proprietors 表兩類代碼）：業主列在前，同名只保留第一筆（業主優先），最後依名稱排序。
+ */
+export function mergeOwnerAndTenantProprietors<
+    T extends { name?: string | null; code?: string | null; id?: string | null },
+>(owners: T[], tenants: T[]): T[] {
+    const combined = [...owners, ...tenants];
+    const seen = new Set<string>();
+    const out: T[] = [];
+    for (const p of combined) {
+        const k = normalizeDuplicateName(p.name || '');
+        if (!k) {
+            out.push(p);
+            continue;
+        }
+        if (seen.has(k)) continue;
+        seen.add(k);
+        out.push(p);
+    }
+    return out.sort((a, b) => (a.name || '').localeCompare(b.name || '', 'zh-HK'));
+}
+
+export function dedupeRecordsByDisplayName<
+    T extends { name?: string | null; code?: string | null; id?: string | null },
+>(records: T[]): T[] {
+    const sorted = [...records].sort((a, b) => {
+        const n = (a.name || '').localeCompare(b.name || '', 'zh-HK');
+        if (n !== 0) return n;
+        const c = (a.code || '').localeCompare(b.code || '', 'zh-HK');
+        if (c !== 0) return c;
+        return String(a.id || '').localeCompare(String(b.id || ''));
+    });
+    const seen = new Set<string>();
+    return sorted.filter(p => {
+        const k = normalizeDuplicateName(p.name || '');
+        if (!k) return true;
+        if (seen.has(k)) return false;
+        seen.add(k);
+        return true;
+    });
+}

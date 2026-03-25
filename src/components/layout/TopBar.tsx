@@ -289,8 +289,7 @@ export default function TopBar({ onSearch, placeholder = '搜尋...', isAuthenti
                                         <p className="px-4 text-xs font-medium text-zinc-400 dark:text-white/40 uppercase tracking-widest mb-2 mt-4">管理</p>
                                         <MobileNavItem href="/dashboard" icon={<LayoutDashboard className="w-6 h-6" />} label="總覽" onClick={() => setShowMobileMenu(false)} />
                                         <MobileNavItem href="/dashboard/properties" icon={<Building2 className="w-6 h-6" />} label="管理物業" onClick={() => setShowMobileMenu(false)} />
-                                        <MobileNavItem href="/dashboard/proprietors" icon={<Users className="w-6 h-6" />} label="管理業主" onClick={() => setShowMobileMenu(false)} />
-                                        <MobileNavItem href="/dashboard/tenants" icon={<Users className="w-6 h-6" />} label="管理承租人" onClick={() => setShowMobileMenu(false)} />
+                                        <MobileNavItem href="/dashboard/tenants" icon={<Users className="w-6 h-6" />} label="管理業主" onClick={() => setShowMobileMenu(false)} />
                                         <MobileNavItem href="/dashboard/contracts" icon={<FileText className="w-6 h-6" />} label="管理合約" onClick={() => setShowMobileMenu(false)} />
                                         <MobileNavItem href="/dashboard/rent-out" icon={<ArrowUpFromLine className="w-6 h-6" />} label="管理收租" onClick={() => setShowMobileMenu(false)} />
                                         <MobileNavItem href="/dashboard/renting" icon={<ArrowDownToLine className="w-6 h-6" />} label="管理交租" onClick={() => setShowMobileMenu(false)} />

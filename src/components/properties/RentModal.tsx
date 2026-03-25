@@ -4,12 +4,13 @@ import { useState, useEffect, useMemo } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
 import { useRents, useProprietors, useProperties, useSubLandlordsQuery, useCurrentTenantsQuery, usePropertiesQuery } from '@/hooks/useStorage';
-import { X } from 'lucide-react';
+import { X, ExternalLink, Building2, Calendar } from 'lucide-react';
 import { fileToBase64, compressImage, validateImageUpload } from '@/lib/imageUtils';
 import type { Proprietor, Property, Rent, SubLandlord, CurrentTenant } from '@/lib/db';
 import ProprietorModal from '@/components/properties/ProprietorModal';
 import RentOutFormModal from '@/components/properties/RentOutFormModal';
-import { formatNumberWithCommas, parsePriceInput } from '@/lib/formatters';
+import CurrentTenantDetailModal from '@/components/properties/CurrentTenantDetailModal';
+import { dedupeRecordsByDisplayName, formatNumberWithCommas, parsePriceInput } from '@/lib/formatters';
 import dynamic from 'next/dynamic';
 import 'react-quill-new/dist/quill.snow.css';
 
@@ -79,6 +80,7 @@ export default function RentModal({
     const [editSubLandlord, setEditSubLandlord] = useState<SubLandlord | null>(null);
     const [editCurrentTenant, setEditCurrentTenant] = useState<CurrentTenant | null>(null);
     const [showSubLandlordDetail, setShowSubLandlordDetail] = useState<SubLandlord | null>(null);
+    const [showCurrentTenantDetail, setShowCurrentTenantDetail] = useState<CurrentTenant | null>(null);
     const [showChildPropertyModal, setShowChildPropertyModal] = useState(false);
     const [childPropertySaving, setChildPropertySaving] = useState(false);
     const [childPropertyForm, setChildPropertyForm] = useState({ parentId: '', name: '', code: '' });
@@ -222,21 +224,27 @@ export default function RentModal({
         loadData();
     }, [getProprietors, getProperties]);
 
+    /** 與「管理業主」一致：排除承租人代碼（T 開頭），並依名稱去重 */
+    const proprietorSelectOptions = useMemo(() => {
+        const owners = proprietors.filter(p => !p.code?.startsWith('T'));
+        return dedupeRecordsByDisplayName(owners);
+    }, [proprietors]);
+
     const lesseeIndividuals = useMemo(
         () =>
-            proprietors
+            proprietorSelectOptions
                 .filter(p => p.type === 'individual')
                 .slice()
                 .sort((a, b) => (a.name || '').localeCompare(b.name || '', 'zh-HK')),
-        [proprietors]
+        [proprietorSelectOptions]
     );
     const lesseeCompanies = useMemo(
         () =>
-            proprietors
+            proprietorSelectOptions
                 .filter(p => p.type === 'company')
                 .slice()
                 .sort((a, b) => (a.name || '').localeCompare(b.name || '', 'zh-HK')),
-        [proprietors]
+        [proprietorSelectOptions]
     );
 
     const propertiesRoot = useMemo(
@@ -577,6 +585,8 @@ export default function RentModal({
     const showOwnerSelect = formData.type === 'contract' || formData.type === 'renting';
     const showSubLandlordSelect = formData.type === 'contract';
     const showCurrentTenantSelect = formData.type === 'contract' || formData.type === 'rent_out';
+    /** 合約類型：第一列 物業｜業主，第二列 二房東｜現時租客 */
+    const isContractLayout = formData.type === 'contract';
 
     const getTitle = () => {
         if (rent) {
@@ -588,6 +598,195 @@ export default function RentModal({
         if (formData.type === 'renting') return '新增租賃記錄 (交租)';
         return '新增合約記錄';
     };
+
+    const ownerSelectField =
+        showOwnerSelect ? (
+            <div className="space-y-2">
+                <label className={labelClass}>業主</label>
+                <div className="flex gap-2 items-center flex-nowrap">
+                    <select
+                        name="tenantId"
+                        value={formData.tenantId}
+                        onChange={handleChange}
+                        className={`${inputClass} flex-1 min-w-0 w-auto`}
+                    >
+                        <option value="" className="bg-white dark:bg-[#1a1a2e]">請選擇業主</option>
+                        {lesseeIndividuals.length > 0 && (
+                            <optgroup label="個人">
+                                {lesseeIndividuals.map(p => (
+                                    <option key={p.id} value={p.id} className="bg-white dark:bg-[#1a1a2e]">
+                                        {p.name}
+                                    </option>
+                                ))}
+                            </optgroup>
+                        )}
+                        {lesseeCompanies.length > 0 && (
+                            <optgroup label="公司">
+                                {lesseeCompanies.map(p => (
+                                    <option key={p.id} value={p.id} className="bg-white dark:bg-[#1a1a2e]">
+                                        {p.name}
+                                    </option>
+                                ))}
+                            </optgroup>
+                        )}
+                    </select>
+                    {formData.tenantId && (
+                        <button
+                            type="button"
+                            onClick={() => {
+                                const p = proprietors.find(pt => pt.id === formData.tenantId);
+                                if (p) setShowProprietorModal(true);
+                            }}
+                            className="p-2 text-zinc-400 hover:text-purple-500 rounded-lg shrink-0"
+                            title="編輯"
+                        >
+                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    strokeWidth={2}
+                                    d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+                                />
+                            </svg>
+                        </button>
+                    )}
+                    <button
+                        type="button"
+                        onClick={() => setShowProprietorModal(true)}
+                        className="px-4 py-2 bg-purple-50 dark:bg-purple-500/20 text-purple-600 dark:text-purple-400 rounded-xl hover:bg-purple-100 dark:hover:bg-purple-500/30 border border-purple-100 dark:border-purple-500/30 text-sm font-medium transition-all duration-300 h-11 whitespace-nowrap shrink-0"
+                    >
+                        + 新增
+                    </button>
+                </div>
+                <p className="text-xs text-zinc-400 dark:text-white/40">請按「+ 新增」以新增業主</p>
+            </div>
+        ) : null;
+
+    const subLandlordSelectBlock =
+        showSubLandlordSelect ? (
+            <div className="space-y-2">
+                <label className={labelClass}>二房東</label>
+                <div className="flex gap-2 items-center flex-nowrap">
+                    <select
+                        name="rentOutSubLandlordId"
+                        value={formData.rentOutSubLandlordId}
+                        onChange={handleChange}
+                        className={`${inputClass} flex-1 min-w-0 w-auto`}
+                    >
+                        <option value="" className="bg-white dark:bg-[#1a1a2e]">請選擇二房東</option>
+                        {subLandlords.map(sl => (
+                            <option key={sl.id} value={sl.id} className="bg-white dark:bg-[#1a1a2e]">
+                                {sl.name}
+                            </option>
+                        ))}
+                    </select>
+                    {formData.rentOutSubLandlordId && (
+                        <div className="flex items-center gap-2">
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    const sl = subLandlords.find(s => s.id === formData.rentOutSubLandlordId);
+                                    if (sl) {
+                                        setEditSubLandlord(sl);
+                                        setShowSubLandlordModal(true);
+                                    }
+                                }}
+                                className="p-2 text-zinc-400 hover:text-purple-500 rounded-lg shrink-0"
+                                title="新增二房東資料"
+                            >
+                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                        strokeWidth={2}
+                                        d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+                                    />
+                                </svg>
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    const sl = subLandlords.find(s => s.id === formData.rentOutSubLandlordId);
+                                    if (sl) setShowSubLandlordDetail(sl);
+                                }}
+                                className="px-3 py-1.5 text-sm text-purple-600 dark:text-purple-400 hover:bg-purple-50 dark:hover:bg-purple-500/20 rounded-lg border border-purple-200 dark:border-purple-500/30 transition-all"
+                            >
+                                二房東資料
+                            </button>
+                        </div>
+                    )}
+                    {!formData.rentOutSubLandlordId && (
+                        <button
+                            type="button"
+                            onClick={() => {
+                                setEditSubLandlord(null);
+                                setShowSubLandlordModal(true);
+                            }}
+                            className="px-4 py-2 bg-purple-50 dark:bg-purple-500/20 text-purple-600 dark:text-purple-400 rounded-xl hover:bg-purple-100 dark:hover:bg-purple-500/30 border border-purple-100 dark:border-purple-500/30 text-sm font-medium transition-all duration-300 h-11 whitespace-nowrap shrink-0"
+                        >
+                            + 新增
+                        </button>
+                    )}
+                </div>
+            </div>
+        ) : null;
+
+    const currentTenantSelectBlock =
+        showCurrentTenantSelect ? (
+            <div className="space-y-2">
+                <label className={labelClass}>現時租客</label>
+                <div className="flex gap-2 items-center flex-nowrap">
+                    <select
+                        name="rentOutTenantId"
+                        value={formData.rentOutTenantId}
+                        onChange={handleChange}
+                        className={`${inputClass} flex-1 min-w-0 w-auto`}
+                    >
+                        <option value="" className="bg-white dark:bg-[#1a1a2e]">請選擇現時租客</option>
+                        {currentTenants.map(ct => (
+                            <option key={ct.id} value={ct.id} className="bg-white dark:bg-[#1a1a2e]">
+                                {ct.name}
+                            </option>
+                        ))}
+                    </select>
+                    {formData.rentOutTenantId && (
+                        <div className="flex items-center gap-1">
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    const ct = currentTenants.find(t => t.id === formData.rentOutTenantId);
+                                    if (ct) {
+                                        setEditCurrentTenant(ct);
+                                        setShowCurrentTenantModal(true);
+                                    }
+                                }}
+                                className="p-2 text-zinc-400 hover:text-purple-500 rounded-lg shrink-0"
+                                title="編輯"
+                            >
+                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                        strokeWidth={2}
+                                        d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+                                    />
+                                </svg>
+                            </button>
+                        </div>
+                    )}
+                    <button
+                        type="button"
+                        onClick={() => {
+                            setEditCurrentTenant(null);
+                            setShowCurrentTenantModal(true);
+                        }}
+                        className="px-4 py-2 bg-purple-50 dark:bg-purple-500/20 text-purple-600 dark:text-purple-400 rounded-xl hover:bg-purple-100 dark:hover:bg-purple-500/30 border border-purple-100 dark:border-purple-500/30 text-sm font-medium transition-all duration-300 h-11 whitespace-nowrap shrink-0"
+                    >
+                        + 新增
+                    </button>
+                </div>
+            </div>
+        ) : null;
 
     return (
         <>
@@ -651,9 +850,10 @@ export default function RentModal({
                         <input type="hidden" name="type" value={formData.type} />
                     )}
 
-                    {/* Property (左) | 二房東 / 現時租客 (右) — 同一行 */}
+                    {/* 物業／業主／二房東／現時租客；合約時第一列 物業｜業主、第二列 二房東｜現時租客 */}
+                    <div className="space-y-4">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {/* 左：物業 */}
+                        {/* 物業 */}
                         <div className="space-y-2">
                             <label className={labelClass}>物業 *</label>
                             {propertyId ? (
@@ -720,153 +920,26 @@ export default function RentModal({
                             )}
                         </div>
 
-                        {/* 右列：二房東 或 現時租客（視乎類型） */}
-                        {(showSubLandlordSelect || showCurrentTenantSelect) && (
-                            <div className="space-y-3">
-                                {showSubLandlordSelect && (
-                                    <div className="space-y-2">
-                                        <label className={labelClass}>二房東</label>
-                                        <div className="flex gap-2 items-center flex-nowrap">
-                                            <select
-                                                name="rentOutSubLandlordId"
-                                                value={formData.rentOutSubLandlordId}
-                                                onChange={handleChange}
-                                                className={`${inputClass} flex-1 min-w-0 w-auto`}
-                                            >
-                                                <option value="" className="bg-white dark:bg-[#1a1a2e]">請選擇二房東</option>
-                                                {subLandlords.map(sl => (
-                                                    <option key={sl.id} value={sl.id} className="bg-white dark:bg-[#1a1a2e]">{sl.name}</option>
-                                                ))}
-                                            </select>
-                                            {formData.rentOutSubLandlordId && (
-                                                <div className="flex items-center gap-2">
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => {
-                                                            const sl = subLandlords.find(s => s.id === formData.rentOutSubLandlordId);
-                                                            if (sl) { setEditSubLandlord(sl); setShowSubLandlordModal(true); }
-                                                        }}
-                                                        className="p-2 text-zinc-400 hover:text-purple-500 rounded-lg shrink-0"
-                                                        title="新增二房東資料"
-                                                    >
-                                                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
-                                                    </button>
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => {
-                                                            const sl = subLandlords.find(s => s.id === formData.rentOutSubLandlordId);
-                                                            if (sl) setShowSubLandlordDetail(sl);
-                                                        }}
-                                                        className="px-3 py-1.5 text-sm text-purple-600 dark:text-purple-400 hover:bg-purple-50 dark:hover:bg-purple-500/20 rounded-lg border border-purple-200 dark:border-purple-500/30 transition-all"
-                                                    >
-                                                        二房東資料
-                                                    </button>
-                                                </div>
-                                            )}
-                                            {!formData.rentOutSubLandlordId && (
-                                                <button
-                                                    type="button"
-                                                    onClick={() => { setEditSubLandlord(null); setShowSubLandlordModal(true); }}
-                                                    className="px-4 py-2 bg-purple-50 dark:bg-purple-500/20 text-purple-600 dark:text-purple-400 rounded-xl hover:bg-purple-100 dark:hover:bg-purple-500/30 border border-purple-100 dark:border-purple-500/30 text-sm font-medium transition-all duration-300 h-11 whitespace-nowrap shrink-0"
-                                                >
-                                                    + 新增
-                                                </button>
-                                            )}
-                                        </div>
+                        {isContractLayout ? (
+                            ownerSelectField
+                        ) : (
+                            <>
+                                {(showSubLandlordSelect || showCurrentTenantSelect) && (
+                                    <div className="space-y-3">
+                                        {subLandlordSelectBlock}
+                                        {currentTenantSelectBlock}
                                     </div>
                                 )}
-                                {showCurrentTenantSelect && (
-                                    <div className="space-y-2">
-                                        <label className={labelClass}>現時租客</label>
-                                        <div className="flex gap-2 items-center flex-nowrap">
-                                            <select
-                                                name="rentOutTenantId"
-                                                value={formData.rentOutTenantId}
-                                                onChange={handleChange}
-                                                className={`${inputClass} flex-1 min-w-0 w-auto`}
-                                            >
-                                                <option value="" className="bg-white dark:bg-[#1a1a2e]">請選擇現時租客</option>
-                                                {currentTenants.map(ct => (
-                                                    <option key={ct.id} value={ct.id} className="bg-white dark:bg-[#1a1a2e]">{ct.name}</option>
-                                                ))}
-                                            </select>
-                                            {formData.rentOutTenantId && (
-                                                <button
-                                                    type="button"
-                                                    onClick={() => {
-                                                        const ct = currentTenants.find(t => t.id === formData.rentOutTenantId);
-                                                        if (ct) { setEditCurrentTenant(ct); setShowCurrentTenantModal(true); }
-                                                    }}
-                                                    className="p-2 text-zinc-400 hover:text-purple-500 rounded-lg shrink-0"
-                                                    title="編輯"
-                                                >
-                                                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
-                                                </button>
-                                            )}
-                                            <button
-                                                type="button"
-                                                onClick={() => { setEditCurrentTenant(null); setShowCurrentTenantModal(true); }}
-                                                className="px-4 py-2 bg-purple-50 dark:bg-purple-500/20 text-purple-600 dark:text-purple-400 rounded-xl hover:bg-purple-100 dark:hover:bg-purple-500/30 border border-purple-100 dark:border-purple-500/30 text-sm font-medium transition-all duration-300 h-11 whitespace-nowrap shrink-0"
-                                            >
-                                                + 新增
-                                            </button>
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
+                                {ownerSelectField}
+                            </>
                         )}
-
-                        {/* 業主（僅合約/交租類型，左列下方） */}
-                        {showOwnerSelect && (
-                            <div className="space-y-2">
-                                <label className={labelClass}>業主</label>
-                                <div className="flex gap-2 items-center flex-nowrap">
-                                    <select
-                                        name="tenantId"
-                                        value={formData.tenantId}
-                                        onChange={handleChange}
-                                        className={`${inputClass} flex-1 min-w-0 w-auto`}
-                                    >
-                                        <option value="" className="bg-white dark:bg-[#1a1a2e]">請選擇業主</option>
-                                        {lesseeIndividuals.length > 0 && (
-                                            <optgroup label="個人">
-                                                {lesseeIndividuals.map(p => (
-                                                    <option key={p.id} value={p.id} className="bg-white dark:bg-[#1a1a2e]">{p.name}</option>
-                                                ))}
-                                            </optgroup>
-                                        )}
-                                        {lesseeCompanies.length > 0 && (
-                                            <optgroup label="公司">
-                                                {lesseeCompanies.map(p => (
-                                                    <option key={p.id} value={p.id} className="bg-white dark:bg-[#1a1a2e]">{p.name}</option>
-                                                ))}
-                                            </optgroup>
-                                        )}
-                                    </select>
-                                    {formData.tenantId && (
-                                        <button
-                                            type="button"
-                                            onClick={() => {
-                                                const p = proprietors.find(pt => pt.id === formData.tenantId);
-                                                if (p) setShowProprietorModal(true);
-                                            }}
-                                            className="p-2 text-zinc-400 hover:text-purple-500 rounded-lg shrink-0"
-                                            title="編輯"
-                                        >
-                                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
-                                        </button>
-                                    )}
-                                    <button
-                                        type="button"
-                                        onClick={() => setShowProprietorModal(true)}
-                                        className="px-4 py-2 bg-purple-50 dark:bg-purple-500/20 text-purple-600 dark:text-purple-400 rounded-xl hover:bg-purple-100 dark:hover:bg-purple-500/30 border border-purple-100 dark:border-purple-500/30 text-sm font-medium transition-all duration-300 h-11 whitespace-nowrap shrink-0"
-                                    >
-                                        + 新增
-                                    </button>
-                                </div>
-                                <p className="text-xs text-zinc-400 dark:text-white/40">請按「+ 新增」以新增業主</p>
-                            </div>
-                        )}
+                    </div>
+                    {isContractLayout && (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            {subLandlordSelectBlock}
+                            {currentTenantSelectBlock}
+                        </div>
+                    )}
                     </div>
 
                     {/* ===== RENT OUT FORM (收租) — 收租記錄 ===== */}
@@ -1363,7 +1436,7 @@ export default function RentModal({
             </motion.div>
 
             {showChildPropertyModal && (
-                <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm" role="dialog" aria-modal="true">
+                <div className="fixed inset-0 z-70 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm" role="dialog" aria-modal="true">
                     <motion.div
                         initial={{ opacity: 0, scale: 0.96 }}
                         animate={{ opacity: 1, scale: 1 }}
@@ -1490,28 +1563,40 @@ export default function RentModal({
                     }}
                 />
             )}
+            {/* Current Tenant Detail Modal */}
+            {showCurrentTenantDetail && (
+                <CurrentTenantDetailModal
+                    currentTenant={showCurrentTenantDetail}
+                    onClose={() => setShowCurrentTenantDetail(null)}
+                    onEdit={() => {
+                        setEditCurrentTenant(showCurrentTenantDetail);
+                        setShowCurrentTenantDetail(null);
+                        setShowCurrentTenantModal(true);
+                    }}
+                />
+            )}
         </>
     );
 }
 
 // Sub-landlord Detail Modal Component
-function SubLandlordDetailModal({ 
-    subLandlord, 
+function SubLandlordDetailModal({
+    subLandlord,
     allProperties,
     onClose,
-    onEdit 
-}: { 
-    subLandlord: SubLandlord; 
+    onEdit
+}: {
+    subLandlord: SubLandlord;
     allProperties: Property[];
     onClose: () => void;
     onEdit: () => void;
 }) {
     const relatedProperties = useMemo(() => {
         if (!subLandlord.tenancyNumber) return [];
-        
+
         const parts = subLandlord.tenancyNumber.split(',').map(p => p.trim());
         const propertyCodes = new Set<string>();
-        
+
         parts.forEach(part => {
             const firstDashIndex = part.indexOf('-');
             if (firstDashIndex > 0) {
@@ -1525,10 +1610,10 @@ function SubLandlordDetailModal({
                 propertyCodes.add(part);
             }
         });
-        
+
         return allProperties.filter(p => {
             if (!p.code) return false;
-            return propertyCodes.has(p.code) || 
+            return propertyCodes.has(p.code) ||
                    Array.from(propertyCodes).some(code => {
                        return p.code === code || (code.length <= 4 && p.code.startsWith(code + '-'));
                    });
@@ -1545,6 +1630,13 @@ function SubLandlordDetailModal({
         return new Intl.NumberFormat('zh-HK').format(num);
     };
 
+    const statusLabel =
+        subLandlord.status === 'listing' ? '放盤中' :
+        subLandlord.status === 'renting' ? '出租中' :
+        subLandlord.status === 'completed' ? '已完租' : '—';
+
+    const isExpired = subLandlord.endDate ? new Date(subLandlord.endDate) < new Date() : false;
+
     return (
         <>
             <motion.div
@@ -1552,18 +1644,25 @@ function SubLandlordDetailModal({
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
                 onClick={onClose}
-                className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[70]"
+                className="fixed inset-0 min-h-screen bg-black/60 backdrop-blur-sm z-70"
             />
             <motion.div
                 initial={{ opacity: 0, scale: 0.95, y: 20 }}
                 animate={{ opacity: 1, scale: 1, y: 0 }}
                 exit={{ opacity: 0, scale: 0.95, y: 20 }}
-                className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-4xl max-h-[90vh] overflow-hidden bg-white dark:bg-[#1a1a2e] rounded-2xl border border-zinc-200 dark:border-white/10 shadow-2xl z-[70] flex flex-col"
+                className="fixed inset-0 m-auto h-fit max-h-[90vh] overflow-y-auto w-full max-w-3xl flex flex-col bg-white dark:bg-[#1a1a2e] rounded-2xl border border-zinc-200 dark:border-white/10 shadow-2xl z-70"
+                onClick={(e) => e.stopPropagation()}
             >
+                {/* Header */}
                 <div className="flex items-center justify-between p-5 border-b border-zinc-100 dark:border-white/5 shrink-0">
-                    <div>
-                        <h2 className="text-lg font-bold text-zinc-900 dark:text-white">二房東詳細資料</h2>
-                        <p className="text-sm text-zinc-500 dark:text-white/50 mt-1">{subLandlord.name}</p>
+                    <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-purple-100 dark:bg-purple-500/20 flex items-center justify-center text-purple-600 dark:text-purple-400">
+                            <Building2 className="w-5 h-5" />
+                        </div>
+                        <div>
+                            <h2 className="text-lg font-bold text-zinc-900 dark:text-white">二房東詳細資料</h2>
+                            <p className="text-sm text-zinc-500 dark:text-white/50">{subLandlord.name}</p>
+                        </div>
                     </div>
                     <div className="flex items-center gap-2">
                         <button
@@ -1580,83 +1679,169 @@ function SubLandlordDetailModal({
                         </button>
                     </div>
                 </div>
-                <div className="p-5 space-y-6 overflow-y-auto flex-1">
-                    <div>
-                        <h3 className="text-sm font-semibold text-zinc-700 dark:text-white/80 mb-3">基本資料</h3>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div>
+
+                {/* Body */}
+                <div className="flex-1 overflow-y-auto p-5 space-y-6">
+                    {/* 基本資料 */}
+                    <section>
+                        <h3 className="text-sm font-semibold text-purple-600 dark:text-purple-400 mb-3">基本資料</h3>
+                        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                            <div className="p-3 bg-zinc-50 dark:bg-white/5 rounded-xl border border-zinc-100 dark:border-white/5">
                                 <p className="text-xs text-zinc-500 dark:text-white/50 mb-1">名稱</p>
-                                <p className="text-sm font-medium text-zinc-900 dark:text-white">{subLandlord.name}</p>
+                                <p className="text-sm font-bold text-zinc-900 dark:text-white">{subLandlord.name}</p>
                             </div>
-                            <div>
+                            <div className="p-3 bg-zinc-50 dark:bg-white/5 rounded-xl border border-zinc-100 dark:border-white/5">
                                 <p className="text-xs text-zinc-500 dark:text-white/50 mb-1">出租號碼</p>
-                                <p className="text-sm font-medium text-zinc-900 dark:text-white">{subLandlord.tenancyNumber || '—'}</p>
+                                <p className="text-sm font-mono font-medium text-zinc-900 dark:text-white">{subLandlord.tenancyNumber || '—'}</p>
                             </div>
-                            <div>
+                            <div className="p-3 bg-zinc-50 dark:bg-white/5 rounded-xl border border-zinc-100 dark:border-white/5">
+                                <p className="text-xs text-zinc-500 dark:text-white/50 mb-1">狀態</p>
+                                <p className={`text-sm font-medium ${isExpired ? 'text-red-500' : 'text-zinc-900 dark:text-white'}`}>
+                                    {isExpired ? '已過期' : statusLabel}
+                                </p>
+                            </div>
+                            <div className="p-3 bg-zinc-50 dark:bg-white/5 rounded-xl border border-zinc-100 dark:border-white/5">
+                                <p className="text-xs text-zinc-500 dark:text-white/50 mb-1">出租人</p>
+                                <p className="text-sm font-medium text-zinc-900 dark:text-white">{subLandlord.lessor || '—'}</p>
+                            </div>
+                            <div className="p-3 bg-zinc-50 dark:bg-white/5 rounded-xl border border-zinc-100 dark:border-white/5">
                                 <p className="text-xs text-zinc-500 dark:text-white/50 mb-1">出租月租</p>
-                                <p className="text-sm font-medium text-zinc-900 dark:text-white">
+                                <p className="text-sm font-bold text-emerald-600 dark:text-emerald-400">
                                     {subLandlord.monthlyRental ? `$${formatNumber(subLandlord.monthlyRental)}` : '—'}
                                 </p>
                             </div>
-                            <div>
-                                <p className="text-xs text-zinc-500 dark:text-white/50 mb-1">出租期數</p>
+                            <div className="p-3 bg-zinc-50 dark:bg-white/5 rounded-xl border border-zinc-100 dark:border-white/5">
+                                <p className="text-xs text-zinc-500 dark:text-white/50 mb-1">期數</p>
                                 <p className="text-sm font-medium text-zinc-900 dark:text-white">
-                                    {subLandlord.periods ? `${subLandlord.periods} 月` : '—'}
+                                    {subLandlord.periods ? `${subLandlord.periods} 個月` : '—'}
                                 </p>
-                            </div>
-                            <div>
-                                <p className="text-xs text-zinc-500 dark:text-white/50 mb-1">出租總額</p>
-                                <p className="text-sm font-medium text-zinc-900 dark:text-white">
-                                    {subLandlord.totalAmount ? `$${formatNumber(subLandlord.totalAmount)}` : '—'}
-                                </p>
-                            </div>
-                            <div>
-                                <p className="text-xs text-zinc-500 dark:text-white/50 mb-1">租務狀態</p>
-                                <p className="text-sm font-medium text-zinc-900 dark:text-white">
-                                    {subLandlord.status === 'listing' ? '放盤中' : 
-                                     subLandlord.status === 'renting' ? '出租中' : 
-                                     subLandlord.status === 'completed' ? '已完租' : '—'}
-                                </p>
-                            </div>
-                            <div>
-                                <p className="text-xs text-zinc-500 dark:text-white/50 mb-1">開始日期</p>
-                                <p className="text-sm font-medium text-zinc-900 dark:text-white">{formatDate(subLandlord.startDate)}</p>
-                            </div>
-                            <div>
-                                <p className="text-xs text-zinc-500 dark:text-white/50 mb-1">結束日期</p>
-                                <p className="text-sm font-medium text-zinc-900 dark:text-white">{formatDate(subLandlord.endDate)}</p>
                             </div>
                         </div>
-                    </div>
+                    </section>
 
-                    <div>
-                        <h3 className="text-sm font-semibold text-zinc-700 dark:text-white/80 mb-3">
+                    {/* 日期資料 */}
+                    <section>
+                        <h3 className="text-sm font-semibold text-purple-600 dark:text-purple-400 mb-3">日期資料</h3>
+                        <div className="bg-zinc-50 dark:bg-white/5 rounded-xl border border-zinc-100 dark:border-white/5 divide-y divide-zinc-100 dark:divide-white/5">
+                            <div className="flex items-center gap-3 px-4 py-3">
+                                <Calendar className="w-4 h-4 text-blue-500 shrink-0" />
+                                <span className="text-xs text-zinc-500 dark:text-white/50 w-20 shrink-0">開始日期</span>
+                                <span className="text-sm font-medium text-zinc-800 dark:text-white">{formatDate(subLandlord.startDate)}</span>
+                            </div>
+                            <div className="flex items-center gap-3 px-4 py-3">
+                                <Calendar className="w-4 h-4 text-blue-500 shrink-0" />
+                                <span className="text-xs text-zinc-500 dark:text-white/50 w-20 shrink-0">結束日期</span>
+                                <span className={`text-sm font-medium ${isExpired ? 'text-red-500' : 'text-zinc-800 dark:text-white'}`}>
+                                    {formatDate(subLandlord.endDate)}
+                                    {isExpired && <span className="ml-2 text-xs font-medium">(已過期)</span>}
+                                </span>
+                            </div>
+                            <div className="flex items-center gap-3 px-4 py-3">
+                                <Calendar className="w-4 h-4 text-amber-500 shrink-0" />
+                                <span className="text-xs text-zinc-500 dark:text-white/50 w-20 shrink-0">實際結束</span>
+                                <span className="text-sm font-medium text-zinc-800 dark:text-white">{formatDate(subLandlord.actualEndDate)}</span>
+                            </div>
+                        </div>
+                    </section>
+
+                    {/* 按金資料 */}
+                    {(subLandlord.depositReceived != null || subLandlord.depositReceiptNumber) && (
+                        <section>
+                            <h3 className="text-sm font-semibold text-purple-600 dark:text-purple-400 mb-3">按金資料</h3>
+                            <div className="bg-zinc-50 dark:bg-white/5 rounded-xl border border-zinc-100 dark:border-white/5 divide-y divide-zinc-100 dark:divide-white/5">
+                                <div className="flex items-center gap-3 px-4 py-3">
+                                    <span className="text-xs text-zinc-500 dark:text-white/50 w-20 shrink-0">按金</span>
+                                    <span className="text-sm font-medium text-zinc-800 dark:text-white">
+                                        {subLandlord.depositReceived != null ? `$${formatNumber(subLandlord.depositReceived)}` : '—'}
+                                    </span>
+                                </div>
+                                {subLandlord.depositReceiptNumber && (
+                                    <div className="flex items-center gap-3 px-4 py-3">
+                                        <span className="text-xs text-zinc-500 dark:text-white/50 w-20 shrink-0">收據號碼</span>
+                                        <span className="text-sm font-mono font-medium text-zinc-800 dark:text-white">{subLandlord.depositReceiptNumber}</span>
+                                    </div>
+                                )}
+                                <div className="flex items-center gap-3 px-4 py-3">
+                                    <Calendar className="w-4 h-4 text-emerald-500 shrink-0" />
+                                    <span className="text-xs text-zinc-500 dark:text-white/50 w-20 shrink-0">收取日期</span>
+                                    <span className="text-sm font-medium text-zinc-800 dark:text-white">{formatDate(subLandlord.depositReceiveDate)}</span>
+                                </div>
+                                <div className="flex items-center gap-3 px-4 py-3">
+                                    <Calendar className="w-4 h-4 text-amber-500 shrink-0" />
+                                    <span className="text-xs text-zinc-500 dark:text-white/50 w-20 shrink-0">退回日期</span>
+                                    <span className="text-sm font-medium text-zinc-800 dark:text-white">{formatDate(subLandlord.depositReturnDate)}</span>
+                                </div>
+                            </div>
+                        </section>
+                    )}
+
+                    {/* 關聯物業 */}
+                    <section>
+                        <h3 className="text-sm font-semibold text-purple-600 dark:text-purple-400 mb-3">
                             關聯物業 ({relatedProperties.length})
                         </h3>
                         {relatedProperties.length === 0 ? (
-                            <p className="text-sm text-zinc-500 dark:text-white/50">暫無關聯物業</p>
+                            <div className="p-6 text-center bg-zinc-50 dark:bg-white/5 rounded-xl border-2 border-dashed border-zinc-200 dark:border-white/10">
+                                <Building2 className="w-8 h-8 text-zinc-300 dark:text-white/10 mx-auto mb-2" />
+                                <p className="text-sm text-zinc-500 dark:text-white/40">暫無關聯物業</p>
+                            </div>
                         ) : (
-                            <div className="space-y-2">
+                            <div className="space-y-3">
                                 {relatedProperties.map(property => (
                                     <div
                                         key={property.id}
-                                        className="p-3 rounded-xl bg-zinc-50 dark:bg-white/5 border border-zinc-200 dark:border-white/10"
+                                        className="p-4 rounded-xl bg-zinc-50 dark:bg-white/5 border border-zinc-200 dark:border-white/10 hover:border-purple-300 dark:hover:border-purple-500/30 transition-colors"
                                     >
-                                        <div className="flex items-center justify-between">
-                                            <div>
-                                                <p className="text-sm font-medium text-zinc-900 dark:text-white">
-                                                    {property.name}
-                                                </p>
-                                                <p className="text-xs text-zinc-500 dark:text-white/50 mt-1">
-                                                    {property.code} • {property.address}
-                                                </p>
+                                        <div className="flex items-start justify-between gap-3">
+                                            <div className="flex-1 min-w-0">
+                                                <div className="flex items-center gap-2 flex-wrap">
+                                                    <span className="text-sm font-bold text-zinc-900 dark:text-white">{property.name}</span>
+                                                    <span className="text-xs px-2 py-0.5 rounded-full bg-purple-100 dark:bg-purple-500/20 text-purple-600 dark:text-purple-300 font-mono font-medium">
+                                                        {property.code}
+                                                    </span>
+                                                </div>
+                                                <div className="flex items-center gap-1.5 mt-1.5">
+                                                    <span className="text-xs text-zinc-500 dark:text-white/50 truncate">{property.address || '—'}</span>
+                                                </div>
                                             </div>
+                                            {property.address && (
+                                                <a
+                                                    href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(property.address)}`}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="p-1.5 rounded-lg hover:bg-purple-100 dark:hover:bg-purple-500/20 text-zinc-400 dark:text-white/40 hover:text-purple-500 dark:hover:text-purple-400 transition-colors shrink-0"
+                                                    title="在 Google Maps 開啟"
+                                                >
+                                                    <ExternalLink className="w-4 h-4" />
+                                                </a>
+                                            )}
                                         </div>
                                     </div>
                                 ))}
                             </div>
                         )}
-                    </div>
+                    </section>
+
+                    {/* 描述 */}
+                    {subLandlord.description && (
+                        <section>
+                            <h3 className="text-sm font-semibold text-purple-600 dark:text-purple-400 mb-3">描述</h3>
+                            <div
+                                className="text-sm text-zinc-700 dark:text-white/80 prose dark:prose-invert max-w-none p-3 bg-zinc-50 dark:bg-white/5 rounded-xl border border-zinc-100 dark:border-white/5"
+                                dangerouslySetInnerHTML={{ __html: subLandlord.description }}
+                            />
+                        </section>
+                    )}
+                </div>
+
+                {/* Footer */}
+                <div className="p-5 border-t border-zinc-100 dark:border-white/5 shrink-0 flex justify-end">
+                    <button
+                        onClick={onClose}
+                        className="px-5 py-2 bg-zinc-100 dark:bg-white/10 text-zinc-700 dark:text-white rounded-xl hover:bg-zinc-200 dark:hover:bg-white/20 text-sm font-medium transition-all"
+                    >
+                        關閉
+                    </button>
                 </div>
             </motion.div>
         </>

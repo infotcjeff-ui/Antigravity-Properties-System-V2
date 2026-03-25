@@ -43,12 +43,6 @@ const dashboardNavItems: DashboardNavItem[] = [
     {
         label: 'Manage Proprietors',
         labelZh: '管理業主',
-        href: '/dashboard/proprietors',
-        icon: <Users className="w-5 h-5" />,
-    },
-    {
-        label: 'Manage Tenants',
-        labelZh: '管理承租人',
         href: '/dashboard/tenants',
         icon: <Users className="w-5 h-5" />,
     },
@@ -87,6 +81,13 @@ export default function DashboardSidebar({ userRole = 'client' }: DashboardSideb
     const router = useRouter();
 
     const isActive = (href: string) => {
+        if (href === '/dashboard/tenants') {
+            return (
+                pathname === href ||
+                pathname.startsWith(href + '/') ||
+                pathname === '/dashboard/proprietors'
+            );
+        }
         return pathname === href || pathname.startsWith(href + '/');
     };
 

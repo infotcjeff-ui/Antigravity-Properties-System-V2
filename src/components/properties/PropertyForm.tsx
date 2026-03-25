@@ -15,7 +15,12 @@ import AnimatedSelect from '@/components/ui/AnimatedSelect';
 import AnimatedMultiSelect from '@/components/ui/AnimatedMultiSelect';
 import { FileUpload } from '@/components/ui/file-upload';
 import LocationPickerMap from '@/components/properties/LocationPickerMapDynamic';
-import { formatLotAreaForInput, parseLotAreaInput, parseLotEntries as parseLotEntriesFromStr } from '@/lib/formatters';
+import {
+    dedupeRecordsByDisplayName,
+    formatLotAreaForInput,
+    parseLotAreaInput,
+    parseLotEntries as parseLotEntriesFromStr,
+} from '@/lib/formatters';
 
 interface PropertyFormProps {
     property?: Property | null;
@@ -101,7 +106,10 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
     const [orderedImages, setOrderedImages] = useState<(string | { file: File; preview: string })[]>([]);
     const [orderedGeoMaps, setOrderedGeoMaps] = useState<(string | { file: File; preview: string })[]>([]);
 
-    const proprietorsList = useMemo(() => (proprietors || []).filter(p => !p.code?.startsWith('T')), [proprietors]);
+    const proprietorsList = useMemo(() => {
+        const owners = (proprietors || []).filter(p => !p.code?.startsWith('T'));
+        return dedupeRecordsByDisplayName(owners);
+    }, [proprietors]);
     const tenantsList = useMemo(() => (proprietors || []).filter(p => p.code?.startsWith('T')), [proprietors]);
 
     const serializeLotEntries = (entries: { type: 'new' | 'old'; value: string }[]): string =>
