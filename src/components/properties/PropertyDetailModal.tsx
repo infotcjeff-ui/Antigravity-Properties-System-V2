@@ -431,6 +431,7 @@ export default function PropertyDetailModal({ propertyName, propertyId, onClose 
                                             const stLabel =
                                                 st === 'renting' ? '出租中' :
                                                     st === 'listing' ? '放盤中' :
+                                                        st === 'leasing_in' ? '租入中' :
                                                         st === 'completed' ? '已完租' : String(st);
                                             const sd = c.rentOutStartDate ? new Date(c.rentOutStartDate).toLocaleDateString() : '-';
                                             const ed = c.rentOutEndDate ? new Date(c.rentOutEndDate).toLocaleDateString() : '-';

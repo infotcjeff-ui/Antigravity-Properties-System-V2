@@ -847,6 +847,7 @@ function SubLandlordDetailModal({
                                 <p className="text-sm font-medium text-zinc-900 dark:text-white">
                                     {subLandlord.status === 'listing' ? '放盤中' :
                                      subLandlord.status === 'renting' ? '出租中' :
+                                     subLandlord.status === 'leasing_in' ? '租入中' :
                                      subLandlord.status === 'completed' ? '已完租' : '—'}
                                 </p>
                             </div>

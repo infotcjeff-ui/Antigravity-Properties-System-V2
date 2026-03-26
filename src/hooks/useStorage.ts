@@ -28,6 +28,21 @@ const toSnake = (obj: any) => {
     return newObj;
 };
 
+/** rents.rent_out_tenant_ids 為 jsonb 陣列，無 FK 至 current_tenants，無法用 embed 查詢 */
+const firstRentOutTenantIdFromRow = (row: { rent_out_tenant_ids?: unknown }): string | undefined => {
+    const raw = row.rent_out_tenant_ids;
+    if (Array.isArray(raw) && raw[0] != null && raw[0] !== '') return String(raw[0]);
+    if (typeof raw === 'string') {
+        try {
+            const parsed = JSON.parse(raw) as unknown;
+            if (Array.isArray(parsed) && parsed[0] != null && parsed[0] !== '') return String(parsed[0]);
+        } catch {
+            /* ignore */
+        }
+    }
+    return undefined;
+};
+
 const extractMissingColumnFromError = (err: unknown): string | null => {
     const message = (err as { message?: string } | null)?.message || '';
     const match = message.match(/Could not find the '([^']+)' column/i);
@@ -215,21 +230,52 @@ export const fetchRentsWithRelations = async (user?: any, options?: { type?: 're
         const { data, error } = await query.order('created_at', { ascending: false });
 
         if (error) {
-            console.error('Supabase query error:', error);
+            const e = error as { message?: string; details?: string; hint?: string; code?: string };
+            console.error('Supabase query error:', e.message, e.details, e.hint, e.code);
             throw error;
         }
 
-        return (data || []).map(r => ({
-            ...toCamel(r),
-            property: toCamel(r.property),
-            proprietor: toCamel(r.proprietor),
-            tenant: toCamel(r.tenant)
-        }));
+        const rows = data || [];
+        const tenantIds = new Set<string>();
+        for (const r of rows) {
+            const id = firstRentOutTenantIdFromRow(r);
+            if (id) tenantIds.add(id);
+        }
+
+        const tenantMap = new Map<string, { id: string; name: string }>();
+        if (tenantIds.size > 0) {
+            const { data: ctRows, error: ctError } = await supabase
+                .from('current_tenants')
+                .select('id,name')
+                .in('id', [...tenantIds]);
+
+            if (ctError) {
+                const ce = ctError as { message?: string; details?: string; code?: string };
+                console.error('current_tenants batch error:', ce.message, ce.details, ce.code);
+            } else {
+                for (const ct of ctRows || []) {
+                    if (ct?.id) tenantMap.set(ct.id, { id: ct.id, name: ct.name ?? '' });
+                }
+            }
+        }
+
+        return rows.map(r => {
+            const tid = firstRentOutTenantIdFromRow(r);
+            const currentTenant = tid ? tenantMap.get(tid) : undefined;
+            return {
+                ...toCamel(r),
+                property: toCamel(r.property),
+                proprietor: toCamel(r.proprietor),
+                tenant: toCamel(r.tenant),
+                currentTenant: currentTenant ? toCamel(currentTenant) : undefined,
+            };
+        });
     } catch (err: any) {
         if (err instanceof TypeError && err.message === 'Failed to fetch') {
             console.error('Network Error: Unable to reach Supabase. Check your URL and internet connection.');
         } else {
-            console.error('Failed to fetch rents with relations:', err);
+            const e = err as { message?: string; details?: string; code?: string };
+            console.error('Failed to fetch rents with relations:', e.message, e.details, e.code, err);
         }
         return [];
     }
@@ -1050,6 +1096,7 @@ export function useRents() {
             if (rent.rentOutEndDate) rentData.rent_out_end_date = rent.rentOutEndDate;
             if (rent.rentOutActualEndDate) rentData.rent_out_actual_end_date = rent.rentOutActualEndDate;
             if (rent.rentOutDepositReceived) rentData.rent_out_deposit_received = rent.rentOutDepositReceived;
+            if ((rent as any).rentOutDepositPaymentMethod) rentData.rent_out_deposit_payment_method = (rent as any).rentOutDepositPaymentMethod;
             if ((rent as any).rentOutDepositReceiptNumber) rentData.rent_out_deposit_receipt_number = (rent as any).rentOutDepositReceiptNumber;
             if (rent.rentOutDepositReceiveDate) rentData.rent_out_deposit_receive_date = rent.rentOutDepositReceiveDate;
             if (rent.rentOutDepositReturnDate) rentData.rent_out_deposit_return_date = rent.rentOutDepositReturnDate;
@@ -1073,6 +1120,10 @@ export function useRents() {
             if (rc.rentCollectionChequeBank) rentData.rent_collection_cheque_bank = rc.rentCollectionChequeBank;
             if (rc.rentCollectionChequeNumber) rentData.rent_collection_cheque_number = rc.rentCollectionChequeNumber;
             if (rc.rentCollectionChequeImage) rentData.rent_collection_cheque_image = rc.rentCollectionChequeImage;
+            if (rc.rentCollectionPaymentDate) rentData.rent_collection_payment_date = rc.rentCollectionPaymentDate;
+            if (rc.rentCollectionBankInImage !== undefined) {
+                rentData.rent_collection_bank_in_image = rc.rentCollectionBankInImage;
+            }
 
             // Add Renting (交租) fields
             if (rent.rentingNumber) rentData.renting_number = rent.rentingNumber;
@@ -1248,14 +1299,17 @@ export function useRents() {
             if (updates.rentOutTotalAmount !== undefined) rentData.rent_out_total_amount = updates.rentOutTotalAmount;
             if (updates.rentOutStartDate) rentData.rent_out_start_date = updates.rentOutStartDate;
             if (updates.rentOutEndDate) rentData.rent_out_end_date = updates.rentOutEndDate;
-            if (updates.rentOutActualEndDate) rentData.rent_out_actual_end_date = updates.rentOutActualEndDate;
+            if (updates.rentOutActualEndDate !== undefined) rentData.rent_out_actual_end_date = updates.rentOutActualEndDate;
             if (updates.rentOutDepositReceived !== undefined) rentData.rent_out_deposit_received = updates.rentOutDepositReceived;
+            if ((updates as any).rentOutDepositPaymentMethod !== undefined) {
+                rentData.rent_out_deposit_payment_method = (updates as any).rentOutDepositPaymentMethod || null;
+            }
             if ((updates as any).rentOutDepositReceiptNumber !== undefined) rentData.rent_out_deposit_receipt_number = (updates as any).rentOutDepositReceiptNumber;
             if (updates.rentOutDepositReceiveDate) rentData.rent_out_deposit_receive_date = updates.rentOutDepositReceiveDate;
             if (updates.rentOutDepositReturnDate) rentData.rent_out_deposit_return_date = updates.rentOutDepositReturnDate;
             if (updates.rentOutDepositReturnAmount !== undefined) rentData.rent_out_deposit_return_amount = updates.rentOutDepositReturnAmount;
-            if (updates.rentOutLessor) rentData.rent_out_lessor = updates.rentOutLessor;
-            if (updates.rentOutAddressDetail) rentData.rent_out_address_detail = updates.rentOutAddressDetail;
+            if (updates.rentOutLessor !== undefined) rentData.rent_out_lessor = updates.rentOutLessor || null;
+            if (updates.rentOutAddressDetail !== undefined) rentData.rent_out_address_detail = updates.rentOutAddressDetail || null;
             if (updates.rentOutStatus) rentData.rent_out_status = updates.rentOutStatus;
             if (updates.rentOutDescription) rentData.rent_out_description = updates.rentOutDescription;
             if ((updates as any).rentOutSubLandlord !== undefined) rentData.rent_out_sub_landlord = (updates as any).rentOutSubLandlord;
@@ -1271,6 +1325,10 @@ export function useRents() {
             if (urc.rentCollectionChequeBank !== undefined) rentData.rent_collection_cheque_bank = urc.rentCollectionChequeBank || null;
             if (urc.rentCollectionChequeNumber !== undefined) rentData.rent_collection_cheque_number = urc.rentCollectionChequeNumber || null;
             if (urc.rentCollectionChequeImage !== undefined) rentData.rent_collection_cheque_image = urc.rentCollectionChequeImage || null;
+            if (urc.rentCollectionPaymentDate !== undefined) rentData.rent_collection_payment_date = urc.rentCollectionPaymentDate || null;
+            if ((urc as any).rentCollectionBankInImage !== undefined) {
+                rentData.rent_collection_bank_in_image = (urc as any).rentCollectionBankInImage || null;
+            }
 
             // RENTING fields
             if (updates.rentingNumber) rentData.renting_number = updates.rentingNumber;

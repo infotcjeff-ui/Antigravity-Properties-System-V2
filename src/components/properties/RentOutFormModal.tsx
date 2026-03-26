@@ -2,9 +2,10 @@
 
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { formatNumberWithCommas, parsePriceInput } from '@/lib/formatters';
+import { formatNumberWithCommas, normalizeDuplicateName, parsePriceInput } from '@/lib/formatters';
+import { RENT_OUT_CONTRACT_STATUS_OPTIONS } from '@/lib/rentPaymentDisplay';
 import type { SubLandlord, CurrentTenant } from '@/lib/db';
-import { useSubLandlords, useCurrentTenants } from '@/hooks/useStorage';
+import { fetchCurrentTenants, fetchSubLandlords, useSubLandlords, useCurrentTenants } from '@/hooks/useStorage';
 import dynamic from 'next/dynamic';
 import 'react-quill-new/dist/quill.snow.css';
 
@@ -12,12 +13,6 @@ const ReactQuill = dynamic(() => import('react-quill-new'), {
     ssr: false,
     loading: () => <div className="h-[120px] w-full bg-zinc-100 dark:bg-white/5 animate-pulse rounded-xl" />,
 });
-
-const rentOutStatuses = [
-    { value: 'listing', label: '放盤中' },
-    { value: 'renting', label: '出租中' },
-    { value: 'completed', label: '已完租' },
-];
 
 type FormData = {
     name: string;
@@ -36,7 +31,7 @@ type FormData = {
     depositReturnAmount: string;
     lessor: string;
     addressDetail: string;
-    status: 'listing' | 'renting' | 'completed';
+    status: 'listing' | 'renting' | 'leasing_in' | 'completed';
     description: string;
 };
 
@@ -145,6 +140,7 @@ export default function RentOutFormModal({ mode, editItem, isAddPropertyData = f
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
         const { name, value } = e.target;
+        if (name === 'name') setError('');
         setFormData(prev => ({ ...prev, [name]: value }));
     };
 
@@ -180,6 +176,35 @@ export default function RentOutFormModal({ mode, editItem, isAddPropertyData = f
             setError('請輸入名稱');
             return;
         }
+
+        const nameNorm = normalizeDuplicateName(formData.name);
+        if (!isAddPropertyData) {
+            try {
+                const list =
+                    mode === 'sub_landlord' ? await fetchSubLandlords() : await fetchCurrentTenants();
+                if (editItem?.id) {
+                    const dup = list.some(
+                        x =>
+                            x.id !== editItem.id &&
+                            normalizeDuplicateName(x.name || '') === nameNorm
+                    );
+                    if (dup) {
+                        setError('已有相同名稱，請使用其他名稱');
+                        return;
+                    }
+                } else {
+                    const dup = list.some(x => normalizeDuplicateName(x.name || '') === nameNorm);
+                    if (dup) {
+                        setError('已有相同名稱，請使用其他名稱');
+                        return;
+                    }
+                }
+            } catch {
+                setError('無法驗證名稱，請稍後再試');
+                return;
+            }
+        }
+
         setSaving(true);
         setError('');
         try {
@@ -379,7 +404,7 @@ export default function RentOutFormModal({ mode, editItem, isAddPropertyData = f
                         <div className="space-y-2">
                             <label className={labelClass}>租務狀態</label>
                             <select name="status" value={formData.status} onChange={handleChange} className={inputClass}>
-                                {rentOutStatuses.map(s => (
+                                {RENT_OUT_CONTRACT_STATUS_OPTIONS.map(s => (
                                     <option key={s.value} value={s.value} className="bg-white dark:bg-[#1a1a2e]">{s.label}</option>
                                 ))}
                             </select>

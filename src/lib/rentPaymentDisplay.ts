@@ -29,16 +29,25 @@ export function hasRentCollectionPaidAmount(rent: { rentCollectionAmount?: numbe
     return v !== null && v !== undefined && !Number.isNaN(Number(v));
 }
 
-/** 收／交租表單之付款方式 */
+/** 收／交租表單之付款方式（含按金方式、出租合約按金方式） */
 export function labelRentCollectionPaymentMethod(
-    method?: 'cheque' | 'fps' | 'cash' | string | null,
+    method?: 'cheque' | 'fps' | 'cash' | 'bank_in' | string | null,
 ): string {
     if (method == null || method === '') return '—';
     if (method === 'cheque') return '支票';
     if (method === 'fps') return 'FPS轉帳';
     if (method === 'cash') return '現金';
+    if (method === 'bank_in') return '入數';
     return String(method);
 }
+
+/** 合約／二房東／現時租客之租務狀態（順序：放盤中 → 出租中 → 租入中 → 已完租） */
+export const RENT_OUT_CONTRACT_STATUS_OPTIONS = [
+    { value: 'listing' as const, label: '放盤中' },
+    { value: 'renting' as const, label: '出租中' },
+    { value: 'leasing_in' as const, label: '租入中' },
+    { value: 'completed' as const, label: '已完租' },
+];
 
 /** 期間結束日是否早於「今天」（本地日曆 0 點比較）；無結束日不算過期 */
 export function isPeriodEndExpired(end?: Date | string | null): boolean {
@@ -52,25 +61,31 @@ export function isPeriodEndExpired(end?: Date | string | null): boolean {
     return endDay < today;
 }
 
-/** 交租列表狀態：已過期優先，否則依繳付金額 */
-export function getRentingListStatus(rent: {
-    endDate?: Date | string | null;
-    rentingEndDate?: Date | string | null;
+/** 交租／收租列表「租務狀態」：已繳付 = 繳付金額有值且已選付款方式；否則未繳付 */
+export type RentCollectionPayListStatus = 'paid' | 'unpaid';
+
+export function getRentCollectionPayListStatus(rent: {
     rentCollectionAmount?: number | null;
-}): 'expired' | 'completed' | 'processing' {
-    const periodEnd = rent.endDate ?? rent.rentingEndDate;
-    if (isPeriodEndExpired(periodEnd)) return 'expired';
-    if (hasRentCollectionPaidAmount(rent)) return 'completed';
-    return 'processing';
+    rentCollectionPaymentMethod?: string | null;
+}): RentCollectionPayListStatus {
+    if (!hasRentCollectionPaidAmount(rent)) return 'unpaid';
+    const m = rent.rentCollectionPaymentMethod;
+    if (m == null || String(m).trim() === '') return 'unpaid';
+    return 'paid';
 }
 
-export type RentPaymentMethodFilterValue = '' | 'none' | 'cheque' | 'fps' | 'cash';
+/** 與 getRentCollectionPayListStatus 相同（舊名保留供少數引用） */
+export function getRentingListStatus(rent: Parameters<typeof getRentCollectionPayListStatus>[0]): RentCollectionPayListStatus {
+    return getRentCollectionPayListStatus(rent);
+}
+
+export type RentPaymentMethodFilterValue = '' | 'none' | 'cheque' | 'fps' | 'cash' | 'bank_in';
 
 export function getRentPaymentMethodKey(rent: {
-    rentCollectionPaymentMethod?: 'cheque' | 'fps' | 'cash' | string | null;
-}): 'none' | 'cheque' | 'fps' | 'cash' {
+    rentCollectionPaymentMethod?: 'cheque' | 'fps' | 'cash' | 'bank_in' | string | null;
+}): 'none' | 'cheque' | 'fps' | 'cash' | 'bank_in' {
     const m = rent.rentCollectionPaymentMethod;
-    if (m === 'cheque' || m === 'fps' || m === 'cash') return m;
+    if (m === 'cheque' || m === 'fps' || m === 'cash' || m === 'bank_in') return m;
     return 'none';
 }
 
@@ -102,3 +117,6 @@ export function getRentOutListStatusKey(rent: {
 }
 
 export type RentOutStatusFilterValue = '' | RentOutListStatusKey;
+
+/** 收租列表「繳付狀態」篩選（與租務狀態欄一致） */
+export type RentOutPayStatusFilterValue = '' | RentCollectionPayListStatus;

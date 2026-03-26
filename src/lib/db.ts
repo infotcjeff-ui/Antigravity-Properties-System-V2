@@ -53,6 +53,9 @@ export interface Proprietor {
   deletedAt?: Date;
 }
 
+/** 收／交租與出租合約按金等下拉共用之付款方式 */
+export type RentCollectionPaymentMethod = 'cheque' | 'fps' | 'cash' | 'bank_in';
+
 export interface Rent {
   id?: string;
   propertyId: string;
@@ -78,14 +81,16 @@ export interface Rent {
   rentOutStartDate?: Date;             // 出租合約開始日期
   rentOutEndDate?: Date;               // 出租合約結束日期
   rentOutActualEndDate?: Date;         // 出租合約實際結束日期
-  rentOutDepositReceived?: number;     // 出租合約按金
+  rentOutDepositReceived?: number;     // 出租合約按金（舊：金額；新表單改以 rentOutDepositPaymentMethod 為主）
+  /** 出租合約按金收取方式（與付款方式選項一致，含 入數） */
+  rentOutDepositPaymentMethod?: RentCollectionPaymentMethod;
   rentOutDepositReceiptNumber?: string; // 按金收據號碼
   rentOutDepositReceiveDate?: Date;    // 出租合約按金收取日期
   rentOutDepositReturnDate?: Date;     // 出租合約按金退回日期
   rentOutDepositReturnAmount?: number; // 出租合約按金退回金額
   rentOutLessor?: string;              // 出租合約出租人
   rentOutAddressDetail?: string;       // 出租合約地址資料
-  rentOutStatus?: 'listing' | 'renting' | 'completed'; // 放盤中、出租中、已完租
+  rentOutStatus?: 'listing' | 'renting' | 'leasing_in' | 'completed'; // 放盤中、出租中、租入中、已完租
   rentOutDescription?: string;         // 出租合約描述 (rich text)
   rentOutSubLandlord?: string;         // 二房東 (legacy display name)
   rentOutSubLandlordId?: string;      // 二房東 (FK to sub_landlords)
@@ -97,11 +102,15 @@ export interface Rent {
   /** 收／交租記錄期間開始（與 startDate 同步寫入簡化表單） */
   rentCollectionDate?: Date;
   rentCollectionAmount?: number;
-  rentCollectionPaymentMethod?: 'cheque' | 'fps' | 'cash';
+  rentCollectionPaymentMethod?: RentCollectionPaymentMethod;
   rentCollectionChequeBank?: string;
   rentCollectionChequeNumber?: string;
   /** 支票影像（base64 data URL） */
   rentCollectionChequeImage?: string;
+  /** 付款日期（入數時填寫） */
+  rentCollectionPaymentDate?: Date;
+  /** 入數憑證／截圖（base64 data URL） */
+  rentCollectionBankInImage?: string;
 
   // ===== RENTING (交租) Fields =====
   rentingNumber?: string;              // 我方租約號碼
@@ -156,7 +165,7 @@ export interface SubLandlord {
   depositReturnAmount?: number;
   lessor?: string;
   addressDetail?: string;
-  status?: 'listing' | 'renting' | 'completed';
+  status?: 'listing' | 'renting' | 'leasing_in' | 'completed';
   description?: string;
   createdBy?: string;
   createdAt: Date;
@@ -184,7 +193,7 @@ export interface CurrentTenant {
   depositReturnAmount?: number;
   lessor?: string;
   addressDetail?: string;
-  status?: 'listing' | 'renting' | 'completed';
+  status?: 'listing' | 'renting' | 'leasing_in' | 'completed';
   description?: string;
   createdBy?: string;
   createdAt: Date;

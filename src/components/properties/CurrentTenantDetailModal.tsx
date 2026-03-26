@@ -16,6 +16,7 @@ interface CurrentTenantDetailModalProps {
 const statusLabels: Record<string, string> = {
     listing: '放盤中',
     renting: '出租中',
+    leasing_in: '租入中',
     completed: '已完租',
 };
 
@@ -269,9 +270,11 @@ export default function CurrentTenantDetailModal({
                                                                 ? 'bg-green-100 dark:bg-green-500/20 text-green-600 dark:text-green-400'
                                                                 : rentStatus === 'listing'
                                                                 ? 'bg-amber-100 dark:bg-amber-500/20 text-amber-600 dark:text-amber-400'
+                                                                : rentStatus === 'leasing_in'
+                                                                ? 'bg-cyan-100 dark:bg-cyan-500/20 text-cyan-600 dark:text-cyan-400'
                                                                 : 'bg-zinc-100 dark:bg-white/10 text-zinc-500 dark:text-white/50'
                                                         }`}>
-                                                            {rentStatus === 'renting' ? '出租中' : rentStatus === 'listing' ? '放盤中' : rentStatusLabel}
+                                                            {rentStatus === 'renting' ? '出租中' : rentStatus === 'listing' ? '放盤中' : rentStatus === 'leasing_in' ? '租入中' : rentStatusLabel}
                                                         </span>
                                                     </div>
                                                     <div className="flex items-center gap-1.5 mt-1.5">

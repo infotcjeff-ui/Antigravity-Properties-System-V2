@@ -5,14 +5,15 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useRentsQuery, usePropertiesQuery, useProprietorsQuery } from '@/hooks/useStorage';
 import type { Rent } from '@/lib/db';
 import {
+    formatDateDMY,
     formatDateRangeDMY,
-    getRentOutListStatusKey,
+    getRentCollectionPayListStatus,
     hasRentCollectionPaidAmount,
     isPeriodEndExpired,
     labelRentCollectionPaymentMethod,
     matchesRentPaymentMethodFilter,
     type RentPaymentMethodFilterValue,
-    type RentOutStatusFilterValue,
+    type RentOutPayStatusFilterValue,
 } from '@/lib/rentPaymentDisplay';
 import { BentoCard } from '@/components/layout/BentoGrid';
 import RentModal from '@/components/properties/RentModal';
@@ -43,15 +44,15 @@ export default function RentOutPage() {
     const [editingContract, setEditingContract] = useState<Rent | null>(null);
     const [editingRentOut, setEditingRentOut] = useState<Rent | null>(null);
     const [filterPaymentMethod, setFilterPaymentMethod] = useState<RentPaymentMethodFilterValue>('');
-    const [filterRentOutStatus, setFilterRentOutStatus] = useState<RentOutStatusFilterValue>('');
+    const [filterRentOutPayStatus, setFilterRentOutPayStatus] = useState<RentOutPayStatusFilterValue>('');
 
     const filteredRents = useMemo(() => {
         return rents.filter(r => {
             if (!matchesRentPaymentMethodFilter(r, filterPaymentMethod)) return false;
-            if (filterRentOutStatus && getRentOutListStatusKey(r) !== filterRentOutStatus) return false;
+            if (filterRentOutPayStatus && getRentCollectionPayListStatus(r) !== filterRentOutPayStatus) return false;
             return true;
         });
-    }, [rents, filterPaymentMethod, filterRentOutStatus]);
+    }, [rents, filterPaymentMethod, filterRentOutPayStatus]);
 
     const totalIncome = rents
         .filter(r => r.status === 'active' || r.status === 'completed' || r.rentOutStatus === 'renting')
@@ -214,20 +215,19 @@ export default function RentOutPage() {
                                     <option value="cheque">支票</option>
                                     <option value="fps">FPS轉帳</option>
                                     <option value="cash">現金</option>
+                                    <option value="bank_in">入數</option>
                                 </select>
                             </div>
                             <div className="flex-1 min-w-[160px]">
-                                <label className="text-xs font-medium text-zinc-500 dark:text-white/50">狀態</label>
+                                <label className="text-xs font-medium text-zinc-500 dark:text-white/50">繳付狀態</label>
                                 <select
-                                    value={filterRentOutStatus}
-                                    onChange={e => setFilterRentOutStatus(e.target.value as RentOutStatusFilterValue)}
+                                    value={filterRentOutPayStatus}
+                                    onChange={e => setFilterRentOutPayStatus(e.target.value as RentOutPayStatusFilterValue)}
                                     className={filterSelectClass}
                                 >
                                     <option value="">全部</option>
-                                    <option value="expired">已過期</option>
-                                    <option value="renting">出租中</option>
-                                    <option value="listing">放租中</option>
-                                    <option value="other">其他</option>
+                                    <option value="paid">已繳付</option>
+                                    <option value="unpaid">未繳付</option>
                                 </select>
                             </div>
                         </div>
@@ -245,6 +245,7 @@ export default function RentOutPage() {
                                 <th className="p-4 font-medium">繳付金額</th>
                                 <th className="p-4 font-medium">收租期間</th>
                                 <th className="p-4 font-medium">付款方式</th>
+                                <th className="p-4 font-medium">付款日期</th>
                                 <th className="p-4 font-medium">操作</th>
                             </tr>
                         </thead>
@@ -287,6 +288,12 @@ export default function RentOutPage() {
                                             {formatDateRangeDMY(payStart, payEnd)}
                                         </td>
                                         <td className="p-4 text-zinc-600 dark:text-white/70 text-sm">{payLabel}</td>
+                                        <td className="p-4 text-zinc-500 dark:text-white/50 text-sm">
+                                            {rent.rentCollectionPaymentDate
+                                                ? formatDateDMY(rent.rentCollectionPaymentDate)
+                                                : <span className="text-zinc-300 dark:text-white/30">—</span>
+                                            }
+                                        </td>
                                         <td className="p-4">
                                             <div className="flex items-center gap-2">
                                                 <button

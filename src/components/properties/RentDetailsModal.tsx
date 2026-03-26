@@ -4,6 +4,7 @@ import { motion } from 'framer-motion';
 import { X, Building2, User } from 'lucide-react';
 import type { Rent, Property, Proprietor } from '@/lib/db';
 import { formatLotArea } from '@/lib/formatters';
+import { labelRentCollectionPaymentMethod } from '@/lib/rentPaymentDisplay';
 import { useLanguage } from '@/components/common/LanguageSwitcher';
 import DOMPurify from 'dompurify';
 import { Tooltip } from '@heroui/react';
@@ -59,7 +60,11 @@ export default function RentDetailsModal({ rent, property, onClose }: RentDetail
 
     const isRentOutLike = rent.type === 'rent_out' || rent.type === 'contract';
 
-    let statusValueRentOut: React.ReactNode = rent.rentOutStatus === 'listing' ? '放盤中' : rent.rentOutStatus === 'renting' ? '出租中' : rent.rentOutStatus === 'completed' ? '已完租' : rent.rentOutStatus;
+    let statusValueRentOut: React.ReactNode =
+        rent.rentOutStatus === 'listing' ? '放盤中' :
+        rent.rentOutStatus === 'renting' ? '出租中' :
+        rent.rentOutStatus === 'leasing_in' ? '租入中' :
+        rent.rentOutStatus === 'completed' ? '已完租' : rent.rentOutStatus;
     if (isExpired) {
         statusValueRentOut = <span className="text-red-500 font-bold whitespace-nowrap">已過期</span>;
     }
@@ -118,13 +123,17 @@ export default function RentDetailsModal({ rent, property, onClose }: RentDetail
                             <DetailRow label={t('Total Amount', '總額')} value={formatCurrency(rent.rentOutTotalAmount)} />
                             <DetailRow label={t('Start Date', '開始日期')} value={formatDate(rent.rentOutStartDate)} />
                             <DetailRow label={t('End Date', '結束日期')} value={formatDate(rent.rentOutEndDate)} />
-                            <DetailRow label={t('Actual End Date', '實際結束日期')} value={formatDate(rent.rentOutActualEndDate)} />
-                            <DetailRow label={t('Deposit Received', '按金')} value={formatCurrency(rent.rentOutDepositReceived)} />
+                            <DetailRow
+                                label={t('Deposit Received', '按金')}
+                                value={
+                                    (rent as any).rentOutDepositPaymentMethod
+                                        ? labelRentCollectionPaymentMethod((rent as any).rentOutDepositPaymentMethod)
+                                        : formatCurrency(rent.rentOutDepositReceived)
+                                }
+                            />
                             <DetailRow label={t('Deposit Receive Date', '按金收取日期')} value={formatDate(rent.rentOutDepositReceiveDate)} />
                             <DetailRow label={t('Deposit Return Date', '按金退回日期')} value={formatDate(rent.rentOutDepositReturnDate)} />
                             <DetailRow label={t('Deposit Return Amount', '按金退回金額')} value={formatCurrency(rent.rentOutDepositReturnAmount)} />
-                            <DetailRow label={t('Lessor', '出租人')} value={rent.rentOutLessor} />
-                            <DetailRow label={t('Address Detail', '地址資料')} value={rent.rentOutAddressDetail} />
                             <DetailRow label={t('Status', '狀態')} value={statusValueRentOut} />
 
                             {property && (

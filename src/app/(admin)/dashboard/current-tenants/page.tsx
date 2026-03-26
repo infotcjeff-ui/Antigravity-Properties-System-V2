@@ -8,6 +8,7 @@ import { Users, Plus, Pencil, Trash2 } from 'lucide-react';
 import type { CurrentTenant } from '@/lib/db';
 import { BentoCard } from '@/components/layout/BentoGrid';
 import RentOutFormModal from '@/components/properties/RentOutFormModal';
+import CurrentTenantDetailModal from '@/components/properties/CurrentTenantDetailModal';
 
 export default function CurrentTenantsPage() {
     const queryClient = useQueryClient();
@@ -15,6 +16,7 @@ export default function CurrentTenantsPage() {
     const { deleteCurrentTenant } = useCurrentTenants();
     const [showModal, setShowModal] = useState(false);
     const [editItem, setEditItem] = useState<CurrentTenant | null>(null);
+    const [detailItem, setDetailItem] = useState<CurrentTenant | null>(null);
     const [searchQuery, setSearchQuery] = useState('');
 
     const filtered = useMemo(() => {
@@ -42,8 +44,14 @@ export default function CurrentTenantsPage() {
     };
 
     const handleOpenEdit = (item: CurrentTenant) => {
+        setDetailItem(null);
         setEditItem(item);
         setShowModal(true);
+    };
+
+    const handleOpenDetail = (item: CurrentTenant) => {
+        setEditItem(null);
+        setDetailItem(item);
     };
 
     if (isLoading) {
@@ -106,7 +114,8 @@ export default function CurrentTenantsPage() {
                             initial={{ opacity: 0, y: 20 }}
                             animate={{ opacity: 1, y: 0 }}
                             transition={{ delay: i * 0.05 }}
-                            className="mobile-card md:glass-card p-4 group"
+                            onClick={() => handleOpenDetail(item)}
+                            className="mobile-card md:glass-card p-4 group cursor-pointer"
                         >
                             <div className="flex items-start justify-between">
                                 <div>
@@ -116,7 +125,7 @@ export default function CurrentTenantsPage() {
                                         <p className="text-xs text-purple-500 dark:text-purple-400 mt-1">月租: {item.monthlyRental.toLocaleString()}</p>
                                     )}
                                 </div>
-                                <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity" onClick={e => e.stopPropagation()}>
                                     <button onClick={() => handleOpenEdit(item)} className="p-2 rounded-lg hover:bg-purple-500/20 text-purple-600 dark:text-purple-400">
                                         <Pencil className="w-4 h-4" />
                                     </button>
@@ -137,6 +146,20 @@ export default function CurrentTenantsPage() {
                         editItem={editItem}
                         onClose={() => { setShowModal(false); setEditItem(null); }}
                         onSuccess={handleSuccess}
+                    />
+                )}
+            </AnimatePresence>
+
+            <AnimatePresence>
+                {detailItem && (
+                    <CurrentTenantDetailModal
+                        currentTenant={detailItem}
+                        onClose={() => setDetailItem(null)}
+                        onEdit={() => {
+                            setEditItem(detailItem);
+                            setDetailItem(null);
+                            setShowModal(true);
+                        }}
                     />
                 )}
             </AnimatePresence>
