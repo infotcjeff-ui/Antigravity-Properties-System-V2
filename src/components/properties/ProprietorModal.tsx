@@ -1,7 +1,9 @@
 import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { Building2, Users, X } from 'lucide-react';
 import { useProprietors } from '@/hooks/useStorage';
 import { type Proprietor } from '@/lib/db';
+import { normalizeDuplicateName } from '@/lib/formatters';
 import AnimatedSelect from '@/components/ui/AnimatedSelect';
 
 interface ProprietorModalProps {
@@ -81,13 +83,49 @@ export default function ProprietorModal({ onClose, onSuccess, mode = 'proprietor
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
         const { name, value } = e.target;
+        if (name === 'name') setError('');
         setFormData(prev => ({ ...prev, [name]: value }));
     };
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        setSaving(true);
         setError('');
+
+        const nameNorm = normalizeDuplicateName(formData.name || '');
+        if (!nameNorm) {
+            setError('請輸入名稱');
+            return;
+        }
+
+        try {
+            const all = await getProprietors();
+            const inOwnerPool = (p: Proprietor) => !p.code?.startsWith('T');
+            const inTenantPool = (p: Proprietor) => p.code?.startsWith('T');
+            const pool = mode === 'tenant' ? all.filter(inTenantPool) : all.filter(inOwnerPool);
+
+            if (initialData?.id) {
+                const dup = pool.some(
+                    p =>
+                        p.id !== initialData.id &&
+                        normalizeDuplicateName(p.name || '') === nameNorm
+                );
+                if (dup) {
+                    setError('已有相同名稱，請使用其他名稱');
+                    return;
+                }
+            } else {
+                const dup = pool.some(p => normalizeDuplicateName(p.name || '') === nameNorm);
+                if (dup) {
+                    setError('已有相同名稱，請使用其他名稱');
+                    return;
+                }
+            }
+        } catch {
+            setError('無法驗證名稱，請稍後再試');
+            return;
+        }
+
+        setSaving(true);
 
         try {
             if (initialData?.id) {
@@ -129,6 +167,16 @@ export default function ProprietorModal({ onClose, onSuccess, mode = 'proprietor
         }
     };
 
+    const categoryLabel =
+        formData.category === 'external_customer' ? '街外客' :
+        formData.category === 'group_company' ? (mode === 'proprietor' ? '集團旗下公司' : '集團公司') :
+        formData.category === 'joint_venture' ? '合資公司' :
+        formData.category === 'managed_individual' ? '代管理的個體' :
+        formData.category === 'external_landlord' ? '出租的業主' : '—';
+
+    /** 與現時租客詳情同 shell：承租人／業主檢視模式 */
+    const isDetailLayoutMode = Boolean(initialData && !isEditing);
+
     return (
         <>
             {/* Backdrop */}
@@ -137,7 +185,11 @@ export default function ProprietorModal({ onClose, onSuccess, mode = 'proprietor
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
                 onClick={onClose}
-                className="fixed top-0 left-0 w-screen h-screen bg-black/60 backdrop-blur-sm z-[60]"
+                className={
+                    isDetailLayoutMode
+                        ? 'fixed inset-0 min-h-screen bg-black/60 backdrop-blur-sm z-70'
+                        : 'fixed top-0 left-0 w-screen h-screen min-h-screen bg-black/60 backdrop-blur-sm z-60'
+                }
             />
 
             {/* Modal */}
@@ -145,80 +197,144 @@ export default function ProprietorModal({ onClose, onSuccess, mode = 'proprietor
                 initial={{ opacity: 0, scale: 0.95, y: 20 }}
                 animate={{ opacity: 1, scale: 1, y: 0 }}
                 exit={{ opacity: 0, scale: 0.95, y: 20 }}
-                className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-2xl bg-white dark:bg-[#1a1a2e] rounded-2xl shadow-2xl z-[60] overflow-hidden"
+                className={
+                    isDetailLayoutMode
+                        ? 'fixed inset-0 m-auto h-fit max-h-[90vh] overflow-y-auto w-full max-w-3xl flex flex-col bg-white dark:bg-[#1a1a2e] rounded-2xl border border-zinc-200 dark:border-white/10 shadow-2xl z-70'
+                        : 'fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-2xl max-h-[90vh] overflow-y-auto bg-white dark:bg-[#1a1a2e] rounded-2xl shadow-2xl z-60'
+                }
+                onClick={isDetailLayoutMode ? (e) => e.stopPropagation() : undefined}
             >
                 {/* Header */}
-                <div className="flex items-center justify-between p-5 border-b border-zinc-100 dark:border-white/5">
-                    <div className="flex items-center gap-3">
-                        <h2 className="text-lg font-bold text-zinc-900 dark:text-white">
-                            {initialData
-                                ? (isEditing ? '編輯資料' : '詳細資料')
-                                : (mode === 'tenant' ? '新增承租人' : '新增業主')
-                            }
-                        </h2>
-                    </div>
-                    <button
-                        onClick={onClose}
-                        className="p-2 rounded-lg text-zinc-400 dark:text-white/40 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-white/10 transition-all"
-                    >
-                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                        </svg>
-                    </button>
+                <div className={`flex items-center justify-between p-5 border-b border-zinc-100 dark:border-white/5 ${isDetailLayoutMode ? 'shrink-0' : ''}`}>
+                    {isDetailLayoutMode ? (
+                        <>
+                            <div className="flex items-center gap-3 min-w-0">
+                                <div className="w-10 h-10 rounded-xl bg-blue-100 dark:bg-blue-500/20 flex items-center justify-center text-blue-600 dark:text-blue-400 shrink-0">
+                                    {mode === 'tenant' ? (
+                                        <Users className="w-5 h-5" />
+                                    ) : (
+                                        <Building2 className="w-5 h-5" />
+                                    )}
+                                </div>
+                                <div className="min-w-0">
+                                    <h2 className="text-lg font-bold text-zinc-900 dark:text-white">
+                                        {mode === 'tenant' ? '承租人詳細資料' : '業主詳細資料'}
+                                    </h2>
+                                    <p className="text-sm text-zinc-500 dark:text-white/50 truncate">{formData.name}</p>
+                                </div>
+                            </div>
+                            <div className="flex items-center gap-2 shrink-0">
+                                <button
+                                    type="button"
+                                    onClick={() => setIsEditing(true)}
+                                    className="px-4 py-2 bg-purple-500 text-white rounded-xl hover:bg-purple-600 text-sm font-medium transition-all"
+                                >
+                                    編輯
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={onClose}
+                                    className="p-2 rounded-lg text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-white/10 transition-all"
+                                >
+                                    <X className="w-5 h-5" />
+                                </button>
+                            </div>
+                        </>
+                    ) : (
+                        <>
+                            <div className="flex items-center gap-3">
+                                <h2 className="text-lg font-bold text-zinc-900 dark:text-white">
+                                    {initialData
+                                        ? (isEditing ? '編輯資料' : '詳細資料')
+                                        : (mode === 'tenant' ? '新增承租人' : '新增業主')
+                                    }
+                                </h2>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={onClose}
+                                className="p-2 rounded-lg text-zinc-400 dark:text-white/40 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-white/10 transition-all"
+                            >
+                                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                            </button>
+                        </>
+                    )}
                 </div>
 
                 {/* Form */}
-                <form onSubmit={handleSubmit} className="p-5 space-y-4 overflow-visible">
-                    {/* View Mode (Non-Editing) */}
+                <form onSubmit={handleSubmit} className={isDetailLayoutMode ? 'flex flex-col flex-1 min-h-0' : 'p-5 space-y-4 overflow-visible'}>
+                    {/* View Mode：承租人／業主與現時租客詳情同風格 */}
                     {initialData && !isEditing ? (
-                        <div className="space-y-6 py-2">
-                            <div className="grid grid-cols-2 gap-6">
-                                <div className="space-y-1">
-                                    <p className="text-xs text-zinc-400 dark:text-white/40 uppercase font-semibold">基本資料</p>
-                                    <p className="text-lg font-bold text-zinc-900 dark:text-white">{formData.name}</p>
-                                    <p className="text-zinc-500 dark:text-white/50 text-sm">{formData.code}</p>
-                                </div>
-                                <div className="space-y-1 text-right">
-                                    <p className="text-xs text-zinc-400 dark:text-white/40 uppercase font-semibold">公司名稱</p>
-                                    <p className="text-zinc-900 dark:text-white font-medium">{formData.englishName || '-'}</p>
-                                </div>
-                            </div>
+                            <>
+                                <div className="flex-1 overflow-y-auto p-5 space-y-6">
+                                    <section>
+                                        <h3 className="text-sm font-semibold text-purple-600 dark:text-purple-400 mb-3">基本資料</h3>
+                                        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                                            <div className="p-3 bg-zinc-50 dark:bg-white/5 rounded-xl border border-zinc-100 dark:border-white/5">
+                                                <p className="text-xs text-zinc-500 dark:text-white/50 mb-1">名稱</p>
+                                                <p className="text-sm font-bold text-zinc-900 dark:text-white wrap-break-word">{formData.name}</p>
+                                            </div>
+                                            <div className="p-3 bg-zinc-50 dark:bg-white/5 rounded-xl border border-zinc-100 dark:border-white/5">
+                                                <p className="text-xs text-zinc-500 dark:text-white/50 mb-1">
+                                                    {mode === 'tenant' ? '承租人編號' : '業主代碼'}
+                                                </p>
+                                                <p className="text-sm font-mono font-medium text-zinc-900 dark:text-white">{formData.code || '—'}</p>
+                                            </div>
+                                            <div className="p-3 bg-zinc-50 dark:bg-white/5 rounded-xl border border-zinc-100 dark:border-white/5">
+                                                <p className="text-xs text-zinc-500 dark:text-white/50 mb-1">狀態</p>
+                                                <p className="text-sm font-medium text-zinc-900 dark:text-white">活躍中</p>
+                                            </div>
+                                            <div className="p-3 bg-zinc-50 dark:bg-white/5 rounded-xl border border-zinc-100 dark:border-white/5 md:col-span-2">
+                                                <p className="text-xs text-zinc-500 dark:text-white/50 mb-1">公司／英文名稱</p>
+                                                <p className="text-sm font-medium text-zinc-900 dark:text-white wrap-break-word">{formData.englishName || '—'}</p>
+                                            </div>
+                                            <div className="p-3 bg-zinc-50 dark:bg-white/5 rounded-xl border border-zinc-100 dark:border-white/5">
+                                                <p className="text-xs text-zinc-500 dark:text-white/50 mb-1">簡稱</p>
+                                                <p className="text-sm font-medium text-zinc-900 dark:text-white wrap-break-word">{formData.shortName || '—'}</p>
+                                            </div>
+                                        </div>
+                                    </section>
 
-                            <div className="grid grid-cols-3 gap-4">
-                                <div className="p-4 bg-zinc-50 dark:bg-white/5 rounded-2xl border border-zinc-100 dark:border-white/5">
-                                    <p className="text-xs text-zinc-400 dark:text-white/40 uppercase mb-1">性質</p>
-                                    <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-blue-500/10 text-blue-500 border border-blue-500/20">
-                                        {formData.type === 'company' ? '公司' : '個人'}
-                                    </span>
-                                </div>
-                                <div className="p-4 bg-zinc-50 dark:bg-white/5 rounded-2xl border border-zinc-100 dark:border-white/5">
-                                    <p className="text-xs text-zinc-400 dark:text-white/40 uppercase mb-1">類別</p>
-                                    <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-500 border border-emerald-500/20">
-                                        {formData.category === 'external_customer' ? '街外客' : formData.category === 'group_company' ? '集團公司' : formData.category === 'joint_venture' ? '合資公司' : formData.category === 'managed_individual' ? '代管理的個體' : formData.category === 'external_landlord' ? '出租的業主' : '街外客'}
-                                    </span>
-                                </div>
-                                <div className="p-4 bg-zinc-50 dark:bg-white/5 rounded-2xl border border-zinc-100 dark:border-white/5">
-                                    <p className="text-xs text-zinc-400 dark:text-white/40 uppercase mb-1">狀態</p>
-                                    <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-purple-500/10 text-purple-500 border border-purple-500/20">
-                                        活躍中
-                                    </span>
-                                </div>
-                            </div>
+                                    <section>
+                                        <h3 className="text-sm font-semibold text-purple-600 dark:text-purple-400 mb-3">分類</h3>
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                            <div className="p-3 bg-zinc-50 dark:bg-white/5 rounded-xl border border-zinc-100 dark:border-white/5">
+                                                <p className="text-xs text-zinc-500 dark:text-white/50 mb-2">性質</p>
+                                                <span className="inline-flex px-2.5 py-1 rounded-full text-xs font-semibold bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20">
+                                                    {formData.type === 'company' ? '公司' : '個人'}
+                                                </span>
+                                            </div>
+                                            <div className="p-3 bg-zinc-50 dark:bg-white/5 rounded-xl border border-zinc-100 dark:border-white/5">
+                                                <p className="text-xs text-zinc-500 dark:text-white/50 mb-2">類別</p>
+                                                <span className="inline-flex px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                                                    {categoryLabel}
+                                                </span>
+                                            </div>
+                                        </div>
+                                    </section>
 
-                            {formData.description && (
-                                <div className="p-4 bg-purple-500/5 rounded-2xl border border-purple-500/10">
-                                    <p className="text-xs text-purple-500 uppercase font-semibold mb-2 flex items-center gap-2">
-                                        <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                        </svg>
-                                        BR Number
-                                    </p>
-                                    <p className="text-zinc-700 dark:text-white/80 text-sm leading-relaxed">
-                                        {formData.description}
-                                    </p>
+                                    {formData.description ? (
+                                        <section>
+                                            <h3 className="text-sm font-semibold text-purple-600 dark:text-purple-400 mb-3">BR Number</h3>
+                                            <div className="p-3 bg-zinc-50 dark:bg-white/5 rounded-xl border border-zinc-100 dark:border-white/5">
+                                                <p className="text-sm text-zinc-700 dark:text-white/80 whitespace-pre-wrap wrap-break-word">{formData.description}</p>
+                                            </div>
+                                        </section>
+                                    ) : null}
                                 </div>
-                            )}
-                        </div>
+
+                                <div className="p-5 border-t border-zinc-100 dark:border-white/5 shrink-0 flex justify-end">
+                                    <button
+                                        type="button"
+                                        onClick={onClose}
+                                        className="px-5 py-2 bg-zinc-100 dark:bg-white/10 text-zinc-700 dark:text-white rounded-xl hover:bg-zinc-200 dark:hover:bg-white/20 text-sm font-medium transition-all"
+                                    >
+                                        關閉
+                                    </button>
+                                </div>
+                            </>
                     ) : (
                         <>
                             {/* Row 1: 個人名稱 * | 公司名稱 */}
@@ -365,7 +481,8 @@ export default function ProprietorModal({ onClose, onSuccess, mode = 'proprietor
                         </>
                     )}
 
-                    {/* Actions */}
+                    {/* Actions（詳情版面已含底部關閉，不重複顯示） */}
+                    {!isDetailLayoutMode && (
                     <div className="flex items-center justify-end gap-3 pt-4 border-t border-zinc-100 dark:border-white/5">
                         <button
                             type="button"
@@ -413,6 +530,7 @@ export default function ProprietorModal({ onClose, onSuccess, mode = 'proprietor
                             </motion.button>
                         )}
                     </div>
+                    )}
                 </form>
             </motion.div>
         </>
