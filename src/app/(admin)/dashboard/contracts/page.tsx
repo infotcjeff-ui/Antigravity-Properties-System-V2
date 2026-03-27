@@ -20,8 +20,8 @@ export default function ContractsPage() {
     const [selectedContract, setSelectedContract] = useState<Rent | null>(null);
     const [showPropertyModal, setShowPropertyModal] = useState(false);
     const [propertyDetailTarget, setPropertyDetailTarget] = useState<{ id?: string; name: string } | null>(null);
-    /** 出租合約 vs 租賃合約（租入中）分頁 */
-    const [contractListTab, setContractListTab] = useState<'lease_out' | 'lease_in'>('lease_out');
+    /** 租賃合約（租入中）優先，其次出租合約 */
+    const [contractListTab, setContractListTab] = useState<'lease_out' | 'lease_in'>('lease_in');
     /** 刪除前確認（頁內對話框，避免僅依賴瀏覽器 confirm） */
     const [deleteConfirm, setDeleteConfirm] = useState<{
         id: string;
@@ -66,8 +66,12 @@ export default function ContractsPage() {
         completed: 'bg-blue-500/20 text-blue-400',
         cancelled: 'bg-red-500/20 text-red-400',
         listing: 'bg-purple-500/20 text-purple-400',
-        renting: 'bg-green-500/20 text-green-400',
-        leasing_in: 'bg-cyan-500/20 text-cyan-400',
+        /** 出租中：深字 + 較實底色 + 邊框，提升可讀性 */
+        renting:
+            'bg-emerald-100 text-emerald-900 border border-emerald-400/70 dark:bg-emerald-950/55 dark:text-emerald-100 dark:border-emerald-500/55',
+        /** 租入中：與出租中區隔且同樣提高對比 */
+        leasing_in:
+            'bg-violet-100 text-violet-900 border border-violet-400/70 dark:bg-violet-950/55 dark:text-violet-100 dark:border-violet-500/55',
     };
 
     const openDeleteConfirm = (e: React.MouseEvent, contract: any) => {
@@ -166,13 +170,11 @@ export default function ContractsPage() {
                 <BentoCard>
                     <div className="flex items-center justify-between">
                         <div>
-                            <p className="text-zinc-500 dark:text-white/50 text-sm">放盤中</p>
-                            <p className="text-2xl font-bold text-zinc-900 dark:text-white mt-1">
-                                {contracts.filter((c: any) => (c.rentOutStatus || c.status) === 'listing').length}
-                            </p>
+                            <p className="text-zinc-500 dark:text-white/50 text-sm">租賃中</p>
+                            <p className="text-2xl font-bold text-zinc-900 dark:text-white mt-1">{leaseInContracts.length}</p>
                         </div>
-                        <div className="p-3 rounded-xl bg-purple-50 dark:bg-purple-500/20">
-                            <FileText className="w-6 h-6 text-purple-600 dark:text-purple-400" />
+                        <div className="p-3 rounded-xl bg-violet-50 dark:bg-violet-500/20">
+                            <FileText className="w-6 h-6 text-violet-600 dark:text-violet-400" />
                         </div>
                     </div>
                 </BentoCard>
@@ -181,27 +183,41 @@ export default function ContractsPage() {
             <div
                 className={`glass-card overflow-hidden transition-colors ${
                     isLeaseInTab
-                        ? 'border-cyan-200 dark:border-cyan-500/35'
+                        ? 'border-violet-200 dark:border-violet-500/35'
                         : 'border-amber-200 dark:border-amber-500/30'
                 }`}
             >
                 <div
                     className={`p-4 border-b flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between transition-colors ${
                         isLeaseInTab
-                            ? 'border-cyan-200 dark:border-cyan-500/25 bg-cyan-50/60 dark:bg-cyan-500/10'
+                            ? 'border-violet-200 dark:border-violet-500/25 bg-violet-50/60 dark:bg-violet-500/10'
                             : 'border-amber-200 dark:border-amber-500/30 bg-amber-50/50 dark:bg-amber-500/10'
                     }`}
                 >
                     <h2
                         className={`text-lg font-semibold shrink-0 ${
                             isLeaseInTab
-                                ? 'text-cyan-900 dark:text-cyan-100'
+                                ? 'text-violet-900 dark:text-violet-100'
                                 : 'text-amber-900 dark:text-amber-100'
                         }`}
                     >
                         {contractListTab === 'lease_out' ? '出租合約記錄列表' : '租賃合約記錄列表'}
+                        <span className="ml-2 text-base font-bold tabular-nums opacity-90">
+                            (總合約({activeContracts.length}))
+                        </span>
                     </h2>
                     <div className="flex gap-0.5 sm:gap-1 p-1 sm:p-1.5 rounded-xl sm:rounded-2xl bg-zinc-100/90 dark:bg-white/10 ring-1 ring-zinc-200/80 dark:ring-white/10 w-full sm:w-auto justify-stretch sm:justify-end">
+                        <button
+                            type="button"
+                            onClick={() => setContractListTab('lease_in')}
+                            className={`flex-1 sm:flex-none px-3 sm:px-4 py-2 rounded-lg sm:rounded-xl text-xs sm:text-sm font-semibold transition-all ${
+                                contractListTab === 'lease_in'
+                                    ? 'bg-white dark:bg-violet-950/50 text-violet-900 dark:text-violet-100 shadow-md ring-2 ring-violet-400/50'
+                                    : 'bg-violet-50/70 dark:bg-violet-500/12 text-violet-800/85 dark:text-violet-200/80 ring-1 ring-violet-300/40 dark:ring-violet-500/25 hover:bg-violet-100/90 dark:hover:bg-violet-500/20'
+                            }`}
+                        >
+                            租賃合約
+                        </button>
                         <button
                             type="button"
                             onClick={() => setContractListTab('lease_out')}
@@ -212,17 +228,6 @@ export default function ContractsPage() {
                             }`}
                         >
                             出租合約
-                        </button>
-                        <button
-                            type="button"
-                            onClick={() => setContractListTab('lease_in')}
-                            className={`flex-1 sm:flex-none px-3 sm:px-4 py-2 rounded-lg sm:rounded-xl text-xs sm:text-sm font-semibold transition-all ${
-                                contractListTab === 'lease_in'
-                                    ? 'bg-white dark:bg-cyan-950/40 text-cyan-800 dark:text-cyan-200 shadow-md ring-1 ring-cyan-400/40'
-                                    : 'text-zinc-500 dark:text-white/50 hover:text-cyan-700 dark:hover:text-cyan-300/90'
-                            }`}
-                        >
-                            租賃合約
                         </button>
                     </div>
                 </div>
@@ -236,11 +241,11 @@ export default function ContractsPage() {
                     <div
                         className={`flex flex-col items-center justify-center py-20 ${
                             isLeaseInTab
-                                ? 'text-cyan-600/70 dark:text-cyan-300/50'
+                                ? 'text-violet-600/70 dark:text-violet-300/50'
                                 : 'text-amber-700/60 dark:text-amber-300/45'
                         }`}
                     >
-                        <FileText className={`w-16 h-16 mb-4 ${isLeaseInTab ? 'opacity-50 text-cyan-500' : 'opacity-40 text-amber-500'}`} />
+                        <FileText className={`w-16 h-16 mb-4 ${isLeaseInTab ? 'opacity-50 text-violet-500' : 'opacity-40 text-amber-500'}`} />
                         <p className="text-lg text-zinc-600 dark:text-white/55">
                             {contractListTab === 'lease_out' ? '暫無出租合約記錄' : '暫無租賃合約記錄'}
                         </p>
@@ -254,7 +259,7 @@ export default function ContractsPage() {
                                     <tr
                                         className={`text-left text-zinc-500 dark:text-white/50 text-sm border-b ${
                                             isLeaseInTab
-                                                ? 'border-cyan-200 dark:border-cyan-500/25'
+                                                ? 'border-violet-200 dark:border-violet-500/25'
                                                 : 'border-amber-200 dark:border-amber-500/20'
                                         }`}
                                     >
@@ -298,7 +303,7 @@ export default function ContractsPage() {
                                                 }}
                                                 className={`border-b transition-colors cursor-pointer ${
                                                     isLeaseInTab
-                                                        ? 'border-cyan-200/50 dark:border-cyan-500/15 hover:bg-cyan-50/50 dark:hover:bg-cyan-500/8'
+                                                        ? 'border-violet-200/50 dark:border-violet-500/15 hover:bg-violet-50/50 dark:hover:bg-violet-500/8'
                                                         : 'border-amber-200/50 dark:border-amber-500/10 hover:bg-amber-50/50 dark:hover:bg-amber-500/5'
                                                 }`}
                                             >
@@ -309,7 +314,7 @@ export default function ContractsPage() {
                                                     <span
                                                         className={`font-medium ${
                                                             isLeaseInTab
-                                                                ? 'text-cyan-700 dark:text-cyan-300'
+                                                                ? 'text-violet-700 dark:text-violet-300'
                                                                 : 'text-amber-600 dark:text-amber-400'
                                                         }`}
                                                     >
@@ -326,7 +331,7 @@ export default function ContractsPage() {
                                                     <span
                                                         className={`font-medium ${
                                                             isLeaseInTab
-                                                                ? 'text-cyan-700 dark:text-cyan-300'
+                                                                ? 'text-violet-700 dark:text-violet-300'
                                                                 : 'text-amber-600 dark:text-amber-400'
                                                         }`}
                                                     >
@@ -410,7 +415,7 @@ export default function ContractsPage() {
                                         }}
                                         className={`mobile-card p-4 space-y-3 border ${
                                             isLeaseInTab
-                                                ? 'border-cyan-200/60 dark:border-cyan-500/25'
+                                                ? 'border-violet-200/60 dark:border-violet-500/25'
                                                 : 'border-amber-200/50 dark:border-amber-500/20'
                                         }`}
                                     >
@@ -420,7 +425,7 @@ export default function ContractsPage() {
                                                 <p
                                                     className={`text-xs mt-0.5 ${
                                                         isLeaseInTab
-                                                            ? 'text-cyan-700 dark:text-cyan-300'
+                                                            ? 'text-violet-700 dark:text-violet-300'
                                                             : 'text-amber-600 dark:text-amber-400'
                                                     }`}
                                                 >
@@ -442,7 +447,7 @@ export default function ContractsPage() {
                                         <p
                                             className={`text-sm font-medium ${
                                                 isLeaseInTab
-                                                    ? 'text-cyan-700 dark:text-cyan-300'
+                                                    ? 'text-violet-700 dark:text-violet-300'
                                                     : 'text-amber-600 dark:text-amber-400'
                                             }`}
                                         >

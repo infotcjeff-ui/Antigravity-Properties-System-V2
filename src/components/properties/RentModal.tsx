@@ -150,7 +150,8 @@ export default function RentModal({
                 rentCollectionChequeImage: (rent as any).rentCollectionChequeImage || '',
                 rentCollectionBankInImage: (rent as any).rentCollectionBankInImage || '',
                 rentCollectionNotes: rent.notes || '',
-                rentCollectionPaymentDate: (rent as any).rentCollectionPaymentDate || '',
+                // 與 rentCollectionDate 一致：必須為 yyyy-mm-dd，否則 type="date" 受控值無效，變更無法寫入 state
+                rentCollectionPaymentDate: formatDate((rent as any).rentCollectionPaymentDate),
             };
         }
 
@@ -483,6 +484,15 @@ export default function RentModal({
                 type: formData.type,
             };
 
+            /** 交租／收租「付款日期」：一律傳 Date 或 null（勿傳 undefined），update 才會寫入或清空欄位 */
+            const parseRentCollectionPaymentDate = (): Date | null => {
+                const raw = String(formData.rentCollectionPaymentDate || '').trim();
+                if (!raw) return null;
+                const d = new Date(raw);
+                return Number.isNaN(d.getTime()) ? null : d;
+            };
+            const rentCollectionPaymentDateForSave = parseRentCollectionPaymentDate();
+
             let rentData: any = { ...baseData };
 
             if (formData.type === 'rent_out') {
@@ -514,7 +524,7 @@ export default function RentModal({
                         formData.rentCollectionChequeImage
                             ? formData.rentCollectionChequeImage
                             : undefined,
-                    rentCollectionPaymentDate: formData.rentCollectionPaymentDate ? new Date(formData.rentCollectionPaymentDate) : undefined,
+                    rentCollectionPaymentDate: rentCollectionPaymentDateForSave,
                     rentCollectionBankInImage:
                         formData.rentCollectionPaymentMethod === 'bank_in'
                             ? formData.rentCollectionBankInImage || null
@@ -542,7 +552,7 @@ export default function RentModal({
                         formData.rentCollectionChequeImage
                             ? formData.rentCollectionChequeImage
                             : undefined,
-                    rentCollectionPaymentDate: formData.rentCollectionPaymentDate ? new Date(formData.rentCollectionPaymentDate) : undefined,
+                    rentCollectionPaymentDate: rentCollectionPaymentDateForSave,
                     rentCollectionBankInImage:
                         formData.rentCollectionPaymentMethod === 'bank_in'
                             ? formData.rentCollectionBankInImage || null
@@ -1062,8 +1072,8 @@ export default function RentModal({
                                     </select>
                                 </div>
                             </div>
-                            {/* 支票資料 — 選支票時或已有資料時顯示 */}
-                            {(formData.rentCollectionPaymentMethod === 'cheque' || formData.rentCollectionChequeBank || formData.rentCollectionChequeNumber) && (
+                            {/* 支票資料 — 僅選支票時顯示（避免與現金／FPS 等區塊同時出現多個「付款日期」欄位） */}
+                            {formData.rentCollectionPaymentMethod === 'cheque' && (
                                 <div className={rentPaymentDetailBoxClass}>
                                     <p className={rentPaymentDetailTitleClass}>支票資料</p>
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1308,8 +1318,8 @@ export default function RentModal({
                                     </select>
                                 </div>
                             </div>
-                            {/* 支票資料 — 選支票時或已有資料時顯示 */}
-                            {(formData.rentCollectionPaymentMethod === 'cheque' || formData.rentCollectionChequeBank || formData.rentCollectionChequeNumber) && (
+                            {/* 支票資料 — 僅選支票時顯示（避免與現金／FPS 等區塊同時出現多個「付款日期」欄位） */}
+                            {formData.rentCollectionPaymentMethod === 'cheque' && (
                                 <div className={rentPaymentDetailBoxClass}>
                                     <p className={rentPaymentDetailTitleClass}>支票資料</p>
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
