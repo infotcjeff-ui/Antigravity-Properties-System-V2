@@ -106,6 +106,14 @@ export default function PropertyDetailsPage() {
     const [selectedRent, setSelectedRent] = useState<Rent | null>(null);
     const [imageError, setImageError] = useState(false);
     const [rentHistoryTab, setRentHistoryTab] = useState<'rent_out' | 'renting' | 'contract'>('rent_out');
+    const [mainTab, setMainTab] = useState<'overview' | 'location' | 'policy' | 'booking'>('overview');
+
+    const mainTabs = [
+        { id: 'overview' as const, en: 'Overview', zh: '概覽' },
+        { id: 'location' as const, en: 'Location', zh: '位置' },
+        { id: 'policy' as const, en: 'Policy', zh: '政策' },
+        { id: 'booking' as const, en: 'Booking', zh: '文件與圖資' },
+    ];
 
     const nextImage = () => {
         if (property?.images && property.images.length > 0) {
@@ -162,94 +170,118 @@ export default function PropertyDetailsPage() {
                 </Link>
             </motion.div>
 
-            {/* Image Gallery */}
-            <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="relative h-[300px] bg-zinc-100 dark:bg-white/5 rounded-2xl overflow-hidden border border-zinc-200 dark:border-white/10"
-            >
-                {property.images && property.images.length > 0 && !imageError ? (
-                    <>
-                        <img
-                            src={property.images[currentImageIndex]}
-                            alt={`${property.name} - Image ${currentImageIndex + 1}`}
-                            className="w-full h-full object-contain"
-                            onError={() => setImageError(true)}
-                        />
-
-                        {/* Image Navigation */}
-                        {property.images.length > 1 && (
-                            <>
-                                <button
-                                    onClick={prevImage}
-                                    className="absolute left-4 top-1/2 -translate-y-1/2 p-2 bg-black/50 backdrop-blur-sm rounded-full text-white hover:bg-black/70 transition-colors"
-                                >
-                                    <ChevronLeft className="w-6 h-6" />
-                                </button>
-                                <button
-                                    onClick={nextImage}
-                                    className="absolute right-4 top-1/2 -translate-y-1/2 p-2 bg-black/50 backdrop-blur-sm rounded-full text-white hover:bg-black/70 transition-colors"
-                                >
-                                    <ChevronRight className="w-6 h-6" />
-                                </button>
-
-                                {/* Image Indicators */}
-                                <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2">
-                                    {property.images.map((_, idx) => (
-                                        <button
-                                            key={idx}
-                                            onClick={() => setCurrentImageIndex(idx)}
-                                            className={`w-2 h-2 rounded-full transition-colors ${idx === currentImageIndex ? 'bg-white' : 'bg-white/40'
-                                                }`}
-                                        />
-                                    ))}
-                                </div>
-                            </>
-                        )}
-                    </>
-                ) : (
-                    <div className="w-full h-full flex flex-col items-center justify-center gap-2">
-                        <ImageIcon className="w-16 h-16 text-zinc-300 dark:text-white/15" />
-                        <p className="text-zinc-400 dark:text-white/30 text-sm">暫無。</p>
-                    </div>
-                )}
-
-                {/* Status Badge */}
-                <div className="absolute top-4 right-4">
-                    <span className={`px-4 py-2 rounded-full text-sm font-medium border backdrop-blur-sm ${statusColors[property.status]}`}>
-                        {statusLabels[property.status]}
-                    </span>
-                </div>
-            </motion.div>
-
-            {/* Main Content */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                {/* Left Column - Details */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-10 lg:items-stretch">
                 <motion.div
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.1 }}
-                    className="lg:col-span-2 space-y-6"
+                    className="relative w-full min-h-[300px] h-[min(45vh,420px)] lg:h-[calc(100dvh-11rem)] lg:min-h-0 lg:max-h-[calc(100dvh-11rem)] rounded-2xl overflow-hidden border border-zinc-200 dark:border-white/10 bg-zinc-100 dark:bg-white/5"
                 >
-                    {/* Title and Basic Info */}
-                    <div className="bg-white dark:bg-white/5 rounded-2xl border border-zinc-200 dark:border-white/10 p-6 shadow-sm dark:shadow-none">
-                        <h1 className="text-3xl font-bold text-zinc-900 dark:text-white">{property.name}</h1>
-                        <p className="text-zinc-500 dark:text-white/50 mt-1">Code: {property.code}</p>
+                    {property.images && property.images.length > 0 && !imageError ? (
+                        <>
+                            <img
+                                src={property.images[currentImageIndex]}
+                                alt={`${property.name} - ${currentImageIndex + 1}`}
+                                className="absolute inset-0 w-full h-full object-cover cursor-pointer"
+                                onClick={() => setLightboxImage(property.images[currentImageIndex])}
+                                onError={() => setImageError(true)}
+                            />
+                            {property.images.length > 1 && (
+                                <>
+                                    <button
+                                        type="button"
+                                        onClick={prevImage}
+                                        className="absolute left-3 top-1/2 -translate-y-1/2 p-2 bg-black/50 backdrop-blur-sm rounded-full text-white hover:bg-black/70 transition-colors z-10"
+                                        aria-label="Previous"
+                                    >
+                                        <ChevronLeft className="w-5 h-5" />
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={nextImage}
+                                        className="absolute right-3 top-1/2 -translate-y-1/2 p-2 bg-black/50 backdrop-blur-sm rounded-full text-white hover:bg-black/70 transition-colors z-10"
+                                        aria-label="Next"
+                                    >
+                                        <ChevronRight className="w-5 h-5" />
+                                    </button>
+                                </>
+                            )}
+                        </>
+                    ) : (
+                        <div className="absolute inset-0 flex flex-col items-center justify-center gap-2">
+                            <ImageIcon className="w-16 h-16 text-zinc-300 dark:text-white/15" />
+                            <p className="text-zinc-400 dark:text-white/30 text-sm">暫無。</p>
+                        </div>
+                    )}
+                </motion.div>
 
-                        {property.address ? (
-                            <div className="flex items-start gap-2 mt-4 text-zinc-600 dark:text-white/70">
-                                <MapPin className="w-5 h-5 flex-shrink-0 mt-0.5" />
-                                <span>{property.address}</span>
-                            </div>
-                        ) : (
-                            <div className="flex items-start gap-2 mt-4 text-zinc-400 dark:text-white/30">
-                                <MapPin className="w-5 h-5 flex-shrink-0 mt-0.5" />
-                                <span className="italic">暫無。</span>
-                            </div>
-                        )}
+                <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.08 }}
+                    className="flex min-h-0 flex-col gap-5 min-w-0 lg:h-[calc(100dvh-11rem)] lg:max-h-[calc(100dvh-11rem)] lg:overflow-hidden"
+                >
+                    <div className="shrink-0 flex flex-col gap-5">
+                    <div className="flex justify-between items-start gap-4">
+                        <div className="min-w-0 flex-1">
+                            <h1 className="text-2xl sm:text-3xl font-bold text-zinc-900 dark:text-white leading-tight">{property.name}</h1>
+                            <p className="text-sm text-zinc-500 dark:text-white/50 mt-1">Code: {property.code}</p>
+                        </div>
+                        <span className={`shrink-0 px-4 py-2 rounded-full text-sm font-semibold border shadow-sm whitespace-nowrap ${statusColors[property.status]}`}>
+                            {statusLabels[property.status]}
+                        </span>
+                    </div>
 
-                        {/* Key Details Grid */}
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-6">
+                    {property.address ? (
+                        <div className="flex items-start gap-2 text-zinc-600 dark:text-white/65 text-sm">
+                            <MapPin className="w-4 h-4 shrink-0 mt-0.5" />
+                            <span>{property.address}</span>
+                        </div>
+                    ) : (
+                        <div className="flex items-start gap-2 text-zinc-400 dark:text-white/35 text-sm">
+                            <MapPin className="w-4 h-4 shrink-0 mt-0.5" />
+                            <span className="italic">暫無。</span>
+                        </div>
+                    )}
+
+                    {property.images && property.images.length > 0 && (
+                        <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
+                            {property.images.map((url, idx) => (
+                                <button
+                                    key={idx}
+                                    type="button"
+                                    onClick={() => {
+                                        setCurrentImageIndex(idx);
+                                        setImageError(false);
+                                    }}
+                                    className={`relative shrink-0 w-16 h-16 sm:w-[72px] sm:h-[72px] rounded-xl overflow-hidden border-2 transition-colors ${idx === currentImageIndex ? 'border-zinc-900 dark:border-white ring-2 ring-zinc-900/20 dark:ring-white/20' : 'border-zinc-200 dark:border-white/15 opacity-80 hover:opacity-100'}`}
+                                >
+                                    <img src={url} alt="" className="w-full h-full object-cover" />
+                                </button>
+                            ))}
+                        </div>
+                    )}
+
+                    <div className="rounded-xl border border-zinc-200 dark:border-white/15 p-1 flex flex-wrap justify-center sm:justify-start gap-1 bg-zinc-50/80 dark:bg-white/[0.04]">
+                        {mainTabs.map((tab) => (
+                            <button
+                                key={tab.id}
+                                type="button"
+                                onClick={() => setMainTab(tab.id)}
+                                className={`px-3 sm:px-4 py-2 rounded-lg text-sm font-medium transition-all ${mainTab === tab.id
+                                    ? 'bg-white dark:bg-white/15 text-zinc-900 dark:text-white shadow-sm border border-zinc-200/80 dark:border-white/10'
+                                    : 'text-zinc-500 dark:text-white/55 hover:text-zinc-800 dark:hover:text-white'}`}
+                            >
+                                {t(tab.en, tab.zh)}
+                            </button>
+                        ))}
+                    </div>
+                    </div>
+
+                    <div className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain pr-1 -mr-0.5 [scrollbar-gutter:stable]">
+                    <div className="flex flex-col gap-6 pb-4">
+                        {mainTab === 'overview' && (
+                            <>
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
                             <div className="bg-zinc-50 dark:bg-white/5 rounded-xl p-4 border border-zinc-100 dark:border-none">
                                 <p className="text-zinc-400 dark:text-white/40 text-sm">{t('Type', '類型')}</p>
                                 <p className="text-zinc-900 dark:text-white font-medium mt-1">{typeLabels[property.type] || '暫無。'}</p>
@@ -315,17 +347,6 @@ export default function PropertyDetailsPage() {
                                 .rich-text-content h3 { font-size: 1rem; }
                             `}</style>
                         </div>
-
-                        {/* Planning Permission - always show */}
-                        <div className="mt-6 p-[15px] border-l-[3px] border-amber-500 bg-amber-500/5 rounded-r-xl">
-                            <p className="text-xs font-semibold text-amber-500 uppercase tracking-wider mb-1">{t('Planning Permission', '最新規劃許可申請')}</p>
-                            {property.hasPlanningPermission ? (
-                                <p className="text-zinc-700 dark:text-white/80 text-sm font-medium">{property.hasPlanningPermission}</p>
-                            ) : (
-                                <p className="text-zinc-400 dark:text-white/30 text-sm text-center py-2">暫無。</p>
-                            )}
-                        </div>
-                    </div>
 
                     {/* Proprietor & Tenant - always show */}
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
@@ -493,77 +514,86 @@ export default function PropertyDetailsPage() {
                             );
                         })()}
                     </div>
-                </motion.div>
-
-                {/* Right Column - Map & Documents */}
-                <motion.div
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.2 }}
-                    className="space-y-6"
-                >
-                    {/* Map - always show, uses address */}
-                    <div className="bg-white dark:bg-white/5 rounded-2xl border border-zinc-200 dark:border-white/10 p-6 shadow-sm dark:shadow-none">
-                        <h2 className="text-lg font-semibold text-zinc-900 dark:text-white mb-4 flex items-center gap-2">
-                            <MapPin className="w-5 h-5" />
-                            {t('Location', '位置')}
-                        </h2>
-                        {property.location?.lat && property.location?.lng ? (
-                            <>
-                                <div className="aspect-[4/3] rounded-xl overflow-hidden bg-white/5">
-                                    <SinglePropertyMapDynamic property={property} />
-                                </div>
-                                <p className="text-zinc-400 dark:text-white/40 text-xs mt-2">
-                                    📍 {property.address}
-                                </p>
                             </>
-                        ) : (
-                            <EmptyPlaceholder />
                         )}
-                    </div>
 
-                    {/* Geo Maps - always show */}
-                    <div className="bg-white dark:bg-white/5 rounded-2xl border border-zinc-200 dark:border-white/10 p-6 shadow-sm dark:shadow-none">
-                        <h2 className="text-lg font-semibold text-zinc-900 dark:text-white mb-4 flex items-center gap-2">
-                            <Map className="w-5 h-5" />
-                            地理資訊圖
-                        </h2>
-                        {property.geoMaps && property.geoMaps.length > 0 ? (
-                            <div className="grid grid-cols-2 gap-2">
-                                {property.geoMaps.map((map, idx) => (
-                                    <img
-                                        key={idx}
-                                        src={map}
-                                        alt={`Geo Map ${idx + 1}`}
-                                        className="rounded-lg cursor-pointer hover:opacity-80 transition-opacity"
-                                        onClick={() => setLightboxImage(map)}
-                                    />
-                                ))}
+                        {mainTab === 'location' && (
+                            <div className="rounded-2xl border border-zinc-200 dark:border-white/10 overflow-hidden bg-zinc-50 dark:bg-white/5">
+                                <div className="h-[280px] sm:h-[320px] lg:h-[380px] relative">
+                                    {property.location?.lat && property.location?.lng ? (
+                                        <SinglePropertyMapDynamic property={property} />
+                                    ) : (
+                                        <div className="w-full h-full flex flex-col items-center justify-center gap-2">
+                                            <MapPin className="w-12 h-12 text-zinc-300 dark:text-white/15" />
+                                            <p className="text-zinc-400 dark:text-white/30 text-sm">暫無位置訊息。</p>
+                                        </div>
+                                    )}
+                                </div>
+                                {property.address ? (
+                                    <div className="p-4 text-sm text-zinc-600 dark:text-white/70 flex items-start gap-2 border-t border-zinc-200 dark:border-white/10">
+                                        <MapPin className="w-4 h-4 shrink-0 mt-0.5" />
+                                        <span>{property.address}</span>
+                                    </div>
+                                ) : null}
                             </div>
-                        ) : (
-                            <EmptyPlaceholder />
+                        )}
+
+                        {mainTab === 'policy' && (
+                            <div className="p-4 border border-zinc-200 dark:border-white/10 border-l-[3px] border-l-amber-500 bg-amber-500/5 rounded-r-xl">
+                                <p className="text-xs font-semibold text-amber-500 uppercase tracking-wider mb-1">{t('Planning Permission', '最新規劃許可申請')}</p>
+                                {property.hasPlanningPermission ? (
+                                    <p className="text-zinc-700 dark:text-white/80 text-sm font-medium">{property.hasPlanningPermission}</p>
+                                ) : (
+                                    <p className="text-zinc-400 dark:text-white/30 text-sm text-center py-2">暫無。</p>
+                                )}
+                            </div>
+                        )}
+
+                        {mainTab === 'booking' && (
+                            <div className="space-y-6">
+                                <div className="bg-white dark:bg-white/5 rounded-2xl border border-zinc-200 dark:border-white/10 p-6 shadow-sm dark:shadow-none">
+                                    <h2 className="text-lg font-semibold text-zinc-900 dark:text-white mb-4 flex items-center gap-2">
+                                        <Map className="w-5 h-5" />
+                                        {t('Geographic maps', '地理資訊圖')}
+                                    </h2>
+                                    {property.geoMaps && property.geoMaps.length > 0 ? (
+                                        <div className="grid grid-cols-2 gap-2">
+                                            {property.geoMaps.map((map, idx) => (
+                                                <img
+                                                    key={idx}
+                                                    src={map}
+                                                    alt={`Geo Map ${idx + 1}`}
+                                                    className="rounded-lg cursor-pointer hover:opacity-80 transition-opacity"
+                                                    onClick={() => setLightboxImage(map)}
+                                                />
+                                            ))}
+                                        </div>
+                                    ) : (
+                                        <EmptyPlaceholder />
+                                    )}
+                                </div>
+                                <div className="bg-white dark:bg-white/5 rounded-2xl border border-zinc-200 dark:border-white/10 p-6 shadow-sm dark:shadow-none">
+                                    <h2 className="text-lg font-semibold text-zinc-900 dark:text-white mb-4 flex items-center gap-2">
+                                        <FileText className="w-5 h-5" />
+                                        {t('Documents', '文件')}
+                                    </h2>
+                                    {property.googleDrivePlanUrl ? (
+                                        <a
+                                            href={property.googleDrivePlanUrl}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="flex items-center gap-2 px-4 py-3 bg-zinc-100 dark:bg-white/5 rounded-xl text-zinc-900 dark:text-white hover:bg-zinc-200 dark:hover:bg-white/10 transition-colors border border-zinc-200 dark:border-none"
+                                        >
+                                            <ExternalLink className="w-4 h-4" />
+                                            <span>{t('View Plan on Google Drive', '在 Google Drive 查看')}</span>
+                                        </a>
+                                    ) : (
+                                        <EmptyPlaceholder />
+                                    )}
+                                </div>
+                            </div>
                         )}
                     </div>
-
-                    {/* Documents - always show */}
-                    <div className="bg-white dark:bg-white/5 rounded-2xl border border-zinc-200 dark:border-white/10 p-6 shadow-sm dark:shadow-none">
-                        <h2 className="text-lg font-semibold text-zinc-900 dark:text-white mb-4 flex items-center gap-2">
-                            <FileText className="w-5 h-5" />
-                            {t('Documents', '文件')}
-                        </h2>
-                        {property.googleDrivePlanUrl ? (
-                            <a
-                                href={property.googleDrivePlanUrl}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="flex items-center gap-2 px-4 py-3 bg-zinc-100 dark:bg-white/5 rounded-xl text-zinc-900 dark:text-white hover:bg-zinc-200 dark:hover:bg-white/10 transition-colors border border-zinc-200 dark:border-none"
-                            >
-                                <ExternalLink className="w-4 h-4" />
-                                <span>{t('View Plan on Google Drive', '在 Google Drive 查看')}</span>
-                            </a>
-                        ) : (
-                            <EmptyPlaceholder />
-                        )}
                     </div>
                 </motion.div>
             </div>
