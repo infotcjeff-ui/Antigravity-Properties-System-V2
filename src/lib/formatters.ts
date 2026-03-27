@@ -83,6 +83,54 @@ export function mergeOwnerAndTenantProprietors<
     return out.sort((a, b) => (a.name || '').localeCompare(b.name || '', 'zh-HK'));
 }
 
+/** 擁有人類別顯示文案（表單／卡片／彈窗／列表徽章） */
+export type ProprietorCategoryDisplayVariant = 'form' | 'card' | 'modal' | 'badge';
+
+export function proprietorCategoryLabelZh(
+    category: string | undefined,
+    variant: ProprietorCategoryDisplayVariant = 'form'
+): string {
+    if (!category) return '—';
+    switch (category) {
+        case 'group_company':
+            return variant === 'modal' ? '集團旗下公司' : variant === 'badge' ? '集團' : '集團公司';
+        case 'joint_venture':
+            return variant === 'badge' ? '合資' : '合資公司';
+        case 'private_company':
+            return variant === 'badge' ? '私人' : '私人公司';
+        case 'private_individual':
+            return '個人';
+        case 'managed_individual':
+            return variant === 'modal' ? '代管理的個體' : variant === 'badge' ? '代管' : '代管個體';
+        case 'external_landlord':
+            return variant === 'modal' || variant === 'form' ? '出租的業主' : variant === 'badge' ? '外部' : '外部業主';
+        case 'tenant':
+            return '承租人';
+        case 'external_customer':
+            return '街外客';
+        default:
+            return '—';
+    }
+}
+
+/** 擁有人類別列表徽章樣式（與業主／租客列表一致） */
+export function proprietorCategoryBadgeClassName(category: string | undefined): string {
+    switch (category) {
+        case 'group_company':
+            return 'bg-purple-500/10 text-purple-500 ring-1 ring-purple-500/20';
+        case 'joint_venture':
+            return 'bg-emerald-500/10 text-emerald-500 ring-1 ring-emerald-500/20';
+        case 'private_company':
+            return 'bg-violet-500/10 text-violet-500 ring-1 ring-violet-500/20';
+        case 'private_individual':
+            return 'bg-sky-500/10 text-sky-500 ring-1 ring-sky-500/20';
+        case 'managed_individual':
+            return 'bg-zinc-500/10 text-zinc-500 ring-1 ring-zinc-500/20';
+        default:
+            return 'bg-amber-500/10 text-amber-500 ring-1 ring-amber-500/20';
+    }
+}
+
 export function dedupeRecordsByDisplayName<
     T extends { name?: string | null; code?: string | null; id?: string | null },
 >(records: T[]): T[] {
