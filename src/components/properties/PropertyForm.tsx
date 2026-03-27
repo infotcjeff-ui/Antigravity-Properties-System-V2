@@ -21,6 +21,34 @@ import {
     parseLotAreaInput,
     parseLotEntries as parseLotEntriesFromStr,
 } from '@/lib/formatters';
+import { normalizePropertyLocation } from '@/lib/propertyLocation';
+
+/** 由物業資料建立表單狀態；地址欄優先使用 address 欄，否則沿用 location 內文字 */
+function formStateFromProperty(p: Property | null | undefined) {
+    const loc = normalizePropertyLocation(p?.location);
+    const addressFromLoc = loc?.address?.trim() || '';
+    const address = (p?.address?.trim() || addressFromLoc || '').trim();
+    return {
+        name: p?.name || '',
+        code: p?.code || '',
+        address,
+        lotIndex: p?.lotIndex || '',
+        lotArea: p?.lotArea || '',
+        type: p?.type || 'group_asset',
+        status: p?.status || 'holding',
+        landUse: p?.landUse ? p.landUse.split(',') : [],
+        proprietorId: p?.proprietorId || '',
+        proprietorIds: p?.proprietorIds || (p?.proprietorId ? [p.proprietorId] : []),
+        tenantId: p?.tenantId || '',
+        googleDrivePlanUrl: p?.googleDrivePlanUrl || '',
+        hasPlanningPermission: p?.hasPlanningPermission || '',
+        location: loc,
+        images: p?.images || [],
+        geoMaps: p?.geoMaps || [],
+        notes: p?.notes || '',
+        createdBy: p?.createdBy || '',
+    };
+}
 
 interface PropertyFormProps {
     property?: Property | null;
@@ -77,30 +105,11 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState('');
     const [proprietorModalMode, setProprietorModalMode] = useState<'proprietor' | 'tenant'>('proprietor');
-    const [isGeocoding, setIsGeocoding] = useState(false);
+    const [isMapSearching, setIsMapSearching] = useState(false);
     const [pendingProprietors, setPendingProprietors] = useState<Record<string, Partial<Proprietor>>>({});
 
-    // Form state
-    const [formData, setFormData] = useState({
-        name: property?.name || '',
-        code: property?.code || '',
-        address: property?.address || '',
-        lotIndex: property?.lotIndex || '',
-        lotArea: property?.lotArea || '',
-        type: property?.type || 'group_asset',
-        status: property?.status || 'holding',
-        landUse: property?.landUse ? property.landUse.split(',') : [],
-        proprietorId: property?.proprietorId || '', // Legacy - kept for compatibility
-        proprietorIds: property?.proprietorIds || (property?.proprietorId ? [property.proprietorId] : []), // Multi-select
-        tenantId: property?.tenantId || '',
-        googleDrivePlanUrl: property?.googleDrivePlanUrl || '',
-        hasPlanningPermission: property?.hasPlanningPermission || '',
-        location: property?.location || null,
-        images: property?.images || [], // kept for compatibility, actual display uses orderedImages
-        geoMaps: property?.geoMaps || [], // kept for compatibility, actual display uses orderedGeoMaps
-        notes: property?.notes || '',
-        createdBy: property?.createdBy || '',
-    });
+    // Form state（編輯時由 formStateFromProperty 帶入，並正規化 location）
+    const [formData, setFormData] = useState(() => formStateFromProperty(property));
 
     // Unified ordered list: string = URL, object = pending upload
     const [orderedImages, setOrderedImages] = useState<(string | { file: File; preview: string })[]>([]);
@@ -307,109 +316,55 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
         );
     };
 
-    const handleGeocode = async () => {
-        if (!formData.address.trim()) {
+    /** 以 OpenStreetMap 同款 Nominatim 搜尋，在下方地圖顯示標記（不經政府 ALS） */
+    const handleMapSearch = async () => {
+        const q = formData.address.trim();
+        if (!q) {
             addNotification('請先輸入地址 / Please enter an address first', 'info');
             return;
         }
 
-        setIsGeocoding(true);
+        setIsMapSearching(true);
         try {
-            // Helper to clean address for various search attempts
-            const clean = (addr: string) => addr.replace(/\(.*?\)/g, '').replace(/（.*?）/g, '').trim();
-            const originalFull = formData.address;
-            const cleanedBase = clean(formData.address);
+            const response = await fetch(`/api/nominatim/search?q=${encodeURIComponent(q)}`);
+            const data = await response.json();
 
-            // Search strategy: 
-            // 1. Full address (including landmarks in parentheses) -> Best for ALS
-            // 2. Cleaned address -> Good for standard matching
-            // 3. Stripped address (no district prefix)
-            const searchSteps = [
-                originalFull,
-                cleanedBase,
-                cleanedBase.replace(/^(香港|九龍|新界|元朗|屯門|粉嶺|錦田|大埔|坑口|西貢|沙田|葵涌|青衣|荃灣|東涌|愉景灣)/, '').trim(),
-            ].filter(Boolean);
-
-            const uniqueSteps = [...new Set(searchSteps)];
-            let foundLocation: { lat: number; lng: number } | null = null;
-
-            // TRY OGCIO ALS FIRST (Official HK government address picker)
-            for (const query of uniqueSteps) {
-                try {
-                    const response = await fetch(`/api/geocode?q=${encodeURIComponent(query)}`);
-                    const data = await response.json();
-
-                    if (data?.lat && data?.lng) {
-                        foundLocation = { lat: data.lat, lng: data.lng };
-                        break;
-                    }
-                } catch (e) { console.error('ALS lookup error:', e); }
+            if (!response.ok) {
+                addNotification(data?.error || '搜尋失敗 / Search failed', 'info');
+                return;
             }
 
-            // FALLBACK TO NOMINATIM IF ALS FAILS
-            if (!foundLocation) {
-                for (const query of uniqueSteps) {
-                    const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&countrycodes=hk&limit=1`, {
-                        headers: {
-                            'Accept-Language': 'zh-TW,zh;q=0.9,en;q=0.8',
-                            'User-Agent': 'AntigravityPropSystem/1.0'
-                        }
-                    });
-                    const data = await response.json();
-                    if (data && data.length > 0) {
-                        foundLocation = { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) };
-                        break;
-                    }
-                }
-            }
-
-            if (foundLocation) {
-                setFormData(prev => ({
+            const best = data?.best as { lat: number; lng: number; displayName?: string } | null;
+            if (best && Number.isFinite(best.lat) && Number.isFinite(best.lng)) {
+                setFormData((prev) => ({
                     ...prev,
                     location: {
-                        lat: foundLocation!.lat,
-                        lng: foundLocation!.lng,
-                        address: formData.address,
+                        lat: best.lat,
+                        lng: best.lng,
+                        address: prev.address,
                     },
                 }));
-                addNotification('定位成功 / Location found', 'update');
+                addNotification('已於地圖顯示（OpenStreetMap Nominatim）/ Shown on map', 'update');
             } else {
-                // Try to detect district for a better fallback
-                const districts = ['錦田', '元朗', '天水圍', '屯門', '粉嶺', '上水', '大埔', '沙田', '西貢', '中心', '中環', '灣仔', '銅鑼灣', '北角', '柴灣', '尖沙咀', '旺角', '九龍城', '觀塘', '黃大仙', '將軍澳', '荃灣', '葵涌', '青衣'];
-                const detectedDistrict = districts.find(d => formData.address.includes(d)) || 'Hong Kong';
-
-                const fallbackRes = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(detectedDistrict + ', Hong Kong')}&limit=1`, {
-                    headers: { 'User-Agent': 'AntigravityPropSystem/1.0' }
-                });
-                const fallbackData = await fallbackRes.json();
-
-                if (fallbackData && fallbackData.length > 0) {
-                    const lat = parseFloat(fallbackData[0].lat) + (Math.random() * 0.006 - 0.003);
-                    const lng = parseFloat(fallbackData[0].lon) + (Math.random() * 0.006 - 0.003);
-
-                    setFormData(prev => ({
-                        ...prev,
-                        location: { lat, lng, address: formData.address },
-                    }));
-                    addNotification(`找不到精準地址，已定位至${detectedDistrict} / Exact location not found, defaulted to ${detectedDistrict}`, 'info');
-                } else {
-                    addNotification('找不到該地址的地點 / Location not found', 'info');
-                }
+                addNotification(
+                    '找不到地點，請改寫地址或在地圖上點擊設定位置 / Not found — try different wording or click the map',
+                    'info',
+                );
             }
         } catch (error) {
-            console.error('Geocoding error:', error);
-            addNotification('定位失敗 / Geocoding failed', 'info');
+            console.error('Map search error:', error);
+            addNotification('搜尋失敗 / Search failed', 'info');
         } finally {
-            setIsGeocoding(false);
+            setIsMapSearching(false);
         }
     };
 
-    // Sync ordered media when property loads
+    // 編輯：物業 id 變更時重設表單與媒體，避免沿用上一筆資料
     useEffect(() => {
-        if (property) {
-            setOrderedImages(property.images || []);
-            setOrderedGeoMaps(property.geoMaps || []);
-        }
+        if (!property?.id) return;
+        setFormData(formStateFromProperty(property));
+        setOrderedImages(property.images || []);
+        setOrderedGeoMaps(property.geoMaps || []);
     }, [property?.id]);
 
     // Cleanup object URLs on unmount
@@ -886,9 +841,21 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                         </div>
                     )}
 
-                    {/* Address with Geocoding */}
+                    {/* 地址：OpenStreetMap Nominatim 搜尋後於下方地圖顯示 */}
                     <div className="space-y-2">
                         <label className="block text-sm font-medium text-zinc-700 dark:text-white/80">地址</label>
+                        <p className="text-[11px] text-zinc-500 dark:text-white/45 leading-snug">
+                            輸入後點「在地圖上顯示」，使用與{' '}
+                            <a
+                                href="https://www.openstreetmap.org"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-purple-600 dark:text-purple-400 underline underline-offset-2"
+                            >
+                                OpenStreetMap
+                            </a>{' '}
+                            相同的 Nominatim 搜尋；可再拖曳標記微調。
+                        </p>
                         <div className="flex gap-2">
                             <input
                                 type="text"
@@ -900,22 +867,21 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                             />
                             <button
                                 type="button"
-                                onClick={handleGeocode}
-                                disabled={isGeocoding || !formData.address.trim()}
+                                onClick={handleMapSearch}
+                                disabled={isMapSearching || !formData.address.trim()}
                                 className="px-4 py-3 bg-purple-100 dark:bg-purple-500/20 text-purple-700 dark:text-purple-300 rounded-xl font-medium hover:bg-purple-200 dark:hover:bg-purple-500/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 whitespace-nowrap"
                             >
-                                {isGeocoding ? (
+                                {isMapSearching ? (
                                     <svg className="animate-spin h-4 w-4 text-purple-700 dark:text-purple-300" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                                         <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                                         <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                                     </svg>
                                 ) : (
                                     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
                                     </svg>
                                 )}
-                                自動定位
+                                在地圖上顯示
                             </button>
                         </div>
                         {formData.location && (

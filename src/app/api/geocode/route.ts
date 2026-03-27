@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { isPlausibleGeocodeForQuery } from '@/lib/addressGeocodePlausibility';
 
 export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
@@ -9,7 +10,8 @@ export async function GET(request: NextRequest) {
     }
 
     try {
-        const response = await fetch(`https://www.als.ogcio.gov.hk/lookup?q=${encodeURIComponent(q)}&n=1`, {
+        // 多筆建議：首筆常誤配至市區；依查詢語意過濾不合理座標
+        const response = await fetch(`https://www.als.ogcio.gov.hk/lookup?q=${encodeURIComponent(q)}&n=15`, {
             headers: { 'Accept': 'application/json' }
         });
 
@@ -18,14 +20,22 @@ export async function GET(request: NextRequest) {
         }
 
         const data = await response.json();
-        const addr = data?.SuggestedAddress?.[0]?.Address;
-
-        if (addr) {
-            const geo = addr.PremisesAddress?.GeospatialInformation || addr.BuildingAddress?.GeospatialInformation;
-            if (geo?.Latitude && geo?.Longitude) {
+        const suggested = data?.SuggestedAddress;
+        if (Array.isArray(suggested)) {
+            for (const item of suggested) {
+                const addr = item?.Address;
+                if (!addr) continue;
+                const geo = addr.PremisesAddress?.GeospatialInformation || addr.BuildingAddress?.GeospatialInformation;
+                const lat = geo?.Latitude;
+                const lng = geo?.Longitude;
+                if (lat == null || lng == null) continue;
+                const latN = typeof lat === 'number' ? lat : parseFloat(String(lat));
+                const lngN = typeof lng === 'number' ? lng : parseFloat(String(lng));
+                if (!Number.isFinite(latN) || !Number.isFinite(lngN)) continue;
+                if (!isPlausibleGeocodeForQuery(q, latN, lngN)) continue;
                 return NextResponse.json({
-                    lat: geo.Latitude,
-                    lng: geo.Longitude,
+                    lat: latN,
+                    lng: lngN,
                     source: 'als'
                 });
             }

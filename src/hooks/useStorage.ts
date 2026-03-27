@@ -4,6 +4,7 @@ import { useCallback, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { db, generateId, type Property, type Proprietor, type Rent, type SubLandlord, type CurrentTenant } from '@/lib/db';
+import { normalizePropertyLocation } from '@/lib/propertyLocation';
 import { useAuth } from '@/contexts/AuthContext';
 
 // Helper to convert snake_case to camelCase
@@ -26,6 +27,13 @@ const toSnake = (obj: any) => {
         newObj[snakeKey] = obj[key];
     }
     return newObj;
+};
+
+/** 統一正規化物業 location，避免 JSONB 內為 latitude/longitude 等格式時表單／地圖讀不到座標 */
+const mapPropertyRow = (row: any): Property => {
+    const p = toCamel(row) as Property;
+    p.location = normalizePropertyLocation(p.location);
+    return p;
 };
 
 /** rents.rent_out_tenant_ids 為 jsonb 陣列，無 FK 至 current_tenants，無法用 embed 查詢 */
@@ -111,7 +119,7 @@ export const fetchProperties = async (user?: any, options?: { query?: string; by
             .order('code', { ascending: true });
 
         if (sbError) throw sbError;
-        return (data || []).map(toCamel) as Property[];
+        return (data || []).map(mapPropertyRow);
     } catch (err: any) {
         if (err instanceof TypeError && err.message === 'Failed to fetch') {
             console.error('Network Error: Unable to reach Supabase. Check your URL and internet connection.');
@@ -131,7 +139,7 @@ export const fetchProperty = async (id: string): Promise<Property | undefined> =
             .single();
 
         if (sbError) throw sbError;
-        return toCamel(data) as Property;
+        return mapPropertyRow(data);
     } catch (err: any) {
         if (err instanceof TypeError && err.message === 'Failed to fetch') {
             console.error('Network Error: Unable to reach Supabase. Check your URL and internet connection.');
@@ -364,7 +372,7 @@ export const fetchPropertiesWithRelations = async (user?: any): Promise<Property
         const camelRents = (rentsData || []).map(r => toCamel(r)) as Rent[];
 
         return (properties || []).map(property => {
-            const camelProperty = toCamel(property) as Property;
+            const camelProperty = mapPropertyRow(property);
             return {
                 ...camelProperty,
                 proprietor: camelProperty.proprietorId ? proprietorMap.get(camelProperty.proprietorId) : undefined,
@@ -702,7 +710,7 @@ export function useProperties() {
                 .or(`name.ilike.%${query}%,code.ilike.%${query}%,address.ilike.%${query}%`);
 
             if (sbError) throw sbError;
-            return (data || []).map(toCamel) as Property[];
+            return (data || []).map(mapPropertyRow);
         } catch (err) {
             setError('Failed to search properties in cloud');
             console.error(err);
@@ -1479,7 +1487,7 @@ export function useRelations() {
 
             if (pError || !property) return null;
 
-            const camelProperty = toCamel(property) as Property;
+            const camelProperty = mapPropertyRow(property);
 
             const [
                 { data: proprietor },
@@ -1528,7 +1536,7 @@ export function useRelations() {
 
             if (pError || !property) return null;
 
-            const camelProperty = toCamel(property) as Property;
+            const camelProperty = mapPropertyRow(property);
 
             const [
                 { data: proprietor },
