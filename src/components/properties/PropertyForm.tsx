@@ -909,7 +909,7 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                 initial={{ opacity: 0, scale: 0.95, y: 20 }}
                 animate={{ opacity: 1, scale: 1, y: 0 }}
                 exit={{ opacity: 0, scale: 0.95, y: 20 }}
-                className="fixed inset-4 md:inset-auto md:left-1/2 md:top-1/2 md:-translate-x-1/2 md:-translate-y-1/2 md:w-full md:max-w-3xl md:max-h-[90vh] bg-white dark:bg-[#1a1a2e] rounded-2xl shadow-2xl z-50 overflow-hidden flex flex-col"
+                className="fixed inset-4 md:inset-auto md:left-1/2 md:top-1/2 md:-translate-x-1/2 md:-translate-y-1/2 md:w-full md:max-w-5xl lg:max-w-6xl md:max-h-[90vh] bg-white dark:bg-[#1a1a2e] rounded-2xl shadow-2xl z-50 overflow-hidden flex flex-col"
             >
                 {/* Header */}
                 <div className="flex items-center justify-between p-6 border-b border-zinc-100 dark:border-white/5">
