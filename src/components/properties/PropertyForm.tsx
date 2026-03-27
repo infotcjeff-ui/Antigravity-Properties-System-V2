@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
-import { useProperties, useProprietorsQuery, useRents, useRentsQuery, useUsersQuery } from '@/hooks/useStorage';
+import { useProperties, useProprietorsQuery, useRents, useRentsQuery, useRentsWithRelationsQuery, useUsersQuery } from '@/hooks/useStorage';
 import { fileToBase64, validateImageUpload, compressImage } from '@/lib/imageUtils';
 import type { Property, Proprietor, Rent } from '@/lib/db';
 import { useNotifications } from '@/contexts/NotificationContext';
@@ -20,8 +20,10 @@ import {
     formatLotAreaForInput,
     parseLotAreaInput,
     parseLotEntries as parseLotEntriesFromStr,
+    proprietorCategoryLabelZh,
 } from '@/lib/formatters';
 import { normalizePropertyLocation } from '@/lib/propertyLocation';
+import { formatDateDMY } from '@/lib/rentPaymentDisplay';
 
 /** 由物業資料建立表單狀態；地址欄優先使用 address 欄，否則沿用 location 內文字 */
 function formStateFromProperty(p: Property | null | undefined) {
@@ -83,6 +85,8 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
     const { addProperty, updateProperty, error: propertiesError } = useProperties();
     const { data: proprietors, isLoading: propsLoading } = useProprietorsQuery();
     const { data: allRents, isLoading: rentsLoading } = useRentsQuery();
+    /** 合約記錄需 join tenant（業主）與 current_tenants（現時租客），與管理合約頁一致 */
+    const { data: allContractsWithRelations = [] } = useRentsWithRelationsQuery({ type: 'contract' });
     const { updateRent, deleteRent } = useRents();
     const { addNotification } = useNotifications();
     const { isAuthenticated, user: currentUser } = useAuth();
@@ -95,7 +99,6 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
     const [showProprietorModal, setShowProprietorModal] = useState(false);
     const [showRentModal, setShowRentModal] = useState(false);
     const [showContractModal, setShowContractModal] = useState(false);
-    const [createRentForProprietorId, setCreateRentForProprietorId] = useState<string | null>(null);
     const [showLotAddModal, setShowLotAddModal] = useState(false);
     const [lotAddMode, setLotAddMode] = useState<'new' | 'old' | null>(null);
     const [tempLotInput, setTempLotInput] = useState('');
@@ -107,6 +110,8 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
     const [proprietorModalMode, setProprietorModalMode] = useState<'proprietor' | 'tenant'>('proprietor');
     const [isMapSearching, setIsMapSearching] = useState(false);
     const [pendingProprietors, setPendingProprietors] = useState<Record<string, Partial<Proprietor>>>({});
+    /** 非 null 時為「編輯業主」；null 為新增業主 */
+    const [proprietorModalInitial, setProprietorModalInitial] = useState<Proprietor | null>(null);
 
     // Form state（編輯時由 formStateFromProperty 帶入，並正規化 location）
     const [formData, setFormData] = useState(() => formStateFromProperty(property));
@@ -174,14 +179,29 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
 
     const rentOutRents = useMemo(() => rents.filter(r => r.type === 'rent_out'), [rents]);
     const rentingRents = useMemo(() => rents.filter(r => r.type === 'renting'), [rents]);
-    const contractRents = useMemo(() => rents.filter(r => r.type === 'contract'), [rents]);
+    const contractRents = useMemo(() => {
+        if (!property?.id) return [];
+        return (allContractsWithRelations as any[])
+            .filter((r) => r.propertyId === property.id)
+            .sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
+    }, [property?.id, allContractsWithRelations]);
+    /** 與 dashboard/contracts 一致：leasing_in 為租賃合約，其餘為出租合約 */
+    const leaseOutContractRents = useMemo(
+        () => contractRents.filter((c: any) => (c.rentOutStatus || c.status) !== 'leasing_in'),
+        [contractRents],
+    );
+    const leaseInContractRents = useMemo(
+        () => contractRents.filter((c: any) => (c.rentOutStatus || c.status) === 'leasing_in'),
+        [contractRents],
+    );
     const latestContract = useMemo(() => contractRents[0], [contractRents]);
     const hasContractRecord = contractRents.length > 0;
     const contractOwnerId = latestContract?.tenantId || '';
     const contractSubLandlordId = (latestContract as any)?.rentOutSubLandlordId || '';
     const contractCurrentTenantId = latestContract?.rentOutTenantIds?.[0] || '';
 
-    const renderRentTable = (records: Rent[]) => {
+    /** 收租表第二欄為現時租客；交租表第二欄為業主（proprietor） */
+    const renderRentTable = (records: Rent[], partyMode: 'lessee' | 'landlord' | 'owner' = 'lessee') => {
         if (records.length === 0) {
             return (
                 <div className="p-6 bg-zinc-50 dark:bg-white/5 rounded-xl text-center text-zinc-600 dark:text-white/60 text-base">
@@ -190,24 +210,54 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
             );
         }
 
+        const rentGridClass =
+            'grid grid-cols-[100px_minmax(0,1fr)_minmax(0,1.5fr)_minmax(0,1.15fr)_minmax(0,1.05fr)_minmax(0,1fr)_90px] gap-4 px-4';
+        /** 交租記錄「編號」欄：顯示所屬物業編號（與表單「編號」一致） */
+        const propertyCodeForRentingRows = (formData.code || property?.code || '').trim() || '-';
+
         return (
             <div className="border border-zinc-200 dark:border-white/10 rounded-xl overflow-hidden shadow-sm">
-                <div className="grid grid-cols-[100px_1fr_1.5fr_1.2fr_1fr_90px] gap-4 px-4 py-3 bg-zinc-100/80 dark:bg-white/5 text-sm font-semibold text-zinc-700 dark:text-white/80 uppercase tracking-wider border-b border-zinc-200 dark:border-white/10">
+                <div
+                    className={`${rentGridClass} py-3 bg-zinc-100/80 dark:bg-white/5 text-sm font-semibold text-zinc-700 dark:text-white/80 uppercase tracking-wider border-b border-zinc-200 dark:border-white/10`}
+                >
                     <div className="flex items-center gap-1.5 font-bold">編號</div>
-                    <div className="font-bold">承租人</div>
+                    <div className="font-bold">
+                        {partyMode === 'landlord' ? '現時租客' : partyMode === 'owner' ? '業主' : '承租人'}
+                    </div>
                     <div className="font-bold">租借位置</div>
                     <div className="font-bold">租期</div>
+                    <div className="font-bold">付款日期</div>
                     <div className="text-right font-bold">租金/月</div>
                     <div className="text-center font-bold">操作</div>
                 </div>
                 {records.map((rent) => {
-                    const otherParty = rent.tenant || rent.proprietor || (proprietors || []).find(p => p.id === (rent.tenantId || rent.proprietorId));
+                    const otherPartyLessee =
+                        rent.tenant || rent.proprietor || (proprietors || []).find(p => p.id === (rent.tenantId || rent.proprietorId));
+                    /** 收租／合約：合約欄位優先，否則用簡化表單寫入的 startDate／endDate */
                     const startDate = rent.type === 'rent_out' || rent.type === 'contract'
-                        ? (rent.rentOutStartDate ? new Date(rent.rentOutStartDate) : null)
-                        : (rent.rentingStartDate ? new Date(rent.rentingStartDate) : (rent.startDate ? new Date(rent.startDate) : null));
+                        ? (rent.rentOutStartDate
+                              ? new Date(rent.rentOutStartDate)
+                              : rent.startDate
+                                ? new Date(rent.startDate)
+                                : (rent as any).rentCollectionDate
+                                  ? new Date((rent as any).rentCollectionDate)
+                                  : null)
+                        : (rent.rentingStartDate
+                              ? new Date(rent.rentingStartDate)
+                              : rent.startDate
+                                ? new Date(rent.startDate)
+                                : null);
                     const endDate = rent.type === 'rent_out' || rent.type === 'contract'
-                        ? (rent.rentOutEndDate ? new Date(rent.rentOutEndDate) : null)
-                        : (rent.rentingEndDate ? new Date(rent.rentingEndDate) : (rent.endDate ? new Date(rent.endDate) : null));
+                        ? (rent.rentOutEndDate
+                              ? new Date(rent.rentOutEndDate)
+                              : rent.endDate
+                                ? new Date(rent.endDate)
+                                : null)
+                        : (rent.rentingEndDate
+                              ? new Date(rent.rentingEndDate)
+                              : rent.endDate
+                                ? new Date(rent.endDate)
+                                : null);
                     const monthlyRent = rent.type === 'rent_out' || rent.type === 'contract'
                         ? (rent.rentOutMonthlyRental || rent.amount || 0)
                         : (rent.rentingMonthlyRental || rent.amount || 0);
@@ -218,12 +268,30 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
 
                     const contractNumber = rent.type === 'rent_out' || rent.type === 'contract'
                         ? (rent.rentOutTenancyNumber || `-`)
-                        : (rent.rentingNumber || `*`);
+                        : propertyCodeForRentingRows;
 
-                    const isExpired = endDate ? endDate < new Date() : false;
+                    /** 交租業主存於 tenant_id（與 RentModal 一致），非 proprietor_id */
+                    const rentingOwnerParty =
+                        rent.type === 'renting'
+                            ? rent.tenant || (proprietors || []).find((p) => p.id === rent.tenantId)
+                            : undefined;
+
+                    const rentOutCurrentTenantLabel = (() => {
+                        const rcName = (rent as any).rentCollectionTenantName;
+                        if (rcName != null && String(rcName).trim()) return String(rcName).trim();
+                        const rt = (rent as any).rentOutTenants;
+                        if (Array.isArray(rt) && rt.length > 0) {
+                            const joined = rt.map((x: unknown) => String(x).trim()).filter(Boolean).join('、');
+                            if (joined) return joined;
+                        }
+                        return '';
+                    })();
 
                     return (
-                        <div key={rent.id} className={`grid grid-cols-[100px_1fr_1.5fr_1.2fr_1fr_90px] gap-4 px-4 py-4 border-b border-zinc-100 dark:border-white/5 text-sm hover:bg-zinc-50/80 dark:hover:bg-white/[0.02] transition-colors items-center last:border-0 group ${isExpired ? 'bg-red-50/50 dark:bg-red-500/5' : ''}`}>
+                        <div
+                            key={rent.id}
+                            className={`${rentGridClass} py-4 border-b border-zinc-100 dark:border-white/5 text-sm hover:bg-zinc-50/80 dark:hover:bg-white/[0.02] transition-colors items-center last:border-0 group`}
+                        >
                             <div className="flex flex-col gap-1">
                                 <span className="font-mono text-xs font-bold text-zinc-600 dark:text-white/70 tracking-tight">{contractNumber}</span>
                                 <div className="flex items-center gap-1 flex-wrap">
@@ -234,20 +302,26 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                                         : 'bg-indigo-100 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-200/50 dark:border-indigo-500/20'}`}>
                                         {rent.type === 'rent_out' ? '收租' : rent.type === 'contract' ? '合約記錄' : '交租'}
                                     </span>
-                                    {isExpired && (
-                                        <span className="text-[10px] px-2 py-0.5 rounded-full w-fit font-bold tracking-wider bg-red-100 dark:bg-red-500/20 text-red-600 dark:text-red-400 border border-red-200/50 dark:border-red-500/30">
-                                            已過期
-                                        </span>
-                                    )}
                                 </div>
                             </div>
-                            <div className="flex flex-col overflow-hidden">
+                            <div className="flex flex-col overflow-hidden min-w-0">
                                 <span className="font-semibold text-zinc-900 dark:text-white truncate">
-                                    {rent.type === 'contract' ? (rent.rentOutLessor || otherParty?.name || '-') : (otherParty?.name || (rent.type === 'renting' ? '(暫缺)' : '-'))}
+                                    {partyMode === 'landlord'
+                                        ? rentOutCurrentTenantLabel || '—'
+                                        : partyMode === 'owner'
+                                          ? (rentingOwnerParty?.name || (rent.type === 'renting' ? '(暫缺)' : '-'))
+                                        : rent.type === 'contract'
+                                          ? (rent.rentOutLessor || otherPartyLessee?.name || '-')
+                                          : (otherPartyLessee?.name || (rent.type === 'renting' ? '(暫缺)' : '-'))}
                                 </span>
-                                {otherParty?.shortName && (
+                                {partyMode !== 'landlord' && partyMode !== 'owner' && otherPartyLessee?.shortName && (
                                     <span className="text-xs text-zinc-500 dark:text-white/50 truncate uppercase">
-                                        {otherParty.shortName}
+                                        {otherPartyLessee.shortName}
+                                    </span>
+                                )}
+                                {partyMode === 'owner' && rentingOwnerParty?.shortName && (
+                                    <span className="text-xs text-zinc-500 dark:text-white/50 truncate uppercase">
+                                        {rentingOwnerParty.shortName}
                                     </span>
                                 )}
                             </div>
@@ -273,14 +347,22 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                                     <span className="text-zinc-500 dark:text-white/40 italic text-sm">未設定</span>
                                 )}
                             </div>
-                            <div className="text-right">
-                                <div className="flex flex-col items-end">
-                                    <span className="text-xs text-zinc-600 dark:text-white/60 font-semibold uppercase tracking-wider">{rent.currency || 'HKD'}</span>
-                                    <span className="text-base font-black text-zinc-900 dark:text-white tabular-nums">
-                                        ${monthlyRent.toLocaleString()}
-                                        <span className="text-sm text-zinc-600 dark:text-white/60 ml-1 font-medium">/月</span>
+                            <div className="flex flex-col justify-center min-w-0">
+                                {(rent as any).rentCollectionPaymentDate ? (
+                                    <span
+                                        className="font-semibold text-zinc-800 dark:text-white/90 tabular-nums text-sm"
+                                        title="付款日期"
+                                    >
+                                        {formatDateDMY((rent as any).rentCollectionPaymentDate)}
                                     </span>
-                                </div>
+                                ) : (
+                                    <span className="text-zinc-400 dark:text-white/35 text-sm font-medium">—</span>
+                                )}
+                            </div>
+                            <div className="text-right min-w-0">
+                                <span className="inline-block text-sm font-semibold text-zinc-900 dark:text-white tabular-nums whitespace-nowrap">
+                                    ${monthlyRent.toLocaleString()}/月
+                                </span>
                             </div>
                             <div className="flex items-center justify-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
                                 <button
@@ -288,6 +370,184 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                                     onClick={() => setEditingRent(rent)}
                                     className="p-2 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-500/20 rounded-lg transition-all"
                                     title="更改租金記錄"
+                                >
+                                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                    </svg>
+                                </button>
+                                <button
+                                    type="button"
+                                    disabled={unlinkingRentId === rent.id}
+                                    onClick={() => handleUnlinkRent(rent.id!)}
+                                    className={`p-2 text-amber-600 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-500/20 rounded-lg transition-all ${unlinkingRentId === rent.id ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                    title="取消物業連結"
+                                >
+                                    {unlinkingRentId === rent.id ? (
+                                        <div className="w-4 h-4 border-2 border-amber-500 border-t-transparent rounded-full animate-spin" />
+                                    ) : (
+                                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+                                        </svg>
+                                    )}
+                                </button>
+                            </div>
+                        </div>
+                    );
+                })}
+            </div>
+        );
+    };
+
+    /** 與 dashboard/contracts 相同：合約業主為 tenant_id join（tenant），現時租客為 current_tenants */
+    const contractOwnerDisplayName = (c: any) => {
+        const fromJoin =
+            (c.tenant?.name && String(c.tenant.name).trim()) ||
+            (c.proprietor?.name && String(c.proprietor.name).trim());
+        if (fromJoin) return fromJoin;
+        const p = (proprietors || []).find((x) => x.id === c.tenantId);
+        return (p?.name && String(p.name).trim()) || '';
+    };
+    const contractLesseeDisplayName = (c: any) => {
+        const fromCt = c.currentTenant?.name && String(c.currentTenant.name).trim();
+        if (fromCt) return fromCt;
+        const rt = c.rentOutTenants;
+        if (Array.isArray(rt) && rt[0] != null && String(rt[0]).trim()) return String(rt[0]).trim();
+        return '';
+    };
+
+    /** 合約記錄：分出租（amber）／租賃（violet），欄位與管理合約頁一致 */
+    const renderContractTable = (records: any[], variant: 'lease_out' | 'lease_in') => {
+        const isLeaseIn = variant === 'lease_in';
+        const shellClass = isLeaseIn
+            ? 'border-violet-200 dark:border-violet-500/35'
+            : 'border-amber-200 dark:border-amber-500/30';
+        const headClass = isLeaseIn
+            ? 'bg-violet-50/60 dark:bg-violet-500/10 border-violet-200 dark:border-violet-500/25'
+            : 'bg-amber-50/50 dark:bg-amber-500/10 border-amber-200 dark:border-amber-500/30';
+        const rowBorderHover = isLeaseIn
+            ? 'border-violet-200/50 dark:border-violet-500/15 hover:bg-violet-50/50 dark:hover:bg-violet-500/8'
+            : 'border-amber-200/50 dark:border-amber-500/10 hover:bg-amber-50/50 dark:hover:bg-amber-500/5';
+        const badgeClass = isLeaseIn
+            ? 'bg-violet-100 text-violet-900 border border-violet-400/70 dark:bg-violet-950/55 dark:text-violet-100 dark:border-violet-500/55'
+            : 'bg-amber-100 text-amber-800 border border-amber-300/60 dark:bg-amber-950/40 dark:text-amber-200 dark:border-amber-500/35';
+
+        if (records.length === 0) {
+            return (
+                <div
+                    className={`p-6 rounded-xl text-center text-base border ${shellClass} ${
+                        isLeaseIn
+                            ? 'text-violet-700/80 dark:text-violet-300/70 bg-violet-50/30 dark:bg-violet-500/5'
+                            : 'text-amber-800/80 dark:text-amber-300/70 bg-amber-50/30 dark:bg-amber-500/5'
+                    }`}
+                >
+                    尚未有相關記錄
+                </div>
+            );
+        }
+
+        return (
+            <div className={`border rounded-xl overflow-hidden shadow-sm ${shellClass}`}>
+                <div
+                    className={`grid grid-cols-[100px_1fr_1fr_1.5fr_1.2fr_1fr_minmax(0,1fr)_90px] gap-4 px-4 py-3 text-sm font-semibold uppercase tracking-wider border-b ${headClass} text-zinc-700 dark:text-white/80`}
+                >
+                    <div className="flex items-center gap-1.5 font-bold">編號</div>
+                    <div className="font-bold">業主</div>
+                    <div className="font-bold">現時租客</div>
+                    <div className="font-bold">租借位置</div>
+                    <div className="font-bold">租期</div>
+                    <div className="text-right font-bold">租金/月</div>
+                    <div className="font-bold">付款日期</div>
+                    <div className="text-center font-bold">操作</div>
+                </div>
+                {records.map((rent) => {
+                    const startDate = rent.rentOutStartDate ? new Date(rent.rentOutStartDate) : null;
+                    const endDate = rent.rentOutEndDate ? new Date(rent.rentOutEndDate) : null;
+                    const monthlyRent = rent.rentOutMonthlyRental || rent.amount || 0;
+                    const months =
+                        startDate && endDate
+                            ? Math.round((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24 * 30))
+                            : rent.rentOutPeriods || 0;
+                    const contractNumber = rent.rentOutTenancyNumber || '—';
+                    const isExpired = endDate ? endDate < new Date() : false;
+                    const ownerName = contractOwnerDisplayName(rent);
+                    const tenantName = contractLesseeDisplayName(rent);
+
+                    return (
+                        <div
+                            key={rent.id}
+                            className={`grid grid-cols-[100px_1fr_1fr_1.5fr_1.2fr_1fr_minmax(0,1fr)_90px] gap-4 px-4 py-4 border-b text-sm transition-colors items-center last:border-0 group ${rowBorderHover} ${
+                                isExpired ? 'bg-red-50/50 dark:bg-red-500/5' : ''
+                            }`}
+                        >
+                            <div className="flex flex-col gap-1">
+                                <span className="font-mono text-xs font-bold text-zinc-600 dark:text-white/70 tracking-tight">
+                                    {contractNumber}
+                                </span>
+                                <div className="flex items-center gap-1 flex-wrap">
+                                    <span className={`text-[10px] px-2 py-0.5 rounded-full w-fit font-bold tracking-wider ${badgeClass}`}>
+                                        {isLeaseIn ? '租賃' : '出租'}
+                                    </span>
+                                    {isExpired && (
+                                        <span className="text-[10px] px-2 py-0.5 rounded-full w-fit font-bold tracking-wider bg-red-100 dark:bg-red-500/20 text-red-600 dark:text-red-400 border border-red-200/50 dark:border-red-500/30">
+                                            已過期
+                                        </span>
+                                    )}
+                                </div>
+                            </div>
+                            <div className="flex flex-col overflow-hidden min-w-0">
+                                <span className="font-semibold text-zinc-900 dark:text-white truncate" title={ownerName || undefined}>
+                                    {ownerName || '—'}
+                                </span>
+                            </div>
+                            <div className="flex flex-col overflow-hidden min-w-0">
+                                <span className="font-semibold text-zinc-900 dark:text-white truncate" title={tenantName || undefined}>
+                                    {tenantName || '—'}
+                                </span>
+                            </div>
+                            <div className="text-zinc-700 dark:text-white/80 text-sm leading-relaxed line-clamp-2">
+                                {rent.location || rent.rentOutAddressDetail || formData.name || '-'}
+                            </div>
+                            <div className="flex flex-col">
+                                {startDate ? (
+                                    <>
+                                        <div className="text-zinc-800 dark:text-white/90 font-medium tabular-nums text-sm">
+                                            {startDate.toLocaleDateString('zh-TW')}
+                                        </div>
+                                        <div className="text-zinc-600 dark:text-white/60 flex items-center gap-1 tabular-nums text-xs">
+                                            <span>~</span> {endDate ? endDate.toLocaleDateString('zh-TW') : '-'}
+                                        </div>
+                                        <div className="mt-1 flex items-center gap-1">
+                                            <span className="text-xs px-2 py-0.5 bg-zinc-100 dark:bg-white/10 rounded font-semibold text-zinc-600 dark:text-white/60">
+                                                {months}個月
+                                            </span>
+                                        </div>
+                                    </>
+                                ) : (
+                                    <span className="text-zinc-500 dark:text-white/40 italic text-sm">未設定</span>
+                                )}
+                            </div>
+                            <div className="text-right min-w-0">
+                                <span
+                                    className={`inline-block text-sm font-semibold tabular-nums whitespace-nowrap ${
+                                        isLeaseIn
+                                            ? 'text-violet-800 dark:text-violet-200'
+                                            : 'text-amber-800 dark:text-amber-200'
+                                    }`}
+                                >
+                                    ${monthlyRent.toLocaleString()}/月
+                                </span>
+                            </div>
+                            <div className="text-zinc-600 dark:text-white/65 text-sm tabular-nums min-w-0">
+                                {rent.rentCollectionPaymentDate
+                                    ? formatDateDMY(rent.rentCollectionPaymentDate)
+                                    : '—'}
+                            </div>
+                            <div className="flex items-center justify-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <button
+                                    type="button"
+                                    onClick={() => setEditingRent(rent as Rent)}
+                                    className="p-2 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-500/20 rounded-lg transition-all"
+                                    title="編輯合約記錄"
                                 >
                                     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
@@ -553,7 +813,8 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
         await queryClient.refetchQueries({ queryKey: ['proprietors'] });
         if (proprietorModalMode === 'tenant') {
             setFormData(prev => ({ ...prev, tenantId: id }));
-        } else {
+        } else if (!proprietorModalInitial?.id) {
+            // 僅「新增業主」時才加入物業業主列表；編輯既有業主不重複加入
             setFormData(prev => ({
                 ...prev,
                 proprietorIds: [...prev.proprietorIds, id],
@@ -561,6 +822,7 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
             }));
         }
         setShowProprietorModal(false);
+        setProprietorModalInitial(null);
         if (proprietorData) {
             setTimeout(() => setPendingProprietors(prev => {
                 const next = { ...prev };
@@ -1150,6 +1412,7 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                                             type="button"
                                             onClick={() => {
                                                 setProprietorModalMode('proprietor');
+                                                setProprietorModalInitial(null);
                                                 setShowProprietorModal(true);
                                             }}
                                             className="px-4 py-2 bg-purple-50 dark:bg-purple-500/20 text-purple-600 dark:text-purple-400 rounded-xl hover:bg-purple-100 dark:hover:bg-purple-500/30 border border-purple-100 dark:border-purple-500/30 text-sm font-medium transition-all duration-300"
@@ -1189,78 +1452,64 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                             ) : (
                                 <div className="border border-zinc-200 dark:border-white/10 rounded-xl overflow-hidden">
                                     {/* Table Header */}
-                                    <div className="grid grid-cols-[80px_1.2fr_1.5fr_90px_110px_90px] gap-4 px-4 py-3 bg-zinc-100/80 dark:bg-white/5 text-sm font-semibold text-zinc-700 dark:text-white/80 uppercase tracking-wider border-b border-zinc-200 dark:border-white/10">
-                                        <div>代碼</div>
-                                        <div>業主名稱</div>
-                                        <div>公司名稱</div>
-                                        <div>業主性質</div>
-                                        <div>擁有人類別</div>
-                                        <div className="text-center">操作</div>
+                                    <div className="grid grid-cols-[4rem_minmax(0,1fr)_6rem_minmax(0,1fr)_4.5rem] gap-x-2.5 gap-y-1 px-3 py-3 bg-zinc-100/80 dark:bg-white/5 text-sm font-semibold text-zinc-700 dark:text-white/80 uppercase tracking-wider border-b border-zinc-200 dark:border-white/10 items-center">
+                                        <div className="shrink-0">代碼</div>
+                                        <div className="min-w-0">業主名稱</div>
+                                        <div className="shrink-0 whitespace-nowrap">業主性質</div>
+                                        <div className="min-w-0">擁有人類別</div>
+                                        <div className="text-center shrink-0 justify-self-center">操作</div>
                                     </div>
                                     {/* Table Rows */}
                                     {formData.proprietorIds.map((propId) => {
                                         const selectedProprietor = proprietorsList.find(p => p.id === propId) || (pendingProprietors[propId] as Proprietor | undefined);
-                                        const rent = rents.find(r => r.proprietorId === propId);
 
                                         if (!selectedProprietor?.name && !pendingProprietors[propId]?.name) return null;
 
                                         const typeLabel = selectedProprietor?.type === 'company' ? '公司' : selectedProprietor?.type === 'individual' ? '個人' : '-';
-                                        const categoryLabel = selectedProprietor?.category === 'group_company' ? '集團公司'
-                                            : selectedProprietor?.category === 'joint_venture' ? '合資公司'
-                                            : selectedProprietor?.category === 'managed_individual' ? '代管個體'
-                                            : selectedProprietor?.category === 'external_landlord' ? '出租的業主'
-                                            : selectedProprietor?.category === 'tenant' ? '承租人'
-                                            : selectedProprietor?.category === 'external_customer' ? '街外客' : '-';
+                                        const categoryLabel = selectedProprietor?.category
+                                            ? proprietorCategoryLabelZh(selectedProprietor.category, 'form')
+                                            : '-';
 
                                         return (
-                                            <div key={propId} className="grid grid-cols-[80px_1.2fr_1.5fr_90px_110px_90px] gap-4 px-4 py-4 border-b border-zinc-100 dark:border-white/5 text-sm hover:bg-zinc-50/50 dark:hover:bg-white/[0.01] transition-colors items-center last:border-0">
+                                            <div key={propId} className="grid grid-cols-[4rem_minmax(0,1fr)_6rem_minmax(0,1fr)_4.5rem] gap-x-2.5 gap-y-1 px-3 py-3 border-b border-zinc-100 dark:border-white/5 text-sm hover:bg-zinc-50/50 dark:hover:bg-white/[0.01] transition-colors items-center last:border-0">
                                                 {/* 代碼 */}
-                                                <div className="text-zinc-600 dark:text-white/60 font-mono text-sm font-medium">
+                                                <div className="text-zinc-600 dark:text-white/60 font-mono text-sm font-medium shrink-0">
                                                     {selectedProprietor?.code || '-'}
                                                 </div>
 
                                                 {/* 業主名稱 */}
-                                                <div className="font-medium text-zinc-900 dark:text-white truncate text-sm" title={selectedProprietor?.name || ''}>
+                                                <div className="font-medium text-zinc-900 dark:text-white truncate text-sm min-w-0" title={selectedProprietor?.name || ''}>
                                                     {selectedProprietor?.name || '(載入中...)'}
                                                 </div>
 
-                                                {/* 公司名稱 */}
-                                                <div className="text-zinc-700 dark:text-white/80 truncate text-sm" title={selectedProprietor?.shortName || ''}>
-                                                    {selectedProprietor?.shortName || '-'}
-                                                </div>
-
                                                 {/* 業主性質 */}
-                                                <div className="text-zinc-700 dark:text-white/80 text-sm">
+                                                <div className="text-zinc-700 dark:text-white/80 text-sm shrink-0 whitespace-nowrap">
                                                     {typeLabel}
                                                 </div>
 
                                                 {/* 擁有人類別 */}
-                                                <div className="text-zinc-700 dark:text-white/80 text-sm">
+                                                <div className="text-zinc-700 dark:text-white/80 text-sm min-w-0 leading-snug">
                                                     {categoryLabel}
                                                 </div>
 
-                                                {/* Actions */}
-                                                <div className="flex items-center justify-center gap-1">
-                                                    {rent ? (
+                                                {/* 操作：編輯業主、移除連結 */}
+                                                <div className="flex items-center justify-center gap-0.5 shrink-0 justify-self-center">
+                                                    {isAuthenticated && selectedProprietor?.id && (
                                                         <button
                                                             type="button"
-                                                            onClick={() => setEditingRent(rent)}
-                                                            className="px-2 py-1 text-xs bg-blue-50 dark:bg-blue-500/20 text-blue-600 dark:text-blue-400 rounded-lg hover:bg-blue-100 dark:hover:bg-blue-500/30 transition-colors border border-blue-100 dark:border-none"
-                                                        >
-                                                            更改
-                                                        </button>
-                                                    ) : hasContractRecord ? (
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => setCreateRentForProprietorId(propId)}
-                                                            className="p-1.5 text-zinc-400 hover:text-purple-500 hover:bg-purple-50 dark:hover:bg-purple-500/20 rounded-lg transition-colors"
-                                                            title="建立租約"
+                                                            onClick={() => {
+                                                                setProprietorModalMode('proprietor');
+                                                                setProprietorModalInitial(selectedProprietor as Proprietor);
+                                                                setShowProprietorModal(true);
+                                                            }}
+                                                            className="p-1.5 text-zinc-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-500/20 rounded-lg transition-colors"
+                                                            title="編輯業主"
                                                         >
                                                             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                                                             </svg>
                                                         </button>
-                                                    ) : null}
+                                                    )}
                                                     <button
                                                         type="button"
                                                         onClick={() => handleUnlinkProprietor(propId)}
@@ -1369,7 +1618,7 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                                         <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]"></div>
                                         收租記錄 (Rent Out Records)
                                     </h4>
-                                    {renderRentTable(rentOutRents)}
+                                    {renderRentTable(rentOutRents, 'landlord')}
                                 </div>
 
                                 <div>
@@ -1377,15 +1626,24 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                                         <div className="w-2.5 h-2.5 rounded-full bg-indigo-500 shadow-[0_0_8px_rgba(99,102,241,0.5)]"></div>
                                         交租記錄 (Renting Records)
                                     </h4>
-                                    {renderRentTable(rentingRents)}
+                                    {renderRentTable(rentingRents, 'owner')}
                                 </div>
 
-                                <div>
-                                    <h4 className="text-base font-bold text-amber-700 dark:text-amber-400 mb-4 flex items-center gap-2 px-1">
-                                        <div className="w-2.5 h-2.5 rounded-full bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.5)]"></div>
-                                        合約記錄 (Contract Records)
-                                    </h4>
-                                    {renderRentTable(contractRents)}
+                                <div className="space-y-8">
+                                    <div>
+                                        <h4 className="text-base font-bold text-violet-900 dark:text-violet-100 mb-3 flex items-center gap-2 px-1">
+                                            <div className="w-2.5 h-2.5 rounded-full bg-violet-500 shadow-[0_0_8px_rgba(139,92,246,0.45)]"></div>
+                                            租賃合約
+                                        </h4>
+                                        {renderContractTable(leaseInContractRents, 'lease_in')}
+                                    </div>
+                                    <div>
+                                        <h4 className="text-base font-bold text-amber-900 dark:text-amber-100 mb-3 flex items-center gap-2 px-1">
+                                            <div className="w-2.5 h-2.5 rounded-full bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.5)]"></div>
+                                            出租合約
+                                        </h4>
+                                        {renderContractTable(leaseOutContractRents, 'lease_out')}
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -1468,9 +1726,15 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
             {/* Proprietor Modal */}
             {showProprietorModal && (
                 <ProprietorModal
+                    key={proprietorModalInitial?.id ?? 'new-proprietor'}
                     mode={proprietorModalMode}
                     propertyCode={property?.code || formData.code}
-                    onClose={() => setShowProprietorModal(false)}
+                    initialData={proprietorModalInitial ?? undefined}
+                    initialEditing={proprietorModalInitial ? true : undefined}
+                    onClose={() => {
+                        setShowProprietorModal(false);
+                        setProprietorModalInitial(null);
+                    }}
                     onSuccess={handleProprietorCreated}
                 />
             )}
@@ -1504,21 +1768,6 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                         queryClient.invalidateQueries({ queryKey: ['properties-with-relations'] });
                         addNotification('合約記錄已建立', 'update');
                     }}
-                />
-            )}
-
-            {/* Create rent for proprietor (from 業主 row when no rent yet) — 僅收租/交租 */}
-            {createRentForProprietorId && property?.id && (
-                <RentModal
-                    propertyId={property.id}
-                    defaultLocation={formData.name}
-                    initialProprietorId={createRentForProprietorId}
-                    allowedTypes={['rent_out', 'renting']}
-                    presetTenantId={contractOwnerId}
-                    presetSubLandlordId={contractSubLandlordId}
-                    presetCurrentTenantId={contractCurrentTenantId}
-                    onClose={() => setCreateRentForProprietorId(null)}
-                    onSuccess={handleRentCreated}
                 />
             )}
 
