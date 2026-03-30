@@ -11,11 +11,22 @@ import { BentoCard } from '@/components/layout/BentoGrid';
 import ProprietorModal from '@/components/properties/ProprietorModal';
 import RentOutFormModal from '@/components/properties/RentOutFormModal';
 import CurrentTenantDetailModal from '@/components/properties/CurrentTenantDetailModal';
-import { mergeOwnerAndTenantProprietors } from '@/lib/formatters';
+import { dedupeRecordsByDisplayName, proprietorCategoryLabelZh, proprietorCategoryBadgeClassName } from '@/lib/formatters';
+
+type ProprietorManageTab = 'owners' | 'lessees' | 'sub_landlords' | 'current_tenants';
+
+const PROPRIETOR_TAB_ORDER: ProprietorManageTab[] = ['owners', 'lessees', 'sub_landlords', 'current_tenants'];
+
+const PROPRIETOR_TAB_LABEL: Record<ProprietorManageTab, string> = {
+    owners: '業主',
+    lessees: '承租人',
+    sub_landlords: '二房東',
+    current_tenants: '現時租客',
+};
 
 export default function TenantsPage() {
     const queryClient = useQueryClient();
-    const [activeTab, setActiveTab] = useState<'tenants' | 'sub_landlords' | 'current_tenants'>('tenants');
+    const [activeTab, setActiveTab] = useState<ProprietorManageTab>('owners');
     const [searchQuery, setSearchQuery] = useState('');
 
     // Tenants (承租人)
@@ -54,23 +65,24 @@ export default function TenantsPage() {
         () => (allProprietors || []).filter(p => p.code?.startsWith('T')),
         [allProprietors]
     );
-    /** 業主＋承租人合併；同名只保留一筆（業主優先） */
-    const mergedOwnersAndTenants = useMemo(
-        () => mergeOwnerAndTenantProprietors(ownerProprietors, tenantProprietors),
-        [ownerProprietors, tenantProprietors]
-    );
+    /** 各分頁內依顯示名稱去重（與下拉／列表一致） */
+    const dedupedOwners = useMemo(() => dedupeRecordsByDisplayName(ownerProprietors), [ownerProprietors]);
+    const dedupedLessees = useMemo(() => dedupeRecordsByDisplayName(tenantProprietors), [tenantProprietors]);
 
-    const filteredMergedOwnersTenants = useMemo(() => {
-        if (!searchQuery) return mergedOwnersAndTenants;
+    const filterProprietorList = (list: Proprietor[]) => {
+        if (!searchQuery) return list;
         const q = searchQuery.toLowerCase();
-        return mergedOwnersAndTenants.filter(
+        return list.filter(
             p =>
                 p.name.toLowerCase().includes(q) ||
                 p.code.toLowerCase().includes(q) ||
                 (p.englishName && p.englishName.toLowerCase().includes(q)) ||
                 (p.shortName && p.shortName.toLowerCase().includes(q))
         );
-    }, [mergedOwnersAndTenants, searchQuery]);
+    };
+
+    const filteredOwners = useMemo(() => filterProprietorList(dedupedOwners), [dedupedOwners, searchQuery]);
+    const filteredLessees = useMemo(() => filterProprietorList(dedupedLessees), [dedupedLessees, searchQuery]);
 
     // Calculate property count for each sub-landlord based on tenancy number
     const subLandlordPropertyCounts = useMemo(() => {
@@ -216,8 +228,10 @@ export default function TenantsPage() {
 
     const getStats = () => {
         switch (activeTab) {
-            case 'tenants':
-                return { count: mergedOwnersAndTenants.length, label: '業主' };
+            case 'owners':
+                return { count: dedupedOwners.length, label: '業主' };
+            case 'lessees':
+                return { count: dedupedLessees.length, label: '承租人' };
             case 'sub_landlords':
                 return { count: subLandlords?.length || 0, label: '二房東數量' };
             case 'current_tenants':
@@ -227,8 +241,10 @@ export default function TenantsPage() {
 
     const getPlaceholder = () => {
         switch (activeTab) {
-            case 'tenants':
-                return '搜尋業主 ...';
+            case 'owners':
+                return '搜尋業主...';
+            case 'lessees':
+                return '搜尋承租人...';
             case 'sub_landlords':
                 return '搜尋二房東...';
             case 'current_tenants':
@@ -246,7 +262,7 @@ export default function TenantsPage() {
                     <Users className="w-6 h-6 text-purple-500 shrink-0" />
                     管理業主
                 </h1>
-                <p className="text-sm text-zinc-500 dark:text-white/55 mt-1">管理業主、二房東與現時租客</p>
+                <p className="text-sm text-zinc-500 dark:text-white/55 mt-1">管理業主、承租人、二房東與現時租客</p>
             </div>
 
             {/* Stats */}
@@ -282,7 +298,7 @@ export default function TenantsPage() {
                         className="w-full pl-10 pr-4 py-2 bg-white dark:bg-white/5 border border-zinc-200 dark:border-white/10 rounded-xl text-sm text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-blue-500/30 transition-all"
                     />
                 </div>
-                {activeTab === 'tenants' && (
+                {activeTab === 'owners' && (
                     <button
                         type="button"
                         onClick={() => {
@@ -295,6 +311,21 @@ export default function TenantsPage() {
                     >
                         <Plus className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
                         新增業主
+                    </button>
+                )}
+                {activeTab === 'lessees' && (
+                    <button
+                        type="button"
+                        onClick={() => {
+                            setProprietorModalMode('tenant');
+                            setSelectedTenant(null);
+                            setTenantEditMode(true);
+                            setShowTenantModal(true);
+                        }}
+                        className="px-3 sm:px-4 py-2 sm:py-2.5 bg-purple-500 text-white rounded-lg sm:rounded-xl hover:bg-purple-600 text-xs sm:text-sm font-medium transition-all duration-300 flex items-center gap-1.5 sm:gap-2 shadow-sm hover:shadow-md whitespace-nowrap"
+                    >
+                        <Plus className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
+                        新增承租人
                     </button>
                 )}
                 {activeTab === 'sub_landlords' && (
@@ -315,35 +346,39 @@ export default function TenantsPage() {
                         新增租客
                     </button>
                 )}
-                <div className="flex gap-0.5 sm:gap-1 p-1 sm:p-1.5 rounded-xl sm:rounded-2xl bg-zinc-100/90 dark:bg-white/10 ring-1 ring-zinc-200/80 dark:ring-white/10 ml-auto w-full sm:w-auto justify-stretch sm:justify-start">
-                    {(['tenants', 'sub_landlords', 'current_tenants'] as const).map((tab) => (
+                <div className="flex gap-0.5 sm:gap-1 p-1 sm:p-1.5 rounded-xl sm:rounded-2xl bg-zinc-100/90 dark:bg-white/10 ring-1 ring-zinc-200/80 dark:ring-white/10 ml-auto w-full sm:w-auto justify-stretch sm:justify-start flex-wrap sm:flex-nowrap">
+                    {PROPRIETOR_TAB_ORDER.map((tab) => (
                         <button
                             key={tab}
                             type="button"
                             onClick={() => setActiveTab(tab)}
-                            className={`flex-1 sm:flex-none px-2.5 sm:px-4 py-2 sm:py-2 rounded-lg sm:rounded-xl text-xs sm:text-sm font-semibold tracking-tight transition-all min-h-9 sm:min-h-10 ${activeTab === tab
+                            className={`flex-1 sm:flex-none px-2 sm:px-3 py-2 sm:py-2 rounded-lg sm:rounded-xl text-xs sm:text-sm font-semibold tracking-tight transition-all min-h-9 sm:min-h-10 ${activeTab === tab
                                 ? 'bg-white dark:bg-white/20 text-purple-700 dark:text-purple-300 shadow-md ring-1 ring-purple-500/20'
                                 : 'text-zinc-600 dark:text-white/65 hover:text-zinc-900 dark:hover:text-white'}`}
                         >
-                            {tab === 'tenants' ? '業主' : tab === 'sub_landlords' ? '二房東' : '現時租客'}
+                            {PROPRIETOR_TAB_LABEL[tab]}
                         </button>
                     ))}
                 </div>
             </div>
 
             {/* Content based on active tab */}
-            {activeTab === 'tenants' && (
+            {(activeTab === 'owners' || activeTab === 'lessees') && (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
-                    {filteredMergedOwnersTenants.length === 0 ? (
+                    {(activeTab === 'owners' ? filteredOwners : filteredLessees).length === 0 ? (
                         <div className="col-span-full glass-card flex flex-col items-center justify-center py-24 text-zinc-400 dark:text-white/40">
                             <svg className="w-20 h-20 mb-6 opacity-20" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
                             </svg>
-                            <p className="text-xl font-medium">暫無業主或承租人資料。</p>
+                            <p className="text-xl font-medium">
+                                {activeTab === 'owners'
+                                    ? '暫無業主資料。請按「+ 新增業主」新增。'
+                                    : '暫無承租人資料。請按「+ 新增承租人」新增。'}
+                            </p>
                         </div>
                     ) : (
-                        filteredMergedOwnersTenants.map((p, index) => {
-                            const isLessee = !!p.code?.startsWith('T');
+                        (activeTab === 'owners' ? filteredOwners : filteredLessees).map((p, index) => {
+                            const isLessee = activeTab === 'lessees';
                             const ringHover = isLessee ? 'hover:ring-blue-500/30' : 'hover:ring-purple-500/30';
                             const titleHover = isLessee
                                 ? 'group-hover:text-blue-600 dark:group-hover:text-blue-400'
@@ -380,23 +415,9 @@ export default function TenantsPage() {
                                         </div>
                                         {!isLessee && (
                                             <div
-                                                className={`shrink-0 px-2 py-1 sm:px-3 sm:py-1.5 text-[10px] sm:text-xs font-semibold rounded-md sm:rounded-lg ${
-                                                    p.category === 'group_company'
-                                                        ? 'bg-purple-500/10 text-purple-600 dark:text-purple-400 ring-1 ring-purple-500/20'
-                                                        : p.category === 'joint_venture'
-                                                          ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 ring-1 ring-emerald-500/20'
-                                                          : p.category === 'managed_individual'
-                                                            ? 'bg-zinc-500/10 text-zinc-600 dark:text-zinc-400 ring-1 ring-zinc-500/20'
-                                                            : 'bg-amber-500/10 text-amber-600 dark:text-amber-400 ring-1 ring-amber-500/20'
-                                                }`}
+                                                className={`shrink-0 px-2 py-1 sm:px-3 sm:py-1.5 text-[10px] sm:text-xs font-semibold rounded-md sm:rounded-lg ${proprietorCategoryBadgeClassName(p.category)}`}
                                             >
-                                                {p.category === 'group_company'
-                                                    ? '集團'
-                                                    : p.category === 'joint_venture'
-                                                      ? '合資'
-                                                      : p.category === 'managed_individual'
-                                                        ? '代管'
-                                                        : '外部'}
+                                                {proprietorCategoryLabelZh(p.category, 'badge')}
                                             </div>
                                         )}
                                     </div>

@@ -5,7 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { usePropertyWithRelationsQuery, useProprietorsQuery } from '@/hooks/useStorage';
-import { formatLotArea } from '@/lib/formatters';
+import { formatLotArea, proprietorCategoryLabelZh } from '@/lib/formatters';
 import type { Property, Proprietor, Rent } from '@/lib/db';
 import {
     ArrowLeft,
@@ -111,8 +111,8 @@ export default function PropertyDetailsPage() {
     const mainTabs = [
         { id: 'overview' as const, en: 'Overview', zh: '概覽' },
         { id: 'location' as const, en: 'Location', zh: '位置' },
-        { id: 'policy' as const, en: 'Policy', zh: '政策' },
-        { id: 'booking' as const, en: 'Booking', zh: '文件與圖資' },
+        { id: 'policy' as const, en: 'Planning', zh: '規劃' },
+        { id: 'booking' as const, en: 'Geographic map', zh: '地理資訊圖' },
     ];
 
     const nextImage = () => {
@@ -441,7 +441,9 @@ export default function PropertyDetailsPage() {
                                                 const otherParty = isRentOutOrContract
                                                     ? rent.tenant
                                                     : (rent.proprietor || rent.tenant);
-                                                const rentNumber = isRentOutOrContract ? (rent.rentOutTenancyNumber || '-') : (rent.rentingNumber || '-');
+                                                const rentNumber = isRentOutOrContract
+                                                    ? (rent.rentOutTenancyNumber || '-')
+                                                    : (property.code?.trim() || '-');
                                                 const startDate = isRentOutOrContract ? (rent.rentOutStartDate || rent.startDate) : (rent.rentingStartDate || rent.startDate);
                                                 const endDate = isRentOutOrContract ? (rent.rentOutEndDate || rent.endDate) : (rent.rentingEndDate || rent.endDate);
                                                 const formatEnDate = (d: any) => d ? new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '';
@@ -479,7 +481,7 @@ export default function PropertyDetailsPage() {
                                                                             <div className="text-xs text-zinc-500 dark:text-white/60 flex items-center justify-between">
                                                                                 <span>類型: <span className="text-zinc-900 dark:text-white">{otherParty.type === 'company' ? '公司' : '個人'}</span></span>
                                                                                 <span className="bg-zinc-100 dark:bg-white/10 px-1.5 py-0.5 rounded text-[10px] text-zinc-600 dark:text-white/70">
-                                                                                    {otherParty.category === 'group_company' ? '集團公司' : otherParty.category === 'joint_venture' ? '合資公司' : otherParty.category === 'managed_individual' ? '代管個體' : otherParty.category === 'external_landlord' ? '外部業主' : '承租人'}
+                                                                                    {proprietorCategoryLabelZh(otherParty.category, 'card')}
                                                                                 </span>
                                                                             </div>
                                                                         </div>
@@ -601,6 +603,7 @@ export default function PropertyDetailsPage() {
             {selectedRent && (
                 <RentDetailsModal
                     rent={selectedRent}
+                    property={property}
                     onClose={() => setSelectedRent(null)}
                 />
             )}

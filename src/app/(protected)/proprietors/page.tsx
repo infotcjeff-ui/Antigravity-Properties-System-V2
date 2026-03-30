@@ -6,6 +6,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useProprietors, useProprietorsQuery } from '@/hooks/useStorage';
 import type { Proprietor } from '@/lib/db';
 import { BentoCard } from '@/components/layout/BentoGrid';
+import { proprietorCategoryLabelZh, proprietorCategoryBadgeClassName } from '@/lib/formatters';
 import ProprietorModal from '@/components/properties/ProprietorModal';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -144,15 +145,8 @@ export default function ProprietorsPage() {
                                         }`}>
                                         {proprietor.type === 'company' ? '公司' : '個人'}
                                     </div>
-                                    <div className={`px-2 py-1 text-[10px] sm:text-xs font-semibold rounded-lg ${proprietor.category === 'group_company'
-                                        ? 'bg-purple-500/10 text-purple-500 ring-1 ring-purple-500/20'
-                                        : proprietor.category === 'joint_venture'
-                                            ? 'bg-emerald-500/10 text-emerald-500 ring-1 ring-emerald-500/20'
-                                            : proprietor.category === 'managed_individual'
-                                                ? 'bg-zinc-500/10 text-zinc-500 ring-1 ring-zinc-500/20'
-                                                : 'bg-amber-500/10 text-amber-500 ring-1 ring-amber-500/20'
-                                        }`}>
-                                        {proprietor.category === 'group_company' ? '集團' : proprietor.category === 'joint_venture' ? '合資' : proprietor.category === 'managed_individual' ? '代管' : '外部'}
+                                    <div className={`px-2 py-1 text-[10px] sm:text-xs font-semibold rounded-lg ${proprietorCategoryBadgeClassName(proprietor.category)}`}>
+                                        {proprietorCategoryLabelZh(proprietor.category, 'badge')}
                                     </div>
                                 </div>
 

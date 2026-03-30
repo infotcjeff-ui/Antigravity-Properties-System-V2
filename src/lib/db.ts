@@ -43,9 +43,11 @@ export interface Proprietor {
   name: string;
   code: string; // Proprietor Code / 業主代碼 (A01, A02...)
   type: 'company' | 'individual'; // Proprietor Property / 業主性質
-  category: 'group_company' | 'joint_venture' | 'managed_individual' | 'external_landlord' | 'tenant'; // Proprietor Type / 擁有人類別
+  category: 'group_company' | 'joint_venture' | 'managed_individual' | 'external_landlord' | 'private_company' | 'private_individual' | 'tenant'; // Proprietor Type / 擁有人類別
   englishName: string; // Proprietor English Name / 業主英文名稱
   shortName: string; // Proprietor Short Name / 業主簡稱
+  /** BR Number / 商業登記號碼（對應資料庫 br_number） */
+  brNumber?: string;
   createdBy?: string; // UUID of the user who created this record
   createdAt: Date;
   updatedAt: Date;

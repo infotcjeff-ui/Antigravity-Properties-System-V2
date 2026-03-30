@@ -3,8 +3,16 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Building2, Users, X } from 'lucide-react';
 import { useProprietors } from '@/hooks/useStorage';
 import { type Proprietor } from '@/lib/db';
-import { normalizeDuplicateName } from '@/lib/formatters';
+import { normalizeDuplicateName, proprietorCategoryLabelZh } from '@/lib/formatters';
 import AnimatedSelect from '@/components/ui/AnimatedSelect';
+
+/** 擁有人類別：依標籤字數由少至多，同字數依繁中排序 */
+const PROPRIETOR_OWNER_CATEGORY_OPTIONS: { value: string; label: string }[] = [
+    { value: 'private_individual', label: '個人' },
+    { value: 'joint_venture', label: '合資公司' },
+    { value: 'private_company', label: '私人公司' },
+    { value: 'group_company', label: '集團旗下公司' },
+].sort((a, b) => a.label.length - b.label.length || a.label.localeCompare(b.label, 'zh-Hant'));
 
 interface ProprietorModalProps {
     onClose: () => void;
@@ -31,7 +39,7 @@ export default function ProprietorModal({ onClose, onSuccess, mode = 'proprietor
         category: (initialData?.category || (mode === 'tenant' ? 'external_customer' : 'group_company')) as any,
         englishName: initialData?.englishName || '',
         shortName: initialData?.shortName || '',
-        description: (initialData as any)?.description || '',
+        brNumber: initialData?.brNumber ?? (initialData as any)?.description ?? '',
     });
 
     // 業主代碼/承租人編號: 業主用propertyCode或自動產生；承租人用placeholder不預填
@@ -138,6 +146,7 @@ export default function ProprietorModal({ onClose, onSuccess, mode = 'proprietor
                         code: formData.code,
                         englishName: formData.englishName,
                         shortName: formData.shortName,
+                        brNumber: formData.brNumber,
                     });
                 } else {
                     setError('更新失敗');
@@ -154,7 +163,7 @@ export default function ProprietorModal({ onClose, onSuccess, mode = 'proprietor
                         shortName: formData.shortName,
                         type: formData.type,
                         category: formData.category,
-                        description: (formData as any).description,
+                        brNumber: formData.brNumber,
                     } as Partial<Proprietor>);
                 } else {
                     setError('創建失敗');
@@ -168,11 +177,9 @@ export default function ProprietorModal({ onClose, onSuccess, mode = 'proprietor
     };
 
     const categoryLabel =
-        formData.category === 'external_customer' ? '街外客' :
-        formData.category === 'group_company' ? (mode === 'proprietor' ? '集團旗下公司' : '集團公司') :
-        formData.category === 'joint_venture' ? '合資公司' :
-        formData.category === 'managed_individual' ? '代管理的個體' :
-        formData.category === 'external_landlord' ? '出租的業主' : '—';
+        mode === 'tenant'
+            ? (formData.category === 'external_customer' ? '街外客' : '集團公司')
+            : proprietorCategoryLabelZh(formData.category, 'modal');
 
     /** 與現時租客詳情同 shell：承租人／業主檢視模式 */
     const isDetailLayoutMode = Boolean(initialData && !isEditing);
@@ -271,7 +278,11 @@ export default function ProprietorModal({ onClose, onSuccess, mode = 'proprietor
                                 <div className="flex-1 overflow-y-auto p-5 space-y-6">
                                     <section>
                                         <h3 className="text-sm font-semibold text-purple-600 dark:text-purple-400 mb-3">基本資料</h3>
-                                        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                                        <div
+                                            className={`grid grid-cols-2 gap-4 ${
+                                                formData.brNumber ? 'md:grid-cols-4' : 'md:grid-cols-3'
+                                            }`}
+                                        >
                                             <div className="p-3 bg-zinc-50 dark:bg-white/5 rounded-xl border border-zinc-100 dark:border-white/5">
                                                 <p className="text-xs text-zinc-500 dark:text-white/50 mb-1">名稱</p>
                                                 <p className="text-sm font-bold text-zinc-900 dark:text-white wrap-break-word">{formData.name}</p>
@@ -286,11 +297,23 @@ export default function ProprietorModal({ onClose, onSuccess, mode = 'proprietor
                                                 <p className="text-xs text-zinc-500 dark:text-white/50 mb-1">狀態</p>
                                                 <p className="text-sm font-medium text-zinc-900 dark:text-white">活躍中</p>
                                             </div>
+                                            {formData.brNumber ? (
+                                                <div className="p-3 bg-zinc-50 dark:bg-white/5 rounded-xl border border-zinc-100 dark:border-white/5">
+                                                    <p className="text-xs text-zinc-500 dark:text-white/50 mb-1">BR Number</p>
+                                                    <p className="text-sm font-medium text-zinc-900 dark:text-white whitespace-pre-wrap wrap-break-word">
+                                                        {formData.brNumber}
+                                                    </p>
+                                                </div>
+                                            ) : null}
                                             <div className="p-3 bg-zinc-50 dark:bg-white/5 rounded-xl border border-zinc-100 dark:border-white/5 md:col-span-2">
                                                 <p className="text-xs text-zinc-500 dark:text-white/50 mb-1">公司／英文名稱</p>
                                                 <p className="text-sm font-medium text-zinc-900 dark:text-white wrap-break-word">{formData.englishName || '—'}</p>
                                             </div>
-                                            <div className="p-3 bg-zinc-50 dark:bg-white/5 rounded-xl border border-zinc-100 dark:border-white/5">
+                                            <div
+                                                className={`p-3 bg-zinc-50 dark:bg-white/5 rounded-xl border border-zinc-100 dark:border-white/5 ${
+                                                    formData.brNumber ? 'md:col-span-2' : ''
+                                                }`}
+                                            >
                                                 <p className="text-xs text-zinc-500 dark:text-white/50 mb-1">簡稱</p>
                                                 <p className="text-sm font-medium text-zinc-900 dark:text-white wrap-break-word">{formData.shortName || '—'}</p>
                                             </div>
@@ -315,14 +338,6 @@ export default function ProprietorModal({ onClose, onSuccess, mode = 'proprietor
                                         </div>
                                     </section>
 
-                                    {formData.description ? (
-                                        <section>
-                                            <h3 className="text-sm font-semibold text-purple-600 dark:text-purple-400 mb-3">BR Number</h3>
-                                            <div className="p-3 bg-zinc-50 dark:bg-white/5 rounded-xl border border-zinc-100 dark:border-white/5">
-                                                <p className="text-sm text-zinc-700 dark:text-white/80 whitespace-pre-wrap wrap-break-word">{formData.description}</p>
-                                            </div>
-                                        </section>
-                                    ) : null}
                                 </div>
 
                                 <div className="p-5 border-t border-zinc-100 dark:border-white/5 shrink-0 flex justify-end">
@@ -429,8 +444,8 @@ export default function ProprietorModal({ onClose, onSuccess, mode = 'proprietor
                                     </label>
                                     <input
                                         type="text"
-                                        name="description"
-                                        value={formData.description}
+                                        name="brNumber"
+                                        value={formData.brNumber}
                                         onChange={handleChange}
                                         className="w-full px-4 py-3 bg-zinc-50 dark:bg-white/5 border border-zinc-200 dark:border-white/10 rounded-xl text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-purple-500/50 transition-all"
                                         placeholder="請輸入 BR Number"
@@ -468,10 +483,13 @@ export default function ProprietorModal({ onClose, onSuccess, mode = 'proprietor
                                                 { value: 'external_customer', label: '街外客' },
                                                 { value: 'group_company', label: '集團公司' }
                                             ] : [
-                                                { value: 'group_company', label: '集團旗下公司' },
-                                                { value: 'joint_venture', label: '合資公司' },
-                                                { value: 'managed_individual', label: '代管理的個體' },
-                                                { value: 'external_landlord', label: '出租的業主' }
+                                                ...PROPRIETOR_OWNER_CATEGORY_OPTIONS,
+                                                ...(initialData?.category === 'managed_individual'
+                                                    ? [{ value: 'managed_individual', label: '代管理的個體' }]
+                                                    : []),
+                                                ...(initialData?.category === 'external_landlord'
+                                                    ? [{ value: 'external_landlord', label: '出租的業主' }]
+                                                    : []),
                                             ]
                                         }
                                         placeholder="選擇類別"
@@ -497,7 +515,7 @@ export default function ProprietorModal({ onClose, onSuccess, mode = 'proprietor
                                         category: initialData.category as any,
                                         englishName: initialData.englishName || '',
                                         shortName: initialData.shortName || '',
-                                        description: (initialData as any).description || '',
+                                        brNumber: initialData.brNumber ?? (initialData as any).description ?? '',
                                     });
                                 } else {
                                     onClose();

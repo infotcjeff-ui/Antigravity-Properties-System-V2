@@ -3,7 +3,7 @@
 import { motion } from 'framer-motion';
 import { X, Building2, User } from 'lucide-react';
 import type { Rent, Property, Proprietor } from '@/lib/db';
-import { formatLotArea } from '@/lib/formatters';
+import { formatLotArea, proprietorCategoryLabelZh } from '@/lib/formatters';
 import { labelRentCollectionPaymentMethod } from '@/lib/rentPaymentDisplay';
 import { useLanguage } from '@/components/common/LanguageSwitcher';
 import DOMPurify from 'dompurify';
@@ -59,6 +59,9 @@ export default function RentDetailsModal({ rent, property, onClose }: RentDetail
     const isExpired = endDate ? new Date(endDate) < new Date(new Date().setHours(0, 0, 0, 0)) : false;
 
     const isRentOutLike = rent.type === 'rent_out' || rent.type === 'contract';
+    /** 交租：頂部編號與列表一致，優先顯示物業編號 */
+    const rentingDisplayNumber =
+        (property?.code?.trim() || rent.rentingNumber?.trim() || '-');
 
     let statusValueRentOut: React.ReactNode =
         rent.rentOutStatus === 'listing' ? '放盤中' :
@@ -93,7 +96,7 @@ export default function RentDetailsModal({ rent, property, onClose }: RentDetail
                     <div className="flex items-center gap-3">
                         <div className="px-3 py-2 rounded-xl bg-purple-100 dark:bg-purple-500/20 border border-purple-200 dark:border-purple-500/30">
                             <span className="text-base font-bold font-mono text-purple-700 dark:text-purple-300">
-                                {isRentOutLike ? (rent.rentOutTenancyNumber || '-') : (rent.rentingNumber || '-')}
+                                {isRentOutLike ? (rent.rentOutTenancyNumber || '-') : rentingDisplayNumber}
                             </span>
                         </div>
                         <div>
@@ -174,10 +177,7 @@ export default function RentDetailsModal({ rent, property, onClose }: RentDetail
                                             <div className="text-xs text-zinc-500 dark:text-white/60 flex items-center justify-between">
                                                 <span>類型: <span className="text-zinc-900 dark:text-white">{rent.tenant.type === 'company' ? '公司' : '個人'}</span></span>
                                                 <span className="bg-zinc-100 dark:bg-white/10 px-1.5 py-0.5 rounded text-[10px] text-zinc-600 dark:text-white/70">
-                                                    {rent.tenant.category === 'group_company' ? '集團公司' :
-                                                        rent.tenant.category === 'joint_venture' ? '合資公司' :
-                                                            rent.tenant.category === 'managed_individual' ? '代管個體' :
-                                                                rent.tenant.category === 'external_landlord' ? '外部業主' : '承租人'}
+                                                    {proprietorCategoryLabelZh(rent.tenant.category, 'card')}
                                                 </span>
                                             </div>
                                         </div>
@@ -240,10 +240,7 @@ export default function RentDetailsModal({ rent, property, onClose }: RentDetail
                                             <div className="text-xs text-zinc-500 dark:text-white/60 flex items-center justify-between">
                                                 <span>類型: <span className="text-zinc-900 dark:text-white">{(rent.proprietor || rent.tenant)?.type === 'company' ? '公司' : '個人'}</span></span>
                                                 <span className="bg-zinc-100 dark:bg-white/10 px-1.5 py-0.5 rounded text-[10px] text-zinc-600 dark:text-white/70">
-                                                    {(rent.proprietor || rent.tenant)?.category === 'group_company' ? '集團公司' :
-                                                        (rent.proprietor || rent.tenant)?.category === 'joint_venture' ? '合資公司' :
-                                                            (rent.proprietor || rent.tenant)?.category === 'managed_individual' ? '代管個體' :
-                                                                (rent.proprietor || rent.tenant)?.category === 'external_landlord' ? '外部業主' : '承租人'}
+                                                    {proprietorCategoryLabelZh((rent.proprietor || rent.tenant)?.category, 'card')}
                                                 </span>
                                             </div>
                                         </div>

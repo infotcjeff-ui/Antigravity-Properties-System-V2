@@ -781,9 +781,8 @@ export function useProprietors() {
                 created_by: user?.id,
             };
 
-            // Only add description if provided (column may not exist in database)
-            if ((proprietor as any).description) {
-                data.description = (proprietor as any).description;
+            if (proprietor.brNumber !== undefined) {
+                data.br_number = proprietor.brNumber === '' ? null : proprietor.brNumber;
             }
 
             const { error: sbError } = await supabase
@@ -793,28 +792,6 @@ export function useProprietors() {
             if (sbError) throw sbError;
             return id;
         } catch (err: any) {
-            // If error is about missing column, retry without description
-            if (err.message?.includes('description')) {
-                try {
-                    const id = generateId();
-                    const fallbackData = {
-                        id,
-                        name: proprietor.name,
-                        code: proprietor.code,
-                        type: proprietor.type,
-                        category: proprietor.category,
-                        english_name: proprietor.englishName,
-                        short_name: proprietor.shortName,
-                        created_by: user?.id,
-                    };
-                    const { error: retryError } = await supabase
-                        .from('proprietors')
-                        .insert([fallbackData]);
-                    if (!retryError) return id;
-                } catch (retryErr) {
-                    console.error('Retry failed:', retryErr);
-                }
-            }
             setError('Failed to add proprietor to cloud');
             console.error(err);
             return null;
@@ -827,16 +804,19 @@ export function useProprietors() {
         setLoading(true);
         setError(null);
         try {
-            const updateData = {
+            const updateData: Record<string, any> = {
                 name: updates.name,
                 code: updates.code,
                 type: updates.type,
                 category: updates.category,
                 english_name: updates.englishName,
-                short_name: updates.shortName
+                short_name: updates.shortName,
             };
+            if (updates.brNumber !== undefined) {
+                updateData.br_number = updates.brNumber === '' ? null : updates.brNumber;
+            }
             // Remove undefined
-            Object.keys(updateData).forEach(key => (updateData as any)[key] === undefined && delete (updateData as any)[key]);
+            Object.keys(updateData).forEach(key => updateData[key] === undefined && delete updateData[key]);
 
             const { error: sbError } = await supabase
                 .from('proprietors')
@@ -1651,7 +1631,8 @@ export function useDatabase() {
                     type: p.type || 'company',
                     category: p.category || 'group_company',
                     english_name: p.englishName || '',
-                    short_name: p.shortName || ''
+                    short_name: p.shortName || '',
+                    ...(p.brNumber !== undefined && p.brNumber !== '' ? { br_number: p.brNumber } : {}),
                 }));
                 const { error: prError } = await supabase.from('proprietors').upsert(mapped);
                 if (prError) throw new Error(`業主同步失敗: ${prError.message}`);

@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation';
 
-/** 已合併至「管理業主」(/dashboard/tenants)，第一個分頁為業主／承租人列表 */
+/** 已合併至「管理業主」(/dashboard/tenants)，含業主與承租人分頁 */
 export default function ProprietorsPageRedirect() {
     redirect('/dashboard/tenants');
 }
