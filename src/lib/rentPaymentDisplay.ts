@@ -29,6 +29,52 @@ export function hasRentCollectionPaidAmount(rent: { rentCollectionAmount?: numbe
     return v !== null && v !== undefined && !Number.isNaN(Number(v));
 }
 
+/**
+ * 租務列表「編號」：收租記錄（rent_out）優先顯示收租記錄編號，無則退回出租合約號碼欄；
+ * 合約記錄（contract）顯示出租合約號碼。兼容未經 toCamel 的 snake_case 欄位。
+ */
+export function getRentOutOrContractListNumber(rent: {
+    type?: string;
+    rentOutTenancyNumber?: string | null;
+    rentCollectionContractNumber?: string | null;
+    rent_out_tenancy_number?: string | null;
+    rent_collection_contract_number?: string | null;
+}): string {
+    const raw = rent as Record<string, unknown>;
+    const collection =
+        rent.rentCollectionContractNumber ??
+        (typeof raw.rent_collection_contract_number === 'string' ? raw.rent_collection_contract_number : null);
+    const tenancy =
+        rent.rentOutTenancyNumber ??
+        (typeof raw.rent_out_tenancy_number === 'string' ? raw.rent_out_tenancy_number : null);
+    if (rent.type === 'rent_out') {
+        if (collection != null && String(collection).trim()) return String(collection).trim();
+    }
+    if (tenancy != null && String(tenancy).trim()) return String(tenancy).trim();
+    return '-';
+}
+
+/**
+ * 收租列表「現時租客／承租人」顯示文字；與編輯物業表單 renderRentTable（partyMode landlord）一致。
+ * 優先：簡化表單 rentCollectionTenantName → rentOutTenants → 關聯 tenant（proprietors）
+ */
+
+export function getRentOutLesseeDisplayLabel(rent: {
+    rentCollectionTenantName?: string | null;
+    rentOutTenants?: string[] | null;
+    tenant?: { name?: string | null } | null;
+}): string {
+    const rcName = rent.rentCollectionTenantName;
+    if (rcName != null && String(rcName).trim()) return String(rcName).trim();
+    const rt = rent.rentOutTenants;
+    if (Array.isArray(rt) && rt.length > 0) {
+        const joined = rt.map((x: unknown) => String(x).trim()).filter(Boolean).join('、');
+        if (joined) return joined;
+    }
+    const tn = rent.tenant?.name;
+    return tn != null && String(tn).trim() ? String(tn).trim() : '';
+}
+
 /** 收／交租表單之付款方式（含按金方式、出租合約按金方式） */
 export function labelRentCollectionPaymentMethod(
     method?: 'cheque' | 'fps' | 'cash' | 'bank_in' | string | null,

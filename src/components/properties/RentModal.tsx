@@ -1,9 +1,17 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
-import { useRents, useProprietors, useProperties, useSubLandlordsQuery, useCurrentTenantsQuery, usePropertiesQuery } from '@/hooks/useStorage';
+import {
+    useRents,
+    useProprietors,
+    useProperties,
+    useSubLandlordsQuery,
+    useCurrentTenantsQuery,
+    usePropertiesQuery,
+    useRentsWithRelationsQuery,
+} from '@/hooks/useStorage';
 import { X, ExternalLink, Building2, Calendar } from 'lucide-react';
 import { fileToBase64, compressImage, validateImageUpload } from '@/lib/imageUtils';
 import type { Proprietor, Property, Rent, RentCollectionPaymentMethod, SubLandlord, CurrentTenant } from '@/lib/db';
@@ -19,6 +27,13 @@ const ReactQuill = dynamic(() => import('react-quill-new'), {
     ssr: false,
     loading: () => <div className="h-[150px] w-full bg-zinc-100 dark:bg-white/5 animate-pulse rounded-xl" />
 });
+
+/** 合約新舊排序用（優先建立時間，其次更新時間） */
+function rentContractRecencyTs(r: Rent): number {
+    const c = r.createdAt ? new Date(r.createdAt).getTime() : 0;
+    const u = r.updatedAt ? new Date(r.updatedAt).getTime() : 0;
+    return Math.max(c, u);
+}
 
 type RentTypeValue = 'rent_out' | 'renting' | 'contract';
 
@@ -47,6 +62,13 @@ const allRentTypes = [
     { value: 'contract' as const, label: '合約記錄' },
 ];
 
+/** 合約記錄「合約性質」選項 */
+const CONTRACT_NATURE_OPTIONS = [
+    { value: 'parking', label: '車位' },
+    { value: 'temporary_parking', label: '臨時車位' },
+    { value: 'rental_venue', label: '租用埸地' },
+] as const;
+
 export default function RentModal({
     propertyId,
     defaultLocation,
@@ -70,6 +92,10 @@ export default function RentModal({
     const [proprietors, setProprietors] = useState<Proprietor[]>([]);
     const [properties, setProperties] = useState<Property[]>([]);
     const [showProprietorModal, setShowProprietorModal] = useState(false);
+    /** 交租：ProprietorModal 完成後寫入 tenantId（業主）或 proprietorId（承租人） */
+    const [rentingProprietorPickTarget, setRentingProprietorPickTarget] = useState<'owner' | 'lessee'>('owner');
+    /** 開啟 ProprietorModal 時帶入編輯對象；+ 新增時為 null */
+    const [proprietorModalInitial, setProprietorModalInitial] = useState<Proprietor | null>(null);
     const [showSubLandlordModal, setShowSubLandlordModal] = useState(false);
     const [showCurrentTenantModal, setShowCurrentTenantModal] = useState(false);
     const [editSubLandlord, setEditSubLandlord] = useState<SubLandlord | null>(null);
@@ -83,6 +109,7 @@ export default function RentModal({
     const { data: subLandlords = [] } = useSubLandlordsQuery();
     const { data: currentTenants = [] } = useCurrentTenantsQuery();
     const { data: allProperties = [] } = usePropertiesQuery();
+    const { data: contractsWithRel = [] } = useRentsWithRelationsQuery({ type: 'contract' });
 
     // Determine effective types for the type selector
     const effectiveTypes = allowedTypes && allowedTypes.length > 0
@@ -110,8 +137,18 @@ export default function RentModal({
                 rentOutStartDate: formatDate(rent.rentOutStartDate),
                 rentOutEndDate: formatDate(rent.rentOutEndDate),
                 rentOutActualEndDate: formatDate(rent.rentOutActualEndDate),
+                rentOutContractNature: (rent as any).rentOutContractNature || '',
+                rentOutDepositReceived:
+                    rent.rentOutDepositReceived != null && !Number.isNaN(Number(rent.rentOutDepositReceived))
+                        ? String(rent.rentOutDepositReceived)
+                        : '',
                 rentOutDepositPaymentMethod: ((rent as any).rentOutDepositPaymentMethod || '') as '' | RentCollectionPaymentMethod,
                 rentOutDepositReceiptNumber: (rent as any).rentOutDepositReceiptNumber || '',
+                rentOutDepositChequeBank: (rent as any).rentOutDepositChequeBank || '',
+                rentOutDepositChequeNumber: (rent as any).rentOutDepositChequeNumber || '',
+                rentOutDepositChequeImage: (rent as any).rentOutDepositChequeImage || '',
+                rentOutDepositPaymentDate: formatDate((rent as any).rentOutDepositPaymentDate),
+                rentOutDepositBankInImage: (rent as any).rentOutDepositBankInImage || '',
                 rentOutDepositReceiveDate: formatDate(rent.rentOutDepositReceiveDate),
                 rentOutDepositReturnDate: formatDate(rent.rentOutDepositReturnDate),
                 rentOutDepositReturnAmount: rent.rentOutDepositReturnAmount?.toString() || '',
@@ -152,6 +189,8 @@ export default function RentModal({
                 rentCollectionNotes: rent.notes || '',
                 // 與 rentCollectionDate 一致：必須為 yyyy-mm-dd，否則 type="date" 受控值無效，變更無法寫入 state
                 rentCollectionPaymentDate: formatDate((rent as any).rentCollectionPaymentDate),
+                rentCollectionContractNumber: (rent as any).rentCollectionContractNumber || '',
+                rentCollectionReceiptNumber: (rent as any).rentCollectionReceiptNumber || '',
             };
         }
 
@@ -174,8 +213,15 @@ export default function RentModal({
             rentOutStartDate: '',
             rentOutEndDate: '',
             rentOutActualEndDate: '',
+            rentOutContractNature: '',
+            rentOutDepositReceived: '',
             rentOutDepositPaymentMethod: '' as '' | RentCollectionPaymentMethod,
             rentOutDepositReceiptNumber: '',
+            rentOutDepositChequeBank: '',
+            rentOutDepositChequeNumber: '',
+            rentOutDepositChequeImage: '',
+            rentOutDepositPaymentDate: '',
+            rentOutDepositBankInImage: '',
             rentOutDepositReceiveDate: '',
             rentOutDepositReturnDate: '',
             rentOutDepositReturnAmount: '',
@@ -206,8 +252,79 @@ export default function RentModal({
             rentCollectionBankInImage: '',
             rentCollectionNotes: '',
             rentCollectionPaymentDate: '',
+            rentCollectionContractNumber: '',
+            rentCollectionReceiptNumber: '',
         };
     });
+
+    const contractsOnProperty = useMemo(() => {
+        const pid = formData.propertyId;
+        if (!pid) return [] as Rent[];
+        return (contractsWithRel as Rent[]).filter(
+            (r) => r.propertyId === pid && r.type === 'contract' && !(r as any).isDeleted,
+        );
+    }, [contractsWithRel, formData.propertyId]);
+
+    /** 出租合約號碼：同一號碼取最新一筆合約的時間，清單依「最新合約」優先 */
+    const leaseOutContractNumbers = useMemo(() => {
+        const leaseOut = contractsOnProperty.filter((r) => (r.rentOutStatus || r.status) !== 'leasing_in');
+        const byNum = new Map<string, number>();
+        for (const r of leaseOut) {
+            const n = (r.rentOutTenancyNumber || '').trim();
+            if (!n) continue;
+            const t = rentContractRecencyTs(r);
+            byNum.set(n, Math.max(byNum.get(n) ?? 0, t));
+        }
+        return [...byNum.entries()]
+            .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], 'zh-HK'))
+            .map(([n]) => n);
+    }, [contractsOnProperty]);
+
+    const lastContractAutoPropertyIdRef = useRef<string | undefined>(undefined);
+    const rentCollectionContractAutoSigRef = useRef('');
+
+    /** 新增模式：切換物業時清空已選合約編號，避免帶到錯誤物業 */
+    useEffect(() => {
+        if (rent?.id) {
+            lastContractAutoPropertyIdRef.current = formData.propertyId;
+            return;
+        }
+        if (lastContractAutoPropertyIdRef.current !== formData.propertyId) {
+            lastContractAutoPropertyIdRef.current = formData.propertyId;
+            rentCollectionContractAutoSigRef.current = '';
+            setFormData((prev) => ({ ...prev, rentCollectionContractNumber: '' }));
+        }
+    }, [formData.propertyId, rent?.id]);
+
+    /**
+     * 新增模式（僅收租）：自動帶入該物業「最新一筆」出租合約編號（清單已依合約新舊排序，首項即最新）。
+     * 交租記錄不使用「收租記錄編號」欄位，故不帶入。
+     */
+    useEffect(() => {
+        if (rent?.id) return;
+        if (formData.type !== 'rent_out') return;
+        const nums = leaseOutContractNumbers;
+        if (nums.length === 0) {
+            rentCollectionContractAutoSigRef.current = '';
+            return;
+        }
+        const preferred = nums[0];
+        const sig = `${formData.propertyId}|${formData.type}|${preferred}`;
+        const cur = (formData.rentCollectionContractNumber || '').trim();
+        if (cur) {
+            rentCollectionContractAutoSigRef.current = `${formData.propertyId}|${formData.type}|${cur}`;
+            return;
+        }
+        if (rentCollectionContractAutoSigRef.current === sig) return;
+        rentCollectionContractAutoSigRef.current = sig;
+        setFormData((prev) => ({ ...prev, rentCollectionContractNumber: preferred }));
+    }, [
+        rent?.id,
+        formData.type,
+        formData.propertyId,
+        formData.rentCollectionContractNumber,
+        leaseOutContractNumbers,
+    ]);
 
     const loadData = async () => {
         setLoadingData(true);
@@ -245,6 +362,23 @@ export default function RentModal({
                 .slice()
                 .sort((a, b) => (a.name || '').localeCompare(b.name || '', 'zh-HK')),
         [proprietorSelectOptions]
+    );
+
+    /** 承租人下拉：含承租人代碼（T 開頭）等全部業主／承租人資料，與「業主」選單範圍不同 */
+    const fullProprietorPickOptions = useMemo(
+        () =>
+            dedupeRecordsByDisplayName(proprietors)
+                .slice()
+                .sort((a, b) => (a.name || '').localeCompare(b.name || '', 'zh-HK')),
+        [proprietors],
+    );
+    const fullPickIndividuals = useMemo(
+        () => fullProprietorPickOptions.filter((p) => p.type === 'individual'),
+        [fullProprietorPickOptions],
+    );
+    const fullPickCompanies = useMemo(
+        () => fullProprietorPickOptions.filter((p) => p.type === 'company'),
+        [fullProprietorPickOptions],
     );
 
     const propertiesRoot = useMemo(
@@ -360,6 +494,44 @@ export default function RentModal({
         }
     };
 
+    /** 合約按金：支票／FPS 影像（與收租欄位分開） */
+    const onDepositChequeImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        e.target.value = '';
+        if (!file || !file.type.startsWith('image/')) return;
+        const check = validateImageUpload(formData.rentOutDepositChequeImage ? [formData.rentOutDepositChequeImage] : [], [file], 'property');
+        if (!check.valid) {
+            setError(check.error || '圖片無效');
+            return;
+        }
+        try {
+            const blob = await compressImage(file, { maxWidth: 1600, maxHeight: 1600, quality: 0.75 });
+            const b64 = await fileToBase64(blob);
+            setFormData(prev => ({ ...prev, rentOutDepositChequeImage: b64 }));
+        } catch {
+            setError('圖片處理失敗');
+        }
+    };
+
+    /** 合約按金：入數憑證 */
+    const onDepositBankInImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        e.target.value = '';
+        if (!file || !file.type.startsWith('image/')) return;
+        const check = validateImageUpload(formData.rentOutDepositBankInImage ? [formData.rentOutDepositBankInImage] : [], [file], 'property');
+        if (!check.valid) {
+            setError(check.error || '圖片無效');
+            return;
+        }
+        try {
+            const blob = await compressImage(file, { maxWidth: 1600, maxHeight: 1600, quality: 0.75 });
+            const b64 = await fileToBase64(blob);
+            setFormData(prev => ({ ...prev, rentOutDepositBankInImage: b64 }));
+        } catch {
+            setError('圖片處理失敗');
+        }
+    };
+
     // Auto-calculate rentOutTotalAmount（僅合約記錄）
     useEffect(() => {
         if (formData.type !== 'contract') return;
@@ -435,13 +607,17 @@ export default function RentModal({
     const handleProprietorCreated = async (id: string) => {
         await loadData();
         if (formData.type === 'rent_out') {
-            setFormData(prev => ({ ...prev, tenantId: id }));
+            setFormData((prev) => ({ ...prev, tenantId: id }));
         } else if (formData.type === 'contract') {
-            // 合約「業主」下拉綁定 tenantId（寫入 rents.tenant_id）
-            setFormData(prev => ({ ...prev, tenantId: id }));
-        } else {
-            setFormData(prev => ({ ...prev, proprietorId: id }));
+            setFormData((prev) => ({ ...prev, tenantId: id }));
+        } else if (formData.type === 'renting') {
+            if (rentingProprietorPickTarget === 'lessee') {
+                setFormData((prev) => ({ ...prev, proprietorId: id }));
+            } else {
+                setFormData((prev) => ({ ...prev, tenantId: id }));
+            }
         }
+        setProprietorModalInitial(null);
         setShowProprietorModal(false);
     };
 
@@ -454,7 +630,7 @@ export default function RentModal({
             }
             // 業主不是必填，移除验证
             if (!formData.rentCollectionTenantName?.trim()) {
-                setError('請填寫租客名稱');
+                setError(formData.type === 'rent_out' ? '請填寫租客名稱' : '請填寫業主名稱');
                 return;
             }
             // 其他字段都不是必填，但如果有选择付款方式为支票，则需要验证支票相关字段
@@ -472,6 +648,16 @@ export default function RentModal({
         if (formData.type === 'contract' && !formData.propertyId) {
             setError('請選擇關聯的物業');
             return;
+        }
+        if (formData.type === 'contract' && formData.rentOutDepositPaymentMethod === 'cheque') {
+            if (!formData.rentOutDepositChequeBank?.trim()) {
+                setError('請填寫按金支票銀行');
+                return;
+            }
+            if (!formData.rentOutDepositChequeNumber?.trim()) {
+                setError('請填寫按金支票號碼');
+                return;
+            }
         }
         setSaving(true);
         setError('');
@@ -499,6 +685,8 @@ export default function RentModal({
                 const paidRaw = String(formData.rentCollectionAmount || '').replace(/,/g, '').trim();
                 const paidAmt = parseFloat(paidRaw);
                 const hasPaidAmount = paidRaw !== '' && !Number.isNaN(paidAmt);
+                // 與「收租記錄編號」一致；同步寫入 rent_out_tenancy_number，列表與未遷移 DB 仍可顯示
+                const collectionContractRef = formData.rentCollectionContractNumber?.trim() || null;
                 rentData = {
                     ...rentData,
                     status: hasPaidAmount ? ('completed' as const) : ('pending' as const),
@@ -513,6 +701,7 @@ export default function RentModal({
                         ? [currentTenants.find(ct => ct.id === formData.rentOutTenantId)?.name || formData.rentOutTenantId]
                         : (formData.rentOutTenants || []).filter(Boolean).length > 0 ? formData.rentOutTenants : undefined,
                     rentOutTenantIds: formData.rentOutTenantId ? [formData.rentOutTenantId] : undefined,
+                    rentOutTenancyNumber: collectionContractRef,
                     rentCollectionTenantName: formData.rentCollectionTenantName.trim(),
                     rentCollectionDate: formData.rentCollectionDate ? new Date(formData.rentCollectionDate) : undefined,
                     rentCollectionAmount: hasPaidAmount ? paidAmt : null,
@@ -528,6 +717,11 @@ export default function RentModal({
                     rentCollectionBankInImage:
                         formData.rentCollectionPaymentMethod === 'bank_in'
                             ? formData.rentCollectionBankInImage || null
+                            : null,
+                    rentCollectionContractNumber: collectionContractRef,
+                    rentCollectionReceiptNumber:
+                        formData.rentCollectionPaymentMethod !== 'cheque' && formData.rentCollectionPaymentMethod
+                            ? formData.rentCollectionReceiptNumber?.trim() || null
                             : null,
                 };
             } else if (formData.type === 'renting') {
@@ -557,6 +751,12 @@ export default function RentModal({
                         formData.rentCollectionPaymentMethod === 'bank_in'
                             ? formData.rentCollectionBankInImage || null
                             : null,
+                    // 交租不使用收租記錄編號，儲存時清空欄位
+                    rentCollectionContractNumber: null,
+                    rentCollectionReceiptNumber:
+                        formData.rentCollectionPaymentMethod !== 'cheque' && formData.rentCollectionPaymentMethod
+                            ? formData.rentCollectionReceiptNumber?.trim() || null
+                            : null,
                     location: formData.location || defaultLocation,
                     rentingNumber: formData.rentingNumber,
                     rentingReferenceNumber: formData.rentingReferenceNumber,
@@ -570,6 +770,16 @@ export default function RentModal({
                 // 合約記錄：以 rentOut* 欄位儲存（已移除實際結束日／出租人／租借地址欄位，寫入時清空舊值）
                 const propRow = properties.find(p => p.id === formData.propertyId);
                 const contractLocation = (propRow?.address || '').trim() || defaultLocation || '';
+                const parseRentOutDepositPaymentDate = (): Date | null => {
+                    const raw = String(formData.rentOutDepositPaymentDate || '').trim();
+                    if (!raw) return null;
+                    const d = new Date(raw);
+                    return Number.isNaN(d.getTime()) ? null : d;
+                };
+                const rentOutDepositPaymentDateForSave = parseRentOutDepositPaymentDate();
+                const depositRaw = String(formData.rentOutDepositReceived || '').replace(/,/g, '').trim();
+                const depositAmt = parseFloat(depositRaw);
+                const hasDepositAmount = depositRaw !== '' && !Number.isNaN(depositAmt);
                 rentData = {
                     ...rentData,
                     rentOutTenancyNumber: formData.rentOutTenancyNumber,
@@ -580,8 +790,27 @@ export default function RentModal({
                     rentOutStartDate: formData.rentOutStartDate ? new Date(formData.rentOutStartDate) : undefined,
                     rentOutEndDate: formData.rentOutEndDate ? new Date(formData.rentOutEndDate) : undefined,
                     rentOutActualEndDate: null,
+                    rentOutContractNature: formData.rentOutContractNature || null,
+                    rentOutDepositReceived: hasDepositAmount ? depositAmt : null,
                     rentOutDepositPaymentMethod: formData.rentOutDepositPaymentMethod || null,
-                    rentOutDepositReceiptNumber: formData.rentOutDepositReceiptNumber || undefined,
+                    rentOutDepositChequeBank:
+                        formData.rentOutDepositPaymentMethod === 'cheque' ? formData.rentOutDepositChequeBank.trim() : null,
+                    rentOutDepositChequeNumber:
+                        formData.rentOutDepositPaymentMethod === 'cheque' ? formData.rentOutDepositChequeNumber.trim() : null,
+                    rentOutDepositChequeImage:
+                        (formData.rentOutDepositPaymentMethod === 'cheque' || formData.rentOutDepositPaymentMethod === 'fps') &&
+                        formData.rentOutDepositChequeImage
+                            ? formData.rentOutDepositChequeImage
+                            : null,
+                    rentOutDepositPaymentDate: rentOutDepositPaymentDateForSave,
+                    rentOutDepositBankInImage:
+                        formData.rentOutDepositPaymentMethod === 'bank_in'
+                            ? formData.rentOutDepositBankInImage || null
+                            : null,
+                    rentOutDepositReceiptNumber:
+                        formData.rentOutDepositPaymentMethod && formData.rentOutDepositPaymentMethod !== 'cheque'
+                            ? formData.rentOutDepositReceiptNumber?.trim() || null
+                            : null,
                     rentOutDepositReceiveDate: formData.rentOutDepositReceiveDate ? new Date(formData.rentOutDepositReceiveDate) : undefined,
                     rentOutDepositReturnDate: formData.rentOutDepositReturnDate ? new Date(formData.rentOutDepositReturnDate) : undefined,
                     rentOutDepositReturnAmount: parseFloat(formData.rentOutDepositReturnAmount) || undefined,
@@ -602,6 +831,10 @@ export default function RentModal({
             if (rent?.id) {
                 const success = await updateRent(rent.id, rentData);
                 if (success) {
+                    // 使租務列表／物業關聯快取失效，避免編輯後仍用舊 rent（例如收租記錄編號看似未儲存）
+                    await queryClient.invalidateQueries({ queryKey: ['rents'] });
+                    await queryClient.invalidateQueries({ queryKey: ['rents-with-relations'] });
+                    await queryClient.invalidateQueries({ queryKey: ['properties-with-relations'] });
                     onSuccess(rent.id);
                     onClose();
                 } else {
@@ -610,6 +843,9 @@ export default function RentModal({
             } else {
                 const id = await addRent(rentData);
                 if (id) {
+                    await queryClient.invalidateQueries({ queryKey: ['rents'] });
+                    await queryClient.invalidateQueries({ queryKey: ['rents-with-relations'] });
+                    await queryClient.invalidateQueries({ queryKey: ['properties-with-relations'] });
                     onSuccess(id);
                     onClose();
                 } else {
@@ -629,6 +865,77 @@ export default function RentModal({
     const rentPaymentDetailBoxClass =
         'rounded-xl border border-blue-100 dark:border-blue-500/25 bg-blue-50/40 dark:bg-blue-500/10 p-4 space-y-4';
     const rentPaymentDetailTitleClass = 'text-xs font-medium text-blue-700 dark:text-blue-300';
+
+    /** 僅收租：收租記錄編號（依出租合約號碼） */
+    const renderCollectionContractRefField = () => {
+        const nums = leaseOutContractNumbers;
+        const hint =
+            '依該物業「出租合約」之合約號碼帶入；多於一筆時請選擇。無合約時可手動輸入。';
+        const val = formData.rentCollectionContractNumber || '';
+        return (
+            <div className="space-y-2">
+                <label className={labelClass}>收租記錄編號</label>
+                <p className="text-xs text-zinc-500 dark:text-white/45 mb-1">{hint}</p>
+                {nums.length > 0 ? (
+                    <select
+                        name="rentCollectionContractNumber"
+                        value={val}
+                        onChange={handleChange}
+                        className={inputClass}
+                    >
+                        <option value="">請選擇</option>
+                        {val && !nums.includes(val) ? (
+                            <option value={val}>{val}（已存）</option>
+                        ) : null}
+                        {nums.map((n) => (
+                            <option key={n} value={n}>
+                                {n}
+                            </option>
+                        ))}
+                    </select>
+                ) : (
+                    <input
+                        type="text"
+                        name="rentCollectionContractNumber"
+                        value={val}
+                        onChange={handleChange}
+                        className={inputClass}
+                        placeholder="暫無合約記錄時可手動填寫"
+                    />
+                )}
+            </div>
+        );
+    };
+
+    const renderRentCollectionReceiptField = () => (
+        <div className="space-y-2">
+            <label className={labelClass}>收據號碼</label>
+            <input
+                type="text"
+                name="rentCollectionReceiptNumber"
+                value={formData.rentCollectionReceiptNumber}
+                onChange={handleChange}
+                className={inputClass}
+                placeholder="選填"
+            />
+        </div>
+    );
+
+    /** 合約按金：非支票時之收據號碼（與收租「收據號碼」同一欄位語意） */
+    const renderContractDepositReceiptField = () => (
+        <div className="space-y-2">
+            <label className={labelClass}>收據號碼</label>
+            <input
+                type="text"
+                name="rentOutDepositReceiptNumber"
+                value={formData.rentOutDepositReceiptNumber}
+                onChange={handleChange}
+                className={inputClass}
+                placeholder="選填"
+            />
+        </div>
+    );
+
     const showOwnerSelect = formData.type === 'contract' || formData.type === 'renting';
     const showSubLandlordSelect = formData.type === 'contract';
     const showCurrentTenantSelect = formData.type === 'contract' || formData.type === 'rent_out';
@@ -689,7 +996,11 @@ export default function RentModal({
                             type="button"
                             onClick={() => {
                                 const p = proprietors.find(pt => pt.id === formData.tenantId);
-                                if (p) setShowProprietorModal(true);
+                                if (p) {
+                                    setProprietorModalInitial(p);
+                                    setRentingProprietorPickTarget('owner');
+                                    setShowProprietorModal(true);
+                                }
                             }}
                             className="p-2 text-zinc-400 hover:text-purple-500 rounded-lg shrink-0"
                             title="編輯"
@@ -706,7 +1017,11 @@ export default function RentModal({
                     )}
                     <button
                         type="button"
-                        onClick={() => setShowProprietorModal(true)}
+                        onClick={() => {
+                            setProprietorModalInitial(null);
+                            setRentingProprietorPickTarget('owner');
+                            setShowProprietorModal(true);
+                        }}
                         className="px-4 py-2 bg-purple-50 dark:bg-purple-500/20 text-purple-600 dark:text-purple-400 rounded-xl hover:bg-purple-100 dark:hover:bg-purple-500/30 border border-purple-100 dark:border-purple-500/30 text-sm font-medium transition-all duration-300 h-11 whitespace-nowrap shrink-0"
                     >
                         + 新增
@@ -1004,6 +1319,7 @@ export default function RentModal({
                             </div>
 
                             <div className="space-y-4">
+                                {renderCollectionContractRefField()}
                                 <div className="space-y-2">
                                     <label className={labelClass}>租客名稱 *</label>
                                     <input
@@ -1060,6 +1376,7 @@ export default function RentModal({
                                                     ? { rentCollectionChequeBank: '', rentCollectionChequeNumber: '', rentCollectionChequeImage: '' }
                                                     : {}),
                                                 ...(v !== 'bank_in' ? { rentCollectionBankInImage: '' } : {}),
+                                                ...(v === 'cheque' || v === '' ? { rentCollectionReceiptNumber: '' } : {}),
                                             }));
                                         }}
                                         className={inputClass}
@@ -1147,6 +1464,7 @@ export default function RentModal({
                                             className={inputClass}
                                         />
                                     </div>
+                                    {renderRentCollectionReceiptField()}
                                     <div className="space-y-2">
                                         <label className={labelClass}>轉帳證明／截圖（選填）</label>
                                         <div className="flex flex-wrap items-center gap-3">
@@ -1184,6 +1502,7 @@ export default function RentModal({
                                             className={inputClass}
                                         />
                                     </div>
+                                    {renderRentCollectionReceiptField()}
                                 </div>
                             )}
                             {/* 入數資料 — 選入數時顯示 */}
@@ -1200,6 +1519,7 @@ export default function RentModal({
                                             className={inputClass}
                                         />
                                     </div>
+                                    {renderRentCollectionReceiptField()}
                                     <div className="space-y-2">
                                         <label className={labelClass}>入數憑證／截圖（選填）</label>
                                         <div className="flex flex-wrap items-center gap-3">
@@ -1250,6 +1570,77 @@ export default function RentModal({
                             </div>
 
                             <div className="space-y-4">
+                                <div className="space-y-2">
+                                    <label className={labelClass}>承租人</label>
+                                    <div className="flex gap-2 items-center flex-nowrap">
+                                        <select
+                                            name="proprietorId"
+                                            value={formData.proprietorId}
+                                            onChange={handleChange}
+                                            className={`${inputClass} flex-1 min-w-0 w-auto`}
+                                        >
+                                            <option value="" className="bg-white dark:bg-[#1a1a2e]">
+                                                請選擇承租人
+                                            </option>
+                                            {fullPickIndividuals.length > 0 && (
+                                                <optgroup label="個人">
+                                                    {fullPickIndividuals.map((p) => (
+                                                        <option key={p.id} value={p.id} className="bg-white dark:bg-[#1a1a2e]">
+                                                            {p.name}
+                                                        </option>
+                                                    ))}
+                                                </optgroup>
+                                            )}
+                                            {fullPickCompanies.length > 0 && (
+                                                <optgroup label="公司">
+                                                    {fullPickCompanies.map((p) => (
+                                                        <option key={p.id} value={p.id} className="bg-white dark:bg-[#1a1a2e]">
+                                                            {p.name}
+                                                        </option>
+                                                    ))}
+                                                </optgroup>
+                                            )}
+                                        </select>
+                                        {formData.proprietorId ? (
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    const p = proprietors.find((pt) => pt.id === formData.proprietorId);
+                                                    if (p) {
+                                                        setProprietorModalInitial(p);
+                                                        setRentingProprietorPickTarget('lessee');
+                                                        setShowProprietorModal(true);
+                                                    }
+                                                }}
+                                                className="p-2 text-zinc-400 hover:text-blue-500 rounded-lg shrink-0"
+                                                title="編輯"
+                                            >
+                                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                    <path
+                                                        strokeLinecap="round"
+                                                        strokeLinejoin="round"
+                                                        strokeWidth={2}
+                                                        d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+                                                    />
+                                                </svg>
+                                            </button>
+                                        ) : null}
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                setProprietorModalInitial(null);
+                                                setRentingProprietorPickTarget('lessee');
+                                                setShowProprietorModal(true);
+                                            }}
+                                            className="px-4 py-2 bg-blue-50 dark:bg-blue-500/20 text-blue-600 dark:text-blue-400 rounded-xl hover:bg-blue-100 dark:hover:bg-blue-500/30 border border-blue-100 dark:border-blue-500/30 text-sm font-medium transition-all duration-300 h-11 whitespace-nowrap shrink-0"
+                                        >
+                                            + 新增
+                                        </button>
+                                    </div>
+                                    <p className="text-xs text-zinc-400 dark:text-white/40">
+                                        交租方（承租人／付款主體），與上方「業主」區分；可含承租人代碼名冊
+                                    </p>
+                                </div>
                                 <div className="space-y-2">
                                     <label className={labelClass}>業主名稱 *</label>
                                     <input
@@ -1306,6 +1697,7 @@ export default function RentModal({
                                                     ? { rentCollectionChequeBank: '', rentCollectionChequeNumber: '', rentCollectionChequeImage: '' }
                                                     : {}),
                                                 ...(v !== 'bank_in' ? { rentCollectionBankInImage: '' } : {}),
+                                                ...(v === 'cheque' || v === '' ? { rentCollectionReceiptNumber: '' } : {}),
                                             }));
                                         }}
                                         className={inputClass}
@@ -1393,6 +1785,7 @@ export default function RentModal({
                                             className={inputClass}
                                         />
                                     </div>
+                                    {renderRentCollectionReceiptField()}
                                     <div className="space-y-2">
                                         <label className={labelClass}>轉帳證明／截圖（選填）</label>
                                         <div className="flex flex-wrap items-center gap-3">
@@ -1430,6 +1823,7 @@ export default function RentModal({
                                             className={inputClass}
                                         />
                                     </div>
+                                    {renderRentCollectionReceiptField()}
                                 </div>
                             )}
                             {/* 入數資料 — 選入數時顯示 */}
@@ -1446,6 +1840,7 @@ export default function RentModal({
                                             className={inputClass}
                                         />
                                     </div>
+                                    {renderRentCollectionReceiptField()}
                                     <div className="space-y-2">
                                         <label className={labelClass}>入數憑證／截圖（選填）</label>
                                         <div className="flex flex-wrap items-center gap-3">
@@ -1585,30 +1980,229 @@ export default function RentModal({
                                 </div>
                             </div>
 
+                            <div className="space-y-2">
+                                <label className={labelClass}>合約性質</label>
+                                <select
+                                    name="rentOutContractNature"
+                                    value={formData.rentOutContractNature}
+                                    onChange={handleChange}
+                                    className={inputClass}
+                                >
+                                    <option value="" className="bg-white dark:bg-[#1a1a2e]">請選擇</option>
+                                    {CONTRACT_NATURE_OPTIONS.map((o) => (
+                                        <option key={o.value} value={o.value} className="bg-white dark:bg-[#1a1a2e]">
+                                            {o.label}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div className="space-y-2">
                                     <label className={labelClass}>出租合約按金</label>
+                                    <input
+                                        type="text"
+                                        name="rentOutDepositReceived"
+                                        value={formatNumberWithCommas(formData.rentOutDepositReceived)}
+                                        onChange={(e) => handlePriceChange('rentOutDepositReceived', e.target.value)}
+                                        className={inputClass}
+                                        placeholder="0"
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <label className={labelClass}>按金收據</label>
                                     <select
                                         name="rentOutDepositPaymentMethod"
                                         value={formData.rentOutDepositPaymentMethod}
                                         onChange={(e) => {
                                             const v = e.target.value as '' | RentCollectionPaymentMethod;
-                                            setFormData(prev => ({ ...prev, rentOutDepositPaymentMethod: v }));
+                                            setFormData((prev) => ({
+                                                ...prev,
+                                                rentOutDepositPaymentMethod: v,
+                                                ...(v === '' || v === 'cash'
+                                                    ? {
+                                                          rentOutDepositChequeBank: '',
+                                                          rentOutDepositChequeNumber: '',
+                                                          rentOutDepositChequeImage: '',
+                                                      }
+                                                    : {}),
+                                                ...(v !== 'bank_in' ? { rentOutDepositBankInImage: '' } : {}),
+                                                ...(v === 'cheque' || v === '' ? { rentOutDepositReceiptNumber: '' } : {}),
+                                            }));
                                         }}
                                         className={inputClass}
                                     >
                                         <option value="" className="bg-white dark:bg-[#1a1a2e]">請選擇</option>
+                                        <option value="cash" className="bg-white dark:bg-[#1a1a2e]">現金</option>
                                         <option value="cheque" className="bg-white dark:bg-[#1a1a2e]">支票</option>
                                         <option value="fps" className="bg-white dark:bg-[#1a1a2e]">FPS轉帳</option>
-                                        <option value="cash" className="bg-white dark:bg-[#1a1a2e]">現金</option>
                                         <option value="bank_in" className="bg-white dark:bg-[#1a1a2e]">入數</option>
                                     </select>
                                 </div>
-                                <div className="space-y-2">
-                                    <label className={labelClass}>{contractSectionPrefix}按金收據號碼</label>
-                                    <input type="text" name="rentOutDepositReceiptNumber" value={formData.rentOutDepositReceiptNumber} onChange={handleChange} className={inputClass} placeholder="請輸入按金收據號碼" />
-                                </div>
                             </div>
+
+                            {formData.rentOutDepositPaymentMethod === 'cheque' && (
+                                <div className={rentPaymentDetailBoxClass}>
+                                    <p className={rentPaymentDetailTitleClass}>支票資料</p>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <div className="space-y-2">
+                                            <label className={labelClass}>銀行</label>
+                                            <input
+                                                type="text"
+                                                name="rentOutDepositChequeBank"
+                                                value={formData.rentOutDepositChequeBank}
+                                                onChange={handleChange}
+                                                className={inputClass}
+                                                placeholder="例如：匯豐銀行"
+                                            />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <label className={labelClass}>支票號碼</label>
+                                            <input
+                                                type="text"
+                                                name="rentOutDepositChequeNumber"
+                                                value={formData.rentOutDepositChequeNumber}
+                                                onChange={handleChange}
+                                                className={inputClass}
+                                                placeholder="支票號碼"
+                                            />
+                                        </div>
+                                    </div>
+                                    <div className="space-y-2">
+                                        <label className={labelClass}>付款日期</label>
+                                        <input
+                                            type="date"
+                                            name="rentOutDepositPaymentDate"
+                                            value={formData.rentOutDepositPaymentDate}
+                                            onChange={handleChange}
+                                            className={inputClass}
+                                        />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <label className={labelClass}>支票影像（選填）</label>
+                                        <div className="flex flex-wrap items-center gap-3">
+                                            <label className="px-4 py-2 rounded-xl border border-dashed border-zinc-300 dark:border-white/20 text-sm text-blue-600 dark:text-blue-400 cursor-pointer hover:bg-blue-50 dark:hover:bg-blue-500/10 transition-colors">
+                                                上載圖片
+                                                <input type="file" accept="image/*" className="hidden" onChange={onDepositChequeImageChange} />
+                                            </label>
+                                            {formData.rentOutDepositChequeImage && (
+                                                <>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setFormData((prev) => ({ ...prev, rentOutDepositChequeImage: '' }))}
+                                                        className="text-sm text-red-500 hover:underline"
+                                                    >
+                                                        移除
+                                                    </button>
+                                                    <img
+                                                        src={formData.rentOutDepositChequeImage}
+                                                        alt="支票預覽"
+                                                        className="h-20 rounded-lg border border-zinc-200 dark:border-white/10 object-contain"
+                                                    />
+                                                </>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+                            {formData.rentOutDepositPaymentMethod === 'fps' && (
+                                <div className={rentPaymentDetailBoxClass}>
+                                    <p className={rentPaymentDetailTitleClass}>FPS 轉帳</p>
+                                    <div className="space-y-2">
+                                        <label className={labelClass}>付款日期</label>
+                                        <input
+                                            type="date"
+                                            name="rentOutDepositPaymentDate"
+                                            value={formData.rentOutDepositPaymentDate}
+                                            onChange={handleChange}
+                                            className={inputClass}
+                                        />
+                                    </div>
+                                    {renderContractDepositReceiptField()}
+                                    <div className="space-y-2">
+                                        <label className={labelClass}>轉帳證明／截圖（選填）</label>
+                                        <div className="flex flex-wrap items-center gap-3">
+                                            <label className="px-4 py-2 rounded-xl border border-dashed border-zinc-300 dark:border-white/20 text-sm text-blue-600 dark:text-blue-400 cursor-pointer hover:bg-blue-50 dark:hover:bg-blue-500/10 transition-colors">
+                                                上載圖片
+                                                <input type="file" accept="image/*" className="hidden" onChange={onDepositChequeImageChange} />
+                                            </label>
+                                            {formData.rentOutDepositChequeImage && (
+                                                <>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setFormData((prev) => ({ ...prev, rentOutDepositChequeImage: '' }))}
+                                                        className="text-sm text-red-500 hover:underline"
+                                                    >
+                                                        移除
+                                                    </button>
+                                                    <img
+                                                        src={formData.rentOutDepositChequeImage}
+                                                        alt="轉帳證明預覽"
+                                                        className="h-20 rounded-lg border border-zinc-200 dark:border-white/10 object-contain"
+                                                    />
+                                                </>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+                            {formData.rentOutDepositPaymentMethod === 'cash' && (
+                                <div className={rentPaymentDetailBoxClass}>
+                                    <p className={rentPaymentDetailTitleClass}>現金資料</p>
+                                    <div className="space-y-2">
+                                        <label className={labelClass}>付款日期</label>
+                                        <input
+                                            type="date"
+                                            name="rentOutDepositPaymentDate"
+                                            value={formData.rentOutDepositPaymentDate}
+                                            onChange={handleChange}
+                                            className={inputClass}
+                                        />
+                                    </div>
+                                    {renderContractDepositReceiptField()}
+                                </div>
+                            )}
+                            {formData.rentOutDepositPaymentMethod === 'bank_in' && (
+                                <div className={rentPaymentDetailBoxClass}>
+                                    <p className={rentPaymentDetailTitleClass}>入數資料</p>
+                                    <div className="space-y-2">
+                                        <label className={labelClass}>付款日期</label>
+                                        <input
+                                            type="date"
+                                            name="rentOutDepositPaymentDate"
+                                            value={formData.rentOutDepositPaymentDate}
+                                            onChange={handleChange}
+                                            className={inputClass}
+                                        />
+                                    </div>
+                                    {renderContractDepositReceiptField()}
+                                    <div className="space-y-2">
+                                        <label className={labelClass}>入數憑證／截圖（選填）</label>
+                                        <div className="flex flex-wrap items-center gap-3">
+                                            <label className="px-4 py-2 rounded-xl border border-dashed border-zinc-300 dark:border-white/20 text-sm text-blue-600 dark:text-blue-400 cursor-pointer hover:bg-blue-50 dark:hover:bg-blue-500/10 transition-colors">
+                                                上載圖片
+                                                <input type="file" accept="image/*" className="hidden" onChange={onDepositBankInImageChange} />
+                                            </label>
+                                            {formData.rentOutDepositBankInImage && (
+                                                <>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setFormData((prev) => ({ ...prev, rentOutDepositBankInImage: '' }))}
+                                                        className="text-sm text-red-500 hover:underline"
+                                                    >
+                                                        移除
+                                                    </button>
+                                                    <img
+                                                        src={formData.rentOutDepositBankInImage}
+                                                        alt="入數憑證預覽"
+                                                        className="h-20 rounded-lg border border-zinc-200 dark:border-white/10 object-contain"
+                                                    />
+                                                </>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div className="space-y-2">
                                     <label className={labelClass}>{contractSectionPrefix}按金收取日期</label>
@@ -1769,7 +2363,15 @@ export default function RentModal({
             {showProprietorModal && (
                 <ProprietorModal
                     mode={formData.type === 'rent_out' ? 'tenant' : 'proprietor'}
-                    onClose={() => setShowProprietorModal(false)}
+                    initialData={proprietorModalInitial}
+                    initialEditing={proprietorModalInitial ? true : undefined}
+                    propertyCode={
+                        formData.propertyId ? properties.find((p) => p.id === formData.propertyId)?.code : undefined
+                    }
+                    onClose={() => {
+                        setShowProprietorModal(false);
+                        setProprietorModalInitial(null);
+                    }}
                     onSuccess={handleProprietorCreated}
                 />
             )}
@@ -1794,6 +2396,7 @@ export default function RentModal({
                 <RentOutFormModal
                     mode="current_tenant"
                     editItem={editCurrentTenant}
+                    currentPropertyCode={formData.propertyId ? properties.find(p => p.id === formData.propertyId)?.code : undefined}
                     onClose={() => { setShowCurrentTenantModal(false); setEditCurrentTenant(null); }}
                     onSuccess={async (id) => {
                         await queryClient.invalidateQueries({ queryKey: ['current_tenants'] });

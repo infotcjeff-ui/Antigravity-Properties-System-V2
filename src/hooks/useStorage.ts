@@ -879,6 +879,12 @@ export function useProprietorsQuery() {
 const rentOutContractToRow = (obj: any): Record<string, any> => {
     const m: Record<string, any> = {};
     const map: [string, string][] = [
+        ['code', 'code'],
+        ['englishName', 'english_name'],
+        ['shortName', 'short_name'],
+        ['type', 'type'],
+        ['category', 'category'],
+        ['brNumber', 'br_number'],
         ['tenancyNumber', 'tenancy_number'],
         ['pricing', 'pricing'],
         ['monthlyRental', 'monthly_rental'],
@@ -976,6 +982,7 @@ export function useCurrentTenants() {
         try {
             const row: Record<string, any> = { updated_at: new Date().toISOString(), ...rentOutContractToRow(updates) };
             if (updates.name !== undefined) row.name = updates.name;
+            if (updates.code !== undefined) row.code = updates.code;
             const { error } = await supabase.from('current_tenants').update(row).eq('id', id);
             if (error) throw error;
             return true;
@@ -1083,9 +1090,20 @@ export function useRents() {
             if (rent.rentOutStartDate) rentData.rent_out_start_date = rent.rentOutStartDate;
             if (rent.rentOutEndDate) rentData.rent_out_end_date = rent.rentOutEndDate;
             if (rent.rentOutActualEndDate) rentData.rent_out_actual_end_date = rent.rentOutActualEndDate;
-            if (rent.rentOutDepositReceived) rentData.rent_out_deposit_received = rent.rentOutDepositReceived;
-            if ((rent as any).rentOutDepositPaymentMethod) rentData.rent_out_deposit_payment_method = (rent as any).rentOutDepositPaymentMethod;
-            if ((rent as any).rentOutDepositReceiptNumber) rentData.rent_out_deposit_receipt_number = (rent as any).rentOutDepositReceiptNumber;
+            const rod = rent as any;
+            if (rod.rentOutContractNature) rentData.rent_out_contract_nature = rod.rentOutContractNature;
+            if (rent.rentOutDepositReceived != null && !Number.isNaN(Number(rent.rentOutDepositReceived))) {
+                rentData.rent_out_deposit_received = Number(rent.rentOutDepositReceived);
+            }
+            if (rod.rentOutDepositPaymentMethod) rentData.rent_out_deposit_payment_method = rod.rentOutDepositPaymentMethod;
+            if (rod.rentOutDepositReceiptNumber !== undefined && rod.rentOutDepositReceiptNumber !== null && rod.rentOutDepositReceiptNumber !== '') {
+                rentData.rent_out_deposit_receipt_number = rod.rentOutDepositReceiptNumber;
+            }
+            if (rod.rentOutDepositChequeBank) rentData.rent_out_deposit_cheque_bank = rod.rentOutDepositChequeBank;
+            if (rod.rentOutDepositChequeNumber) rentData.rent_out_deposit_cheque_number = rod.rentOutDepositChequeNumber;
+            if (rod.rentOutDepositChequeImage) rentData.rent_out_deposit_cheque_image = rod.rentOutDepositChequeImage;
+            if (rod.rentOutDepositPaymentDate) rentData.rent_out_deposit_payment_date = rod.rentOutDepositPaymentDate;
+            if (rod.rentOutDepositBankInImage) rentData.rent_out_deposit_bank_in_image = rod.rentOutDepositBankInImage;
             if (rent.rentOutDepositReceiveDate) rentData.rent_out_deposit_receive_date = rent.rentOutDepositReceiveDate;
             if (rent.rentOutDepositReturnDate) rentData.rent_out_deposit_return_date = rent.rentOutDepositReturnDate;
             if (rent.rentOutDepositReturnAmount) rentData.rent_out_deposit_return_amount = rent.rentOutDepositReturnAmount;
@@ -1111,6 +1129,12 @@ export function useRents() {
             if (rc.rentCollectionPaymentDate) rentData.rent_collection_payment_date = rc.rentCollectionPaymentDate;
             if (rc.rentCollectionBankInImage !== undefined) {
                 rentData.rent_collection_bank_in_image = rc.rentCollectionBankInImage;
+            }
+            if (rc.rentCollectionContractNumber !== undefined) {
+                rentData.rent_collection_contract_number = rc.rentCollectionContractNumber || null;
+            }
+            if (rc.rentCollectionReceiptNumber !== undefined) {
+                rentData.rent_collection_receipt_number = rc.rentCollectionReceiptNumber || null;
             }
 
             // Add Renting (交租) fields
@@ -1279,8 +1303,10 @@ export function useRents() {
             if (updates.startDate !== undefined) rentData.start_date = updates.startDate;
             if (updates.endDate !== undefined) rentData.end_date = updates.endDate;
 
-            // RENT OUT fields
-            if (updates.rentOutTenancyNumber) rentData.rent_out_tenancy_number = updates.rentOutTenancyNumber;
+            // RENT OUT fields（含清空：收租記錄編號同步寫入時可能為 null）
+            if (updates.rentOutTenancyNumber !== undefined) {
+                rentData.rent_out_tenancy_number = updates.rentOutTenancyNumber || null;
+            }
             if (updates.rentOutPricing !== undefined) rentData.rent_out_pricing = updates.rentOutPricing;
             if (updates.rentOutMonthlyRental !== undefined) rentData.rent_out_monthly_rental = updates.rentOutMonthlyRental;
             if (updates.rentOutPeriods !== undefined) rentData.rent_out_periods = updates.rentOutPeriods;
@@ -1293,6 +1319,25 @@ export function useRents() {
                 rentData.rent_out_deposit_payment_method = (updates as any).rentOutDepositPaymentMethod || null;
             }
             if ((updates as any).rentOutDepositReceiptNumber !== undefined) rentData.rent_out_deposit_receipt_number = (updates as any).rentOutDepositReceiptNumber;
+            const udep = updates as any;
+            if (udep.rentOutContractNature !== undefined) {
+                rentData.rent_out_contract_nature = udep.rentOutContractNature || null;
+            }
+            if (udep.rentOutDepositChequeBank !== undefined) {
+                rentData.rent_out_deposit_cheque_bank = udep.rentOutDepositChequeBank || null;
+            }
+            if (udep.rentOutDepositChequeNumber !== undefined) {
+                rentData.rent_out_deposit_cheque_number = udep.rentOutDepositChequeNumber || null;
+            }
+            if (udep.rentOutDepositChequeImage !== undefined) {
+                rentData.rent_out_deposit_cheque_image = udep.rentOutDepositChequeImage || null;
+            }
+            if (udep.rentOutDepositPaymentDate !== undefined) {
+                rentData.rent_out_deposit_payment_date = udep.rentOutDepositPaymentDate || null;
+            }
+            if (udep.rentOutDepositBankInImage !== undefined) {
+                rentData.rent_out_deposit_bank_in_image = udep.rentOutDepositBankInImage || null;
+            }
             if (updates.rentOutDepositReceiveDate) rentData.rent_out_deposit_receive_date = updates.rentOutDepositReceiveDate;
             if (updates.rentOutDepositReturnDate) rentData.rent_out_deposit_return_date = updates.rentOutDepositReturnDate;
             if (updates.rentOutDepositReturnAmount !== undefined) rentData.rent_out_deposit_return_amount = updates.rentOutDepositReturnAmount;
@@ -1316,6 +1361,12 @@ export function useRents() {
             if (urc.rentCollectionPaymentDate !== undefined) rentData.rent_collection_payment_date = urc.rentCollectionPaymentDate || null;
             if ((urc as any).rentCollectionBankInImage !== undefined) {
                 rentData.rent_collection_bank_in_image = (urc as any).rentCollectionBankInImage || null;
+            }
+            if (urc.rentCollectionContractNumber !== undefined) {
+                rentData.rent_collection_contract_number = urc.rentCollectionContractNumber || null;
+            }
+            if (urc.rentCollectionReceiptNumber !== undefined) {
+                rentData.rent_collection_receipt_number = urc.rentCollectionReceiptNumber || null;
             }
 
             // RENTING fields

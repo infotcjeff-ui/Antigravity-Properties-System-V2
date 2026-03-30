@@ -23,7 +23,7 @@ import {
     proprietorCategoryLabelZh,
 } from '@/lib/formatters';
 import { normalizePropertyLocation } from '@/lib/propertyLocation';
-import { formatDateDMY, getRentCollectionPayListStatus } from '@/lib/rentPaymentDisplay';
+import { formatDateDMY, getRentCollectionPayListStatus, getRentOutOrContractListNumber } from '@/lib/rentPaymentDisplay';
 
 /** 由物業資料建立表單狀態；地址欄優先使用 address 欄，否則沿用 location 內文字 */
 function formStateFromProperty(p: Property | null | undefined) {
@@ -200,7 +200,7 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
     const contractSubLandlordId = (latestContract as any)?.rentOutSubLandlordId || '';
     const contractCurrentTenantId = latestContract?.rentOutTenantIds?.[0] || '';
 
-    /** 收租表第二欄為現時租客；交租表第二欄為業主（proprietor） */
+    /** 收租表第二欄為現時租客；交租表第二、三欄為業主（tenant_id）、承租人（proprietor_id） */
     const renderRentTable = (records: Rent[], partyMode: 'lessee' | 'landlord' | 'owner' = 'lessee') => {
         if (records.length === 0) {
             return (
@@ -211,7 +211,9 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
         }
 
         const rentGridClass =
-            'grid grid-cols-[100px_minmax(0,1fr)_minmax(0,1.5fr)_minmax(0,1.15fr)_minmax(0,1.05fr)_minmax(76px,0.95fr)_minmax(0,1fr)_90px] gap-4 px-4';
+            partyMode === 'owner'
+                ? 'grid grid-cols-[100px_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.5fr)_minmax(0,1.15fr)_minmax(0,1.05fr)_minmax(76px,0.95fr)_minmax(0,1fr)_90px] gap-4 px-4'
+                : 'grid grid-cols-[100px_minmax(0,1fr)_minmax(0,1.5fr)_minmax(0,1.15fr)_minmax(0,1.05fr)_minmax(76px,0.95fr)_minmax(0,1fr)_90px] gap-4 px-4';
         /** 交租記錄「編號」欄：顯示所屬物業編號（與表單「編號」一致） */
         const propertyCodeForRentingRows = (formData.code || property?.code || '').trim() || '-';
 
@@ -221,9 +223,16 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                     className={`${rentGridClass} py-3 bg-zinc-100/80 dark:bg-white/5 text-sm font-semibold text-zinc-700 dark:text-white/80 uppercase tracking-wider border-b border-zinc-200 dark:border-white/10`}
                 >
                     <div className="flex items-center gap-1.5 font-bold">編號</div>
-                    <div className="font-bold">
-                        {partyMode === 'landlord' ? '現時租客' : partyMode === 'owner' ? '業主' : '承租人'}
-                    </div>
+                    {partyMode === 'owner' ? (
+                        <>
+                            <div className="font-bold">業主</div>
+                            <div className="font-bold">承租人</div>
+                        </>
+                    ) : (
+                        <div className="font-bold">
+                            {partyMode === 'landlord' ? '現時租客' : '承租人'}
+                        </div>
+                    )}
                     <div className="font-bold">租借位置</div>
                     <div className="font-bold">租期</div>
                     <div className="font-bold">付款日期</div>
@@ -267,14 +276,19 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                         ? Math.round((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24 * 30))
                         : (rent.type === 'rent_out' || rent.type === 'contract' ? rent.rentOutPeriods : rent.rentingPeriods) || 0;
 
-                    const contractNumber = rent.type === 'rent_out' || rent.type === 'contract'
-                        ? (rent.rentOutTenancyNumber || `-`)
-                        : propertyCodeForRentingRows;
+                    const contractNumber =
+                        rent.type === 'rent_out' || rent.type === 'contract'
+                            ? getRentOutOrContractListNumber(rent as Rent)
+                            : propertyCodeForRentingRows;
 
-                    /** 交租業主存於 tenant_id（與 RentModal 一致），非 proprietor_id */
+                    /** 交租業主存於 tenant_id；承租人存於 proprietor_id（與 RentModal 一致） */
                     const rentingOwnerParty =
                         rent.type === 'renting'
                             ? rent.tenant || (proprietors || []).find((p) => p.id === rent.tenantId)
+                            : undefined;
+                    const rentingLesseeParty =
+                        rent.type === 'renting'
+                            ? rent.proprietor || (proprietors || []).find((p) => p.id === rent.proprietorId)
                             : undefined;
 
                     const rentOutCurrentTenantLabel = (() => {
@@ -310,27 +324,45 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                                     </span>
                                 </div>
                             </div>
-                            <div className="flex flex-col overflow-hidden min-w-0">
-                                <span className="font-semibold text-zinc-900 dark:text-white truncate">
-                                    {partyMode === 'landlord'
-                                        ? rentOutCurrentTenantLabel || '—'
-                                        : partyMode === 'owner'
-                                          ? (rentingOwnerParty?.name || (rent.type === 'renting' ? '(暫缺)' : '-'))
-                                        : rent.type === 'contract'
-                                          ? (rent.rentOutLessor || otherPartyLessee?.name || '-')
-                                          : (otherPartyLessee?.name || (rent.type === 'renting' ? '(暫缺)' : '-'))}
-                                </span>
-                                {partyMode !== 'landlord' && partyMode !== 'owner' && otherPartyLessee?.shortName && (
-                                    <span className="text-xs text-zinc-500 dark:text-white/50 truncate uppercase">
-                                        {otherPartyLessee.shortName}
+                            {partyMode === 'owner' ? (
+                                <>
+                                    <div className="flex flex-col overflow-hidden min-w-0">
+                                        <span className="font-semibold text-zinc-900 dark:text-white truncate">
+                                            {rentingOwnerParty?.name || (rent.type === 'renting' ? '(暫缺)' : '-')}
+                                        </span>
+                                        {rentingOwnerParty?.shortName ? (
+                                            <span className="text-xs text-zinc-500 dark:text-white/50 truncate uppercase">
+                                                {rentingOwnerParty.shortName}
+                                            </span>
+                                        ) : null}
+                                    </div>
+                                    <div className="flex flex-col overflow-hidden min-w-0">
+                                        <span className="font-semibold text-zinc-900 dark:text-white truncate">
+                                            {rentingLesseeParty?.name || (rent.type === 'renting' ? '(暫缺)' : '-')}
+                                        </span>
+                                        {rentingLesseeParty?.shortName ? (
+                                            <span className="text-xs text-zinc-500 dark:text-white/50 truncate uppercase">
+                                                {rentingLesseeParty.shortName}
+                                            </span>
+                                        ) : null}
+                                    </div>
+                                </>
+                            ) : (
+                                <div className="flex flex-col overflow-hidden min-w-0">
+                                    <span className="font-semibold text-zinc-900 dark:text-white truncate">
+                                        {partyMode === 'landlord'
+                                            ? rentOutCurrentTenantLabel || '—'
+                                            : rent.type === 'contract'
+                                              ? (rent.rentOutLessor || otherPartyLessee?.name || '-')
+                                              : (otherPartyLessee?.name || '-')}
                                     </span>
-                                )}
-                                {partyMode === 'owner' && rentingOwnerParty?.shortName && (
-                                    <span className="text-xs text-zinc-500 dark:text-white/50 truncate uppercase">
-                                        {rentingOwnerParty.shortName}
-                                    </span>
-                                )}
-                            </div>
+                                    {partyMode !== 'landlord' && otherPartyLessee?.shortName && (
+                                        <span className="text-xs text-zinc-500 dark:text-white/50 truncate uppercase">
+                                            {otherPartyLessee.shortName}
+                                        </span>
+                                    )}
+                                </div>
+                            )}
                             <div className="text-zinc-700 dark:text-white/80 text-sm leading-relaxed line-clamp-2">
                                 {rent.location || rent.rentOutAddressDetail || formData.name || '-'}
                             </div>

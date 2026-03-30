@@ -1,12 +1,13 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
-import { usePropertyWithRelationsQuery } from '@/hooks/useStorage';
+import { usePropertyWithRelationsQuery, useSubLandlordsQuery, useCurrentTenantsQuery } from '@/hooks/useStorage';
 import { formatLotArea, proprietorCategoryLabelZh } from '@/lib/formatters';
 import type { Property, Proprietor, Rent } from '@/lib/db';
+import { hasRentCollectionPaidAmount, getRentOutLesseeDisplayLabel, getRentOutOrContractListNumber } from '@/lib/rentPaymentDisplay';
 import {
     ArrowLeft,
     Building2,
@@ -22,6 +23,7 @@ import {
     Image as ImageIcon,
     ChevronDown,
     ChevronUp,
+    Users,
 } from 'lucide-react';
 import { useRef } from 'react';
 import DOMPurify from 'dompurify';
@@ -30,6 +32,50 @@ import RentDetailsModal from '@/components/properties/RentDetailsModal';
 import SinglePropertyMapDynamic from '@/components/properties/SinglePropertyMapDynamic';
 import { useAuth } from '@/contexts/AuthContext';
 import { Tooltip } from '@heroui/react';
+
+/** 租務記錄表：業主／承租人（交租：tenant_id＝業主、proprietor_id＝承租人） */
+function RentHistoryProprietorCell({ party }: { party?: Proprietor | null }) {
+    if (!party?.name) {
+        return <div className="text-zinc-600 dark:text-white/70 text-sm">-</div>;
+    }
+    return (
+        <Tooltip
+            content={
+                <div className="flex flex-col gap-1.5 w-full">
+                    <div className="flex items-center gap-2 mb-1">
+                        <User className="w-4 h-4 text-blue-500" />
+                        <span className="font-bold">{party.name}</span>
+                        <span className="bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-300 px-1.5 py-0.5 rounded text-[10px] ml-auto">
+                            {party.code}
+                        </span>
+                    </div>
+                    <div className="text-xs text-zinc-500 dark:text-white/60">
+                        英文名稱:{' '}
+                        <span className="text-zinc-900 dark:text-white text-[10px]">{party.englishName || '-'}</span>
+                    </div>
+                    <div className="text-xs text-zinc-500 dark:text-white/60 flex items-center justify-between">
+                        <span>
+                            類型:{' '}
+                            <span className="text-zinc-900 dark:text-white">{party.type === 'company' ? '公司' : '個人'}</span>
+                        </span>
+                        <span className="bg-zinc-100 dark:bg-white/10 px-1.5 py-0.5 rounded text-[10px] text-zinc-600 dark:text-white/70">
+                            {proprietorCategoryLabelZh(party.category, 'card')}
+                        </span>
+                    </div>
+                </div>
+            }
+            placement="top"
+            className="bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white p-3 rounded-xl shadow-xl border border-zinc-200 dark:border-white/10 max-w-xs"
+        >
+            <div
+                className="text-sm font-medium text-purple-600 dark:text-purple-400 border-b border-dashed border-purple-300 dark:border-purple-600/50 cursor-pointer block min-w-0 max-w-full truncate"
+                title={party.name}
+            >
+                {party.name}
+            </div>
+        </Tooltip>
+    );
+}
 
 const statusColors: Record<string, string> = {
     holding: 'bg-emerald-600/80 text-white border-emerald-500/50',
@@ -50,6 +96,34 @@ const typeLabels: Record<string, string> = {
     co_investment: '合作投資',
     external_lease: '外租物業',
     managed_asset: '代管資產',
+};
+
+type RentHistoryTabKey = 'rent_out' | 'renting' | 'contract_lease_in' | 'contract_lease_out';
+
+const RENT_HISTORY_TAB_BUTTON: Record<
+    RentHistoryTabKey,
+    { active: string; inactive: string }
+> = {
+    rent_out: {
+        active:
+            'bg-white dark:bg-white/15 text-emerald-700 dark:text-emerald-400 shadow-sm ring-1 ring-emerald-200/70 dark:ring-emerald-500/30',
+        inactive: 'text-zinc-600 dark:text-white/60 hover:text-emerald-800 dark:hover:text-emerald-300',
+    },
+    renting: {
+        active:
+            'bg-white dark:bg-white/15 text-indigo-700 dark:text-indigo-400 shadow-sm ring-1 ring-indigo-200/70 dark:ring-indigo-500/30',
+        inactive: 'text-zinc-600 dark:text-white/60 hover:text-indigo-800 dark:hover:text-indigo-300',
+    },
+    contract_lease_in: {
+        active:
+            'bg-white dark:bg-white/15 text-violet-800 dark:text-violet-300 shadow-sm ring-1 ring-violet-200/80 dark:ring-violet-500/35',
+        inactive: 'text-zinc-600 dark:text-white/60 hover:text-violet-900 dark:hover:text-violet-200',
+    },
+    contract_lease_out: {
+        active:
+            'bg-white dark:bg-white/15 text-amber-800 dark:text-amber-400 shadow-sm ring-1 ring-amber-200/80 dark:ring-amber-500/35',
+        inactive: 'text-zinc-600 dark:text-white/60 hover:text-amber-900 dark:hover:text-amber-300',
+    },
 };
 
 const landUseLabels: Record<string, string> = {
@@ -94,13 +168,15 @@ export default function PropertyDetailsPage() {
     const t = (en: string, zh: string) => isZh ? zh : en;
     const propertyId = params.id as string;
     const { data: property, isLoading: loading } = usePropertyWithRelationsQuery(propertyId);
+    const { data: subLandlords = [] } = useSubLandlordsQuery();
+    const { data: currentTenants = [] } = useCurrentTenantsQuery();
     const [currentImageIndex, setCurrentImageIndex] = useState(0);
     const [lightboxImage, setLightboxImage] = useState<string | null>(null);
     const [selectedRent, setSelectedRent] = useState<Rent | null>(null);
     const [showGeoMaps, setShowGeoMaps] = useState(false);
     const [imageError, setImageError] = useState(false);
     const [isNotesExpanded, setIsNotesExpanded] = useState(false);
-    const [rentHistoryTab, setRentHistoryTab] = useState<'rent_out' | 'renting' | 'contract'>('rent_out');
+    const [rentHistoryTab, setRentHistoryTab] = useState<RentHistoryTabKey>('rent_out');
     const [mainTab, setMainTab] = useState<'overview' | 'location' | 'policy' | 'booking'>('overview');
     const [showNotesToggle, setShowNotesToggle] = useState(false);
     const notesRef = useRef<HTMLDivElement>(null);
@@ -124,11 +200,58 @@ export default function PropertyDetailsPage() {
     const activeRenting = property?.rents?.find((r: Rent) => r.type === 'renting');
 
     const proprietor = property?.proprietor || activeRenting?.proprietor || null;
-    const tenant = property?.tenant || activeRentOut?.tenant || null;
     const rents = property?.rents || [];
     const contractRents = rents.filter((r: Rent) => r.type === 'contract');
     const rentOutRents = rents.filter((r: Rent) => r.type === 'rent_out');
     const rentingRents = rents.filter((r: Rent) => r.type === 'renting');
+    const leaseInContractRents = useMemo(
+        () => contractRents.filter((c: Rent) => (c.rentOutStatus || c.status) === 'leasing_in'),
+        [contractRents],
+    );
+    const leaseOutContractRents = useMemo(
+        () => contractRents.filter((c: Rent) => (c.rentOutStatus || c.status) !== 'leasing_in'),
+        [contractRents],
+    );
+
+    const subLandlordCard = useMemo(() => {
+        if (!property) return null;
+        const pool = [...(property.rents || [])]
+            .filter((r) => r.type === 'contract' || r.type === 'rent_out')
+            .sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
+        for (const r of pool) {
+            if (r.rentOutSubLandlordId) {
+                const sl = subLandlords.find((s) => s.id === r.rentOutSubLandlordId);
+                if (sl) return { name: sl.name, subtitle: sl.tenancyNumber?.trim() || '' };
+            }
+            if (r.rentOutSubLandlord?.trim()) {
+                return { name: r.rentOutSubLandlord.trim(), subtitle: '' };
+            }
+        }
+        return null;
+    }, [property, subLandlords]);
+
+    const currentTenantCard = useMemo(() => {
+        if (!property) return null;
+        const contracts = [...(property.rents || [])]
+            .filter((r) => r.type === 'contract')
+            .sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
+        const latestContract = contracts[0];
+        const ctId = latestContract?.rentOutTenantIds?.[0];
+        if (ctId) {
+            const ct = currentTenants.find((c) => c.id === ctId);
+            if (ct) return { mode: 'ct' as const, name: ct.name, subtitle: ct.tenancyNumber?.trim() || '' };
+        }
+        const rentOutsSorted = [...(property.rents || [])]
+            .filter((r) => r.type === 'rent_out')
+            .sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
+        for (const r of rentOutsSorted) {
+            const lab = getRentOutLesseeDisplayLabel(r);
+            if (lab) return { mode: 'label' as const, name: lab, subtitle: '' };
+        }
+        const propT = property.tenant || activeRentOut?.tenant;
+        if (propT) return { mode: 'proprietor' as const, proprietor: propT };
+        return null;
+    }, [property, currentTenants, activeRentOut]);
 
     const nextImage = () => {
         if (property?.images && property.images.length > 0) {
@@ -313,13 +436,13 @@ export default function PropertyDetailsPage() {
                             </div>
                             <div className="bg-zinc-50 dark:bg-white/5 rounded-xl p-4 border border-zinc-100 dark:border-none">
                                 <p className="text-zinc-400 dark:text-white/40 text-sm">{t('Lot Index', '物業地段')}</p>
-                                <p className={`font-medium mt-1 ${property.lotIndex ? 'text-zinc-900 dark:text-white' : 'text-zinc-400 dark:text-white/30'}`}>
+                                <p className="font-medium mt-1 text-zinc-900 dark:text-white">
                                     {property.lotIndex || '暫無。'}
                                 </p>
                             </div>
                             <div className="bg-zinc-50 dark:bg-white/5 rounded-xl p-4 border border-zinc-100 dark:border-none">
                                 <p className="text-zinc-400 dark:text-white/40 text-sm">{t('Lot Area', '地段面積')}</p>
-                                <p className={`font-medium mt-1 ${property.lotArea ? 'text-zinc-900 dark:text-white' : 'text-zinc-400 dark:text-white/30'}`}>
+                                <p className="font-medium mt-1 text-zinc-900 dark:text-white">
                                     {property.lotArea ? formatLotArea(property.lotArea) : '暫無。'}
                                 </p>
                             </div>
@@ -385,22 +508,29 @@ export default function PropertyDetailsPage() {
                             `}</style>
                         </div>
 
-                    {/* Proprietor & Tenant - always show */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                        {/* Proprietor */}
-                        <div className="bg-white dark:bg-white/5 rounded-2xl border border-zinc-200 dark:border-white/10 p-6 shadow-sm dark:shadow-none">
+                    {/* 業主、二房東、現時租客 */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 min-w-0">
+                        <div className="bg-white dark:bg-white/5 rounded-2xl border border-zinc-200 dark:border-white/10 p-6 shadow-sm dark:shadow-none min-w-0 overflow-hidden">
                             <h2 className="text-lg font-semibold text-zinc-900 dark:text-white mb-4 flex items-center gap-2">
                                 <User className="w-5 h-5 text-purple-500" />
                                 {t('Proprietor', '業主')}
                             </h2>
                             {proprietor ? (
-                                <div className="flex items-center gap-4">
-                                    <div className="w-12 h-12 rounded-full bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center text-white font-semibold">
+                                <div className="flex items-center gap-4 min-w-0">
+                                    <div className="w-12 h-12 shrink-0 rounded-full bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center text-white font-semibold">
                                         {proprietor.name.charAt(0).toUpperCase()}
                                     </div>
-                                    <div>
-                                        <p className="text-zinc-900 dark:text-white font-medium">{proprietor.name}</p>
-                                        <p className="text-zinc-500 dark:text-white/50 text-sm">
+                                    <div className="min-w-0 flex-1 overflow-hidden">
+                                        <p
+                                            className="text-zinc-900 dark:text-white font-medium truncate"
+                                            title={proprietor.name}
+                                        >
+                                            {proprietor.name}
+                                        </p>
+                                        <p
+                                            className="text-zinc-500 dark:text-white/50 text-sm truncate"
+                                            title={`${proprietor.code} ${proprietor.englishName ? `• ${proprietor.englishName}` : ''}`.trim() || undefined}
+                                        >
                                             {proprietor.code} {proprietor.englishName ? `• ${proprietor.englishName}` : ''}
                                         </p>
                                     </div>
@@ -410,22 +540,66 @@ export default function PropertyDetailsPage() {
                             )}
                         </div>
 
-                        {/* Tenant */}
-                        <div className="bg-white dark:bg-white/5 rounded-2xl border border-zinc-200 dark:border-white/10 p-6 shadow-sm dark:shadow-none">
+                        <div className="bg-white dark:bg-white/5 rounded-2xl border border-zinc-200 dark:border-white/10 p-6 shadow-sm dark:shadow-none min-w-0 overflow-hidden">
+                            <h2 className="text-lg font-semibold text-zinc-900 dark:text-white mb-4 flex items-center gap-2">
+                                <Users className="w-5 h-5 text-amber-600 dark:text-amber-400" />
+                                {t('Sub-landlord', '二房東')}
+                            </h2>
+                            {subLandlordCard ? (
+                                <div className="flex items-center gap-4 min-w-0">
+                                    <div className="w-12 h-12 shrink-0 rounded-full bg-gradient-to-br from-amber-500 to-orange-500 flex items-center justify-center text-white font-semibold">
+                                        {subLandlordCard.name.charAt(0).toUpperCase()}
+                                    </div>
+                                    <div className="min-w-0 flex-1 overflow-hidden">
+                                        <p
+                                            className="text-zinc-900 dark:text-white font-medium truncate"
+                                            title={subLandlordCard.name}
+                                        >
+                                            {subLandlordCard.name}
+                                        </p>
+                                        {subLandlordCard.subtitle ? (
+                                            <p
+                                                className="text-zinc-500 dark:text-white/50 text-sm font-mono truncate"
+                                                title={subLandlordCard.subtitle}
+                                            >
+                                                {subLandlordCard.subtitle}
+                                            </p>
+                                        ) : null}
+                                    </div>
+                                </div>
+                            ) : (
+                                <EmptyPlaceholder />
+                            )}
+                        </div>
+
+                        <div className="bg-white dark:bg-white/5 rounded-2xl border border-zinc-200 dark:border-white/10 p-6 shadow-sm dark:shadow-none min-w-0 overflow-hidden sm:col-span-2 lg:col-span-1">
                             <h2 className="text-lg font-semibold text-zinc-900 dark:text-white mb-4 flex items-center gap-2">
                                 <User className="w-5 h-5 text-blue-500" />
-                                {t('Tenant', '目前承租人')}
+                                {t('Current tenant', '現時租客')}
                             </h2>
-                            {tenant ? (
-                                <div className="flex items-center gap-4">
-                                    <div className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center text-white font-semibold">
-                                        {tenant.name.charAt(0).toUpperCase()}
+                            {currentTenantCard ? (
+                                <div className="flex items-center gap-4 min-w-0">
+                                    <div className="w-12 h-12 shrink-0 rounded-full bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center text-white font-semibold">
+                                        {(currentTenantCard.name || '?').charAt(0).toUpperCase()}
                                     </div>
-                                    <div>
-                                        <p className="text-zinc-900 dark:text-white font-medium">{tenant.name}</p>
-                                        <p className="text-zinc-500 dark:text-white/50 text-sm">
-                                            {tenant.code} {tenant.englishName ? `• ${tenant.englishName}` : ''}
+                                    <div className="min-w-0 flex-1 overflow-hidden">
+                                        <p
+                                            className="text-zinc-900 dark:text-white font-medium truncate"
+                                            title={currentTenantCard.name || undefined}
+                                        >
+                                            {currentTenantCard.name}
                                         </p>
+                                        {(() => {
+                                            const sub =
+                                                currentTenantCard.mode === 'proprietor'
+                                                    ? `${currentTenantCard.proprietor.code} ${currentTenantCard.proprietor.englishName ? `• ${currentTenantCard.proprietor.englishName}` : ''}`.trim()
+                                                    : currentTenantCard.subtitle;
+                                            return sub ? (
+                                                <p className="text-zinc-500 dark:text-white/50 text-sm truncate" title={sub}>
+                                                    {sub}
+                                                </p>
+                                            ) : null;
+                                        })()}
                                     </div>
                                 </div>
                             ) : (
@@ -441,108 +615,279 @@ export default function PropertyDetailsPage() {
                                 <Calendar className="w-5 h-5" />
                                 {t('Rent History', '租務記錄')}
                             </h2>
-                            <div className="flex gap-1 p-1 rounded-xl bg-zinc-100 dark:bg-white/10 w-fit">
-                            {(['rent_out', 'renting', 'contract'] as const).map((tab) => (
-                                <button
-                                    key={tab}
-                                    type="button"
-                                    onClick={() => setRentHistoryTab(tab)}
-                                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${rentHistoryTab === tab
-                                        ? 'bg-white dark:bg-white/15 text-purple-600 dark:text-purple-400 shadow-sm'
-                                        : 'text-zinc-600 dark:text-white/60 hover:text-zinc-900 dark:hover:text-white'}`}
-                                >
-                                    {tab === 'rent_out' ? t('Rent Collection', '收租') : tab === 'renting' ? t('Rent Payment', '交租') : t('Contract Records', '合約')}
-                                </button>
-                            ))}
+                            <div className="flex flex-wrap gap-1 p-1 rounded-xl bg-zinc-100 dark:bg-white/10 w-fit max-w-full">
+                                {(
+                                    [
+                                        ['rent_out', t('Rent Collection', '收租')] as const,
+                                        ['renting', t('Rent Payment', '交租')] as const,
+                                        ['contract_lease_in', t('Lease-in contract', '租賃合約')] as const,
+                                        ['contract_lease_out', t('Lease-out contract', '出租合約')] as const,
+                                    ] as const
+                                ).map(([tab, label]) => {
+                                    const styles = RENT_HISTORY_TAB_BUTTON[tab];
+                                    const isActive = rentHistoryTab === tab;
+                                    return (
+                                        <button
+                                            key={tab}
+                                            type="button"
+                                            onClick={() => setRentHistoryTab(tab)}
+                                            className={`px-3 sm:px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                                                isActive ? styles.active : styles.inactive
+                                            }`}
+                                        >
+                                            {label}
+                                        </button>
+                                    );
+                                })}
                             </div>
                         </div>
 
                         {(() => {
-                            const list = rentHistoryTab === 'rent_out' ? rentOutRents : rentHistoryTab === 'renting' ? rentingRents : contractRents;
+                            const list =
+                                rentHistoryTab === 'rent_out'
+                                    ? rentOutRents
+                                    : rentHistoryTab === 'renting'
+                                      ? rentingRents
+                                      : rentHistoryTab === 'contract_lease_in'
+                                        ? leaseInContractRents
+                                        : leaseOutContractRents;
                             if (list.length === 0) return <EmptyPlaceholder />;
+                            const isRentingTab = rentHistoryTab === 'renting';
+                            const partyHeader =
+                                rentHistoryTab === 'rent_out'
+                                    ? t('Current tenant', '現時租客')
+                                    : t('Tenant', '承租人');
+                            const historyRowGrid = isRentingTab
+                                ? 'grid-cols-[1fr_2fr_1.1fr_1.1fr_2fr_1fr]'
+                                : 'grid-cols-[1fr_2fr_1.5fr_2fr_1fr]';
                             return (
                                 <div className="overflow-x-auto">
-                                    <div className="min-w-[800px]">
-                                        <div className="grid grid-cols-[1fr_2fr_1.5fr_2fr_1fr] gap-0 pb-3 border-b border-zinc-200 dark:border-white/10 text-xs font-bold text-zinc-900 dark:text-white">
+                                    <div className={isRentingTab ? 'min-w-[960px]' : 'min-w-[800px]'}>
+                                        <div
+                                            className={`grid ${historyRowGrid} gap-0 pb-3 border-b border-zinc-200 dark:border-white/10 text-xs font-bold text-zinc-900 dark:text-white`}
+                                        >
                                             <div className="pr-4">{t('Number', '編號')}</div>
                                             <div className="px-4">{t('Property', '物業')}</div>
-                                            <div className="px-4">
-                                                {rentHistoryTab === 'renting' ? t('Proprietor', '業主') : t('Tenant', '承租人')}
-                                            </div>
+                                            {isRentingTab ? (
+                                                <>
+                                                    <div className="px-4">{t('Proprietor', '業主')}</div>
+                                                    <div className="px-4">{t('Lessee', '承租人')}</div>
+                                                </>
+                                            ) : (
+                                                <div className="px-4">{partyHeader}</div>
+                                            )}
                                             <div className="px-4">{t('Lease Term & Location', '租期及地點')}</div>
                                             <div className="pl-4">{t('Rent', '租金')}</div>
                                         </div>
                                         <div className="divide-y divide-zinc-200 dark:divide-white/10">
                                             {list.map((rent: Rent) => {
                                                 const isRentOutOrContract = rent.type === 'rent_out' || rent.type === 'contract';
-                                                const otherParty = isRentOutOrContract
-                                                    ? rent.tenant
-                                                    : (rent.proprietor || rent.tenant);
-                                                const rentNumber = isRentOutOrContract
-                                                    ? (rent.rentOutTenancyNumber || '-')
-                                                    : (property.code?.trim() || '-');
-                                                const startDate = isRentOutOrContract ? (rent.rentOutStartDate || rent.startDate) : (rent.rentingStartDate || rent.startDate);
-                                                const endDate = isRentOutOrContract ? (rent.rentOutEndDate || rent.endDate) : (rent.rentingEndDate || rent.endDate);
-                                                const formatEnDate = (d: any) => d ? new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '';
+                                                const otherParty = isRentOutOrContract ? rent.tenant : rent.proprietor || rent.tenant;
+                                                const rentOutLesseeLabel =
+                                                    rent.type === 'rent_out' ? getRentOutLesseeDisplayLabel(rent) : '';
+                                                const rentNumber =
+                                                    rent.type === 'renting'
+                                                        ? property.code?.trim() || '-'
+                                                        : getRentOutOrContractListNumber(rent as Rent);
+                                                const startDate = isRentOutOrContract
+                                                    ? rent.rentOutStartDate || rent.startDate
+                                                    : rent.rentingStartDate || rent.startDate;
+                                                const endDate = isRentOutOrContract
+                                                    ? rent.rentOutEndDate || rent.endDate
+                                                    : rent.rentingEndDate || rent.endDate;
+                                                const formatEnDate = (d: any) =>
+                                                    d
+                                                        ? new Date(d).toLocaleDateString('en-US', {
+                                                              month: 'short',
+                                                              day: 'numeric',
+                                                              year: 'numeric',
+                                                          })
+                                                        : '';
                                                 const periods = isRentOutOrContract ? rent.rentOutPeriods : rent.rentingPeriods;
-                                                const monthlyRent = isRentOutOrContract ? (rent.rentOutMonthlyRental || rent.amount || 0) : (rent.rentingMonthlyRental || rent.amount || 0);
-                                                const isExpired = endDate ? new Date(endDate) < new Date(new Date().setHours(0, 0, 0, 0)) : false;
-                                                const locationStr = isRentOutOrContract ? (rent.location || (rent as any).rentOutAddressDetail) : rent.location;
+                                                const monthlyRent = isRentOutOrContract
+                                                    ? rent.rentOutMonthlyRental || rent.amount || 0
+                                                    : rent.rentingMonthlyRental || rent.amount || 0;
+                                                const locationStr = isRentOutOrContract
+                                                    ? rent.location || (rent as any).rentOutAddressDetail
+                                                    : rent.location;
+                                                const showPaidBadge =
+                                                    (rent.type === 'rent_out' || rent.type === 'renting') &&
+                                                    hasRentCollectionPaidAmount(rent as any);
+                                                const partyForRentOut =
+                                                    rent.type === 'rent_out'
+                                                        ? rentOutLesseeLabel || otherParty?.name || '-'
+                                                        : null;
                                                 return (
                                                     <div
                                                         key={rent.id}
-                                                        className="grid grid-cols-[1fr_2fr_1.5fr_2fr_1fr] gap-0 hover:bg-zinc-50/50 dark:hover:bg-white/[0.02] transition-colors items-stretch cursor-pointer"
+                                                        className={`grid ${historyRowGrid} gap-0 hover:bg-zinc-50/50 dark:hover:bg-white/[0.02] transition-colors items-stretch cursor-pointer`}
                                                         onClick={() => setSelectedRent(rent)}
                                                     >
                                                         <div className="py-4 pr-4 flex flex-col justify-center">
                                                             <div className="text-zinc-700 dark:text-white/80 text-sm">{rentNumber}</div>
-                                                            <div className="text-zinc-500 hover:text-zinc-900 dark:hover:text-white text-xs mt-1 flex items-center w-fit" onClick={(e) => { e.stopPropagation(); setSelectedRent(rent); }}>
+                                                            <div
+                                                                className="text-zinc-500 hover:text-zinc-900 dark:hover:text-white text-xs mt-1 flex items-center w-fit"
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    setSelectedRent(rent);
+                                                                }}
+                                                            >
                                                                 <ChevronRight className="w-3 h-3 mr-0.5" /> {t('View', '查看')}
                                                             </div>
                                                         </div>
-                                                        <div className="py-4 px-4 border-l border-dashed border-zinc-200 dark:border-white/10 flex flex-col justify-center">
-                                                            <div className="text-zinc-600 dark:text-white/70 text-sm whitespace-pre-wrap">{property.code} {property.name}</div>
-                                                            <div className="text-zinc-900 dark:text-white font-bold text-sm mt-1">{property.lotIndex || '-'}</div>
-                                                        </div>
-                                                        <div className="py-4 px-4 border-l border-dashed border-zinc-200 dark:border-white/10 flex flex-col justify-center">
-                                                            {otherParty ? (
-                                                                <Tooltip
-                                                                    content={
-                                                                        <div className="flex flex-col gap-1.5 w-full">
-                                                                            <div className="flex items-center gap-2 mb-1">
-                                                                                <User className="w-4 h-4 text-blue-500" />
-                                                                                <span className="font-bold">{otherParty.name}</span>
-                                                                                <span className="bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-300 px-1.5 py-0.5 rounded text-[10px] ml-auto">{otherParty.code}</span>
-                                                                            </div>
-                                                                            <div className="text-xs text-zinc-500 dark:text-white/60">英文名稱: <span className="text-zinc-900 dark:text-white text-[10px]">{otherParty.englishName || '-'}</span></div>
-                                                                            <div className="text-xs text-zinc-500 dark:text-white/60 flex items-center justify-between">
-                                                                                <span>類型: <span className="text-zinc-900 dark:text-white">{otherParty.type === 'company' ? '公司' : '個人'}</span></span>
-                                                                                <span className="bg-zinc-100 dark:bg-white/10 px-1.5 py-0.5 rounded text-[10px] text-zinc-600 dark:text-white/70">
-                                                                                    {proprietorCategoryLabelZh(otherParty.category, 'card')}
-                                                                                </span>
-                                                                            </div>
-                                                                        </div>
-                                                                    }
-                                                                    placement="top"
-                                                                    className="bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white p-3 rounded-xl shadow-xl border border-zinc-200 dark:border-white/10 max-w-xs"
-                                                                >
-                                                                    <div className="text-sm font-medium text-purple-600 dark:text-purple-400 border-b border-dashed border-purple-300 dark:border-purple-600/50 cursor-pointer w-fit inline-block">{otherParty.name}</div>
-                                                                </Tooltip>
-                                                            ) : (
-                                                                <div className="text-zinc-600 dark:text-white/70 text-sm">-</div>
-                                                            )}
-                                                        </div>
-                                                        <div className="py-4 px-4 border-l border-dashed border-zinc-200 dark:border-white/10 flex flex-col justify-center">
-                                                            <div className={`text-sm ${isExpired ? 'text-red-500 font-medium' : 'text-zinc-600 dark:text-white/70'}`}>
-                                                                {formatEnDate(startDate)}{startDate && endDate && ' ~ '}{formatEnDate(endDate)}{periods ? `(${periods}個月)` : ''}
+                                                        <div className="py-4 px-4 border-l border-dashed border-zinc-200 dark:border-white/10 flex flex-col justify-center min-w-0 overflow-hidden">
+                                                            <div
+                                                                className="text-zinc-600 dark:text-white/70 text-sm truncate"
+                                                                title={`${property.code} ${property.name}`.trim()}
+                                                            >
+                                                                {property.code} {property.name}
                                                             </div>
-                                                            <div className="flex items-center gap-2 mt-1">
-                                                                {isExpired && <span className="text-[10px] px-1.5 py-0.5 bg-red-100 dark:bg-red-500/20 text-red-600 dark:text-red-400 rounded font-medium">已過期</span>}
-                                                                <span className="text-xs text-zinc-500 dark:text-white/40 truncate">{locationStr}</span>
+                                                            <div
+                                                                className="text-zinc-900 dark:text-white font-bold text-sm mt-1 truncate"
+                                                                title={property.lotIndex || undefined}
+                                                            >
+                                                                {property.lotIndex || '-'}
+                                                            </div>
+                                                        </div>
+                                                        {isRentingTab ? (
+                                                            <>
+                                                                <div className="py-4 px-4 border-l border-dashed border-zinc-200 dark:border-white/10 flex flex-col justify-center min-w-0 overflow-hidden">
+                                                                    <RentHistoryProprietorCell party={rent.tenant ?? null} />
+                                                                </div>
+                                                                <div className="py-4 px-4 border-l border-dashed border-zinc-200 dark:border-white/10 flex flex-col justify-center min-w-0 overflow-hidden">
+                                                                    <RentHistoryProprietorCell party={rent.proprietor ?? null} />
+                                                                </div>
+                                                            </>
+                                                        ) : (
+                                                            <div className="py-4 px-4 border-l border-dashed border-zinc-200 dark:border-white/10 flex flex-col justify-center min-w-0 overflow-hidden">
+                                                                {rent.type === 'rent_out' ? (
+                                                                    partyForRentOut &&
+                                                                    partyForRentOut !== '-' &&
+                                                                    otherParty &&
+                                                                    rentOutLesseeLabel === otherParty.name ? (
+                                                                        <Tooltip
+                                                                            content={
+                                                                                <div className="flex flex-col gap-1.5 w-full">
+                                                                                    <div className="flex items-center gap-2 mb-1">
+                                                                                        <User className="w-4 h-4 text-blue-500" />
+                                                                                        <span className="font-bold">{otherParty.name}</span>
+                                                                                        <span className="bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-300 px-1.5 py-0.5 rounded text-[10px] ml-auto">
+                                                                                            {otherParty.code}
+                                                                                        </span>
+                                                                                    </div>
+                                                                                    <div className="text-xs text-zinc-500 dark:text-white/60">
+                                                                                        英文名稱:{' '}
+                                                                                        <span className="text-zinc-900 dark:text-white text-[10px]">
+                                                                                            {otherParty.englishName || '-'}
+                                                                                        </span>
+                                                                                    </div>
+                                                                                    <div className="text-xs text-zinc-500 dark:text-white/60 flex items-center justify-between">
+                                                                                        <span>
+                                                                                            類型:{' '}
+                                                                                            <span className="text-zinc-900 dark:text-white">
+                                                                                                {otherParty.type === 'company' ? '公司' : '個人'}
+                                                                                            </span>
+                                                                                        </span>
+                                                                                        <span className="bg-zinc-100 dark:bg-white/10 px-1.5 py-0.5 rounded text-[10px] text-zinc-600 dark:text-white/70">
+                                                                                            {proprietorCategoryLabelZh(otherParty.category, 'card')}
+                                                                                        </span>
+                                                                                    </div>
+                                                                                </div>
+                                                                            }
+                                                                            placement="top"
+                                                                            className="bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white p-3 rounded-xl shadow-xl border border-zinc-200 dark:border-white/10 max-w-xs"
+                                                                        >
+                                                                            <div
+                                                                                className="text-sm font-medium text-purple-600 dark:text-purple-400 border-b border-dashed border-purple-300 dark:border-purple-600/50 cursor-pointer block min-w-0 max-w-full truncate"
+                                                                                title={partyForRentOut}
+                                                                            >
+                                                                                {partyForRentOut}
+                                                                            </div>
+                                                                        </Tooltip>
+                                                                    ) : (
+                                                                        <div
+                                                                            className="text-sm font-medium text-purple-600 dark:text-purple-400 truncate min-w-0"
+                                                                            title={partyForRentOut || undefined}
+                                                                        >
+                                                                            {partyForRentOut}
+                                                                        </div>
+                                                                    )
+                                                                ) : otherParty ? (
+                                                                    <Tooltip
+                                                                        content={
+                                                                            <div className="flex flex-col gap-1.5 w-full">
+                                                                                <div className="flex items-center gap-2 mb-1">
+                                                                                    <User className="w-4 h-4 text-blue-500" />
+                                                                                    <span className="font-bold">{otherParty.name}</span>
+                                                                                    <span className="bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-300 px-1.5 py-0.5 rounded text-[10px] ml-auto">
+                                                                                        {otherParty.code}
+                                                                                    </span>
+                                                                                </div>
+                                                                                <div className="text-xs text-zinc-500 dark:text-white/60">
+                                                                                    英文名稱:{' '}
+                                                                                    <span className="text-zinc-900 dark:text-white text-[10px]">
+                                                                                        {otherParty.englishName || '-'}
+                                                                                    </span>
+                                                                                </div>
+                                                                                <div className="text-xs text-zinc-500 dark:text-white/60 flex items-center justify-between">
+                                                                                    <span>
+                                                                                        類型:{' '}
+                                                                                        <span className="text-zinc-900 dark:text-white">
+                                                                                            {otherParty.type === 'company' ? '公司' : '個人'}
+                                                                                        </span>
+                                                                                    </span>
+                                                                                    <span className="bg-zinc-100 dark:bg-white/10 px-1.5 py-0.5 rounded text-[10px] text-zinc-600 dark:text-white/70">
+                                                                                        {proprietorCategoryLabelZh(otherParty.category, 'card')}
+                                                                                    </span>
+                                                                                </div>
+                                                                            </div>
+                                                                        }
+                                                                        placement="top"
+                                                                        className="bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white p-3 rounded-xl shadow-xl border border-zinc-200 dark:border-white/10 max-w-xs"
+                                                                    >
+                                                                        <div
+                                                                            className="text-sm font-medium text-purple-600 dark:text-purple-400 border-b border-dashed border-purple-300 dark:border-purple-600/50 cursor-pointer block min-w-0 max-w-full truncate"
+                                                                            title={otherParty.name}
+                                                                        >
+                                                                            {otherParty.name}
+                                                                        </div>
+                                                                    </Tooltip>
+                                                                ) : (
+                                                                    <div className="text-zinc-600 dark:text-white/70 text-sm">-</div>
+                                                                )}
+                                                            </div>
+                                                        )}
+                                                        <div className="py-4 px-4 border-l border-dashed border-zinc-200 dark:border-white/10 flex flex-col justify-center min-w-0 overflow-hidden">
+                                                            <div
+                                                                className="text-sm text-zinc-600 dark:text-white/70 truncate"
+                                                                title={
+                                                                    `${formatEnDate(startDate)}${startDate && endDate ? ' ~ ' : ''}${formatEnDate(endDate)}${periods ? `(${periods}個月)` : ''}` ||
+                                                                    undefined
+                                                                }
+                                                            >
+                                                                {formatEnDate(startDate)}
+                                                                {startDate && endDate && ' ~ '}
+                                                                {formatEnDate(endDate)}
+                                                                {periods ? `(${periods}個月)` : ''}
+                                                            </div>
+                                                            <div className="flex items-center gap-2 mt-1 min-w-0 flex-nowrap">
+                                                                {showPaidBadge && (
+                                                                    <span className="text-[10px] px-1.5 py-0.5 bg-emerald-100 dark:bg-emerald-500/20 text-emerald-800 dark:text-emerald-300 rounded font-medium border border-emerald-200/70 dark:border-emerald-500/30 shrink-0">
+                                                                        {t('Paid', '已繳交')}
+                                                                    </span>
+                                                                )}
+                                                                <span
+                                                                    className="text-xs text-zinc-500 dark:text-white/40 min-w-0 flex-1 truncate"
+                                                                    title={locationStr || undefined}
+                                                                >
+                                                                    {locationStr}
+                                                                </span>
                                                             </div>
                                                         </div>
                                                         <div className="py-4 pl-4 border-l border-dashed border-zinc-200 dark:border-white/10 flex flex-col justify-center text-left">
-                                                            <div className="text-zinc-800 dark:text-white text-sm whitespace-nowrap">${Number(monthlyRent).toLocaleString()}/月</div>
+                                                            <div className="text-zinc-800 dark:text-white text-sm whitespace-nowrap">
+                                                                ${Number(monthlyRent).toLocaleString()}/月
+                                                            </div>
                                                         </div>
                                                     </div>
                                                 );

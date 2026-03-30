@@ -4,7 +4,7 @@ import { motion } from 'framer-motion';
 import { X, Building2, User } from 'lucide-react';
 import type { Rent, Property, Proprietor } from '@/lib/db';
 import { formatLotArea, proprietorCategoryLabelZh } from '@/lib/formatters';
-import { labelRentCollectionPaymentMethod } from '@/lib/rentPaymentDisplay';
+import { labelRentCollectionPaymentMethod, getRentOutOrContractListNumber } from '@/lib/rentPaymentDisplay';
 import { useLanguage } from '@/components/common/LanguageSwitcher';
 import DOMPurify from 'dompurify';
 import { Tooltip } from '@heroui/react';
@@ -77,6 +77,16 @@ export default function RentDetailsModal({ rent, property, onClose }: RentDetail
         statusValueRenting = <span className="text-red-500 font-bold whitespace-nowrap">已過期</span>;
     }
 
+    const contractNatureLabelZh = (v: string | undefined) => {
+        const map: Record<string, string> = {
+            parking: '車位',
+            temporary_parking: '臨時車位',
+            rental_venue: '租用埸地',
+        };
+        if (!v?.trim()) return '';
+        return map[v] || v;
+    };
+
     return (
         <motion.div
             initial={{ opacity: 0 }}
@@ -96,7 +106,7 @@ export default function RentDetailsModal({ rent, property, onClose }: RentDetail
                     <div className="flex items-center gap-3">
                         <div className="px-3 py-2 rounded-xl bg-purple-100 dark:bg-purple-500/20 border border-purple-200 dark:border-purple-500/30">
                             <span className="text-base font-bold font-mono text-purple-700 dark:text-purple-300">
-                                {isRentOutLike ? (rent.rentOutTenancyNumber || '-') : rentingDisplayNumber}
+                                {isRentOutLike ? getRentOutOrContractListNumber(rent as Rent) : rentingDisplayNumber}
                             </span>
                         </div>
                         <div>
@@ -126,14 +136,37 @@ export default function RentDetailsModal({ rent, property, onClose }: RentDetail
                             <DetailRow label={t('Total Amount', '總額')} value={formatCurrency(rent.rentOutTotalAmount)} />
                             <DetailRow label={t('Start Date', '開始日期')} value={formatDate(rent.rentOutStartDate)} />
                             <DetailRow label={t('End Date', '結束日期')} value={formatDate(rent.rentOutEndDate)} />
+                            {rent.type === 'contract' ? (
+                                <DetailRow
+                                    label={t('Contract nature', '合約性質')}
+                                    value={contractNatureLabelZh((rent as any).rentOutContractNature)}
+                                />
+                            ) : null}
+                            <DetailRow label={t('Deposit Received', '按金')} value={formatCurrency(rent.rentOutDepositReceived)} />
+                            {(rent as any).rentOutDepositPaymentMethod ? (
+                                <DetailRow
+                                    label={t('Deposit receipt', '按金收據')}
+                                    value={labelRentCollectionPaymentMethod((rent as any).rentOutDepositPaymentMethod)}
+                                />
+                            ) : null}
+                            {rent.type === 'contract' && (rent as any).rentOutDepositPaymentMethod === 'cheque' ? (
+                                <>
+                                    <DetailRow label={t('Cheque bank', '按金支票銀行')} value={(rent as any).rentOutDepositChequeBank} />
+                                    <DetailRow label={t('Cheque number', '按金支票號碼')} value={(rent as any).rentOutDepositChequeNumber} />
+                                </>
+                            ) : null}
                             <DetailRow
-                                label={t('Deposit Received', '按金')}
-                                value={
-                                    (rent as any).rentOutDepositPaymentMethod
-                                        ? labelRentCollectionPaymentMethod((rent as any).rentOutDepositPaymentMethod)
-                                        : formatCurrency(rent.rentOutDepositReceived)
-                                }
+                                label={t('Deposit payment date', '按金付款日期')}
+                                value={formatDate((rent as any).rentOutDepositPaymentDate)}
                             />
+                            {(rent as any).rentOutDepositPaymentMethod &&
+                            (rent as any).rentOutDepositPaymentMethod !== 'cheque' &&
+                            (rent as any).rentOutDepositReceiptNumber ? (
+                                <DetailRow
+                                    label={t('Receipt number', '收據號碼')}
+                                    value={(rent as any).rentOutDepositReceiptNumber}
+                                />
+                            ) : null}
                             <DetailRow label={t('Deposit Receive Date', '按金收取日期')} value={formatDate(rent.rentOutDepositReceiveDate)} />
                             <DetailRow label={t('Deposit Return Date', '按金退回日期')} value={formatDate(rent.rentOutDepositReturnDate)} />
                             <DetailRow label={t('Deposit Return Amount', '按金退回金額')} value={formatCurrency(rent.rentOutDepositReturnAmount)} />

@@ -5,9 +5,26 @@ import { motion } from 'framer-motion';
 import { formatNumberWithCommas, normalizeDuplicateName, parsePriceInput } from '@/lib/formatters';
 import { RENT_OUT_CONTRACT_STATUS_OPTIONS } from '@/lib/rentPaymentDisplay';
 import type { SubLandlord, CurrentTenant } from '@/lib/db';
-import { fetchCurrentTenants, fetchSubLandlords, useSubLandlords, useCurrentTenants } from '@/hooks/useStorage';
+import { fetchCurrentTenants, fetchProprietors, fetchSubLandlords, useSubLandlords, useCurrentTenants } from '@/hooks/useStorage';
 import dynamic from 'next/dynamic';
+import AnimatedSelect from '@/components/ui/AnimatedSelect';
 import 'react-quill-new/dist/quill.snow.css';
+
+/** 擁有人類別：與 ProprietorModal 新增業主相同選項與排序 */
+const PROPRIETOR_OWNER_CATEGORY_OPTIONS: { value: string; label: string }[] = [
+    { value: 'private_individual', label: '個人' },
+    { value: 'joint_venture', label: '合資公司' },
+    { value: 'private_company', label: '私人公司' },
+    { value: 'group_company', label: '集團旗下公司' },
+].sort((a, b) => a.label.length - b.label.length || a.label.localeCompare(b.label, 'zh-Hant'));
+
+/** 現時租客表單：租客類別（與業主新增擁有人類別一致，固定排序） */
+const CURRENT_TENANT_CATEGORY_OPTIONS: { value: string; label: string }[] = [
+    { value: 'private_individual', label: '個人' },
+    { value: 'joint_venture', label: '合資公司' },
+    { value: 'private_company', label: '私人公司' },
+    { value: 'group_company', label: '集團旗下公司' },
+];
 
 const ReactQuill = dynamic(() => import('react-quill-new'), {
     ssr: false,
@@ -16,6 +33,12 @@ const ReactQuill = dynamic(() => import('react-quill-new'), {
 
 type FormData = {
     name: string;
+    code: string;
+    englishName: string;
+    shortName: string;
+    type: 'company' | 'individual';
+    category: string;
+    brNumber: string;
     tenancyNumber: string;
     pricing: string;
     monthlyRental: string;
@@ -65,6 +88,12 @@ export default function RentOutFormModal({ mode, editItem, isAddPropertyData = f
             
             return {
                 name: editItem.name || '', // 名称保持，但只读
+                code: '',
+                englishName: '',
+                shortName: '',
+                type: 'company',
+                category: 'group_company',
+                brNumber: '',
                 tenancyNumber: newTenancyNumber,
                 pricing: '', // 新物业数据，字段为空
                 monthlyRental: '',
@@ -86,8 +115,15 @@ export default function RentOutFormModal({ mode, editItem, isAddPropertyData = f
         }
         
         if (editItem) {
+            const ct = mode === 'current_tenant' ? (editItem as CurrentTenant) : null;
             return {
                 name: editItem.name || '',
+                code: ct?.code ?? '',
+                englishName: ct?.englishName ?? '',
+                shortName: ct?.shortName ?? '',
+                type: (ct?.type || 'company') as 'company' | 'individual',
+                category: ct?.category ?? 'group_company',
+                brNumber: ct?.brNumber ?? '',
                 tenancyNumber: editItem.tenancyNumber || '',
                 pricing: editItem.pricing?.toString() || '',
                 monthlyRental: editItem.monthlyRental?.toString() || '',
@@ -109,6 +145,12 @@ export default function RentOutFormModal({ mode, editItem, isAddPropertyData = f
         }
         return {
             name: '',
+            code: '',
+            englishName: '',
+            shortName: '',
+            type: 'company',
+            category: 'group_company',
+            brNumber: '',
             tenancyNumber: '',
             pricing: '',
             monthlyRental: '',
@@ -130,13 +172,36 @@ export default function RentOutFormModal({ mode, editItem, isAddPropertyData = f
     });
 
     useEffect(() => {
+        if (mode === 'current_tenant') return;
         const monthly = parseFloat(formData.monthlyRental);
         const periods = parseInt(formData.periods);
         const newTotal = !isNaN(monthly) && !isNaN(periods) ? (monthly * periods).toString() : '';
         if (formData.totalAmount !== newTotal) {
             setFormData(prev => ({ ...prev, totalAmount: newTotal }));
         }
-    }, [formData.monthlyRental, formData.periods]);
+    }, [mode, formData.monthlyRental, formData.periods]);
+
+    // 現時租客：業主代碼預填邏輯與 ProprietorModal（新增業主）一致
+    useEffect(() => {
+        if (mode !== 'current_tenant' || isAddPropertyData || editItem) return;
+        if (currentPropertyCode) {
+            const code = currentPropertyCode.replace(/[^a-zA-Z0-9]/g, '').slice(0, 3) || 'A01';
+            setFormData(prev => ({ ...prev, code }));
+            return;
+        }
+        let cancelled = false;
+        (async () => {
+            const data = await fetchProprietors(undefined);
+            if (cancelled) return;
+            const prefix = 'A';
+            const sameTypeCount = data.filter(p => p.code?.startsWith(prefix)).length + 1;
+            const code = `${prefix}${sameTypeCount.toString().padStart(2, '0')}`;
+            setFormData(prev => ({ ...prev, code }));
+        })();
+        return () => {
+            cancelled = true;
+        };
+    }, [mode, isAddPropertyData, editItem, currentPropertyCode]);
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
         const { name, value } = e.target;
@@ -149,7 +214,7 @@ export default function RentOutFormModal({ mode, editItem, isAddPropertyData = f
         setFormData(prev => ({ ...prev, [name]: parsed }));
     };
 
-    const buildPayload = (): Omit<SubLandlord, 'id' | 'createdAt' | 'updatedAt'> => ({
+    const buildContractPayload = (): Omit<SubLandlord, 'id' | 'createdAt' | 'updatedAt'> => ({
         name: formData.name.trim(),
         tenancyNumber: formData.tenancyNumber || undefined,
         pricing: parseFloat(formData.pricing) || undefined,
@@ -173,7 +238,11 @@ export default function RentOutFormModal({ mode, editItem, isAddPropertyData = f
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!formData.name.trim()) {
-            setError('請輸入名稱');
+            setError(mode === 'current_tenant' ? '請輸入租客名稱' : '請輸入名稱');
+            return;
+        }
+        if (mode === 'current_tenant' && !formData.code.trim()) {
+            setError('請輸入租客代碼');
             return;
         }
 
@@ -208,8 +277,19 @@ export default function RentOutFormModal({ mode, editItem, isAddPropertyData = f
         setSaving(true);
         setError('');
         try {
-            let payload = buildPayload();
-            
+            let payload: Omit<SubLandlord, 'id' | 'createdAt' | 'updatedAt'> | Omit<CurrentTenant, 'id' | 'createdAt' | 'updatedAt'> =
+                mode === 'current_tenant'
+                    ? {
+                          ...buildContractPayload(),
+                          code: formData.code.trim(),
+                          englishName: formData.englishName.trim(),
+                          shortName: formData.shortName.trim(),
+                          type: formData.type,
+                          category: formData.category as CurrentTenant['category'],
+                          brNumber: formData.brNumber.trim() || undefined,
+                      }
+                    : buildContractPayload();
+
             // 如果是为已有二房东添加新物业数据，需要将当前物业编号追加到原有号码后面
             if (isAddPropertyData && editItem?.id && mode === 'sub_landlord') {
                 // 名称保持不变
@@ -263,21 +343,21 @@ export default function RentOutFormModal({ mode, editItem, isAddPropertyData = f
             
             if (editItem?.id) {
                 if (mode === 'sub_landlord') {
-                    const ok = await updateSubLandlord(editItem.id, payload);
+                    const ok = await updateSubLandlord(editItem.id, payload as Omit<SubLandlord, 'id' | 'createdAt' | 'updatedAt'>);
                     if (ok) onSuccess(editItem.id);
                     else setError('更新失敗');
                 } else {
-                    const ok = await updateCurrentTenant(editItem.id, payload);
+                    const ok = await updateCurrentTenant(editItem.id, payload as Omit<CurrentTenant, 'id' | 'createdAt' | 'updatedAt'>);
                     if (ok) onSuccess(editItem.id);
                     else setError('更新失敗');
                 }
             } else {
                 if (mode === 'sub_landlord') {
-                    const id = await addSubLandlord(payload);
+                    const id = await addSubLandlord(payload as Omit<SubLandlord, 'id' | 'createdAt' | 'updatedAt'>);
                     if (id) onSuccess(id);
                     else setError('新增失敗');
                 } else {
-                    const id = await addCurrentTenant(payload);
+                    const id = await addCurrentTenant(payload as Omit<CurrentTenant, 'id' | 'createdAt' | 'updatedAt'>);
                     if (id) onSuccess(id);
                     else setError('新增失敗');
                 }
@@ -289,7 +369,8 @@ export default function RentOutFormModal({ mode, editItem, isAddPropertyData = f
         }
     };
 
-    const inputClass = 'w-full px-4 py-3 bg-zinc-50 dark:bg-white/5 border border-zinc-200 dark:border-white/10 rounded-xl text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-purple-500/50 transition-all';
+    const inputClass =
+        'w-full min-h-12 px-4 py-3.5 bg-zinc-50 dark:bg-white/5 border border-zinc-200 dark:border-white/10 rounded-xl text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-purple-500/50 transition-all';
     const labelClass = 'block text-sm font-medium text-zinc-700 dark:text-white/80 mb-1';
 
     const title = mode === 'sub_landlord'
@@ -303,7 +384,7 @@ export default function RentOutFormModal({ mode, editItem, isAddPropertyData = f
                 initial={{ opacity: 0, scale: 0.95, y: 20 }}
                 animate={{ opacity: 1, scale: 1, y: 0 }}
                 exit={{ opacity: 0, scale: 0.95, y: 20 }}
-                className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-3xl max-h-[90vh] overflow-hidden bg-white dark:bg-[#1a1a2e] rounded-2xl border border-zinc-200 dark:border-white/10 shadow-2xl z-[70] flex flex-col"
+                className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-3xl min-h-[min(480px,88vh)] max-h-[94vh] overflow-hidden bg-white dark:bg-[#1a1a2e] rounded-2xl border border-zinc-200 dark:border-white/10 shadow-2xl z-[70] flex flex-col"
             >
                 <div className="flex items-center justify-between p-5 border-b border-zinc-100 dark:border-white/5 shrink-0">
                     <h2 className="text-lg font-bold text-zinc-900 dark:text-white">{title}</h2>
@@ -312,23 +393,110 @@ export default function RentOutFormModal({ mode, editItem, isAddPropertyData = f
                     </button>
                 </div>
                 <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
-                    <div className="p-5 space-y-4 overflow-y-auto flex-1">
+                    <div className="p-5 space-y-4 overflow-y-auto flex-1 min-h-0">
                         {error && (
                             <div className="p-3 bg-red-500/20 border border-red-500/30 rounded-xl text-red-600 dark:text-red-200 text-sm">{error}</div>
                         )}
-                        <div className="space-y-2">
-                            <label className={labelClass}>名稱 *</label>
-                            <input 
-                                type="text" 
-                                name="name" 
-                                value={formData.name} 
-                                onChange={handleChange} 
-                                required 
-                                disabled={isAddPropertyData}
-                                className={`${inputClass} ${isAddPropertyData ? 'opacity-60 cursor-not-allowed' : ''}`}
-                                placeholder={mode === 'sub_landlord' ? '二房東名稱' : '租客名稱'} 
-                            />
-                        </div>
+                        {mode === 'current_tenant' ? (
+                            <>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div className="space-y-2">
+                                        <label className={labelClass}>租客名稱 *</label>
+                                        <input
+                                            type="text"
+                                            name="name"
+                                            value={formData.name}
+                                            onChange={handleChange}
+                                            required
+                                            disabled={isAddPropertyData}
+                                            className={`${inputClass} ${isAddPropertyData ? 'opacity-60 cursor-not-allowed' : ''}`}
+                                            placeholder="請輸入租客名稱"
+                                        />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <label className={labelClass}>公司名稱</label>
+                                        <input
+                                            type="text"
+                                            name="englishName"
+                                            value={formData.englishName}
+                                            onChange={handleChange}
+                                            className={inputClass}
+                                            placeholder="例如: CITIC (HK) Investment Ltd"
+                                        />
+                                    </div>
+                                </div>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div className="space-y-2">
+                                        <label className={labelClass}>租客代碼 *</label>
+                                        <input
+                                            type="text"
+                                            name="code"
+                                            value={formData.code}
+                                            onChange={handleChange}
+                                            required
+                                            className={inputClass}
+                                            placeholder="例如: A01"
+                                        />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <label className={labelClass}>BR Number</label>
+                                        <input
+                                            type="text"
+                                            name="brNumber"
+                                            value={formData.brNumber}
+                                            onChange={handleChange}
+                                            className={inputClass}
+                                            placeholder="請輸入 BR Number"
+                                        />
+                                    </div>
+                                </div>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div className="space-y-2">
+                                        <label className={labelClass}>業主性質</label>
+                                        <AnimatedSelect
+                                            name="type"
+                                            value={formData.type}
+                                            onChange={(value) =>
+                                                handleChange({ target: { name: 'type', value } } as React.ChangeEvent<HTMLInputElement>)
+                                            }
+                                            options={[
+                                                { value: 'company', label: '公司' },
+                                                { value: 'individual', label: '個人' },
+                                            ]}
+                                            placeholder="選擇性質"
+                                        />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <label className={labelClass}>租客類別</label>
+                                        <AnimatedSelect
+                                            name="category"
+                                            value={formData.category}
+                                            onChange={(value) =>
+                                                handleChange({ target: { name: 'category', value } } as React.ChangeEvent<HTMLInputElement>)
+                                            }
+                                            options={CURRENT_TENANT_CATEGORY_OPTIONS}
+                                            placeholder="選擇類別"
+                                        />
+                                    </div>
+                                </div>
+                            </>
+                        ) : (
+                            <div className="space-y-2">
+                                <label className={labelClass}>名稱 *</label>
+                                <input
+                                    type="text"
+                                    name="name"
+                                    value={formData.name}
+                                    onChange={handleChange}
+                                    required
+                                    disabled={isAddPropertyData}
+                                    className={`${inputClass} ${isAddPropertyData ? 'opacity-60 cursor-not-allowed' : ''}`}
+                                    placeholder="二房東名稱"
+                                />
+                            </div>
+                        )}
+                        {mode === 'sub_landlord' && (
+                        <>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div className="space-y-2">
                                 <label className={labelClass}>出租號碼</label>
@@ -427,6 +595,8 @@ export default function RentOutFormModal({ mode, editItem, isAddPropertyData = f
                                 />
                             </div>
                         </div>
+                        </>
+                        )}
                     </div>
                     <div className="flex items-center justify-end gap-3 p-5 border-t border-zinc-100 dark:border-white/5 shrink-0">
                         <button type="button" onClick={onClose} className="px-4 py-2 rounded-xl text-zinc-500 dark:text-white/70 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-white/10 transition-all">

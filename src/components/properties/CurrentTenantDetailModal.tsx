@@ -5,6 +5,7 @@ import { motion } from 'framer-motion';
 import { X, Building2, MapPin, Calendar, DollarSign, ExternalLink } from 'lucide-react';
 import type { CurrentTenant, Property, Rent } from '@/lib/db';
 import { useRentsWithRelationsQuery } from '@/hooks/useStorage';
+import { proprietorCategoryLabelZh } from '@/lib/formatters';
 
 interface CurrentTenantDetailModalProps {
     currentTenant: CurrentTenant;
@@ -81,6 +82,8 @@ export default function CurrentTenantDetailModal({
 
     const statusLabel = statusLabels[currentTenant.status || ''] || '—';
     const isExpired = currentTenant.endDate ? new Date(currentTenant.endDate) < new Date() : false;
+    const partyTypeLabel =
+        currentTenant.type === 'individual' ? '個人' : currentTenant.type === 'company' ? '公司' : '—';
 
     return (
         <>
@@ -134,9 +137,41 @@ export default function CurrentTenantDetailModal({
                         <h3 className="text-sm font-semibold text-purple-600 dark:text-purple-400 mb-3">基本資料</h3>
                         <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                             <div className="p-3 bg-zinc-50 dark:bg-white/5 rounded-xl border border-zinc-100 dark:border-white/5">
-                                <p className="text-xs text-zinc-500 dark:text-white/50 mb-1">名稱</p>
+                                <p className="text-xs text-zinc-500 dark:text-white/50 mb-1">個人名稱</p>
                                 <p className="text-sm font-bold text-zinc-900 dark:text-white">{currentTenant.name}</p>
                             </div>
+                            {currentTenant.code && (
+                                <div className="p-3 bg-zinc-50 dark:bg-white/5 rounded-xl border border-zinc-100 dark:border-white/5">
+                                    <p className="text-xs text-zinc-500 dark:text-white/50 mb-1">業主代碼</p>
+                                    <p className="text-sm font-mono font-medium text-zinc-900 dark:text-white">{currentTenant.code}</p>
+                                </div>
+                            )}
+                            {currentTenant.englishName && (
+                                <div className="p-3 bg-zinc-50 dark:bg-white/5 rounded-xl border border-zinc-100 dark:border-white/5">
+                                    <p className="text-xs text-zinc-500 dark:text-white/50 mb-1">公司名稱</p>
+                                    <p className="text-sm font-medium text-zinc-900 dark:text-white">{currentTenant.englishName}</p>
+                                </div>
+                            )}
+                            {currentTenant.type && (
+                                <div className="p-3 bg-zinc-50 dark:bg-white/5 rounded-xl border border-zinc-100 dark:border-white/5">
+                                    <p className="text-xs text-zinc-500 dark:text-white/50 mb-1">業主性質</p>
+                                    <p className="text-sm font-medium text-zinc-900 dark:text-white">{partyTypeLabel}</p>
+                                </div>
+                            )}
+                            {currentTenant.category && (
+                                <div className="p-3 bg-zinc-50 dark:bg-white/5 rounded-xl border border-zinc-100 dark:border-white/5">
+                                    <p className="text-xs text-zinc-500 dark:text-white/50 mb-1">擁有人類別</p>
+                                    <p className="text-sm font-medium text-zinc-900 dark:text-white">
+                                        {proprietorCategoryLabelZh(currentTenant.category, 'modal')}
+                                    </p>
+                                </div>
+                            )}
+                            {currentTenant.brNumber && (
+                                <div className="p-3 bg-zinc-50 dark:bg-white/5 rounded-xl border border-zinc-100 dark:border-white/5">
+                                    <p className="text-xs text-zinc-500 dark:text-white/50 mb-1">BR Number</p>
+                                    <p className="text-sm font-mono font-medium text-zinc-900 dark:text-white">{currentTenant.brNumber}</p>
+                                </div>
+                            )}
                             <div className="p-3 bg-zinc-50 dark:bg-white/5 rounded-xl border border-zinc-100 dark:border-white/5">
                                 <p className="text-xs text-zinc-500 dark:text-white/50 mb-1">合約號碼</p>
                                 <p className="text-sm font-mono font-medium text-zinc-900 dark:text-white">{currentTenant.tenancyNumber || '—'}</p>

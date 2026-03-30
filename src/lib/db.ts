@@ -58,6 +58,9 @@ export interface Proprietor {
 /** 收／交租與出租合約按金等下拉共用之付款方式 */
 export type RentCollectionPaymentMethod = 'cheque' | 'fps' | 'cash' | 'bank_in';
 
+/** 合約記錄「合約性質」 */
+export type RentOutContractNature = 'parking' | 'temporary_parking' | 'rental_venue';
+
 export interface Rent {
   id?: string;
   propertyId: string;
@@ -83,10 +86,18 @@ export interface Rent {
   rentOutStartDate?: Date;             // 出租合約開始日期
   rentOutEndDate?: Date;               // 出租合約結束日期
   rentOutActualEndDate?: Date;         // 出租合約實際結束日期
-  rentOutDepositReceived?: number;     // 出租合約按金（舊：金額；新表單改以 rentOutDepositPaymentMethod 為主）
-  /** 出租合約按金收取方式（與付款方式選項一致，含 入數） */
+  /** 合約性質（車位／臨時車位／租用埸地） */
+  rentOutContractNature?: RentOutContractNature | string;
+  rentOutDepositReceived?: number;     // 出租合約按金（金額）
+  /** 按金「收據」對應之付款方式（與收／交租付款方式選項一致） */
   rentOutDepositPaymentMethod?: RentCollectionPaymentMethod;
-  rentOutDepositReceiptNumber?: string; // 按金收據號碼
+  rentOutDepositReceiptNumber?: string; // 按金收據號碼（非支票時）
+  rentOutDepositChequeBank?: string;
+  rentOutDepositChequeNumber?: string;
+  /** 支票影像或 FPS 轉帳證明（base64 data URL） */
+  rentOutDepositChequeImage?: string;
+  rentOutDepositPaymentDate?: Date;
+  rentOutDepositBankInImage?: string;
   rentOutDepositReceiveDate?: Date;    // 出租合約按金收取日期
   rentOutDepositReturnDate?: Date;     // 出租合約按金退回日期
   rentOutDepositReturnAmount?: number; // 出租合約按金退回金額
@@ -113,6 +124,10 @@ export interface Rent {
   rentCollectionPaymentDate?: Date;
   /** 入數憑證／截圖（base64 data URL） */
   rentCollectionBankInImage?: string;
+  /** 收租記錄編號：對應所選「出租／租賃」合約之 rentOutTenancyNumber */
+  rentCollectionContractNumber?: string | null;
+  /** 收據號碼（現金／FPS／入數等非支票付款方式） */
+  rentCollectionReceiptNumber?: string | null;
 
   // ===== RENTING (交租) Fields =====
   rentingNumber?: string;              // 我方租約號碼
@@ -180,6 +195,13 @@ export interface SubLandlord {
 export interface CurrentTenant {
   id?: string;
   name: string;
+  /** 與新增業主表單一致之代碼（如 A01） */
+  code?: string;
+  englishName?: string;
+  shortName?: string;
+  type?: Proprietor['type'];
+  category?: Proprietor['category'];
+  brNumber?: string;
   tenancyNumber?: string;
   pricing?: number;
   monthlyRental?: number;
