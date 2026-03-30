@@ -111,7 +111,7 @@ export default function PropertyDetailModal({ propertyName, propertyId, onClose 
         [property?.rents]
     );
 
-    const renderRentTable = (records: Rent[]) => {
+    const renderRentTable = (records: Rent[], partyColumn: 'tenant' | 'landlord' = 'tenant') => {
         if (records.length === 0) {
             return (
                 <div className="p-8 text-center bg-zinc-50 dark:bg-white/5 rounded-3xl text-zinc-400 dark:text-white/30 italic text-sm border-2 border-dashed border-zinc-200 dark:border-white/5">
@@ -120,13 +120,16 @@ export default function PropertyDetailModal({ propertyName, propertyId, onClose 
             );
         }
 
+        const partyHeader =
+            partyColumn === 'landlord' ? t('Landlord', '業主') : t('Tenant', '承租人');
+
         return (
             <div className="overflow-x-auto">
                 <div className="min-w-[780px]">
                     <div className="grid grid-cols-[1fr_2fr_1.5fr_2fr_0.9fr_1fr] gap-0 pb-3 border-b border-zinc-200 dark:border-white/10 text-xs font-bold text-zinc-900 dark:text-white">
                         <div className="pr-4">{t('Number', '編號')}</div>
                         <div className="px-4">{t('Property', '物業')}</div>
-                        <div className="px-4">{t('Tenant', '承租人')}</div>
+                        <div className="px-4">{partyHeader}</div>
                         <div className="px-4">{t('Lease Term & Location', '租期及地點')}</div>
                         <div className="px-4">{t('Payment status', '繳付狀態')}</div>
                         <div className="pl-4">{t('Rent', '租金')}</div>
@@ -216,12 +219,27 @@ export default function PropertyDetailModal({ propertyName, propertyId, onClose 
                                         )}
                                     </div>
                                     <div className="py-4 px-4 border-l border-dashed border-zinc-200 dark:border-white/10 flex flex-col justify-center">
-                                        <div className={`text-sm ${isExpired ? 'text-red-500 font-medium' : 'text-zinc-600 dark:text-white/70'}`}>
-                                            {formatEnDate(startDate)}{startDate && endDate && ' ~ '}{formatEnDate(endDate)}{periods ? `(${periods}個月)` : ''}
+                                        <div
+                                            className={`text-base font-semibold tabular-nums leading-snug tracking-tight ${
+                                                isExpired ? 'text-red-600 dark:text-red-400' : 'text-zinc-800 dark:text-white/90'
+                                            }`}
+                                        >
+                                            {formatEnDate(startDate)}
+                                            {startDate && endDate && ' — '}
+                                            {formatEnDate(endDate)}
+                                            {periods ? (
+                                                <span className="text-sm font-medium text-zinc-600 dark:text-white/65 ml-1">
+                                                    （{periods} 個月）
+                                                </span>
+                                            ) : null}
                                         </div>
-                                        <div className="flex items-center gap-2 mt-1">
-                                            {isExpired && <span className="text-[10px] px-1.5 py-0.5 bg-red-100 dark:bg-red-500/20 text-red-600 dark:text-red-400 rounded font-medium">已過期</span>}
-                                            <span className="text-xs text-zinc-500 dark:text-white/40 truncate">
+                                        <div className="flex items-center gap-2 mt-1.5">
+                                            {isExpired && (
+                                                <span className="text-[10px] px-1.5 py-0.5 bg-red-100 dark:bg-red-500/20 text-red-600 dark:text-red-400 rounded font-semibold">
+                                                    已過期
+                                                </span>
+                                            )}
+                                            <span className="text-sm text-zinc-500 dark:text-white/50 truncate">
                                                 {rent.type === 'rent_out' ? (rent.location || rent.rentOutAddressDetail) : rent.location}
                                             </span>
                                         </div>
@@ -498,7 +516,7 @@ export default function PropertyDetailModal({ propertyName, propertyId, onClose 
                                                             業主：{ownerLine}
                                                         </p>
                                                     ) : null}
-                                                    <p className="text-xs text-zinc-400 dark:text-white/40 mt-2">
+                                                    <p className="mt-3 text-sm sm:text-base font-semibold tabular-nums text-zinc-800 dark:text-white/90 leading-relaxed">
                                                         {sd} — {ed}
                                                         {c.rentOutMonthlyRental != null
                                                             ? ` · ${c.currency || 'HKD'} ${Number(c.rentOutMonthlyRental).toLocaleString()}/月`
@@ -516,7 +534,7 @@ export default function PropertyDetailModal({ propertyName, propertyId, onClose 
                                     <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]"></div>
                                     收租記錄 (Rent Out Records)
                                 </h4>
-                                {renderRentTable(rentOutRents)}
+                                {renderRentTable(rentOutRents, 'tenant')}
                             </div>
 
                             <div>
@@ -524,7 +542,7 @@ export default function PropertyDetailModal({ propertyName, propertyId, onClose 
                                     <div className="w-2.5 h-2.5 rounded-full bg-indigo-500 shadow-[0_0_8px_rgba(99,102,241,0.5)]"></div>
                                     交租記錄 (Renting Records)
                                 </h4>
-                                {renderRentTable(rentingRents)}
+                                {renderRentTable(rentingRents, 'landlord')}
                             </div>
                         </div>
                     </div>
