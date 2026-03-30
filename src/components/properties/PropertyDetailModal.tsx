@@ -574,14 +574,14 @@ export default function PropertyDetailModal({ propertyName, propertyId, onClose 
                                                                 <div className="text-[11px] font-semibold text-zinc-500 dark:text-white/45 mb-2">
                                                                     合約開始
                                                                 </div>
-                                                                <div className="flex items-center justify-center gap-1.5">
-                                                                    <span className="text-sm font-bold text-zinc-800 dark:text-white/90 tabular-nums leading-tight">
+                                                                <div className="flex items-center justify-center gap-2">
+                                                                    <span className="text-lg font-bold text-zinc-800 dark:text-white/90 tabular-nums leading-none">
                                                                         {s.y}
                                                                     </span>
-                                                                    <span className="text-sm font-bold text-zinc-600 dark:text-white/70 tabular-nums leading-tight">
+                                                                    <span className="text-lg font-bold text-zinc-600 dark:text-white/65 tabular-nums leading-none">
                                                                         {s.m}
                                                                     </span>
-                                                                    <span className="text-lg font-extrabold text-zinc-900 dark:text-white tabular-nums leading-none">
+                                                                    <span className="text-lg font-bold text-zinc-800 dark:text-white/90 tabular-nums leading-none">
                                                                         {s.d}
                                                                     </span>
                                                                 </div>
@@ -599,9 +599,9 @@ export default function PropertyDetailModal({ propertyName, propertyId, onClose 
                                                                 <div className="text-[11px] font-semibold text-zinc-500 dark:text-white/45 mb-2">
                                                                     合約期滿
                                                                 </div>
-                                                                <div className="flex items-center justify-center gap-1.5">
+                                                                <div className="flex items-center justify-center gap-2">
                                                                     <span
-                                                                        className={`text-sm font-bold tabular-nums leading-tight ${
+                                                                        className={`text-lg font-bold tabular-nums leading-none ${
                                                                             isEndExpired
                                                                                 ? 'text-red-600 dark:text-red-400'
                                                                                 : 'text-zinc-800 dark:text-white/90'
@@ -610,19 +610,19 @@ export default function PropertyDetailModal({ propertyName, propertyId, onClose 
                                                                         {e.y}
                                                                     </span>
                                                                     <span
-                                                                        className={`text-sm font-bold tabular-nums leading-tight ${
+                                                                        className={`text-lg font-bold tabular-nums leading-none ${
                                                                             isEndExpired
                                                                                 ? 'text-red-600 dark:text-red-400'
-                                                                                : 'text-zinc-600 dark:text-white/70'
+                                                                                : 'text-zinc-600 dark:text-white/65'
                                                                         }`}
                                                                     >
                                                                         {e.m}
                                                                     </span>
                                                                     <span
-                                                                        className={`text-lg font-extrabold tabular-nums leading-none ${
+                                                                        className={`text-lg font-bold tabular-nums leading-none ${
                                                                             isEndExpired
                                                                                 ? 'text-red-600 dark:text-red-400'
-                                                                                : 'text-zinc-900 dark:text-white'
+                                                                                : 'text-zinc-800 dark:text-white/90'
                                                                         }`}
                                                                     >
                                                                         {e.d}
