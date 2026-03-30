@@ -1,3 +1,5 @@
+import type { CurrentTenant, Property, Proprietor, Rent } from '@/lib/db';
+
 /**
  * 交／收租列表顯示：dd/mm/yyyy、期間字串、繳付金額是否已填（含 0）
  */
@@ -73,6 +75,56 @@ export function getRentOutLesseeDisplayLabel(rent: {
     }
     const tn = rent.tenant?.name;
     return tn != null && String(tn).trim() ? String(tn).trim() : '';
+}
+
+/** 物業單頁「現時租客」：與收租列表一致，優先收租記錄欄位，再退回合約 FK、物業 tenant */
+export type PropertyCurrentTenantDisplay =
+    | { mode: 'label'; name: string; subtitle: string }
+    | { mode: 'ct'; name: string; subtitle: string }
+    | { mode: 'proprietor'; name: string; subtitle: string; proprietor: Proprietor };
+
+export function resolvePropertyCurrentTenantDisplay(
+    property: Property | null | undefined,
+    currentTenants: CurrentTenant[],
+    activeRentOut: Rent | undefined | null,
+): PropertyCurrentTenantDisplay | null {
+    if (!property) return null;
+
+    const rentOutsSorted = [...(property.rents || [])]
+        .filter((r: Rent) => r.type === 'rent_out')
+        .sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
+    for (const r of rentOutsSorted) {
+        const lab = getRentOutLesseeDisplayLabel(r);
+        if (lab) {
+            const subtitle =
+                (r.rentOutTenancyNumber && String(r.rentOutTenancyNumber).trim()) ||
+                property.code?.trim() ||
+                '';
+            return { mode: 'label', name: lab, subtitle };
+        }
+    }
+
+    const contracts = [...(property.rents || [])]
+        .filter((r: Rent) => r.type === 'contract')
+        .sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
+    const latestContract = contracts[0];
+    const ctId = latestContract?.rentOutTenantIds?.[0];
+    if (ctId) {
+        const ct = currentTenants.find((c) => c.id === ctId);
+        if (ct) return { mode: 'ct', name: ct.name, subtitle: (ct.tenancyNumber || '').trim() };
+    }
+
+    const propT = property.tenant || activeRentOut?.tenant;
+    if (propT?.name) {
+        return {
+            mode: 'proprietor',
+            name: propT.name,
+            subtitle: (propT.code || '').trim(),
+            proprietor: propT,
+        };
+    }
+
+    return null;
 }
 
 /** 收／交租表單之付款方式（含按金方式、出租合約按金方式） */

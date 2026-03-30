@@ -10,8 +10,13 @@ import {
     useCurrentTenantsQuery,
 } from '@/hooks/useStorage';
 import { formatLotArea, proprietorCategoryLabelZh } from '@/lib/formatters';
-import type { Property, Proprietor, Rent } from '@/lib/db';
-import { hasRentCollectionPaidAmount, getRentOutLesseeDisplayLabel, getRentOutOrContractListNumber } from '@/lib/rentPaymentDisplay';
+import type { CurrentTenant, Property, Proprietor, Rent } from '@/lib/db';
+import {
+    hasRentCollectionPaidAmount,
+    getRentOutLesseeDisplayLabel,
+    getRentOutOrContractListNumber,
+    resolvePropertyCurrentTenantDisplay,
+} from '@/lib/rentPaymentDisplay';
 import {
     ArrowLeft,
     Building2,
@@ -68,12 +73,72 @@ function RentHistoryProprietorCell({ party }: { party?: Proprietor | null }) {
             className="bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white p-3 rounded-xl shadow-xl border border-zinc-200 dark:border-white/10 max-w-xs"
         >
             <div
-                className="text-sm font-medium text-purple-600 dark:text-purple-400 border-b border-dashed border-purple-300 dark:border-purple-600/50 cursor-pointer block min-w-0 max-w-full truncate"
+                className="text-sm font-medium text-zinc-900 dark:text-white truncate min-w-0 max-w-full block"
                 title={party.name}
             >
                 {party.name}
             </div>
         </Tooltip>
+    );
+}
+
+/** 出租合約分頁：承租人與物業「現時租客」摘要一致（收租記錄優先於合約 FK） */
+function RentHistoryLeaseOutContractLesseeCell({
+    displayName,
+    currentTenants,
+    proprietorFromRent,
+}: {
+    displayName: string;
+    currentTenants: CurrentTenant[];
+    proprietorFromRent?: Proprietor | null;
+}) {
+    if (!displayName || displayName === '-') {
+        return <div className="text-zinc-600 dark:text-white/70 text-sm">-</div>;
+    }
+    const dn = displayName.trim();
+    if (proprietorFromRent?.name?.trim() === dn) {
+        return <RentHistoryProprietorCell party={proprietorFromRent} />;
+    }
+    const ct = currentTenants.find((c) => c.name?.trim() === dn);
+    const nameClass = 'text-sm font-medium text-zinc-900 dark:text-white truncate min-w-0 max-w-full block';
+    if (ct) {
+        return (
+            <Tooltip
+                content={
+                    <div className="flex flex-col gap-1.5 w-full">
+                        <div className="flex items-center gap-2 mb-1">
+                            <User className="w-4 h-4 text-blue-500" />
+                            <span className="font-bold">{ct.name}</span>
+                            {ct.code ? (
+                                <span className="bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-300 px-1.5 py-0.5 rounded text-[10px] ml-auto">
+                                    {ct.code}
+                                </span>
+                            ) : null}
+                        </div>
+                        {ct.englishName ? (
+                            <div className="text-xs text-zinc-500 dark:text-white/60">
+                                公司名稱:{' '}
+                                <span className="text-zinc-900 dark:text-white text-[10px]">{ct.englishName}</span>
+                            </div>
+                        ) : null}
+                        {ct.tenancyNumber ? (
+                            <div className="text-xs text-zinc-500 dark:text-white/60">出租號碼: {ct.tenancyNumber}</div>
+                        ) : null}
+                    </div>
+                }
+                placement="top"
+                className="bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white p-3 rounded-xl shadow-xl border border-zinc-200 dark:border-white/10 max-w-xs"
+            >
+                <div className={nameClass} title={displayName}>
+                    {displayName}
+                </div>
+            </Tooltip>
+        );
+    }
+    return (
+        <div className={nameClass} title={displayName}>
+            {displayName}
+        </div>
     );
 }
 
@@ -205,28 +270,10 @@ export default function PropertyDetailsPage() {
         return null;
     }, [property, subLandlords]);
 
-    const currentTenantCard = useMemo(() => {
-        if (!property) return null;
-        const contracts = [...(property.rents || [])]
-            .filter((r) => r.type === 'contract')
-            .sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
-        const latestContract = contracts[0];
-        const ctId = latestContract?.rentOutTenantIds?.[0];
-        if (ctId) {
-            const ct = currentTenants.find((c) => c.id === ctId);
-            if (ct) return { mode: 'ct' as const, name: ct.name, subtitle: ct.tenancyNumber?.trim() || '' };
-        }
-        const rentOutsSorted = [...(property.rents || [])]
-            .filter((r) => r.type === 'rent_out')
-            .sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
-        for (const r of rentOutsSorted) {
-            const lab = getRentOutLesseeDisplayLabel(r);
-            if (lab) return { mode: 'label' as const, name: lab, subtitle: '' };
-        }
-        const propT = property.tenant || activeRentOut?.tenant;
-        if (propT) return { mode: 'proprietor' as const, proprietor: propT };
-        return null;
-    }, [property, currentTenants, activeRentOut]);
+    const propertyCurrentTenantDisplay = useMemo(
+        () => resolvePropertyCurrentTenantDisplay(property, currentTenants, activeRentOut),
+        [property, currentTenants, activeRentOut],
+    );
     const [currentImageIndex, setCurrentImageIndex] = useState(0);
     const [lightboxImage, setLightboxImage] = useState<string | null>(null);
     const [selectedRent, setSelectedRent] = useState<Rent | null>(null);
@@ -493,12 +540,14 @@ export default function PropertyDetailsPage() {
                                         >
                                             {proprietor.name}
                                         </p>
-                                        <p
-                                            className="text-zinc-500 dark:text-white/50 text-sm truncate"
-                                            title={`${proprietor.code} ${proprietor.englishName ? `• ${proprietor.englishName}` : ''}`.trim() || undefined}
-                                        >
-                                            {proprietor.code} {proprietor.englishName ? `• ${proprietor.englishName}` : ''}
-                                        </p>
+                                        {proprietor.code ? (
+                                            <p
+                                                className="text-zinc-500 dark:text-white/50 text-sm font-mono truncate"
+                                                title={proprietor.code}
+                                            >
+                                                {proprietor.code}
+                                            </p>
+                                        ) : null}
                                     </div>
                                 </div>
                             ) : (
@@ -543,29 +592,26 @@ export default function PropertyDetailsPage() {
                                 <User className="w-5 h-5 text-blue-500" />
                                 {t('Current tenant', '現時租客')}
                             </h2>
-                            {currentTenantCard ? (
+                            {propertyCurrentTenantDisplay ? (
                                 <div className="flex items-center gap-4 min-w-0">
                                     <div className="w-12 h-12 shrink-0 rounded-full bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center text-white font-semibold">
-                                        {(currentTenantCard.name || '?').charAt(0).toUpperCase()}
+                                        {(propertyCurrentTenantDisplay.name || '?').charAt(0).toUpperCase()}
                                     </div>
                                     <div className="min-w-0 flex-1 overflow-hidden">
                                         <p
                                             className="text-zinc-900 dark:text-white font-medium truncate"
-                                            title={currentTenantCard.name || undefined}
+                                            title={propertyCurrentTenantDisplay.name || undefined}
                                         >
-                                            {currentTenantCard.name}
+                                            {propertyCurrentTenantDisplay.name}
                                         </p>
-                                        {(() => {
-                                            const sub =
-                                                currentTenantCard.mode === 'proprietor'
-                                                    ? `${currentTenantCard.proprietor.code} ${currentTenantCard.proprietor.englishName ? `• ${currentTenantCard.proprietor.englishName}` : ''}`.trim()
-                                                    : currentTenantCard.subtitle;
-                                            return sub ? (
-                                                <p className="text-zinc-500 dark:text-white/50 text-sm truncate" title={sub}>
-                                                    {sub}
-                                                </p>
-                                            ) : null;
-                                        })()}
+                                        {propertyCurrentTenantDisplay.subtitle ? (
+                                            <p
+                                                className="text-zinc-500 dark:text-white/50 text-sm font-mono truncate"
+                                                title={propertyCurrentTenantDisplay.subtitle}
+                                            >
+                                                {propertyCurrentTenantDisplay.subtitle}
+                                            </p>
+                                        ) : null}
                                     </div>
                                 </div>
                             ) : (
@@ -727,57 +773,31 @@ export default function PropertyDetailsPage() {
                                                         ) : (
                                                             <div className="py-4 px-4 border-l border-dashed border-zinc-200 dark:border-white/10 flex flex-col justify-center min-w-0 overflow-hidden">
                                                                 {rent.type === 'rent_out' ? (
-                                                                    partyForRentOut &&
-                                                                    partyForRentOut !== '-' &&
-                                                                    otherParty &&
-                                                                    rentOutLesseeLabel === otherParty.name ? (
-                                                                        <Tooltip
-                                                                            content={
-                                                                                <div className="flex flex-col gap-1.5 w-full">
-                                                                                    <div className="flex items-center gap-2 mb-1">
-                                                                                        <User className="w-4 h-4 text-blue-500" />
-                                                                                        <span className="font-bold">{otherParty.name}</span>
-                                                                                        <span className="bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-300 px-1.5 py-0.5 rounded text-[10px] ml-auto">
-                                                                                            {otherParty.code}
-                                                                                        </span>
-                                                                                    </div>
-                                                                                    <div className="text-xs text-zinc-500 dark:text-white/60">
-                                                                                        英文名稱:{' '}
-                                                                                        <span className="text-zinc-900 dark:text-white text-[10px]">
-                                                                                            {otherParty.englishName || '-'}
-                                                                                        </span>
-                                                                                    </div>
-                                                                                    <div className="text-xs text-zinc-500 dark:text-white/60 flex items-center justify-between">
-                                                                                        <span>
-                                                                                            類型:{' '}
-                                                                                            <span className="text-zinc-900 dark:text-white">
-                                                                                                {otherParty.type === 'company' ? '公司' : '個人'}
-                                                                                            </span>
-                                                                                        </span>
-                                                                                        <span className="bg-zinc-100 dark:bg-white/10 px-1.5 py-0.5 rounded text-[10px] text-zinc-600 dark:text-white/70">
-                                                                                            {proprietorCategoryLabelZh(otherParty.category, 'card')}
-                                                                                        </span>
-                                                                                    </div>
-                                                                                </div>
+                                                                    partyForRentOut && partyForRentOut !== '-' ? (
+                                                                        <RentHistoryLeaseOutContractLesseeCell
+                                                                            displayName={partyForRentOut}
+                                                                            currentTenants={currentTenants}
+                                                                            proprietorFromRent={
+                                                                                otherParty &&
+                                                                                rentOutLesseeLabel === otherParty.name
+                                                                                    ? otherParty
+                                                                                    : null
                                                                             }
-                                                                            placement="top"
-                                                                            className="bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white p-3 rounded-xl shadow-xl border border-zinc-200 dark:border-white/10 max-w-xs"
-                                                                        >
-                                                                            <div
-                                                                                className="text-sm font-medium text-purple-600 dark:text-purple-400 border-b border-dashed border-purple-300 dark:border-purple-600/50 cursor-pointer block min-w-0 max-w-full truncate"
-                                                                                title={partyForRentOut}
-                                                                            >
-                                                                                {partyForRentOut}
-                                                                            </div>
-                                                                        </Tooltip>
+                                                                        />
                                                                     ) : (
-                                                                        <div
-                                                                            className="text-sm font-medium text-purple-600 dark:text-purple-400 truncate min-w-0"
-                                                                            title={partyForRentOut || undefined}
-                                                                        >
-                                                                            {partyForRentOut}
-                                                                        </div>
+                                                                        <div className="text-zinc-600 dark:text-white/70 text-sm">-</div>
                                                                     )
+                                                                ) : rent.type === 'contract' &&
+                                                                  rentHistoryTab === 'contract_lease_out' ? (
+                                                                    <RentHistoryLeaseOutContractLesseeCell
+                                                                        displayName={
+                                                                            propertyCurrentTenantDisplay?.name ||
+                                                                            otherParty?.name ||
+                                                                            '-'
+                                                                        }
+                                                                        currentTenants={currentTenants}
+                                                                        proprietorFromRent={otherParty ?? null}
+                                                                    />
                                                                 ) : otherParty ? (
                                                                     <Tooltip
                                                                         content={
@@ -812,7 +832,7 @@ export default function PropertyDetailsPage() {
                                                                         className="bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white p-3 rounded-xl shadow-xl border border-zinc-200 dark:border-white/10 max-w-xs"
                                                                     >
                                                                         <div
-                                                                            className="text-sm font-medium text-purple-600 dark:text-purple-400 border-b border-dashed border-purple-300 dark:border-purple-600/50 cursor-pointer block min-w-0 max-w-full truncate"
+                                                                            className="text-sm font-medium text-zinc-900 dark:text-white truncate min-w-0 max-w-full block"
                                                                             title={otherParty.name}
                                                                         >
                                                                             {otherParty.name}
