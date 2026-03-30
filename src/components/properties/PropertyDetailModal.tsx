@@ -467,6 +467,22 @@ export default function PropertyDetailModal({ propertyName, propertyId, onClose 
                                 ) : (
                                     <div className="grid gap-3">
                                         {contractRents.map((c) => {
+                                            const parseDate = (d: string | Date | null | undefined) => {
+                                                if (!d) return null;
+                                                const date = d instanceof Date ? d : new Date(d as string);
+                                                return Number.isNaN(date.getTime()) ? null : date;
+                                            };
+                                            const startD = parseDate(c.rentOutStartDate);
+                                            const endD = parseDate(c.rentOutEndDate);
+                                            const today0 = new Date();
+                                            today0.setHours(0, 0, 0, 0);
+                                            /** 結束日與「今天」皆以本地日曆 0 點比較 */
+                                            const endDayLocal =
+                                                endD != null
+                                                    ? new Date(endD.getFullYear(), endD.getMonth(), endD.getDate())
+                                                    : null;
+                                            const isEndExpired = endDayLocal != null ? endDayLocal < today0 : false;
+
                                             const st = c.rentOutStatus || 'listing';
                                             const stLabel =
                                                 st === 'renting' ? '出租中' :
@@ -489,14 +505,26 @@ export default function PropertyDetailModal({ propertyName, propertyId, onClose 
                                                     : st === 'renting'
                                                       ? 'border-emerald-200/80 dark:border-emerald-500/30 bg-emerald-50/40 dark:bg-emerald-500/5 hover:bg-emerald-50/70 dark:hover:bg-emerald-500/10'
                                                       : 'border-amber-200/80 dark:border-amber-500/25 bg-amber-50/50 dark:bg-amber-500/5 hover:bg-amber-50 dark:hover:bg-amber-500/10';
-                                            const parseDate = (d: string | Date | null | undefined) => {
-                                                if (!d) return null;
-                                                const date = d instanceof Date ? d : new Date(d as string);
-                                                return Number.isNaN(date.getTime()) ? null : date;
-                                            };
-                                            const startD = parseDate(c.rentOutStartDate);
-                                            const endD = parseDate(c.rentOutEndDate);
-                                            /** 合約日期區塊：由上而下 年 → 月 → 日（附中文單位） */
+                                            const barColor =
+                                                st === 'leasing_in'
+                                                    ? 'border-l-violet-500'
+                                                    : st === 'renting'
+                                                      ? 'border-l-emerald-500'
+                                                      : st === 'completed'
+                                                        ? 'border-l-zinc-400'
+                                                        : 'border-l-amber-500';
+
+                                            /** 合約已過期：狀態改為「已過期」並紅色顯示 */
+                                            const listLabel = isEndExpired ? '已過期' : stLabel;
+                                            const listBadgeClass = isEndExpired
+                                                ? 'bg-red-100 dark:bg-red-500/25 text-red-800 dark:text-red-100 border border-red-300/80 dark:border-red-500/50'
+                                                : contractStatusBadgeClass;
+                                            const listCardShell = isEndExpired
+                                                ? 'border-red-200/90 dark:border-red-500/35 bg-red-50/45 dark:bg-red-500/8 hover:bg-red-50/80 dark:hover:bg-red-500/12'
+                                                : cardShellClass;
+                                            const listBarColor = isEndExpired ? 'border-l-red-500' : barColor;
+
+                                            /** 合約日期區塊：年 → 月 → 日（附中文單位） */
                                             const fmtYMDZh = (date: Date | null) => {
                                                 if (!date) return { y: '—', m: '—', d: '—' };
                                                 const y = date.getFullYear();
@@ -511,9 +539,6 @@ export default function PropertyDetailModal({ propertyName, propertyId, onClose 
 
                                             const s = fmtYMDZh(startD);
                                             const e = fmtYMDZh(endD);
-                                            const today0 = new Date();
-                                            today0.setHours(0, 0, 0, 0);
-                                            const isEndExpired = endD ? endD < today0 : false;
                                             const months =
                                                 startD && endD
                                                     ? Math.round((endD.getTime() - startD.getTime()) / (1000 * 60 * 60 * 24 * 30))
@@ -526,30 +551,20 @@ export default function PropertyDetailModal({ propertyName, propertyId, onClose 
                                                 (c as any).rentOutLessor?.trim?.() ||
                                                 '';
 
-                                            /** 左側豎線顏色，配合狀態 */
-                                            const barColor =
-                                                st === 'leasing_in'
-                                                    ? 'border-l-violet-500'
-                                                    : st === 'renting'
-                                                      ? 'border-l-emerald-500'
-                                                      : st === 'completed'
-                                                        ? 'border-l-zinc-400'
-                                                        : 'border-l-amber-500';
-
                                             return (
                                                 <button
                                                     key={c.id}
                                                     type="button"
                                                     onClick={() => setSelectedRent(c)}
-                                                    className={`text-left rounded-2xl border border-zinc-200 dark:border-white/10 border-l-4 ${barColor} ${cardShellClass} transition-all hover:shadow-md dark:hover:shadow-black/20`}
+                                                    className={`text-left rounded-2xl border border-zinc-200 dark:border-white/10 border-l-4 ${listBarColor} ${listCardShell} transition-all hover:shadow-md dark:hover:shadow-black/20`}
                                                 >
                                                     {/* 頂部列：合約編號 + 狀態 */}
                                                     <div className="flex items-center justify-between gap-3 px-4 pt-4 pb-2">
                                                         <span className="font-mono text-sm font-bold text-zinc-700 dark:text-white/80 tracking-tight">
                                                             {c.rentOutTenancyNumber || '—'}
                                                         </span>
-                                                        <span className={`text-[11px] px-2.5 py-0.5 rounded-full font-semibold shrink-0 ${contractStatusBadgeClass}`}>
-                                                            {stLabel}
+                                                        <span className={`text-[11px] px-2.5 py-0.5 rounded-full font-semibold shrink-0 ${listBadgeClass}`}>
+                                                            {listLabel}
                                                         </span>
                                                     </div>
 
