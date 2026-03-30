@@ -575,13 +575,13 @@ export default function PropertyDetailModal({ propertyName, propertyId, onClose 
                                                                     合約開始
                                                                 </div>
                                                                 <div className="flex items-center justify-center gap-2">
-                                                                    <span className="text-lg font-bold text-zinc-800 dark:text-white/90 tabular-nums leading-none">
+                                                                    <span className="text-lg font-bold text-[oklch(27.4%_0.006_286.033)] dark:text-[oklch(27.4%_0.006_286.033)] tabular-nums leading-none">
                                                                         {s.y}
                                                                     </span>
-                                                                    <span className="text-lg font-bold text-zinc-600 dark:text-white/65 tabular-nums leading-none">
+                                                                    <span className="text-lg font-bold text-[oklch(27.4%_0.006_286.033)] dark:text-[oklch(27.4%_0.006_286.033)] tabular-nums leading-none">
                                                                         {s.m}
                                                                     </span>
-                                                                    <span className="text-lg font-bold text-zinc-800 dark:text-white/90 tabular-nums leading-none">
+                                                                    <span className="text-lg font-bold text-[oklch(27.4%_0.006_286.033)] dark:text-[oklch(27.4%_0.006_286.033)] tabular-nums leading-none">
                                                                         {s.d}
                                                                     </span>
                                                                 </div>
@@ -603,8 +603,8 @@ export default function PropertyDetailModal({ propertyName, propertyId, onClose 
                                                                     <span
                                                                         className={`text-lg font-bold tabular-nums leading-none ${
                                                                             isEndExpired
-                                                                                ? 'text-red-600 dark:text-red-400'
-                                                                                : 'text-zinc-800 dark:text-white/90'
+                                                                                ? 'text-red-500 dark:text-red-400'
+                                                                                : 'text-[oklch(27.4%_0.006_286.033)] dark:text-[oklch(27.4%_0.006_286.033)]'
                                                                         }`}
                                                                     >
                                                                         {e.y}
@@ -612,8 +612,8 @@ export default function PropertyDetailModal({ propertyName, propertyId, onClose 
                                                                     <span
                                                                         className={`text-lg font-bold tabular-nums leading-none ${
                                                                             isEndExpired
-                                                                                ? 'text-red-600 dark:text-red-400'
-                                                                                : 'text-zinc-600 dark:text-white/65'
+                                                                                ? 'text-red-500 dark:text-red-400'
+                                                                                : 'text-[oklch(27.4%_0.006_286.033)] dark:text-[oklch(27.4%_0.006_286.033)]'
                                                                         }`}
                                                                     >
                                                                         {e.m}
@@ -621,8 +621,8 @@ export default function PropertyDetailModal({ propertyName, propertyId, onClose 
                                                                     <span
                                                                         className={`text-lg font-bold tabular-nums leading-none ${
                                                                             isEndExpired
-                                                                                ? 'text-red-600 dark:text-red-400'
-                                                                                : 'text-zinc-800 dark:text-white/90'
+                                                                                ? 'text-red-500 dark:text-red-400'
+                                                                                : 'text-[oklch(27.4%_0.006_286.033)] dark:text-[oklch(27.4%_0.006_286.033)]'
                                                                         }`}
                                                                     >
                                                                         {e.d}
