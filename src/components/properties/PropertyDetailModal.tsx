@@ -275,7 +275,7 @@ export default function PropertyDetailModal({ propertyName, propertyId, onClose 
                 initial={{ opacity: 0, scale: 0.95, y: 20 }}
                 animate={{ opacity: 1, scale: 1, y: 0 }}
                 exit={{ opacity: 0, scale: 0.95, y: 20 }}
-                className="relative bg-white dark:bg-[#1a1a2e] w-full max-w-3xl max-h-[90vh] rounded-3xl overflow-hidden shadow-2xl flex flex-col"
+                className="relative bg-white dark:bg-[#1a1a2e] w-full max-w-5xl lg:max-w-6xl max-h-[90vh] rounded-3xl overflow-hidden shadow-2xl flex flex-col"
                 onClick={(e) => e.stopPropagation()}
             >
                 {/* Header */}
