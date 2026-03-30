@@ -489,39 +489,145 @@ export default function PropertyDetailModal({ propertyName, propertyId, onClose 
                                                     : st === 'renting'
                                                       ? 'border-emerald-200/80 dark:border-emerald-500/30 bg-emerald-50/40 dark:bg-emerald-500/5 hover:bg-emerald-50/70 dark:hover:bg-emerald-500/10'
                                                       : 'border-amber-200/80 dark:border-amber-500/25 bg-amber-50/50 dark:bg-amber-500/5 hover:bg-amber-50 dark:hover:bg-amber-500/10';
-                                            const sd = c.rentOutStartDate ? new Date(c.rentOutStartDate).toLocaleDateString() : '-';
-                                            const ed = c.rentOutEndDate ? new Date(c.rentOutEndDate).toLocaleDateString() : '-';
+                                            const parseDate = (d: string | Date | null | undefined) => {
+                                                if (!d) return null;
+                                                const date = d instanceof Date ? d : new Date(d as string);
+                                                return Number.isNaN(date.getTime()) ? null : date;
+                                            };
+                                            const startD = parseDate(c.rentOutStartDate);
+                                            const endD = parseDate(c.rentOutEndDate);
+                                            const fmtDMY = (date: Date | null) => {
+                                                if (!date) return { day: '-', month: '-', year: '-' };
+                                                return {
+                                                    day: String(date.getDate()).padStart(2, '0'),
+                                                    month: date.toLocaleString('zh-TW', { month: 'short' }).replace('月', ''),
+                                                    year: String(date.getFullYear()),
+                                                };
+                                            };
+                                            const fmtYMD = (date: Date | null) =>
+                                                date
+                                                    ? date.toLocaleDateString('zh-TW', { year: 'numeric', month: '2-digit', day: '2-digit' })
+                                                    : '—';
+
+                                            const s = fmtDMY(startD);
+                                            const e = fmtDMY(endD);
+                                            const months =
+                                                startD && endD
+                                                    ? Math.round((endD.getTime() - startD.getTime()) / (1000 * 60 * 60 * 24 * 30))
+                                                    : null;
+                                            const rentAmt = c.rentOutMonthlyRental;
+                                            const currency = c.currency || 'HKD';
                                             const ownerLine =
                                                 (c as any).tenant?.name?.trim?.() ||
                                                 (c as any).proprietor?.name?.trim?.() ||
                                                 (c as any).rentOutLessor?.trim?.() ||
                                                 '';
+
+                                            /** 左側豎線顏色，配合狀態 */
+                                            const barColor =
+                                                st === 'leasing_in'
+                                                    ? 'border-l-violet-500'
+                                                    : st === 'renting'
+                                                      ? 'border-l-emerald-500'
+                                                      : st === 'completed'
+                                                        ? 'border-l-zinc-400'
+                                                        : 'border-l-amber-500';
+
                                             return (
                                                 <button
                                                     key={c.id}
                                                     type="button"
                                                     onClick={() => setSelectedRent(c)}
-                                                    className={`text-left p-4 rounded-2xl border transition-colors ${cardShellClass}`}
+                                                    className={`text-left rounded-2xl border border-zinc-200 dark:border-white/10 border-l-4 ${barColor} ${cardShellClass} transition-all hover:shadow-md dark:hover:shadow-black/20`}
                                                 >
-                                                    <div className="flex items-start justify-between gap-2">
-                                                        <span className="font-mono font-semibold text-zinc-900 dark:text-white text-sm">
+                                                    {/* 頂部列：合約編號 + 狀態 */}
+                                                    <div className="flex items-center justify-between gap-3 px-4 pt-4 pb-2">
+                                                        <span className="font-mono text-sm font-bold text-zinc-700 dark:text-white/80 tracking-tight">
                                                             {c.rentOutTenancyNumber || '—'}
                                                         </span>
-                                                        <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium shrink-0 ${contractStatusBadgeClass}`}>
+                                                        <span className={`text-[11px] px-2.5 py-0.5 rounded-full font-semibold shrink-0 ${contractStatusBadgeClass}`}>
                                                             {stLabel}
                                                         </span>
                                                     </div>
+
+                                                    {/* 業主一行 */}
                                                     {ownerLine ? (
-                                                        <p className="text-xs text-zinc-500 dark:text-white/50 mt-1 truncate" title={ownerLine}>
-                                                            業主：{ownerLine}
-                                                        </p>
+                                                        <div className="px-4 pb-2 flex items-center gap-1.5">
+                                                            <User className="w-3 h-3 text-zinc-400 dark:text-white/40 shrink-0" />
+                                                            <span className="text-xs text-zinc-500 dark:text-white/50 truncate" title={ownerLine}>
+                                                                {ownerLine}
+                                                            </span>
+                                                        </div>
                                                     ) : null}
-                                                    <p className="mt-3 text-sm sm:text-base font-semibold tabular-nums text-zinc-800 dark:text-white/90 leading-relaxed">
-                                                        {sd} — {ed}
-                                                        {c.rentOutMonthlyRental != null
-                                                            ? ` · ${c.currency || 'HKD'} ${Number(c.rentOutMonthlyRental).toLocaleString()}/月`
-                                                            : ''}
-                                                    </p>
+
+                                                    {/* 分隔線 */}
+                                                    <div className="border-t border-dashed border-zinc-200/80 dark:border-white/8 mx-4" />
+
+                                                    {/* 約期核心資訊：開始日 | 箭頭 | 結束日 */}
+                                                    <div className="px-4 pt-3 pb-3">
+                                                        <div className="flex items-stretch gap-2">
+                                                            {/* 開始日 */}
+                                                            <div className="flex-1 bg-white/70 dark:bg-white/6 rounded-xl p-2.5 border border-zinc-200/70 dark:border-white/10 text-center">
+                                                                <div className="text-[10px] font-semibold text-zinc-400 dark:text-white/40 uppercase tracking-widest mb-1">
+                                                                    開始
+                                                                </div>
+                                                                <div className="flex flex-col items-center gap-0.5">
+                                                                    <span className="text-xl font-extrabold text-zinc-800 dark:text-white/90 tabular-nums leading-none">
+                                                                        {s.day}
+                                                                    </span>
+                                                                    <span className="text-xs font-medium text-zinc-500 dark:text-white/55">
+                                                                        {s.month}
+                                                                    </span>
+                                                                    <span className="text-[10px] text-zinc-400 dark:text-white/35 tabular-nums">
+                                                                        {s.year}
+                                                                    </span>
+                                                                </div>
+                                                            </div>
+
+                                                            {/* 中間箭頭 */}
+                                                            <div className="flex items-center">
+                                                                <svg className="w-6 h-4 text-zinc-300 dark:text-white/20" viewBox="0 0 24 14" fill="none">
+                                                                    <path d="M1 7h18M14 1l6 6-6 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                                                                </svg>
+                                                            </div>
+
+                                                            {/* 結束日 */}
+                                                            <div className="flex-1 bg-white/70 dark:bg-white/6 rounded-xl p-2.5 border border-zinc-200/70 dark:border-white/10 text-center">
+                                                                <div className="text-[10px] font-semibold text-zinc-400 dark:text-white/40 uppercase tracking-widest mb-1">
+                                                                    屆滿
+                                                                </div>
+                                                                <div className="flex flex-col items-center gap-0.5">
+                                                                    <span className={`text-xl font-extrabold tabular-nums leading-none ${endD && endD < new Date() ? 'text-red-500' : 'text-zinc-800 dark:text-white/90'}`}>
+                                                                        {e.day}
+                                                                    </span>
+                                                                    <span className="text-xs font-medium text-zinc-500 dark:text-white/55">
+                                                                        {e.month}
+                                                                    </span>
+                                                                    <span className="text-[10px] text-zinc-400 dark:text-white/35 tabular-nums">
+                                                                        {e.year}
+                                                                    </span>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+
+                                                        {/* 月數 + 月租 */}
+                                                        <div className="mt-2.5 flex items-center justify-between gap-2">
+                                                            {months !== null ? (
+                                                                <span className="inline-flex items-center gap-1 text-[11px] font-medium text-zinc-500 dark:text-white/45 bg-zinc-100 dark:bg-white/8 px-2 py-0.5 rounded-full">
+                                                                    <Calendar className="w-3 h-3" />
+                                                                    {months} 個月
+                                                                </span>
+                                                            ) : (
+                                                                <span />
+                                                            )}
+                                                            {rentAmt != null ? (
+                                                                <span className="text-sm sm:text-base font-extrabold text-zinc-900 dark:text-white tabular-nums">
+                                                                    {currency} {Number(rentAmt).toLocaleString()}
+                                                                    <span className="text-[11px] font-normal text-zinc-500 dark:text-white/45 ml-1">/月</span>
+                                                                </span>
+                                                            ) : null}
+                                                        </div>
+                                                    </div>
                                                 </button>
                                             );
                                         })}
