@@ -23,7 +23,7 @@ import {
     proprietorCategoryLabelZh,
 } from '@/lib/formatters';
 import { normalizePropertyLocation } from '@/lib/propertyLocation';
-import { formatDateDMY } from '@/lib/rentPaymentDisplay';
+import { formatDateDMY, getRentCollectionPayListStatus } from '@/lib/rentPaymentDisplay';
 
 /** 由物業資料建立表單狀態；地址欄優先使用 address 欄，否則沿用 location 內文字 */
 function formStateFromProperty(p: Property | null | undefined) {
@@ -211,7 +211,7 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
         }
 
         const rentGridClass =
-            'grid grid-cols-[100px_minmax(0,1fr)_minmax(0,1.5fr)_minmax(0,1.15fr)_minmax(0,1.05fr)_minmax(0,1fr)_90px] gap-4 px-4';
+            'grid grid-cols-[100px_minmax(0,1fr)_minmax(0,1.5fr)_minmax(0,1.15fr)_minmax(0,1.05fr)_minmax(76px,0.95fr)_minmax(0,1fr)_90px] gap-4 px-4';
         /** 交租記錄「編號」欄：顯示所屬物業編號（與表單「編號」一致） */
         const propertyCodeForRentingRows = (formData.code || property?.code || '').trim() || '-';
 
@@ -227,6 +227,7 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                     <div className="font-bold">租借位置</div>
                     <div className="font-bold">租期</div>
                     <div className="font-bold">付款日期</div>
+                    <div className="font-bold">繳付狀態</div>
                     <div className="text-right font-bold">租金/月</div>
                     <div className="text-center font-bold">操作</div>
                 </div>
@@ -286,6 +287,11 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                         }
                         return '';
                     })();
+
+                    const payStatus =
+                        rent.type === 'rent_out' || rent.type === 'renting'
+                            ? getRentCollectionPayListStatus(rent as any)
+                            : null;
 
                     return (
                         <div
@@ -357,6 +363,19 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                                     </span>
                                 ) : (
                                     <span className="text-zinc-400 dark:text-white/35 text-sm font-medium">—</span>
+                                )}
+                            </div>
+                            <div className="flex items-center min-w-0">
+                                {payStatus === 'paid' ? (
+                                    <span className="text-[10px] sm:text-xs px-2 py-0.5 rounded-full font-semibold bg-emerald-100 text-emerald-900 border border-emerald-300/60 dark:bg-emerald-950/50 dark:text-emerald-100 dark:border-emerald-500/40">
+                                        已繳付
+                                    </span>
+                                ) : payStatus === 'unpaid' ? (
+                                    <span className="text-[10px] sm:text-xs px-2 py-0.5 rounded-full font-semibold bg-zinc-100 text-zinc-700 border border-zinc-200 dark:bg-white/10 dark:text-zinc-200 dark:border-white/15">
+                                        未繳付
+                                    </span>
+                                ) : (
+                                    <span className="text-zinc-400 dark:text-white/35 text-sm">—</span>
                                 )}
                             </div>
                             <div className="text-right min-w-0">
@@ -485,7 +504,7 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                                 </span>
                                 <div className="flex items-center gap-1 flex-wrap">
                                     <span className={`text-[10px] px-2 py-0.5 rounded-full w-fit font-bold tracking-wider ${badgeClass}`}>
-                                        {isLeaseIn ? '租賃' : '出租'}
+                                        {isLeaseIn ? '租入中' : '出租中'}
                                     </span>
                                     {isExpired && (
                                         <span className="text-[10px] px-2 py-0.5 rounded-full w-fit font-bold tracking-wider bg-red-100 dark:bg-red-500/20 text-red-600 dark:text-red-400 border border-red-200/50 dark:border-red-500/30">

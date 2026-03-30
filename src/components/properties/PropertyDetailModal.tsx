@@ -16,7 +16,7 @@ import {
     Image as ImageIcon
 } from 'lucide-react';
 import type { Property, Rent } from '@/lib/db';
-import { formatLotArea } from '@/lib/formatters';
+import { formatLotArea, proprietorCategoryLabelZh } from '@/lib/formatters';
 import LotIndexDisplay from '@/components/properties/LotIndexDisplay';
 import { usePropertyWithRelationsByNameQuery, usePropertyWithRelationsQuery } from '@/hooks/useStorage';
 import DOMPurify from 'dompurify';
@@ -25,6 +25,7 @@ import { useLanguage } from '@/components/common/LanguageSwitcher';
 import RentDetailsModal from '@/components/properties/RentDetailsModal';
 import { Tooltip } from '@heroui/react';
 import SinglePropertyMapDynamic from '@/components/properties/SinglePropertyMapDynamic';
+import { getRentCollectionPayListStatus } from '@/lib/rentPaymentDisplay';
 
 interface PropertyDetailModalProps {
     /** 顯示用／無 ID 時後備查詢 */
@@ -36,7 +37,8 @@ interface PropertyDetailModalProps {
 
 const statusColors: Record<string, string> = {
     holding: 'bg-emerald-600/80 text-white border-emerald-500/50',
-    renting: 'bg-blue-500/20 text-blue-400 border-blue-500/30',
+    /** 物業「出租中」：與「持有中」綠色區隔，採琥珀色系 */
+    renting: 'bg-amber-500/90 text-amber-950 border-amber-400/80 dark:bg-amber-500/25 dark:text-amber-100 dark:border-amber-400/50',
     sold: 'bg-gray-500/20 text-gray-400 border-gray-500/30',
     suspended: 'bg-red-500/20 text-red-400 border-red-500/30',
 };
@@ -120,18 +122,28 @@ export default function PropertyDetailModal({ propertyName, propertyId, onClose 
 
         return (
             <div className="overflow-x-auto">
-                <div className="min-w-[700px]">
-                    <div className="grid grid-cols-[1fr_2fr_1.5fr_2fr_1fr] gap-0 pb-3 border-b border-zinc-200 dark:border-white/10 text-xs font-bold text-zinc-900 dark:text-white">
+                <div className="min-w-[780px]">
+                    <div className="grid grid-cols-[1fr_2fr_1.5fr_2fr_0.9fr_1fr] gap-0 pb-3 border-b border-zinc-200 dark:border-white/10 text-xs font-bold text-zinc-900 dark:text-white">
                         <div className="pr-4">{t('Number', '編號')}</div>
                         <div className="px-4">{t('Property', '物業')}</div>
                         <div className="px-4">{t('Tenant', '承租人')}</div>
                         <div className="px-4">{t('Lease Term & Location', '租期及地點')}</div>
+                        <div className="px-4">{t('Payment status', '繳付狀態')}</div>
                         <div className="pl-4">{t('Rent', '租金')}</div>
                     </div>
                     <div className="divide-y divide-zinc-200 dark:divide-white/10">
                         {records.map((rent: any) => {
-                            const otherParty = rent.type === 'rent_out' ? rent.tenant : rent.proprietor;
-                            const rentNumber = rent.type === 'rent_out' ? (rent.rentOutTenancyNumber || '-') : (rent.rentingNumber || '-');
+                            /** 收租：承租人為 tenant；交租：業主存 tenant_id（與 RentModal 一致） */
+                            const otherParty =
+                                rent.type === 'rent_out'
+                                    ? rent.tenant
+                                    : rent.type === 'renting'
+                                      ? rent.tenant
+                                      : rent.proprietor;
+                            const rentNumber =
+                                rent.type === 'rent_out'
+                                    ? (rent.rentOutTenancyNumber || '-')
+                                    : (property?.code?.trim() || '-');
 
                             const startDate = rent.type === 'rent_out'
                                 ? (rent.rentOutStartDate || rent.startDate)
@@ -153,10 +165,12 @@ export default function PropertyDetailModal({ propertyName, propertyId, onClose 
 
                             const isExpired = endDate ? new Date(endDate) < new Date(new Date().setHours(0, 0, 0, 0)) : false;
 
+                            const payListStatus = getRentCollectionPayListStatus(rent);
+
                             return (
                                 <div
                                     key={rent.id}
-                                    className="grid grid-cols-[1fr_2fr_1.5fr_2fr_1fr] gap-0 hover:bg-zinc-50/50 dark:hover:bg-white/[0.02] transition-colors group items-stretch cursor-pointer"
+                                    className="grid grid-cols-[1fr_2fr_1.5fr_2fr_0.9fr_1fr] gap-0 hover:bg-zinc-50/50 dark:hover:bg-white/[0.02] transition-colors group items-stretch cursor-pointer"
                                     onClick={() => setSelectedRent(rent)}
                                 >
                                     <div className="py-4 pr-4 flex flex-col justify-center">
@@ -185,10 +199,7 @@ export default function PropertyDetailModal({ propertyName, propertyId, onClose 
                                                         <div className="text-xs text-zinc-500 dark:text-white/60 flex items-center justify-between">
                                                             <span>類型: <span className="text-zinc-900 dark:text-white">{otherParty.type === 'company' ? '公司' : '個人'}</span></span>
                                                             <span className="bg-zinc-100 dark:bg-white/10 px-1.5 py-0.5 rounded text-[10px] text-zinc-600 dark:text-white/70">
-                                                                {otherParty.category === 'group_company' ? '集團公司' :
-                                                                    otherParty.category === 'joint_venture' ? '合資公司' :
-                                                                        otherParty.category === 'managed_individual' ? '代管個體' :
-                                                                            otherParty.category === 'external_landlord' ? '外部業主' : '承租人'}
+                                                                {proprietorCategoryLabelZh(otherParty.category, 'card')}
                                                             </span>
                                                         </div>
                                                     </div>
@@ -214,6 +225,17 @@ export default function PropertyDetailModal({ propertyName, propertyId, onClose 
                                                 {rent.type === 'rent_out' ? (rent.location || rent.rentOutAddressDetail) : rent.location}
                                             </span>
                                         </div>
+                                    </div>
+                                    <div className="py-4 px-4 border-l border-dashed border-zinc-200 dark:border-white/10 flex flex-col justify-center">
+                                        {payListStatus === 'paid' ? (
+                                            <span className="text-[10px] px-2 py-0.5 rounded-full font-semibold w-fit bg-emerald-100 dark:bg-emerald-500/20 text-emerald-800 dark:text-emerald-200 border border-emerald-200/70 dark:border-emerald-500/35">
+                                                已繳付
+                                            </span>
+                                        ) : (
+                                            <span className="text-[10px] px-2 py-0.5 rounded-full font-semibold w-fit bg-zinc-100 dark:bg-white/10 text-zinc-700 dark:text-zinc-200 border border-zinc-200 dark:border-white/15">
+                                                未繳付
+                                            </span>
+                                        )}
                                     </div>
                                     <div className="py-4 pl-4 border-l border-dashed border-zinc-200 dark:border-white/10 flex flex-col justify-center text-left">
                                         <div className="text-zinc-800 dark:text-white text-sm whitespace-nowrap">${(monthlyRent as any).toLocaleString()}/月</div>
@@ -253,7 +275,7 @@ export default function PropertyDetailModal({ propertyName, propertyId, onClose 
                 initial={{ opacity: 0, scale: 0.95, y: 20 }}
                 animate={{ opacity: 1, scale: 1, y: 0 }}
                 exit={{ opacity: 0, scale: 0.95, y: 20 }}
-                className="relative bg-white dark:bg-[#1a1a2e] w-full max-w-4xl max-h-[90vh] rounded-3xl overflow-hidden shadow-2xl flex flex-col"
+                className="relative bg-white dark:bg-[#1a1a2e] w-full max-w-3xl max-h-[90vh] rounded-3xl overflow-hidden shadow-2xl flex flex-col"
                 onClick={(e) => e.stopPropagation()}
             >
                 {/* Header */}
@@ -433,25 +455,48 @@ export default function PropertyDetailModal({ propertyName, propertyId, onClose 
                                                     st === 'listing' ? '放盤中' :
                                                         st === 'leasing_in' ? '租入中' :
                                                         st === 'completed' ? '已完租' : String(st);
+                                            const contractStatusBadgeClass =
+                                                st === 'leasing_in'
+                                                    ? 'bg-violet-100 dark:bg-violet-500/25 text-violet-900 dark:text-violet-100 border border-violet-300/70 dark:border-violet-500/45'
+                                                    : st === 'renting'
+                                                      ? 'bg-emerald-100 dark:bg-emerald-500/20 text-emerald-900 dark:text-emerald-100 border border-emerald-300/70 dark:border-emerald-500/40'
+                                                      : st === 'listing'
+                                                        ? 'bg-amber-100 dark:bg-amber-500/20 text-amber-900 dark:text-amber-200 border border-amber-300/60 dark:border-amber-500/35'
+                                                        : st === 'completed'
+                                                          ? 'bg-zinc-200/80 dark:bg-white/10 text-zinc-800 dark:text-zinc-200 border border-zinc-300/60 dark:border-white/15'
+                                                          : 'bg-amber-100 dark:bg-amber-500/20 text-amber-800 dark:text-amber-300 border border-amber-200/80 dark:border-amber-500/25';
+                                            const cardShellClass =
+                                                st === 'leasing_in'
+                                                    ? 'border-violet-200/80 dark:border-violet-500/30 bg-violet-50/40 dark:bg-violet-500/5 hover:bg-violet-50/70 dark:hover:bg-violet-500/10'
+                                                    : st === 'renting'
+                                                      ? 'border-emerald-200/80 dark:border-emerald-500/30 bg-emerald-50/40 dark:bg-emerald-500/5 hover:bg-emerald-50/70 dark:hover:bg-emerald-500/10'
+                                                      : 'border-amber-200/80 dark:border-amber-500/25 bg-amber-50/50 dark:bg-amber-500/5 hover:bg-amber-50 dark:hover:bg-amber-500/10';
                                             const sd = c.rentOutStartDate ? new Date(c.rentOutStartDate).toLocaleDateString() : '-';
                                             const ed = c.rentOutEndDate ? new Date(c.rentOutEndDate).toLocaleDateString() : '-';
+                                            const ownerLine =
+                                                (c as any).tenant?.name?.trim?.() ||
+                                                (c as any).proprietor?.name?.trim?.() ||
+                                                (c as any).rentOutLessor?.trim?.() ||
+                                                '';
                                             return (
                                                 <button
                                                     key={c.id}
                                                     type="button"
                                                     onClick={() => setSelectedRent(c)}
-                                                    className="text-left p-4 rounded-2xl border border-amber-200/80 dark:border-amber-500/25 bg-amber-50/50 dark:bg-amber-500/5 hover:bg-amber-50 dark:hover:bg-amber-500/10 transition-colors"
+                                                    className={`text-left p-4 rounded-2xl border transition-colors ${cardShellClass}`}
                                                 >
                                                     <div className="flex items-start justify-between gap-2">
                                                         <span className="font-mono font-semibold text-zinc-900 dark:text-white text-sm">
                                                             {c.rentOutTenancyNumber || '—'}
                                                         </span>
-                                                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-500/20 text-amber-800 dark:text-amber-300 font-medium shrink-0">
+                                                        <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium shrink-0 ${contractStatusBadgeClass}`}>
                                                             {stLabel}
                                                         </span>
                                                     </div>
-                                                    {c.rentOutLessor ? (
-                                                        <p className="text-xs text-zinc-500 dark:text-white/50 mt-1">{c.rentOutLessor}</p>
+                                                    {ownerLine ? (
+                                                        <p className="text-xs text-zinc-500 dark:text-white/50 mt-1 truncate" title={ownerLine}>
+                                                            業主：{ownerLine}
+                                                        </p>
                                                     ) : null}
                                                     <p className="text-xs text-zinc-400 dark:text-white/40 mt-2">
                                                         {sd} — {ed}
@@ -504,6 +549,7 @@ export default function PropertyDetailModal({ propertyName, propertyId, onClose 
             {selectedRent && (
                 <RentDetailsModal
                     rent={selectedRent}
+                    property={property ?? undefined}
                     onClose={() => setSelectedRent(null)}
                 />
             )}
