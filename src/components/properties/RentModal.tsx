@@ -137,8 +137,8 @@ export default function RentModal({
                 rentOutStartDate: formatDate(rent.rentOutStartDate),
                 rentOutEndDate: formatDate(rent.rentOutEndDate),
                 rentOutActualEndDate: formatDate(rent.rentOutActualEndDate),
-                rentOutContractNature: (() => {
-                    const r = rent as Record<string, unknown>;
+                rentOutContractNature: ((): string => {
+                    const r = rent as unknown as Record<string, unknown>;
                     const v = r.rentOutContractNature ?? r.rent_out_contract_nature;
                     return typeof v === 'string' && v.trim() ? v.trim() : '';
                 })(),
