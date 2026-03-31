@@ -1155,6 +1155,9 @@ export function useRents() {
             if (rc.rentCollectionReceiptNumber !== undefined) {
                 rentData.rent_collection_receipt_number = rc.rentCollectionReceiptNumber || null;
             }
+            if (rc.rentCollectionContractNature !== undefined) {
+                rentData.rent_collection_contract_nature = rc.rentCollectionContractNature || null;
+            }
 
             // Add Renting (交租) fields
             if (rent.rentingNumber) rentData.renting_number = rent.rentingNumber;
@@ -1392,6 +1395,9 @@ export function useRents() {
             }
             if (urc.rentCollectionReceiptNumber !== undefined) {
                 rentData.rent_collection_receipt_number = urc.rentCollectionReceiptNumber || null;
+            }
+            if (urc.rentCollectionContractNature !== undefined) {
+                rentData.rent_collection_contract_nature = urc.rentCollectionContractNature || null;
             }
 
             // RENTING fields
