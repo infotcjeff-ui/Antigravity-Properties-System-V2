@@ -328,7 +328,11 @@ export default function RentOutPage() {
                                             >
                                                 <td className="p-4 text-zinc-900 dark:text-white font-medium">{property?.name || '-'}</td>
                                                 <td className="p-4 text-zinc-600 dark:text-white/70">{rent.currentTenant?.name || tenant?.name || '-'}</td>
-                                                <td className="p-4 text-zinc-500 dark:text-white/50 text-sm">{labelRentOutContractNatureZh(rent.rentOutContractNature)}</td>
+                                                <td className="p-4 text-zinc-500 dark:text-white/50 text-sm">{((): string => {
+                                                    const raw = rent as any;
+                                                    const v = raw.rentCollectionContractNature ?? raw.rent_collection_contract_nature ?? rent.rentOutContractNature ?? '';
+                                                    return labelRentOutContractNatureZh(v);
+                                                })()}</td>
                                                 <td className="p-4 text-green-600 dark:text-green-400 font-medium">
                                                     {payFilled ? (
                                                         <>+ {rent.currency || 'HKD'} {Number(rent.rentCollectionAmount).toLocaleString()}</>
@@ -444,7 +448,11 @@ export default function RentOutPage() {
                                                     </div>
                                                     <div className="flex items-center gap-1.5 mt-0.5">
                                                         <p className="text-[10px] text-zinc-400 dark:text-white/40">租賃性質</p>
-                                                        <p className="text-xs text-zinc-600 dark:text-white/70">{labelRentOutContractNatureZh(rent.rentOutContractNature)}</p>
+                                                        <p className="text-xs text-zinc-600 dark:text-white/70">{((): string => {
+                                                            const raw = rent as any;
+                                                            const v = raw.rentCollectionContractNature ?? raw.rent_collection_contract_nature ?? rent.rentOutContractNature ?? '';
+                                                            return labelRentOutContractNatureZh(v);
+                                                        })()}</p>
                                                     </div>
                                                 </div>
                                             </div>

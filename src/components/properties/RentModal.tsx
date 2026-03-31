@@ -15,7 +15,7 @@ import {
 import { X, ExternalLink, Building2, Calendar } from 'lucide-react';
 import { fileToBase64, compressImage, validateImageUpload } from '@/lib/imageUtils';
 import type { Proprietor, Property, Rent, RentCollectionPaymentMethod, SubLandlord, CurrentTenant } from '@/lib/db';
-import { RENT_OUT_CONTRACT_STATUS_OPTIONS } from '@/lib/rentPaymentDisplay';
+import { RENT_OUT_CONTRACT_STATUS_OPTIONS, getRentOutOrContractListNumber } from '@/lib/rentPaymentDisplay';
 import ProprietorModal from '@/components/properties/ProprietorModal';
 import RentOutFormModal from '@/components/properties/RentOutFormModal';
 import CurrentTenantDetailModal from '@/components/properties/CurrentTenantDetailModal';
@@ -193,9 +193,26 @@ export default function RentModal({
                 rentCollectionNotes: rent.notes || '',
                 // 與 rentCollectionDate 一致：必須為 yyyy-mm-dd，否則 type="date" 受控值無效，變更無法寫入 state
                 rentCollectionPaymentDate: formatDate((rent as any).rentCollectionPaymentDate),
-                rentCollectionContractNumber: (rent as any).rentCollectionContractNumber || '',
+                rentCollectionContractNumber: (() => {
+                    const r = rent as any;
+                    const camel = r.rentCollectionContractNumber || '';
+                    if (camel && String(camel).trim()) return String(camel).trim();
+                    // snake_case fallback
+                    const snake = r.rent_collection_contract_number || '';
+                    if (snake && String(snake).trim()) return String(snake).trim();
+                    // 遷移期：若兩者皆空，使用 getRentOutOrContractListNumber（與列表一致）
+                    return getRentOutOrContractListNumber(rent);
+                })(),
                 rentCollectionReceiptNumber: (rent as any).rentCollectionReceiptNumber || '',
-                rentCollectionContractNature: (rent as any).rentCollectionContractNature || '',
+                rentCollectionContractNature: (() => {
+                    const r = rent as any;
+                    const camel = r.rentCollectionContractNature || '';
+                    if (camel && String(camel).trim()) return String(camel).trim();
+                    // snake_case fallback
+                    const snake = r.rent_collection_contract_nature || '';
+                    if (snake && String(snake).trim()) return String(snake).trim();
+                    return '';
+                })(),
             };
         }
 
@@ -581,6 +598,27 @@ export default function RentModal({
         });
     }, [rent, presetTenantId, presetSubLandlordId, presetCurrentTenantId]);
 
+    /** 編輯模式：contractsOnProperty 就緒後，自動同步租賃性質（避免覆蓋用戶已修改的值） */
+    const rentCollectionNatureSyncRef = useRef(false);
+    useEffect(() => {
+        if (!rent?.id) {
+            rentCollectionNatureSyncRef.current = false;
+            return;
+        }
+        if (contractsOnProperty.length === 0) return;
+        const refNum = (formData.rentCollectionContractNumber || '').trim();
+        if (!refNum) return;
+        const matched = contractsOnProperty.find((c) => (c.rentOutTenancyNumber || '').trim() === refNum);
+        if (!matched) return;
+        const raw = matched as any;
+        const nature = raw?.rentOutContractNature || raw?.rent_out_contract_nature || '';
+        if (!nature) return;
+        if (!formData.rentCollectionContractNature || !rentCollectionNatureSyncRef.current) {
+            rentCollectionNatureSyncRef.current = true;
+            setFormData((prev) => ({ ...prev, rentCollectionContractNature: nature }));
+        }
+    }, [rent?.id, contractsOnProperty, formData.rentCollectionContractNumber]);
+
     // Auto-generate rentOutTenancyNumber based on property code and sub-landlord (僅合約記錄)
     useEffect(() => {
         if (formData.type !== 'contract') return;
@@ -602,7 +640,24 @@ export default function RentModal({
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
         const { name, value } = e.target;
-        setFormData(prev => ({ ...prev, [name]: value }));
+        // 用戶手動選擇「收租記錄編號」時，同步租賃性質
+        if (name === 'rentCollectionContractNumber') {
+            const refNum = value.trim();
+            const matched = contractsOnProperty.find((c) => {
+                const cNum = (c.rentOutTenancyNumber || '').trim();
+                return cNum === refNum;
+            });
+            const raw = matched as any;
+            const nature =
+                raw?.rentOutContractNature ||
+                raw?.rent_out_contract_nature ||
+                '';
+            if (nature) {
+                setFormData((prev) => ({ ...prev, rentCollectionContractNumber: value, rentCollectionContractNature: nature }));
+                return;
+            }
+        }
+        setFormData((prev) => ({ ...prev, [name]: value }));
     };
 
     const handlePriceChange = (name: string, value: string) => {

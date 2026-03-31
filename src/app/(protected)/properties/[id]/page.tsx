@@ -909,7 +909,7 @@ export default function PropertyDetailsPage() {
                                                             <div className="py-4 px-4 border-l border-dashed border-zinc-200 dark:border-white/10 flex flex-col justify-center min-w-0 overflow-hidden">
                                                                     {(() => {
                                                                     const r = rent as any;
-                                                                    const v = r.rentCollectionContractNature || r.rentOutContractNature;
+                                                                    const v = r.rentCollectionContractNature || r.rent_collection_contract_nature || r.rentOutContractNature || r.rent_out_contract_nature;
                                                                     const label = labelRentOutContractNatureZh(v);
                                                                     return (
                                                                         <div
