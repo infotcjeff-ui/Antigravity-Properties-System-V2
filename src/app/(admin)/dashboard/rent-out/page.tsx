@@ -349,16 +349,19 @@ export default function RentOutPage() {
                                                     {formatDateRangeDMY(startDate, endDate)}
                                                 </td>
                                                 <td className="p-4 text-zinc-500 dark:text-white/50 text-sm max-w-32">
-                                                    {rent.notes ? (
-                                                        <span
-                                                            className="line-clamp-2 cursor-default"
-                                                            title={String(rent.notes).replace(/<[^>]*>/g, '')}
-                                                        >
-                                                            {String(rent.notes).replace(/<[^>]*>/g, '')}
-                                                        </span>
-                                                    ) : (
-                                                        <span className="text-zinc-300 dark:text-white/20">—</span>
-                                                    )}
+                                                    {(() => {
+                                                        const raw = String(rent.notes || '');
+                                                        const plain = raw.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim();
+                                                        if (!plain) return <span className="text-zinc-300 dark:text-white/20">—</span>;
+                                                        return (
+                                                            <span
+                                                                className="line-clamp-2 cursor-default"
+                                                                title={plain}
+                                                            >
+                                                                {plain}
+                                                            </span>
+                                                        );
+                                                    })()}
                                                 </td>
                                                 <td className="p-4">
                                                     <span
@@ -500,16 +503,21 @@ export default function RentOutPage() {
                                                     {formatDateRangeDMY(startDate, endDate)}
                                                 </p>
                                             </div>
-                                            {rent.notes && (
-                                                <div className="col-span-2">
-                                                    <div className="flex items-center gap-1.5 mb-1">
-                                                        <p className="text-[10px] text-zinc-400 uppercase font-bold tracking-wider">備註</p>
+                                            {(() => {
+                                                const raw = String(rent.notes || '');
+                                                const plain = raw.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim();
+                                                if (!plain) return null;
+                                                return (
+                                                    <div className="col-span-2">
+                                                        <div className="flex items-center gap-1.5 mb-1">
+                                                            <p className="text-[10px] text-zinc-400 uppercase font-bold tracking-wider">備註</p>
+                                                        </div>
+                                                        <p className="text-sm text-zinc-600 dark:text-white/70 line-clamp-2">
+                                                            {plain}
+                                                        </p>
                                                     </div>
-                                                    <p className="text-sm text-zinc-600 dark:text-white/70 line-clamp-2">
-                                                        {String(rent.notes).replace(/<[^>]*>/g, '')}
-                                                    </p>
-                                                </div>
-                                            )}
+                                                );
+                                            })()}
                                         </div>
 
                                         <div className="flex items-center justify-end pt-1">

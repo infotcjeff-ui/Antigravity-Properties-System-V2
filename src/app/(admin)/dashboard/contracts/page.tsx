@@ -361,16 +361,19 @@ export default function ContractsPage() {
                                                     {labelRentOutContractNatureZh(contract.rentOutContractNature)}
                                                 </td>
                                                 <td className="p-4 text-zinc-500 dark:text-white/50 text-sm max-w-30">
-                                                    {contract.rentOutDescription ? (
-                                                        <span
-                                                            className="line-clamp-2 cursor-default"
-                                                            title={contract.rentOutDescription.replace(/<[^>]*>/g, '')}
-                                                        >
-                                                            {contract.rentOutDescription.replace(/<[^>]*>/g, '')}
-                                                        </span>
-                                                    ) : (
-                                                        <span className="text-zinc-300 dark:text-white/20">—</span>
-                                                    )}
+                                                    {(() => {
+                                                        const raw = contract.rentOutDescription || '';
+                                                        const plain = raw.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim();
+                                                        if (!plain) return <span className="text-zinc-300 dark:text-white/20">—</span>;
+                                                        return (
+                                                            <span
+                                                                className="line-clamp-2 cursor-default"
+                                                                title={plain}
+                                                            >
+                                                                {plain}
+                                                            </span>
+                                                        );
+                                                    })()}
                                                 </td>
                                                 <td className="p-4">
                                                     <span
@@ -495,10 +498,16 @@ export default function ContractsPage() {
                                                 {labelRentOutContractNatureZh(contract.rentOutContractNature)}
                                             </span>
                                         </p>
-                                        {contract.rentOutDescription && (
-                                            <p className="text-xs text-zinc-500 dark:text-white/50 line-clamp-2">
-                                                合約描述：<span className="text-zinc-700 dark:text-white/70">{contract.rentOutDescription.replace(/<[^>]*>/g, '')}</span>
-                                            </p>
+                                        {(() => {
+                                            const raw = contract.rentOutDescription || '';
+                                            const plain = raw.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim();
+                                            if (!plain) return null;
+                                            return (
+                                                <p className="text-xs text-zinc-500 dark:text-white/50 line-clamp-2">
+                                                    合約描述：<span className="text-zinc-700 dark:text-white/70">{plain}</span>
+                                                </p>
+                                            );
+                                        })()}
                                         )}
                                         <div className="flex justify-end gap-2 pt-2 border-t border-zinc-100 dark:border-white/5" onClick={(e) => e.stopPropagation()}>
                                             <button
