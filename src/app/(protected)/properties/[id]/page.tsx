@@ -907,8 +907,9 @@ export default function PropertyDetailsPage() {
                                                         )}
                                                         {isRentOutOrContract && (
                                                             <div className="py-4 px-4 border-l border-dashed border-zinc-200 dark:border-white/10 flex flex-col justify-center min-w-0 overflow-hidden">
-                                                                {(() => {
-                                                                    const v = rent.rentCollectionContractNature || (rent as any).rentOutContractNature;
+                                                                    {(() => {
+                                                                    const r = rent as any;
+                                                                    const v = r.rentCollectionContractNature || r.rentOutContractNature;
                                                                     const label = labelRentOutContractNatureZh(v);
                                                                     return (
                                                                         <div
