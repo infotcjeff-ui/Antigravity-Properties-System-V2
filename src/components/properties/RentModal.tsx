@@ -2017,7 +2017,7 @@ export default function RentModal({
                                     />
                                 </div>
                                 <div className="space-y-2">
-                                    <label className={labelClass}>按金收據</label>
+                                    <label className={labelClass}>按金支付方式</label>
                                     <select
                                         name="rentOutDepositPaymentMethod"
                                         value={formData.rentOutDepositPaymentMethod}

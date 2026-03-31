@@ -171,7 +171,7 @@ export default function RentDetailsModal({ rent, property, onClose }: RentDetail
                             <DetailRow label={t('Deposit Received', '按金')} value={formatCurrency(rent.rentOutDepositReceived)} />
                             {(rent as any).rentOutDepositPaymentMethod ? (
                                 <DetailRow
-                                    label={t('Deposit receipt', '按金收據')}
+                                    label={t('Deposit payment method', '按金支付方式')}
                                     value={labelRentCollectionPaymentMethod((rent as any).rentOutDepositPaymentMethod)}
                                 />
                             ) : null}
