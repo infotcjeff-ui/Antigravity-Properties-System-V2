@@ -13,6 +13,7 @@ import {
     hasRentCollectionPaidAmount,
     isPeriodEndExpired,
     labelRentCollectionPaymentMethod,
+    labelRentOutContractNatureZh,
     matchesRentPaymentMethodFilter,
     rentOutPeriodOverlapsDateFilter,
     type RentPaymentMethodFilterValue,
@@ -42,6 +43,7 @@ export default function RentOutPage() {
     const [filterPaymentMethod, setFilterPaymentMethod] = useState<RentPaymentMethodFilterValue>('');
     const [filterRentOutPayStatus, setFilterRentOutPayStatus] = useState<RentOutPayStatusFilterValue>('');
     const [filterCurrentTenant, setFilterCurrentTenant] = useState('');
+    const [filterContractNature, setFilterContractNature] = useState('');
     const [filterLeaseFrom, setFilterLeaseFrom] = useState('');
     const [filterLeaseTo, setFilterLeaseTo] = useState('');
     const { deleteRent } = useRents();
@@ -71,17 +73,26 @@ export default function RentOutPage() {
         return [...set].sort((a, b) => a.localeCompare(b, 'zh-HK'));
     }, [rents]);
 
+    const contractNatureFilterOptions = useMemo(() => {
+        const set = new Set<string>();
+        for (const r of rents) {
+            if (r.rentOutContractNature) set.add(r.rentOutContractNature);
+        }
+        return [...set].sort((a, b) => a.localeCompare(b, 'zh-HK'));
+    }, [rents]);
+
     const filteredRents = useMemo(() => {
         return rents.filter((r) => {
             if (!matchesRentPaymentMethodFilter(r, filterPaymentMethod)) return false;
             if (filterRentOutPayStatus && getRentCollectionPayListStatus(r) !== filterRentOutPayStatus) return false;
             if (filterCurrentTenant && adminRentOutLesseeLabel(r) !== filterCurrentTenant) return false;
+            if (filterContractNature && r.rentOutContractNature !== filterContractNature) return false;
             const startDate = r.rentCollectionDate || r.rentOutStartDate || r.startDate;
             const endDate = r.endDate || r.rentOutEndDate;
             if (!rentOutPeriodOverlapsDateFilter(startDate, endDate, filterLeaseFrom, filterLeaseTo)) return false;
             return true;
         });
-    }, [rents, filterPaymentMethod, filterRentOutPayStatus, filterCurrentTenant, filterLeaseFrom, filterLeaseTo]);
+    }, [rents, filterPaymentMethod, filterRentOutPayStatus, filterCurrentTenant, filterContractNature, filterLeaseFrom, filterLeaseTo]);
 
     if (isLoading) {
         return (
@@ -224,6 +235,21 @@ export default function RentOutPage() {
                                     ))}
                                 </select>
                             </div>
+                            <div className="flex-1 min-w-[160px]">
+                                <label className="text-xs font-medium text-zinc-500 dark:text-white/50">租賃性質</label>
+                                <select
+                                    value={filterContractNature}
+                                    onChange={(e) => setFilterContractNature(e.target.value)}
+                                    className={filterSelectClass}
+                                >
+                                    <option value="">全部</option>
+                                    {contractNatureFilterOptions.map((v) => (
+                                        <option key={v} value={v}>
+                                            {labelRentOutContractNatureZh(v)}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
                             <div className="flex-1 min-w-[220px] sm:min-w-[280px]">
                                 <label className="text-xs font-medium text-zinc-500 dark:text-white/50">租約期間</label>
                                 <div className="mt-1 flex flex-wrap items-center gap-2">
@@ -260,6 +286,7 @@ export default function RentOutPage() {
                                     <tr className="text-left text-zinc-500 dark:text-white/50 text-sm border-b border-zinc-100 dark:border-white/5">
                                         <th className="p-4 font-medium">物業</th>
                                         <th className="p-4 font-medium">現時租客</th>
+                                        <th className="p-4 font-medium">租賃性質</th>
                                         <th className="p-4 font-medium">繳付金額</th>
                                         <th className="p-4 font-medium">付款方式</th>
                                         <th className="p-4 font-medium">付款日期</th>
@@ -300,6 +327,7 @@ export default function RentOutPage() {
                                             >
                                                 <td className="p-4 text-zinc-900 dark:text-white font-medium">{property?.name || '-'}</td>
                                                 <td className="p-4 text-zinc-600 dark:text-white/70">{rent.currentTenant?.name || tenant?.name || '-'}</td>
+                                                <td className="p-4 text-zinc-500 dark:text-white/50 text-sm">{labelRentOutContractNatureZh(rent.rentOutContractNature)}</td>
                                                 <td className="p-4 text-green-600 dark:text-green-400 font-medium">
                                                     {payFilled ? (
                                                         <>+ {rent.currency || 'HKD'} {Number(rent.rentCollectionAmount).toLocaleString()}</>
@@ -397,6 +425,10 @@ export default function RentOutPage() {
                                                     <div className="flex items-center gap-1.5 mt-0.5">
                                                         <User className="w-3 h-3 text-zinc-400" />
                                                         <p className="text-xs text-zinc-500 dark:text-white/50">{rent.currentTenant?.name || tenant?.name || '-'}</p>
+                                                    </div>
+                                                    <div className="flex items-center gap-1.5 mt-0.5">
+                                                        <p className="text-[10px] text-zinc-400 dark:text-white/40">租賃性質</p>
+                                                        <p className="text-xs text-zinc-600 dark:text-white/70">{labelRentOutContractNatureZh(rent.rentOutContractNature)}</p>
                                                     </div>
                                                 </div>
                                             </div>
