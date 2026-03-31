@@ -270,7 +270,7 @@ export default function PropertyDetailsPage() {
     const rents = property?.rents || [];
     const contractRents = rents.filter((r: Rent) => r.type === 'contract');
     const rentOutRents = useMemo(
-        () => [...rents.filter((r: Rent) => r.type === 'rent_out')].sort(compareRentOutForListNewestFirst),
+        () => [...rents.filter((r: Rent) => r.type === 'rent_out')].sort(compareRentOutForListNewestFirst).reverse(),
         [rents],
     );
     const rentingRents = rents.filter((r: Rent) => r.type === 'renting');

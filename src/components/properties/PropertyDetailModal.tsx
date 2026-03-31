@@ -141,7 +141,7 @@ export default function PropertyDetailModal({ propertyName, propertyId, onClose 
     const [selectedRent, setSelectedRent] = useState<Rent | null>(null);
 
     const rentOutRents = useMemo(
-        () => [...(property?.rents || []).filter((r) => r.type === 'rent_out')].sort(compareRentOutForListNewestFirst),
+        () => [...(property?.rents || []).filter((r) => r.type === 'rent_out')].sort(compareRentOutForListNewestFirst).reverse(),
         [property?.rents],
     );
 

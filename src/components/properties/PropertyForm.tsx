@@ -184,7 +184,7 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
     }, [property?.id, allRents]);
 
     const rentOutRents = useMemo(
-        () => [...rents.filter((r) => r.type === 'rent_out')].sort(compareRentOutForListNewestFirst),
+        () => [...rents.filter((r) => r.type === 'rent_out')].sort(compareRentOutForListNewestFirst).reverse(),
         [rents],
     );
     const rentingRents = useMemo(() => rents.filter(r => r.type === 'renting'), [rents]);
