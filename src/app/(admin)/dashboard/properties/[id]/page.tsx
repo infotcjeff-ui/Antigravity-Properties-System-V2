@@ -673,7 +673,9 @@ export default function PropertyDetailsPage() {
                             const partyHeader =
                                 rentHistoryTab === 'rent_out'
                                     ? t('Current tenant', '現時租客')
-                                    : t('Tenant', '承租人');
+                                    : rentHistoryTab === 'contract_lease_in'
+                                      ? t('Proprietor', '業主')
+                                      : t('Tenant', '承租人');
                             const historyRowGrid = isRentingTab
                                 ? 'grid-cols-[1fr_2fr_1.1fr_1.1fr_2fr_1fr]'
                                 : 'grid-cols-[1fr_2fr_1.5fr_2fr_1fr]';
