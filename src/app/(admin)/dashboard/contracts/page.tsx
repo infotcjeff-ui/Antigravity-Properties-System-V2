@@ -280,7 +280,7 @@ export default function ContractsPage() {
                                         <th className="p-4 font-medium">承租人</th>
                                         <th className="p-4 font-medium">月租</th>
                                         <th className="p-4 font-medium">租約期間</th>
-                                        <th className="p-4 font-medium">已收按金</th>
+                                        <th className="p-4 font-medium">{isLeaseInTab ? '已付按金' : '已收按金'}</th>
                                         <th className="p-4 font-medium">租賃性質</th>
                                         <th className="p-4 font-medium">合約描述</th>
                                         <th className="p-4 font-medium">狀態</th>
@@ -488,7 +488,7 @@ export default function ContractsPage() {
                                             {endDate ? new Date(endDate).toLocaleDateString() : '-'}
                                         </p>
                                         <p className="text-xs text-zinc-500 dark:text-white/50">
-                                            已收按金：<span className="text-zinc-800 dark:text-white/90">{formatContractDepositPaid(contract)}</span>
+                                            {isLeaseInTab ? '已付按金' : '已收按金'}：<span className="text-zinc-800 dark:text-white/90">{formatContractDepositPaid(contract)}</span>
                                         </p>
                                         <p className="text-xs text-zinc-500 dark:text-white/50">
                                             租賃性質：<span className="text-zinc-800 dark:text-white/90">
