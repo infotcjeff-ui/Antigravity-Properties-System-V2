@@ -508,7 +508,6 @@ export default function ContractsPage() {
                                                 </p>
                                             );
                                         })()}
-                                        )}
                                         <div className="flex justify-end gap-2 pt-2 border-t border-zinc-100 dark:border-white/5" onClick={(e) => e.stopPropagation()}>
                                             <button
                                                 type="button"
