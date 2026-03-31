@@ -13,6 +13,7 @@ import {
     getRentOutCollectionDisplayPeriod,
     getRentOutLesseeDisplayLabel,
     getRentOutOrContractListNumber,
+    labelRentOutContractNatureZh,
     resolvePropertyCurrentTenantDisplay,
 } from '@/lib/rentPaymentDisplay';
 import {
@@ -712,7 +713,7 @@ export default function PropertyDetailsPage() {
                                       : t('Tenant', '承租人');
                             const historyRowGrid = isRentingTab
                                 ? 'grid-cols-[1fr_2fr_1.1fr_1.1fr_2fr_1fr]'
-                                : 'grid-cols-[1fr_2fr_1.5fr_2fr_1fr]';
+                                : 'grid-cols-[1fr_2fr_1.5fr_1.2fr_2fr_1fr]';
                             return (
                                 <div className="overflow-x-auto">
                                     <div className={isRentingTab ? 'min-w-[960px]' : 'min-w-[800px]'}>
@@ -729,6 +730,7 @@ export default function PropertyDetailsPage() {
                                             ) : (
                                                 <div className="px-4">{partyHeader}</div>
                                             )}
+                                            <div className="px-4">{t('Lease Type', '租賃性質')}</div>
                                             <div className="px-4">{t('Lease Term & Location', '租期及地點')}</div>
                                             <div className="pl-4">{t('Rent', '租金')}</div>
                                         </div>
@@ -901,6 +903,22 @@ export default function PropertyDetailsPage() {
                                                                 ) : (
                                                                     <div className="text-zinc-600 dark:text-white/70 text-sm">-</div>
                                                                 )}
+                                                            </div>
+                                                        )}
+                                                        {isRentOutOrContract && (
+                                                            <div className="py-4 px-4 border-l border-dashed border-zinc-200 dark:border-white/10 flex flex-col justify-center min-w-0 overflow-hidden">
+                                                                {(() => {
+                                                                    const v = rent.rentCollectionContractNature || (rent as any).rentOutContractNature;
+                                                                    const label = labelRentOutContractNatureZh(v);
+                                                                    return (
+                                                                        <div
+                                                                            className="text-sm text-zinc-600 dark:text-white/70 truncate"
+                                                                            title={label === '—' ? undefined : label}
+                                                                        >
+                                                                            {label}
+                                                                        </div>
+                                                                    );
+                                                                })()}
                                                             </div>
                                                         )}
                                                         <div className="py-4 px-4 border-l border-dashed border-zinc-200 dark:border-white/10 flex flex-col justify-center min-w-0 overflow-hidden">

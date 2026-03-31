@@ -195,6 +195,7 @@ export default function RentModal({
                 rentCollectionPaymentDate: formatDate((rent as any).rentCollectionPaymentDate),
                 rentCollectionContractNumber: (rent as any).rentCollectionContractNumber || '',
                 rentCollectionReceiptNumber: (rent as any).rentCollectionReceiptNumber || '',
+                rentCollectionContractNature: (rent as any).rentCollectionContractNature || '',
             };
         }
 
@@ -258,6 +259,7 @@ export default function RentModal({
             rentCollectionPaymentDate: '',
             rentCollectionContractNumber: '',
             rentCollectionReceiptNumber: '',
+            rentCollectionContractNature: '',
         };
     });
 
@@ -727,6 +729,7 @@ export default function RentModal({
                         formData.rentCollectionPaymentMethod !== 'cheque' && formData.rentCollectionPaymentMethod
                             ? formData.rentCollectionReceiptNumber?.trim() || null
                             : null,
+                    rentCollectionContractNature: formData.rentCollectionContractNature || null,
                 };
             } else if (formData.type === 'renting') {
                 const paidRaw = String(formData.rentCollectionAmount || '').replace(/,/g, '').trim();
@@ -756,11 +759,12 @@ export default function RentModal({
                             ? formData.rentCollectionBankInImage || null
                             : null,
                     // 交租不使用收租記錄編號，儲存時清空欄位
-                    rentCollectionContractNumber: null,
+                    rentCollectionContractNumber                            : null,
                     rentCollectionReceiptNumber:
                         formData.rentCollectionPaymentMethod !== 'cheque' && formData.rentCollectionPaymentMethod
                             ? formData.rentCollectionReceiptNumber?.trim() || null
                             : null,
+                    rentCollectionContractNature: formData.rentCollectionContractNature || null,
                     location: formData.location || defaultLocation,
                     rentingNumber: formData.rentingNumber,
                     rentingReferenceNumber: formData.rentingReferenceNumber,
@@ -1338,6 +1342,22 @@ export default function RentModal({
                                         className={inputClass}
                                         placeholder={formData.rentOutTenantId ? '已自動填入現時租客' : '與收據一致之名稱'}
                                     />
+                                </div>
+                                <div className="space-y-2">
+                                    <label className={labelClass}>租賃性質</label>
+                                    <select
+                                        name="rentCollectionContractNature"
+                                        value={formData.rentCollectionContractNature ?? ''}
+                                        onChange={handleChange}
+                                        className={inputClass}
+                                    >
+                                        <option value="" className="bg-white dark:bg-[#1a1a2e]">請選擇</option>
+                                        {CONTRACT_NATURE_OPTIONS.map((o) => (
+                                            <option key={o.value} value={o.value} className="bg-white dark:bg-[#1a1a2e]">
+                                                {o.label}
+                                            </option>
+                                        ))}
+                                    </select>
                                 </div>
                                 <div className="space-y-2">
                                     <label className={labelClass}>收租日期（日／月／年 至 日／月／年）</label>
