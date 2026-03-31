@@ -137,7 +137,11 @@ export default function RentModal({
                 rentOutStartDate: formatDate(rent.rentOutStartDate),
                 rentOutEndDate: formatDate(rent.rentOutEndDate),
                 rentOutActualEndDate: formatDate(rent.rentOutActualEndDate),
-                rentOutContractNature: (rent as any).rentOutContractNature || '',
+                rentOutContractNature: (() => {
+                    const r = rent as Record<string, unknown>;
+                    const v = r.rentOutContractNature ?? r.rent_out_contract_nature;
+                    return typeof v === 'string' && v.trim() ? v.trim() : '';
+                })(),
                 rentOutDepositReceived:
                     rent.rentOutDepositReceived != null && !Number.isNaN(Number(rent.rentOutDepositReceived))
                         ? String(rent.rentOutDepositReceived)
@@ -790,7 +794,10 @@ export default function RentModal({
                     rentOutStartDate: formData.rentOutStartDate ? new Date(formData.rentOutStartDate) : undefined,
                     rentOutEndDate: formData.rentOutEndDate ? new Date(formData.rentOutEndDate) : undefined,
                     rentOutActualEndDate: null,
-                    rentOutContractNature: formData.rentOutContractNature || null,
+                    rentOutContractNature: (() => {
+                        const v = String(formData.rentOutContractNature ?? '').trim();
+                        return v === '' ? null : v;
+                    })(),
                     rentOutDepositReceived: hasDepositAmount ? depositAmt : null,
                     rentOutDepositPaymentMethod: formData.rentOutDepositPaymentMethod || null,
                     rentOutDepositChequeBank:
@@ -1984,7 +1991,7 @@ export default function RentModal({
                                 <label className={labelClass}>合約性質</label>
                                 <select
                                     name="rentOutContractNature"
-                                    value={formData.rentOutContractNature}
+                                    value={formData.rentOutContractNature ?? ''}
                                     onChange={handleChange}
                                     className={inputClass}
                                 >

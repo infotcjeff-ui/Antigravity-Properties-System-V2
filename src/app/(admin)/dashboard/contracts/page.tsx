@@ -7,6 +7,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { FileText, Pencil, Trash2, Building2 } from 'lucide-react';
 import { useRentsWithRelationsQuery, useRents } from '@/hooks/useStorage';
 import type { Rent } from '@/lib/db';
+import { labelRentOutContractNatureZh } from '@/lib/rentPaymentDisplay';
 import { BentoCard } from '@/components/layout/BentoGrid';
 import RentModal from '@/components/properties/RentModal';
 import PropertyDetailModal from '@/components/properties/PropertyDetailModal';
@@ -58,6 +59,14 @@ export default function ContractsPage() {
         const rt = c.rentOutTenants;
         if (Array.isArray(rt) && rt[0] != null && String(rt[0]).trim()) return String(rt[0]).trim();
         return '';
+    };
+
+    const formatContractDepositPaid = (c: any) => {
+        const v = c.rentOutDepositReceived;
+        if (v == null || v === '') return '—';
+        const n = Number(v);
+        if (Number.isNaN(n)) return '—';
+        return `${c.currency || 'HKD'} ${n.toLocaleString()}`;
     };
 
     const statusColors: Record<string, string> = {
@@ -254,7 +263,7 @@ export default function ContractsPage() {
                 ) : (
                     <>
                         <div className="hidden md:block overflow-x-auto">
-                            <table className="w-full min-w-[820px]">
+                            <table className="w-full min-w-[1020px]">
                                 <thead>
                                     <tr
                                         className={`text-left text-zinc-500 dark:text-white/50 text-sm border-b ${
@@ -271,6 +280,8 @@ export default function ContractsPage() {
                                         <th className="p-4 font-medium">承租人</th>
                                         <th className="p-4 font-medium">月租</th>
                                         <th className="p-4 font-medium">租約期間</th>
+                                        <th className="p-4 font-medium">已付按金</th>
+                                        <th className="p-4 font-medium">租賃性質</th>
                                         <th className="p-4 font-medium">狀態</th>
                                         <th className="p-4 font-medium">操作</th>
                                     </tr>
@@ -341,6 +352,12 @@ export default function ContractsPage() {
                                                 <td className="p-4 text-zinc-500 dark:text-white/50 text-sm">
                                                     {startDate ? new Date(startDate).toLocaleDateString() : '-'} —{' '}
                                                     {endDate ? new Date(endDate).toLocaleDateString() : '-'}
+                                                </td>
+                                                <td className="p-4 text-zinc-600 dark:text-white/70 text-sm">
+                                                    {formatContractDepositPaid(contract)}
+                                                </td>
+                                                <td className="p-4 text-zinc-600 dark:text-white/70 text-sm">
+                                                    {labelRentOutContractNatureZh(contract.rentOutContractNature)}
                                                 </td>
                                                 <td className="p-4">
                                                     <span
@@ -457,6 +474,14 @@ export default function ContractsPage() {
                                             {startDate ? new Date(startDate).toLocaleDateString() : '-'} —{' '}
                                             {endDate ? new Date(endDate).toLocaleDateString() : '-'}
                                         </p>
+                                        <p className="text-xs text-zinc-500 dark:text-white/50">
+                                            已付按金：<span className="text-zinc-800 dark:text-white/90">{formatContractDepositPaid(contract)}</span>
+                                        </p>
+                                        <p className="text-xs text-zinc-500 dark:text-white/50">
+                                            租賃性質：<span className="text-zinc-800 dark:text-white/90">
+                                                {labelRentOutContractNatureZh(contract.rentOutContractNature)}
+                                            </span>
+                                        </p>
                                         <div className="flex justify-end gap-2 pt-2 border-t border-zinc-100 dark:border-white/5" onClick={(e) => e.stopPropagation()}>
                                             <button
                                                 type="button"
@@ -487,6 +512,7 @@ export default function ContractsPage() {
             <AnimatePresence>
                 {showModal && (
                     <RentModal
+                        key={selectedContract?.id ?? 'contract-modal'}
                         defaultType="contract"
                         allowedTypes={['contract']}
                         rent={selectedContract || undefined}

@@ -51,47 +51,66 @@ const firstRentOutTenantIdFromRow = (row: { rent_out_tenant_ids?: unknown }): st
     return undefined;
 };
 
+/**
+ * 從 Supabase／PostgREST／PostgreSQL 錯誤訊息擷取「不存在的欄位」snake_case 名稱，供略過寫入。
+ */
 const extractMissingColumnFromError = (err: unknown): string | null => {
     const message = (err as { message?: string } | null)?.message || '';
-    const match = message.match(/Could not find the '([^']+)' column/i);
-    return match?.[1] || null;
+    if (!message) return null;
+    const m1 = message.match(/Could not find the '([^']+)' column/i);
+    if (m1) return m1[1];
+    const m2 = message.match(/column\s+"([^"]+)"\s+of relation/i);
+    if (m2) return m2[1];
+    const m3 = message.match(/column\s+"([^"]+)"\s+does not exist/i);
+    if (m3) return m3[1];
+    const m4 = message.match(/column\s+(\w+)\s+does not exist/i);
+    if (m4) return m4[1];
+    return null;
 };
 
 const withSchemaFallbackInsert = async (
     table: string,
     payload: Record<string, unknown>,
-    maxRetries = 8,
+    maxRetries = 64,
 ): Promise<{ data: unknown; error: unknown }> => {
     const attemptPayload = { ...payload };
-    for (let i = 0; i <= maxRetries; i++) {
-        const result = await supabase.from(table).insert([attemptPayload]);
-        if (!result.error) return result as { data: unknown; error: unknown };
+    let result = await supabase.from(table).insert([attemptPayload]);
+    let attempts = 0;
+    const MAX = 64;
+    while (result.error && attempts < MAX) {
         const missingColumn = extractMissingColumnFromError(result.error);
         if (!missingColumn || !(missingColumn in attemptPayload)) {
             return result as { data: unknown; error: unknown };
         }
         delete attemptPayload[missingColumn];
+        attempts++;
+        result = await supabase.from(table).insert([attemptPayload]);
     }
-    return { data: null, error: new Error('Insert failed after schema fallback retries') };
+    if (!result.error) return result as { data: unknown; error: unknown };
+    return { data: null, error: result.error ?? new Error('Insert failed after schema fallback retries') };
 };
 
 const withSchemaFallbackUpdate = async (
     table: string,
     id: string,
     payload: Record<string, unknown>,
-    maxRetries = 8,
+    maxRetries = 64,
 ): Promise<{ data: unknown; error: unknown }> => {
     const attemptPayload = { ...payload };
-    for (let i = 0; i <= maxRetries; i++) {
-        const result = await supabase.from(table).update(attemptPayload).eq('id', id);
-        if (!result.error) return result as { data: unknown; error: unknown };
+    let result = await supabase.from(table).update(attemptPayload).eq('id', id);
+    let attempts = 0;
+    const MAX = maxRetries;
+    while (result.error && attempts < MAX) {
         const missingColumn = extractMissingColumnFromError(result.error);
         if (!missingColumn || !(missingColumn in attemptPayload)) {
             return result as { data: unknown; error: unknown };
         }
         delete attemptPayload[missingColumn];
+        attempts++;
+        result = await supabase.from(table).update(attemptPayload).eq('id', id);
     }
-    return { data: null, error: new Error('Update failed after schema fallback retries') };
+    if (!result.error) return result as { data: unknown; error: unknown };
+    return { data: null, error: result.error ?? new Error('Update failed after schema fallback retries') };
 };
 
 // ==================== PROPERTY HOOKS ====================
@@ -485,13 +504,13 @@ export const fetchDashboardStats = async (user?: any) => {
         const rentingLeases = rents.filter(r => {
             if (r.type !== 'rent_out') return false;
             if (r.status !== 'active' && r.rentOutStatus !== 'renting') return false;
-            const endDate = r.rentOutEndDate || r.endDate;
+            const endDate = r.endDate || r.rentOutEndDate;
             return !endDate || new Date(endDate) >= now;
         }).length;
 
         const expiredLeases = rents.filter(r => {
             if (r.type !== 'rent_out') return false;
-            const endDate = r.rentOutEndDate || r.endDate;
+            const endDate = r.endDate || r.rentOutEndDate;
             return endDate && new Date(endDate) < now;
         }).length;
 
@@ -1320,8 +1339,14 @@ export function useRents() {
             }
             if ((updates as any).rentOutDepositReceiptNumber !== undefined) rentData.rent_out_deposit_receipt_number = (updates as any).rentOutDepositReceiptNumber;
             const udep = updates as any;
-            if (udep.rentOutContractNature !== undefined) {
-                rentData.rent_out_contract_nature = udep.rentOutContractNature || null;
+            // 合約性質：trim 後寫入；空字串寫 null（與表單「請選擇」一致）
+            if (Object.prototype.hasOwnProperty.call(updates, 'rentOutContractNature')) {
+                const raw = (updates as { rentOutContractNature?: string | null }).rentOutContractNature;
+                if (raw == null || raw === '') {
+                    rentData.rent_out_contract_nature = null;
+                } else {
+                    rentData.rent_out_contract_nature = String(raw).trim() || null;
+                }
             }
             if (udep.rentOutDepositChequeBank !== undefined) {
                 rentData.rent_out_deposit_cheque_bank = udep.rentOutDepositChequeBank || null;

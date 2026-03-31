@@ -8,7 +8,9 @@ import { usePropertyWithRelationsQuery, useSubLandlordsQuery, useCurrentTenantsQ
 import { formatLotArea, proprietorCategoryLabelZh } from '@/lib/formatters';
 import type { CurrentTenant, Property, Proprietor, Rent } from '@/lib/db';
 import {
+    compareRentOutForListNewestFirst,
     hasRentCollectionPaidAmount,
+    getRentOutCollectionDisplayPeriod,
     getRentOutLesseeDisplayLabel,
     getRentOutOrContractListNumber,
     resolvePropertyCurrentTenantDisplay,
@@ -267,7 +269,10 @@ export default function PropertyDetailsPage() {
     const proprietor = property?.proprietor || activeRenting?.proprietor || null;
     const rents = property?.rents || [];
     const contractRents = rents.filter((r: Rent) => r.type === 'contract');
-    const rentOutRents = rents.filter((r: Rent) => r.type === 'rent_out');
+    const rentOutRents = useMemo(
+        () => [...rents.filter((r: Rent) => r.type === 'rent_out')].sort(compareRentOutForListNewestFirst),
+        [rents],
+    );
     const rentingRents = rents.filter((r: Rent) => r.type === 'renting');
     const leaseInContractRents = useMemo(
         () => contractRents.filter((c: Rent) => (c.rentOutStatus || c.status) === 'leasing_in'),
@@ -735,12 +740,20 @@ export default function PropertyDetailsPage() {
                                                     rent.type === 'renting'
                                                         ? property.code?.trim() || '-'
                                                         : getRentOutOrContractListNumber(rent as Rent);
-                                                const startDate = isRentOutOrContract
-                                                    ? rent.rentOutStartDate || rent.startDate
-                                                    : rent.rentingStartDate || rent.startDate;
-                                                const endDate = isRentOutOrContract
-                                                    ? rent.rentOutEndDate || rent.endDate
-                                                    : rent.rentingEndDate || rent.endDate;
+                                                const rentOutListPeriod =
+                                                    rent.type === 'rent_out' ? getRentOutCollectionDisplayPeriod(rent) : null;
+                                                const startDate =
+                                                    rent.type === 'rent_out'
+                                                        ? rentOutListPeriod?.start || rent.rentOutStartDate || rent.startDate
+                                                        : isRentOutOrContract
+                                                          ? rent.rentOutStartDate || rent.startDate
+                                                          : rent.rentingStartDate || rent.startDate;
+                                                const endDate =
+                                                    rent.type === 'rent_out'
+                                                        ? rentOutListPeriod?.end || rent.rentOutEndDate || rent.endDate
+                                                        : isRentOutOrContract
+                                                          ? rent.rentOutEndDate || rent.endDate
+                                                          : rent.rentingEndDate || rent.endDate;
                                                 const formatEnDate = (d: any) =>
                                                     d
                                                         ? new Date(d).toLocaleDateString('en-US', {
@@ -750,6 +763,17 @@ export default function PropertyDetailsPage() {
                                                           })
                                                         : '';
                                                 const periods = isRentOutOrContract ? rent.rentOutPeriods : rent.rentingPeriods;
+                                                const periodsDisplay =
+                                                    rent.type === 'rent_out' && startDate && endDate
+                                                        ? Math.max(
+                                                              1,
+                                                              Math.round(
+                                                                  (new Date(endDate as any).getTime() -
+                                                                      new Date(startDate as any).getTime()) /
+                                                                      (1000 * 60 * 60 * 24 * 30),
+                                                              ),
+                                                          )
+                                                        : periods;
                                                 const monthlyRent = isRentOutOrContract
                                                     ? rent.rentOutMonthlyRental || rent.amount || 0
                                                     : rent.rentingMonthlyRental || rent.amount || 0;
@@ -881,14 +905,14 @@ export default function PropertyDetailsPage() {
                                                             <div
                                                                 className="text-sm text-zinc-600 dark:text-white/70 truncate"
                                                                 title={
-                                                                    `${formatEnDate(startDate)}${startDate && endDate ? ' ~ ' : ''}${formatEnDate(endDate)}${periods ? `(${periods}個月)` : ''}` ||
+                                                                    `${formatEnDate(startDate)}${startDate && endDate ? ' ~ ' : ''}${formatEnDate(endDate)}${periodsDisplay ? `(${periodsDisplay}個月)` : ''}` ||
                                                                     undefined
                                                                 }
                                                             >
                                                                 {formatEnDate(startDate)}
                                                                 {startDate && endDate && ' ~ '}
                                                                 {formatEnDate(endDate)}
-                                                                {periods ? `(${periods}個月)` : ''}
+                                                                {periodsDisplay ? `(${periodsDisplay}個月)` : ''}
                                                             </div>
                                                             <div className="flex items-center gap-2 mt-1 min-w-0 flex-nowrap">
                                                                 {showPaidBadge && (

@@ -3,7 +3,7 @@
 import { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useRentsQuery, usePropertiesQuery, useProprietorsQuery } from '@/hooks/useStorage';
-import type { Rent } from '@/lib/db';
+import type { Proprietor, Rent } from '@/lib/db';
 import {
     formatDateDMY,
     formatDateRangeDMY,
@@ -12,6 +12,7 @@ import {
     isPeriodEndExpired,
     labelRentCollectionPaymentMethod,
     matchesRentPaymentMethodFilter,
+    rentOutPeriodOverlapsDateFilter,
     type RentPaymentMethodFilterValue,
     type RentOutPayStatusFilterValue,
 } from '@/lib/rentPaymentDisplay';
@@ -26,6 +27,18 @@ const contractStatusColors: Record<string, string> = {
     renting: 'bg-green-500/20 text-green-400',
     completed: 'bg-blue-500/20 text-blue-400',
 };
+
+/** 與本頁列表「租客名稱」欄一致，供現時租客篩選 */
+function rentOutTenantLabelForFilter(rent: Rent, proprietorMap: Map<string, Proprietor>) {
+    const tenant = rent.tenantId ? proprietorMap.get(rent.tenantId) : null;
+    const proprietor = rent.proprietorId ? proprietorMap.get(rent.proprietorId) : null;
+    const raw =
+        (rent as { rentCollectionTenantName?: string | null }).rentCollectionTenantName ||
+        tenant?.name ||
+        proprietor?.name ||
+        '';
+    return String(raw).trim();
+}
 
 export default function RentOutPage() {
     const { data: allRents, isLoading: rentsLoading } = useRentsQuery();
@@ -45,14 +58,38 @@ export default function RentOutPage() {
     const [editingRentOut, setEditingRentOut] = useState<Rent | null>(null);
     const [filterPaymentMethod, setFilterPaymentMethod] = useState<RentPaymentMethodFilterValue>('');
     const [filterRentOutPayStatus, setFilterRentOutPayStatus] = useState<RentOutPayStatusFilterValue>('');
+    const [filterCurrentTenant, setFilterCurrentTenant] = useState('');
+    const [filterLeaseFrom, setFilterLeaseFrom] = useState('');
+    const [filterLeaseTo, setFilterLeaseTo] = useState('');
+
+    const currentTenantFilterOptions = useMemo(() => {
+        const set = new Set<string>();
+        for (const r of rents) {
+            const lab = rentOutTenantLabelForFilter(r, proprietors);
+            if (lab) set.add(lab);
+        }
+        return [...set].sort((a, b) => a.localeCompare(b, 'zh-HK'));
+    }, [rents, proprietors]);
 
     const filteredRents = useMemo(() => {
         return rents.filter(r => {
             if (!matchesRentPaymentMethodFilter(r, filterPaymentMethod)) return false;
             if (filterRentOutPayStatus && getRentCollectionPayListStatus(r) !== filterRentOutPayStatus) return false;
+            if (filterCurrentTenant && rentOutTenantLabelForFilter(r, proprietors) !== filterCurrentTenant) return false;
+            const payStart = r.rentCollectionDate || r.startDate;
+            const payEnd = r.endDate || r.rentOutEndDate;
+            if (!rentOutPeriodOverlapsDateFilter(payStart, payEnd, filterLeaseFrom, filterLeaseTo)) return false;
             return true;
         });
-    }, [rents, filterPaymentMethod, filterRentOutPayStatus]);
+    }, [
+        rents,
+        proprietors,
+        filterPaymentMethod,
+        filterRentOutPayStatus,
+        filterCurrentTenant,
+        filterLeaseFrom,
+        filterLeaseTo,
+    ]);
 
     const totalIncome = rents
         .filter(r => r.status === 'active' || r.status === 'completed' || r.rentOutStatus === 'renting')
@@ -230,11 +267,46 @@ export default function RentOutPage() {
                                     <option value="unpaid">未繳付</option>
                                 </select>
                             </div>
+                            <div className="flex-1 min-w-[160px]">
+                                <label className="text-xs font-medium text-zinc-500 dark:text-white/50">現時租客</label>
+                                <select
+                                    value={filterCurrentTenant}
+                                    onChange={(e) => setFilterCurrentTenant(e.target.value)}
+                                    className={filterSelectClass}
+                                >
+                                    <option value="">全部</option>
+                                    {currentTenantFilterOptions.map((name) => (
+                                        <option key={name} value={name}>
+                                            {name}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+                            <div className="flex-1 min-w-[220px] sm:min-w-[280px]">
+                                <label className="text-xs font-medium text-zinc-500 dark:text-white/50">租約期間</label>
+                                <div className="mt-1 flex flex-wrap items-center gap-2">
+                                    <input
+                                        type="date"
+                                        value={filterLeaseFrom}
+                                        onChange={(e) => setFilterLeaseFrom(e.target.value)}
+                                        className={`${filterSelectClass} mt-0 flex-1 min-w-[140px]`}
+                                        aria-label="租約期間開始"
+                                    />
+                                    <span className="text-zinc-400 dark:text-white/40 text-sm shrink-0">至</span>
+                                    <input
+                                        type="date"
+                                        value={filterLeaseTo}
+                                        onChange={(e) => setFilterLeaseTo(e.target.value)}
+                                        className={`${filterSelectClass} mt-0 flex-1 min-w-[140px]`}
+                                        aria-label="租約期間結束"
+                                    />
+                                </div>
+                            </div>
                         </div>
                         {filteredRents.length === 0 ? (
                             <div className="flex flex-col items-center justify-center py-16 text-zinc-500 dark:text-white/45">
                                 <p className="text-lg font-medium">沒有符合篩選條件的記錄</p>
-                                <p className="text-sm mt-1">請調整「付款方式」或「狀態」篩選</p>
+                                <p className="text-sm mt-1">請調整上方篩選條件</p>
                             </div>
                         ) : (
                     <table className="w-full">

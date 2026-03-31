@@ -5,6 +5,7 @@ import { motion } from 'framer-motion';
 import { usePropertiesWithRelationsQuery, type PropertyWithRelations } from '@/hooks/useStorage';
 import { useLanguage } from '@/components/common/LanguageSwitcher';
 import { formatLotArea } from '@/lib/formatters';
+import { getRentOutCollectionDisplayPeriod } from '@/lib/rentPaymentDisplay';
 
 export default function RelationsPage() {
     const { data: propertiesData, isLoading } = usePropertiesWithRelationsQuery();
@@ -210,12 +211,15 @@ export default function RelationsPage() {
                                                 <p className="text-xs text-green-600 dark:text-green-400/70 uppercase">租金記錄</p>
                                                 {property.rents.map(rent => {
                                                     // Handle both new and legacy rent data formats
-                                                    const startDate = rent.type === 'rent_out'
-                                                        ? (rent.rentOutStartDate || rent.startDate)
-                                                        : (rent.rentingStartDate || rent.startDate);
-                                                    const endDate = rent.type === 'rent_out'
-                                                        ? (rent.rentOutEndDate || rent.endDate)
-                                                        : (rent.rentingEndDate || rent.endDate);
+                                                    const rop = rent.type === 'rent_out' ? getRentOutCollectionDisplayPeriod(rent) : null;
+                                                    const startDate =
+                                                        rent.type === 'rent_out'
+                                                            ? rop?.start || rent.rentOutStartDate || rent.startDate
+                                                            : rent.rentingStartDate || rent.startDate;
+                                                    const endDate =
+                                                        rent.type === 'rent_out'
+                                                            ? rop?.end || rent.rentOutEndDate || rent.endDate
+                                                            : rent.rentingEndDate || rent.endDate;
                                                     const monthlyRent = rent.type === 'rent_out'
                                                         ? (rent.rentOutMonthlyRental || rent.amount || 0)
                                                         : (rent.rentingMonthlyRental || rent.amount || 0);

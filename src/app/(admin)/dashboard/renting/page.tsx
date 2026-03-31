@@ -7,6 +7,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { Calendar, DollarSign, User, Building2, Pencil, Trash2, ChevronRight, LayoutList } from 'lucide-react';
 import type { Rent } from '@/lib/db';
 import {
+    formatDateDMY,
     formatDateRangeDMY,
     getRentCollectionPayListStatus,
     hasRentCollectionPaidAmount,
@@ -195,6 +196,7 @@ export default function RentingPage() {
                                         <th className="p-4 font-medium">承租人</th>
                                         <th className="p-4 font-medium">繳付金額</th>
                                         <th className="p-4 font-medium">付款方式</th>
+                                        <th className="p-4 font-medium">付款日期</th>
                                         <th className="p-4 font-medium">交租期間</th>
                                         <th className="p-4 font-medium">租務狀態</th>
                                         <th className="p-4 font-medium">操作</th>
@@ -245,6 +247,9 @@ export default function RentingPage() {
                                                 </td>
                                                 <td className="p-4 text-zinc-600 dark:text-white/70 text-sm">
                                                     {payMethod}
+                                                </td>
+                                                <td className="p-4 text-zinc-600 dark:text-white/70 text-sm tabular-nums">
+                                                    {formatDateDMY(rent.rentCollectionPaymentDate) || '—'}
                                                 </td>
                                                 <td
                                                     className={`p-4 text-sm font-medium ${
@@ -374,6 +379,15 @@ export default function RentingPage() {
                                                 </div>
                                                 <p className="font-bold text-zinc-900 dark:text-white text-sm">
                                                     {payMethod}
+                                                </p>
+                                            </div>
+                                            <div className="col-span-2">
+                                                <div className="flex items-center gap-1.5 mb-1">
+                                                    <Calendar className="w-3 h-3 text-blue-500" />
+                                                    <p className="text-[10px] text-zinc-400 uppercase font-bold tracking-wider">付款日期</p>
+                                                </div>
+                                                <p className="font-bold text-zinc-900 dark:text-white text-sm tabular-nums">
+                                                    {formatDateDMY(rent.rentCollectionPaymentDate) || '—'}
                                                 </p>
                                             </div>
                                             <div className="col-span-2">

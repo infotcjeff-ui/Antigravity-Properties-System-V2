@@ -23,7 +23,13 @@ import {
     proprietorCategoryLabelZh,
 } from '@/lib/formatters';
 import { normalizePropertyLocation } from '@/lib/propertyLocation';
-import { formatDateDMY, getRentCollectionPayListStatus, getRentOutOrContractListNumber } from '@/lib/rentPaymentDisplay';
+import {
+    compareRentOutForListNewestFirst,
+    formatDateDMY,
+    getRentCollectionPayListStatus,
+    getRentOutCollectionDisplayPeriod,
+    getRentOutOrContractListNumber,
+} from '@/lib/rentPaymentDisplay';
 
 /** 由物業資料建立表單狀態；地址欄優先使用 address 欄，否則沿用 location 內文字 */
 function formStateFromProperty(p: Property | null | undefined) {
@@ -177,7 +183,10 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
             .sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
     }, [property?.id, allRents]);
 
-    const rentOutRents = useMemo(() => rents.filter(r => r.type === 'rent_out'), [rents]);
+    const rentOutRents = useMemo(
+        () => [...rents.filter((r) => r.type === 'rent_out')].sort(compareRentOutForListNewestFirst),
+        [rents],
+    );
     const rentingRents = useMemo(() => rents.filter(r => r.type === 'renting'), [rents]);
     const contractRents = useMemo(() => {
         if (!property?.id) return [];
@@ -213,7 +222,9 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
         const rentGridClass =
             partyMode === 'owner'
                 ? 'grid grid-cols-[100px_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.5fr)_minmax(0,1.15fr)_minmax(0,1.05fr)_minmax(76px,0.95fr)_minmax(0,1fr)_90px] gap-4 px-4'
-                : 'grid grid-cols-[100px_minmax(0,1fr)_minmax(0,1.5fr)_minmax(0,1.15fr)_minmax(0,1.05fr)_minmax(76px,0.95fr)_minmax(0,1fr)_90px] gap-4 px-4';
+                : partyMode === 'landlord'
+                  ? 'grid grid-cols-[100px_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.5fr)_minmax(0,1.15fr)_minmax(0,1.05fr)_minmax(76px,0.95fr)_minmax(0,1fr)_90px] gap-4 px-4'
+                  : 'grid grid-cols-[100px_minmax(0,1fr)_minmax(0,1.5fr)_minmax(0,1.15fr)_minmax(0,1.05fr)_minmax(76px,0.95fr)_minmax(0,1fr)_90px] gap-4 px-4';
         /** 交租記錄「編號」欄：顯示所屬物業編號（與表單「編號」一致） */
         const propertyCodeForRentingRows = (formData.code || property?.code || '').trim() || '-';
 
@@ -228,10 +239,13 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                             <div className="font-bold">業主</div>
                             <div className="font-bold">承租人</div>
                         </>
+                    ) : partyMode === 'landlord' ? (
+                        <>
+                            <div className="font-bold">業主</div>
+                            <div className="font-bold">現時租客</div>
+                        </>
                     ) : (
-                        <div className="font-bold">
-                            {partyMode === 'landlord' ? '現時租客' : '承租人'}
-                        </div>
+                        <div className="font-bold">承租人</div>
                     )}
                     <div className="font-bold">租借位置</div>
                     <div className="font-bold">租期</div>
@@ -243,37 +257,47 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                 {records.map((rent) => {
                     const otherPartyLessee =
                         rent.tenant || rent.proprietor || (proprietors || []).find(p => p.id === (rent.tenantId || rent.proprietorId));
-                    /** 收租／合約：合約欄位優先，否則用簡化表單寫入的 startDate／endDate */
-                    const startDate = rent.type === 'rent_out' || rent.type === 'contract'
-                        ? (rent.rentOutStartDate
-                              ? new Date(rent.rentOutStartDate)
-                              : rent.startDate
-                                ? new Date(rent.startDate)
-                                : (rent as any).rentCollectionDate
-                                  ? new Date((rent as any).rentCollectionDate)
-                                  : null)
-                        : (rent.rentingStartDate
-                              ? new Date(rent.rentingStartDate)
-                              : rent.startDate
-                                ? new Date(rent.startDate)
-                                : null);
-                    const endDate = rent.type === 'rent_out' || rent.type === 'contract'
-                        ? (rent.rentOutEndDate
-                              ? new Date(rent.rentOutEndDate)
-                              : rent.endDate
-                                ? new Date(rent.endDate)
-                                : null)
-                        : (rent.rentingEndDate
-                              ? new Date(rent.rentingEndDate)
-                              : rent.endDate
-                                ? new Date(rent.endDate)
-                                : null);
+                    /** 收租：本期以簡化表單 end_date／rent_collection_date 為準；合約列仍用 rent_out_* */
+                    let startDate: Date | null = null;
+                    let endDate: Date | null = null;
+                    if (rent.type === 'rent_out') {
+                        const p = getRentOutCollectionDisplayPeriod(rent as Rent);
+                        startDate = p.start;
+                        endDate = p.end;
+                    } else if (rent.type === 'contract') {
+                        startDate = rent.rentOutStartDate
+                            ? new Date(rent.rentOutStartDate)
+                            : rent.startDate
+                              ? new Date(rent.startDate)
+                              : (rent as any).rentCollectionDate
+                                ? new Date((rent as any).rentCollectionDate)
+                                : null;
+                        endDate = rent.rentOutEndDate
+                            ? new Date(rent.rentOutEndDate)
+                            : rent.endDate
+                              ? new Date(rent.endDate)
+                              : null;
+                    } else {
+                        startDate = rent.rentingStartDate
+                            ? new Date(rent.rentingStartDate)
+                            : rent.startDate
+                              ? new Date(rent.startDate)
+                              : null;
+                        endDate = rent.rentingEndDate
+                            ? new Date(rent.rentingEndDate)
+                            : rent.endDate
+                              ? new Date(rent.endDate)
+                              : null;
+                    }
                     const monthlyRent = rent.type === 'rent_out' || rent.type === 'contract'
                         ? (rent.rentOutMonthlyRental || rent.amount || 0)
                         : (rent.rentingMonthlyRental || rent.amount || 0);
 
                     const months = startDate && endDate
-                        ? Math.round((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24 * 30))
+                        ? Math.max(
+                              1,
+                              Math.round((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24 * 30)),
+                          )
                         : (rent.type === 'rent_out' || rent.type === 'contract' ? rent.rentOutPeriods : rent.rentingPeriods) || 0;
 
                     const contractNumber =
@@ -301,6 +325,18 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                         }
                         return '';
                     })();
+
+                    const rentOutOwnerParty =
+                        rent.type === 'rent_out' || rent.type === 'contract'
+                            ? rent.proprietor ||
+                              (proprietors || []).find((p) => p.id === rent.proprietorId) ||
+                              (formData.proprietorId
+                                  ? (proprietors || []).find((p) => p.id === formData.proprietorId)
+                                  : undefined) ||
+                              (formData.proprietorIds?.length
+                                  ? (proprietors || []).find((p) => p.id === formData.proprietorIds[0])
+                                  : undefined)
+                            : undefined;
 
                     const payStatus =
                         rent.type === 'rent_out' || rent.type === 'renting'
@@ -347,16 +383,32 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                                         ) : null}
                                     </div>
                                 </>
+                            ) : partyMode === 'landlord' ? (
+                                <>
+                                    <div className="flex flex-col overflow-hidden min-w-0">
+                                        <span className="font-semibold text-zinc-900 dark:text-white truncate">
+                                            {rentOutOwnerParty?.name || '—'}
+                                        </span>
+                                        {rentOutOwnerParty?.shortName ? (
+                                            <span className="text-xs text-zinc-500 dark:text-white/50 truncate uppercase">
+                                                {rentOutOwnerParty.shortName}
+                                            </span>
+                                        ) : null}
+                                    </div>
+                                    <div className="flex flex-col overflow-hidden min-w-0">
+                                        <span className="font-semibold text-zinc-900 dark:text-white truncate">
+                                            {rentOutCurrentTenantLabel || '—'}
+                                        </span>
+                                    </div>
+                                </>
                             ) : (
                                 <div className="flex flex-col overflow-hidden min-w-0">
                                     <span className="font-semibold text-zinc-900 dark:text-white truncate">
-                                        {partyMode === 'landlord'
-                                            ? rentOutCurrentTenantLabel || '—'
-                                            : rent.type === 'contract'
-                                              ? (rent.rentOutLessor || otherPartyLessee?.name || '-')
-                                              : (otherPartyLessee?.name || '-')}
+                                        {rent.type === 'contract'
+                                            ? (rent.rentOutLessor || otherPartyLessee?.name || '-')
+                                            : (otherPartyLessee?.name || '-')}
                                     </span>
-                                    {partyMode !== 'landlord' && otherPartyLessee?.shortName && (
+                                    {otherPartyLessee?.shortName && (
                                         <span className="text-xs text-zinc-500 dark:text-white/50 truncate uppercase">
                                             {otherPartyLessee.shortName}
                                         </span>
@@ -1650,7 +1702,10 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                                                 const tenantName = r.type === 'rent_out'
                                                     ? (proprietors || []).find(p => p.id === r.tenantId)?.name
                                                     : (proprietors || []).find(p => p.id === r.proprietorId)?.name;
-                                                const endDate = r.type === 'rent_out' ? r.rentOutEndDate : (r.rentingEndDate || (r as any).endDate);
+                                                const endDate =
+                                                    r.type === 'rent_out'
+                                                        ? getRentOutCollectionDisplayPeriod(r as Rent).end || r.rentOutEndDate
+                                                        : r.rentingEndDate || (r as any).endDate;
                                                 const isExpired = endDate ? new Date(endDate) < new Date(new Date().setHours(0, 0, 0, 0)) : false;
 
                                                 return {

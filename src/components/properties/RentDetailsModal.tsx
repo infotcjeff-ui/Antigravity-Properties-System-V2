@@ -4,7 +4,11 @@ import { motion } from 'framer-motion';
 import { X, Building2, User } from 'lucide-react';
 import type { Rent, Property, Proprietor } from '@/lib/db';
 import { formatLotArea, proprietorCategoryLabelZh } from '@/lib/formatters';
-import { labelRentCollectionPaymentMethod, getRentOutOrContractListNumber } from '@/lib/rentPaymentDisplay';
+import {
+    getRentOutCollectionDisplayPeriod,
+    labelRentCollectionPaymentMethod,
+    getRentOutOrContractListNumber,
+} from '@/lib/rentPaymentDisplay';
 import { useLanguage } from '@/components/common/LanguageSwitcher';
 import DOMPurify from 'dompurify';
 import { Tooltip } from '@heroui/react';
@@ -55,8 +59,16 @@ export default function RentDetailsModal({ rent, property, onClose }: RentDetail
             : date.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
     };
 
-    const endDate = rent.type === 'renting' ? rent.rentingEndDate : rent.rentOutEndDate;
-    const isExpired = endDate ? new Date(endDate) < new Date(new Date().setHours(0, 0, 0, 0)) : false;
+    const rentOutListPeriod = rent.type === 'rent_out' ? getRentOutCollectionDisplayPeriod(rent) : null;
+    const endDateForExpiry =
+        rent.type === 'renting'
+            ? rent.rentingEndDate
+            : rent.type === 'rent_out'
+              ? rentOutListPeriod?.end || rent.rentOutEndDate
+              : rent.rentOutEndDate;
+    const isExpired = endDateForExpiry
+        ? new Date(endDateForExpiry) < new Date(new Date().setHours(0, 0, 0, 0))
+        : false;
 
     const isRentOutLike = rent.type === 'rent_out' || rent.type === 'contract';
     /** 交租：頂部編號與列表一致，優先顯示物業編號 */
@@ -134,8 +146,22 @@ export default function RentDetailsModal({ rent, property, onClose }: RentDetail
                             <DetailRow label={t('Listing Price', '放盤價')} value={formatCurrency(rent.rentOutPricing)} />
                             <DetailRow label={t('Periods', '期數')} value={rent.rentOutPeriods} />
                             <DetailRow label={t('Total Amount', '總額')} value={formatCurrency(rent.rentOutTotalAmount)} />
-                            <DetailRow label={t('Start Date', '開始日期')} value={formatDate(rent.rentOutStartDate)} />
-                            <DetailRow label={t('End Date', '結束日期')} value={formatDate(rent.rentOutEndDate)} />
+                            <DetailRow
+                                label={t('Start Date', '開始日期')}
+                                value={formatDate(
+                                    rent.type === 'rent_out'
+                                        ? rentOutListPeriod?.start || rent.rentOutStartDate
+                                        : rent.rentOutStartDate,
+                                )}
+                            />
+                            <DetailRow
+                                label={t('End Date', '結束日期')}
+                                value={formatDate(
+                                    rent.type === 'rent_out'
+                                        ? rentOutListPeriod?.end || rent.rentOutEndDate
+                                        : rent.rentOutEndDate,
+                                )}
+                            />
                             {rent.type === 'contract' ? (
                                 <DetailRow
                                     label={t('Contract nature', '合約性質')}

@@ -25,7 +25,12 @@ import { useLanguage } from '@/components/common/LanguageSwitcher';
 import RentDetailsModal from '@/components/properties/RentDetailsModal';
 import { Tooltip } from '@heroui/react';
 import SinglePropertyMapDynamic from '@/components/properties/SinglePropertyMapDynamic';
-import { getRentCollectionPayListStatus, getRentOutOrContractListNumber } from '@/lib/rentPaymentDisplay';
+import {
+    compareRentOutForListNewestFirst,
+    getRentCollectionPayListStatus,
+    getRentOutCollectionDisplayPeriod,
+    getRentOutOrContractListNumber,
+} from '@/lib/rentPaymentDisplay';
 
 interface PropertyDetailModalProps {
     /** 顯示用／無 ID 時後備查詢 */
@@ -135,9 +140,9 @@ export default function PropertyDetailModal({ propertyName, propertyId, onClose 
     const [currentImageIndex, setCurrentImageIndex] = useState(0);
     const [selectedRent, setSelectedRent] = useState<Rent | null>(null);
 
-    const rentOutRents = useMemo(() =>
-        (property?.rents || []).filter(r => r.type === 'rent_out'),
-        [property?.rents]
+    const rentOutRents = useMemo(
+        () => [...(property?.rents || []).filter((r) => r.type === 'rent_out')].sort(compareRentOutForListNewestFirst),
+        [property?.rents],
     );
 
     const rentingRents = useMemo(() =>
@@ -200,12 +205,16 @@ export default function PropertyDetailModal({ propertyName, propertyId, onClose 
                                     ? getRentOutOrContractListNumber(rent)
                                     : (property?.code?.trim() || '-');
 
-                            const startDate = rent.type === 'rent_out'
-                                ? (rent.rentOutStartDate || rent.startDate)
-                                : (rent.rentingStartDate || rent.startDate);
-                            const endDate = rent.type === 'rent_out'
-                                ? (rent.rentOutEndDate || rent.endDate)
-                                : (rent.rentingEndDate || rent.endDate);
+                            const rentOutListPeriod =
+                                rent.type === 'rent_out' ? getRentOutCollectionDisplayPeriod(rent) : null;
+                            const startDate =
+                                rent.type === 'rent_out'
+                                    ? rentOutListPeriod?.start || rent.rentOutStartDate || rent.startDate
+                                    : rent.rentingStartDate || rent.startDate;
+                            const endDate =
+                                rent.type === 'rent_out'
+                                    ? rentOutListPeriod?.end || rent.rentOutEndDate || rent.endDate
+                                    : rent.rentingEndDate || rent.endDate;
 
                             const formatEnDate = (d: any) => {
                                 if (!d) return '';

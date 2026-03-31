@@ -4,6 +4,7 @@ import { useState, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { useRentsQuery, usePropertiesQuery, useProprietorsQuery } from '@/hooks/useStorage';
 import {
+    formatDateDMY,
     formatDateRangeDMY,
     getRentCollectionPayListStatus,
     hasRentCollectionPaidAmount,
@@ -196,6 +197,7 @@ export default function RentingPage() {
                                 <th className="p-4 font-medium">承租人</th>
                                 <th className="p-4 font-medium">繳付金額</th>
                                 <th className="p-4 font-medium">付款方式</th>
+                                <th className="p-4 font-medium">付款日期</th>
                                 <th className="p-4 font-medium">交租期間</th>
                                 <th className="p-4 font-medium">租務狀態</th>
                                 <th className="p-4 font-medium">操作</th>
@@ -238,6 +240,9 @@ export default function RentingPage() {
                                         </td>
                                         <td className="p-4 text-zinc-600 dark:text-white/70 text-sm">
                                             {payMethod}
+                                        </td>
+                                        <td className="p-4 text-zinc-600 dark:text-white/70 text-sm tabular-nums">
+                                            {formatDateDMY(rent.rentCollectionPaymentDate) || '—'}
                                         </td>
                                         <td
                                             className={`p-4 text-sm font-medium ${

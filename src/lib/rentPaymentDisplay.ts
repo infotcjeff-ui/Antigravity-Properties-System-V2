@@ -61,6 +61,83 @@ export function getRentOutOrContractListNumber(rent: {
  * 優先：簡化表單 rentCollectionTenantName → rentOutTenants → 關聯 tenant（proprietors）
  */
 
+/**
+ * 收租記錄列表用「本期租期」：簡化表單寫入 start_date / end_date 與 rent_collection_date；
+ * 勿用 rent_out_end_date（整份出租合約）覆蓋本期結束日。
+ */
+export function getRentOutCollectionDisplayPeriod(rent: {
+    type?: string;
+    startDate?: Date | string | null;
+    endDate?: Date | string | null;
+    rentOutStartDate?: Date | string | null;
+    rentOutEndDate?: Date | string | null;
+    rentCollectionDate?: Date | string | null;
+}): { start: Date | null; end: Date | null } {
+    if (rent.type !== 'rent_out') return { start: null, end: null };
+
+    const toValid = (v: unknown): Date | null => {
+        if (v == null || v === '') return null;
+        const d = v instanceof Date ? v : new Date(v as string);
+        return Number.isNaN(d.getTime()) ? null : d;
+    };
+
+    const start =
+        toValid((rent as { rentCollectionDate?: unknown }).rentCollectionDate) ??
+        toValid(rent.startDate) ??
+        toValid(rent.rentOutStartDate);
+    const end = toValid(rent.endDate) ?? toValid(rent.rentOutEndDate);
+    return { start, end };
+}
+
+function coerceRentDateField(v: Date | string | null | undefined): Date | null {
+    if (v == null || v === '') return null;
+    const d = v instanceof Date ? v : new Date(v);
+    return Number.isNaN(d.getTime()) ? null : d;
+}
+
+/** 與物業頁／表單收租列「租期」顯示一致，供排序用（避免只用 period 而漏掉列上仍顯示的後備日期） */
+function getRentOutCollectionListEffectiveStart(rent: Rent): Date | null {
+    const p = getRentOutCollectionDisplayPeriod(rent);
+    return p.start ?? coerceRentDateField(rent.rentOutStartDate) ?? coerceRentDateField(rent.startDate);
+}
+
+function getRentOutCollectionListEffectiveEnd(rent: Rent): Date | null {
+    const p = getRentOutCollectionDisplayPeriod(rent);
+    return p.end ?? coerceRentDateField(rent.rentOutEndDate) ?? coerceRentDateField(rent.endDate);
+}
+
+/** 出租合約「合約性質」中文標籤（與 RentDetailsModal 一致） */
+export function labelRentOutContractNatureZh(v: string | undefined | null): string {
+    if (v == null || String(v).trim() === '') return '—';
+    const map: Record<string, string> = {
+        parking: '車位',
+        temporary_parking: '臨時車位',
+        rental_venue: '租用埸地',
+    };
+    const key = String(v).trim();
+    return map[key] || key;
+}
+
+/** 收租列表排序：依租期起始日舊→新（例：一月在前、二月在後），無起始日排最後；同日起再依結束日、建立時間舊→新 */
+export function compareRentOutForListNewestFirst(a: Rent, b: Rent): number {
+    const msOr = (d: Date | null | undefined, fallback: number) => {
+        if (d == null) return fallback;
+        const t = d.getTime();
+        return Number.isNaN(t) ? fallback : t;
+    };
+    const key = (r: Rent) => {
+        const startT = msOr(getRentOutCollectionListEffectiveStart(r), Number.POSITIVE_INFINITY);
+        const endT = msOr(getRentOutCollectionListEffectiveEnd(r), Number.POSITIVE_INFINITY);
+        const created = new Date(r.createdAt || 0).getTime();
+        return { startT, endT, created };
+    };
+    const ka = key(a);
+    const kb = key(b);
+    if (ka.startT !== kb.startT) return ka.startT - kb.startT;
+    if (ka.endT !== kb.endT) return ka.endT - kb.endT;
+    return ka.created - kb.created;
+}
+
 export function getRentOutLesseeDisplayLabel(rent: {
     rentCollectionTenantName?: string | null;
     rentOutTenants?: string[] | null;
@@ -195,6 +272,89 @@ export function matchesRentPaymentMethodFilter(
     const key = getRentPaymentMethodKey(rent);
     if (filter === 'none') return key === 'none';
     return key === filter;
+}
+
+/** 篩選用：YYYY-MM-DD → 本地日曆當日 */
+function parseYmdLocal(ymd: string): Date | null {
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(ymd.trim());
+    if (!m) return null;
+    const d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+    return Number.isNaN(d.getTime()) ? null : d;
+}
+
+/**
+ * 收租管理「租約期間」篩選：記錄區間 [start,end]（含首尾當日）是否與篩選 [filterFrom, filterTo] 重疊；
+ * filter 僅填一側則另一側視為無限；兩者皆空則通過；記錄無有效起訖則不通過。
+ */
+export function rentOutPeriodOverlapsDateFilter(
+    periodStart: Date | string | null | undefined,
+    periodEnd: Date | string | null | undefined,
+    filterFrom: string,
+    filterTo: string,
+): boolean {
+    const ff = (filterFrom || '').trim();
+    const tt = (filterTo || '').trim();
+    if (!ff && !tt) return true;
+
+    const dayStartMs = (v: Date | string): number | null => {
+        if (v == null || v === '') return null;
+        const d = v instanceof Date ? new Date(v) : new Date(v as string);
+        if (Number.isNaN(d.getTime())) return null;
+        const x = new Date(d);
+        x.setHours(0, 0, 0, 0);
+        return x.getTime();
+    };
+    const dayEndMs = (v: Date | string): number | null => {
+        if (v == null || v === '') return null;
+        const d = v instanceof Date ? new Date(v) : new Date(v as string);
+        if (Number.isNaN(d.getTime())) return null;
+        const x = new Date(d);
+        x.setHours(23, 59, 59, 999);
+        return x.getTime();
+    };
+
+    let lo: number;
+    let hi: number;
+    const sMs = periodStart != null && periodStart !== '' ? dayStartMs(periodStart as Date | string) : null;
+    const eMs = periodEnd != null && periodEnd !== '' ? dayEndMs(periodEnd as Date | string) : null;
+    if (sMs != null && eMs != null) {
+        lo = sMs;
+        hi = eMs;
+        if (hi < lo) {
+            const t = lo;
+            lo = hi;
+            hi = t;
+        }
+    } else if (sMs != null) {
+        lo = sMs;
+        hi = dayEndMs(periodStart as Date | string)!;
+    } else if (eMs != null) {
+        lo = dayStartMs(periodEnd as Date | string)!;
+        hi = eMs;
+    } else {
+        return false;
+    }
+
+    let fLo = -Infinity;
+    let fHi = Infinity;
+    if (ff) {
+        const fd = parseYmdLocal(ff);
+        if (!fd) return false;
+        fd.setHours(0, 0, 0, 0);
+        fLo = fd.getTime();
+    }
+    if (tt) {
+        const td = parseYmdLocal(tt);
+        if (!td) return false;
+        td.setHours(23, 59, 59, 999);
+        fHi = td.getTime();
+    }
+    if (fLo > fHi) {
+        const x = fLo;
+        fLo = fHi;
+        fHi = x;
+    }
+    return lo <= fHi && hi >= fLo;
 }
 
 export type RentOutListStatusKey = 'expired' | 'renting' | 'listing' | 'other';
