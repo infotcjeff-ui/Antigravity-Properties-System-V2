@@ -291,6 +291,7 @@ export default function RentOutPage() {
                                         <th className="p-4 font-medium">付款方式</th>
                                         <th className="p-4 font-medium">付款日期</th>
                                         <th className="p-4 font-medium">租約期間</th>
+                                        <th className="p-4 font-medium">備註</th>
                                         <th className="p-4 font-medium">租務狀態</th>
                                         <th className="p-4 font-medium">操作</th>
                                     </tr>
@@ -346,6 +347,18 @@ export default function RentOutPage() {
                                                 </td>
                                                 <td className={`p-4 text-sm ${isExpired ? 'text-red-500 font-medium' : 'text-zinc-500 dark:text-white/50'}`}>
                                                     {formatDateRangeDMY(startDate, endDate)}
+                                                </td>
+                                                <td className="p-4 text-zinc-500 dark:text-white/50 text-sm max-w-32">
+                                                    {rent.notes ? (
+                                                        <span
+                                                            className="line-clamp-2 cursor-default"
+                                                            title={String(rent.notes).replace(/<[^>]*>/g, '')}
+                                                        >
+                                                            {String(rent.notes).replace(/<[^>]*>/g, '')}
+                                                        </span>
+                                                    ) : (
+                                                        <span className="text-zinc-300 dark:text-white/20">—</span>
+                                                    )}
                                                 </td>
                                                 <td className="p-4">
                                                     <span
@@ -487,6 +500,16 @@ export default function RentOutPage() {
                                                     {formatDateRangeDMY(startDate, endDate)}
                                                 </p>
                                             </div>
+                                            {rent.notes && (
+                                                <div className="col-span-2">
+                                                    <div className="flex items-center gap-1.5 mb-1">
+                                                        <p className="text-[10px] text-zinc-400 uppercase font-bold tracking-wider">備註</p>
+                                                    </div>
+                                                    <p className="text-sm text-zinc-600 dark:text-white/70 line-clamp-2">
+                                                        {String(rent.notes).replace(/<[^>]*>/g, '')}
+                                                    </p>
+                                                </div>
+                                            )}
                                         </div>
 
                                         <div className="flex items-center justify-end pt-1">
