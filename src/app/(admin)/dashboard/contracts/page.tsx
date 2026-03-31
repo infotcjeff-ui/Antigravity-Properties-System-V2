@@ -282,7 +282,7 @@ export default function ContractsPage() {
                                         <th className="p-4 font-medium">租約期間</th>
                                         <th className="p-4 font-medium">已收按金</th>
                                         <th className="p-4 font-medium">租賃性質</th>
-                                        <th className="p-4 font-medium">備註</th>
+                                        <th className="p-4 font-medium">合約描述</th>
                                         <th className="p-4 font-medium">狀態</th>
                                         <th className="p-4 font-medium">操作</th>
                                     </tr>
@@ -361,12 +361,12 @@ export default function ContractsPage() {
                                                     {labelRentOutContractNatureZh(contract.rentOutContractNature)}
                                                 </td>
                                                 <td className="p-4 text-zinc-500 dark:text-white/50 text-sm max-w-30">
-                                                    {contract.notes ? (
+                                                    {contract.rentOutDescription ? (
                                                         <span
                                                             className="line-clamp-2 cursor-default"
-                                                            title={contract.notes}
+                                                            title={contract.rentOutDescription.replace(/<[^>]*>/g, '')}
                                                         >
-                                                            {contract.notes}
+                                                            {contract.rentOutDescription.replace(/<[^>]*>/g, '')}
                                                         </span>
                                                     ) : (
                                                         <span className="text-zinc-300 dark:text-white/20">—</span>
@@ -495,9 +495,9 @@ export default function ContractsPage() {
                                                 {labelRentOutContractNatureZh(contract.rentOutContractNature)}
                                             </span>
                                         </p>
-                                        {contract.notes && (
+                                        {contract.rentOutDescription && (
                                             <p className="text-xs text-zinc-500 dark:text-white/50 line-clamp-2">
-                                                備註：<span className="text-zinc-700 dark:text-white/70">{contract.notes}</span>
+                                                合約描述：<span className="text-zinc-700 dark:text-white/70">{contract.rentOutDescription.replace(/<[^>]*>/g, '')}</span>
                                             </p>
                                         )}
                                         <div className="flex justify-end gap-2 pt-2 border-t border-zinc-100 dark:border-white/5" onClick={(e) => e.stopPropagation()}>
