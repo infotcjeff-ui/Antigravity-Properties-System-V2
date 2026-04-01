@@ -32,6 +32,15 @@ import {
     getRentOutOrContractListNumber,
 } from '@/lib/rentPaymentDisplay';
 
+const fmtYears = (m: number | null | undefined): string | null => {
+    if (!m) return null;
+    const y = Math.floor(m / 12);
+    const r = m % 12;
+    if (y === 0) return `${r} 個月`;
+    if (r === 0) return `${y} 年`;
+    return `${y} 年 ${r} 個月`;
+};
+
 interface PropertyDetailModalProps {
     /** 顯示用／無 ID 時後備查詢 */
     propertyName: string;
@@ -222,14 +231,6 @@ export default function PropertyDetailModal({ propertyName, propertyId, onClose 
                                 return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
                             };
                             const periods = rent.type === 'rent_out' ? rent.rentOutPeriods : rent.rentingPeriods;
-                            const fmtYears = (m: number | null | undefined) => {
-                                if (!m) return null;
-                                const y = Math.floor(m / 12);
-                                const r = m % 12;
-                                if (y === 0) return `${r} 個月`;
-                                if (r === 0) return `${y} 年`;
-                                return `${y} 年 ${r} 個月`;
-                            };
 
                             const monthlyRent = rent.type === 'rent_out'
                                 ? (rent.rentOutMonthlyRental || rent.amount || 0)
