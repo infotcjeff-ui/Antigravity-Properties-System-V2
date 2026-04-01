@@ -221,11 +221,11 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
 
         const rentGridClass =
             partyMode === 'simple'
-                ? 'grid grid-cols-[100px_minmax(0,1fr)_minmax(0,1.5fr)_minmax(0,1fr)_minmax(76px,0.95fr)_minmax(0,1fr)_90px] gap-4 px-4'
+                ? 'grid grid-cols-[100px_minmax(0,1fr)_minmax(0,1.5fr)_minmax(0,1fr)_90px] gap-4 px-4'
                 : partyMode === 'owner'
-                  ? 'grid grid-cols-[100px_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.5fr)_minmax(0,1fr)_minmax(76px,0.95fr)_minmax(0,1fr)_90px] gap-4 px-4'
+                  ? 'grid grid-cols-[100px_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.5fr)_minmax(0,1fr)_90px] gap-4 px-4'
                   : partyMode === 'landlord'
-                    ? 'grid grid-cols-[100px_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.5fr)_minmax(0,1fr)_minmax(76px,0.95fr)_minmax(0,1fr)_90px] gap-4 px-4'
+                    ? 'grid grid-cols-[100px_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.5fr)_minmax(0,1fr)_90px] gap-4 px-4'
                     : 'grid grid-cols-[100px_minmax(0,1fr)_minmax(0,1.5fr)_minmax(0,1.15fr)_minmax(0,1.05fr)_minmax(76px,0.95fr)_minmax(0,1fr)_90px] gap-4 px-4';
         /** 交租記錄「編號」欄：顯示所屬物業編號（與表單「編號」一致） */
         const propertyCodeForRentingRows = (formData.code || property?.code || '').trim() || '-';
@@ -251,13 +251,11 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                     ) : (
                         <div className="font-bold">承租人</div>
                     )}
-                    <div className="font-bold">{partyMode === 'simple' || partyMode === 'landlord' || partyMode === 'owner' ? '地點' : '租借位置'}</div>
+                    <div className="font-bold">{partyMode === 'simple' || partyMode === 'landlord' ? '租期' : '地點'}</div>
                     {partyMode !== 'simple' && partyMode !== 'landlord' && partyMode !== 'owner' && (
                         <div className="font-bold">租期</div>
                     )}
-                    <div className="font-bold">付款日期</div>
                     <div className="font-bold">繳付狀態</div>
-                    <div className="text-right font-bold">租金/月</div>
                     <div className="text-center font-bold">操作</div>
                 </div>
                 {records.map((rent) => {
@@ -426,12 +424,34 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                                 </div>
                             )}
                             {/*
-                             * 任務2：收租 & 交租 tab（landlord/owner/simple），
-                             * 表頭改為「地點」，內容只顯示位置，隱藏租期
+                             * landlord/simple：該列顯示「租期」（日期+月數）
+                             * owner/simple owner：該列顯示「地點」（位置名稱）
                              */}
-                            <div className="text-zinc-700 dark:text-white/80 text-sm leading-relaxed line-clamp-2">
-                                {rent.location || rent.rentOutAddressDetail || formData.name || '-'}
-                            </div>
+                            {partyMode === 'simple' || partyMode === 'landlord' ? (
+                                <div className="flex flex-col">
+                                    {startDate ? (
+                                        <>
+                                            <div className="text-zinc-800 dark:text-white/90 font-medium tabular-nums text-sm">
+                                                {startDate.toLocaleDateString('zh-TW')}
+                                            </div>
+                                            <div className="text-zinc-600 dark:text-white/60 flex items-center gap-1 tabular-nums text-xs">
+                                                <span>~</span> {endDate ? endDate.toLocaleDateString('zh-TW') : '-'}
+                                            </div>
+                                            <div className="mt-1 flex items-center gap-1">
+                                                <span className="text-xs px-2 py-0.5 bg-zinc-100 dark:bg-white/10 rounded font-semibold text-zinc-600 dark:text-white/60">
+                                                    {months}個月
+                                                </span>
+                                            </div>
+                                        </>
+                                    ) : (
+                                        <span className="text-zinc-500 dark:text-white/40 italic text-sm">未設定</span>
+                                    )}
+                                </div>
+                            ) : (
+                                <div className="text-zinc-700 dark:text-white/80 text-sm leading-relaxed line-clamp-2">
+                                    {rent.location || rent.rentOutAddressDetail || formData.name || '-'}
+                                </div>
+                            )}
                             {partyMode !== 'simple' && partyMode !== 'landlord' && partyMode !== 'owner' && (
                                 <div className="flex flex-col">
                                     {startDate ? (
@@ -453,18 +473,6 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                                     )}
                                 </div>
                             )}
-                            <div className="flex flex-col justify-center min-w-0">
-                                {(rent as any).rentCollectionPaymentDate ? (
-                                    <span
-                                        className="font-semibold text-zinc-800 dark:text-white/90 tabular-nums text-sm"
-                                        title="付款日期"
-                                    >
-                                        {formatDateDMY((rent as any).rentCollectionPaymentDate)}
-                                    </span>
-                                ) : (
-                                    <span className="text-zinc-400 dark:text-white/35 text-sm font-medium">—</span>
-                                )}
-                            </div>
                             <div className="flex items-center min-w-0">
                                 {payStatus === 'paid' ? (
                                     <span className="text-[10px] sm:text-xs px-2 py-0.5 rounded-full font-semibold bg-emerald-100 text-emerald-900 border border-emerald-300/60 dark:bg-emerald-950/50 dark:text-emerald-100 dark:border-emerald-500/40">
@@ -478,11 +486,13 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                                     <span className="text-zinc-400 dark:text-white/35 text-sm">—</span>
                                 )}
                             </div>
-                            <div className="text-right min-w-0">
-                                <span className="inline-block text-sm font-semibold text-zinc-900 dark:text-white tabular-nums whitespace-nowrap">
-                                    ${monthlyRent.toLocaleString()}/月
-                                </span>
-                            </div>
+                            {partyMode !== 'simple' && partyMode !== 'landlord' && partyMode !== 'owner' && (
+                                <div className="text-right min-w-0">
+                                    <span className="inline-block text-sm font-semibold text-zinc-900 dark:text-white tabular-nums whitespace-nowrap">
+                                        ${monthlyRent.toLocaleString()}/月
+                                    </span>
+                                </div>
+                            )}
                             <div className="flex items-center justify-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
                                 <button
                                     type="button"
