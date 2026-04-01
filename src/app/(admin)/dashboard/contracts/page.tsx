@@ -350,9 +350,23 @@ export default function ContractsPage() {
                                                         {contract.currency || 'HKD'} {monthlyRent.toLocaleString()}
                                                     </span>
                                                 </td>
-                                                <td className="p-4 text-zinc-500 dark:text-white/50 text-sm">
-                                                    {startDate ? new Date(startDate).toLocaleDateString() : '-'} —{' '}
-                                                    {endDate ? new Date(endDate).toLocaleDateString() : '-'}
+                                                <td className="p-4 text-zinc-500 dark:text-white/50 text-sm leading-relaxed whitespace-nowrap">
+                                                    <div>{startDate ? new Date(startDate).toLocaleDateString() : '-'}</div>
+                                                    <div>
+                                                        ~ {endDate ? new Date(endDate).toLocaleDateString() : '-'}
+                                                        {startDate && endDate
+                                                            ? ` (${
+                                                                  (() => {
+                                                                      const m = Math.round((new Date(endDate).getTime() - new Date(startDate).getTime()) / (1000 * 60 * 60 * 24 * 30));
+                                                                      const y = Math.floor(m / 12);
+                                                                      const r = m % 12;
+                                                                      if (y === 0) return `${r} 個月`;
+                                                                      if (r === 0) return `${y} 年`;
+                                                                      return `${y} 年 ${r} 個月`;
+                                                                  })()
+                                                              })`
+                                                            : ''}
+                                                    </div>
                                                 </td>
                                                 <td className="p-4 text-zinc-600 dark:text-white/70 text-sm">
                                                     {formatContractDepositPaid(contract)}
@@ -486,10 +500,24 @@ export default function ContractsPage() {
                                         >
                                             {contract.currency || 'HKD'} {monthlyRent.toLocaleString()} / 月
                                         </p>
-                                        <p className="text-xs text-zinc-500 dark:text-white/50">
-                                            {startDate ? new Date(startDate).toLocaleDateString() : '-'} —{' '}
-                                            {endDate ? new Date(endDate).toLocaleDateString() : '-'}
-                                        </p>
+                                        <div className="text-xs text-zinc-500 dark:text-white/50 leading-relaxed">
+                                            <div>{startDate ? new Date(startDate).toLocaleDateString() : '-'}</div>
+                                            <div>
+                                                ~ {endDate ? new Date(endDate).toLocaleDateString() : '-'}
+                                                {startDate && endDate
+                                                    ? ` (${
+                                                          (() => {
+                                                              const m = Math.round((new Date(endDate).getTime() - new Date(startDate).getTime()) / (1000 * 60 * 60 * 24 * 30));
+                                                              const y = Math.floor(m / 12);
+                                                              const r = m % 12;
+                                                              if (y === 0) return `${r} 個月`;
+                                                              if (r === 0) return `${y} 年`;
+                                                              return `${y} 年 ${r} 個月`;
+                                                          })()
+                                                      })`
+                                                    : ''}
+                                            </div>
+                                        </div>
                                         <p className="text-xs text-zinc-500 dark:text-white/50">
                                             {isLeaseInTab ? '已付按金' : '已收按金'}：<span className="text-zinc-800 dark:text-white/90">{formatContractDepositPaid(contract)}</span>
                                         </p>
