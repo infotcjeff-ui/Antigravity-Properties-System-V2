@@ -208,6 +208,31 @@ const landUseLabels: Record<string, string> = {
     recreation_use: '休憩用地',
 };
 
+function LotIndexBadge({ lotIndex }: { lotIndex: string }) {
+    const match = lotIndex.match(/^(新|舊)\s*:?\s*(.*?)\s*:?\s*$/);
+    if (match) {
+        const tag = match[1];
+        const rest = match[2];
+        return (
+            <div className="flex items-center gap-1 truncate">
+                <span
+                    className={`shrink-0 text-[10px] font-bold px-1.5 py-0.5 rounded-sm border ${
+                        tag === '新'
+                            ? 'text-[oklch(59.6%_0.145_163.225)] bg-[color-mix(in_oklab,var(--color-emerald-500)_20%,transparent)] border-emerald-300 dark:border-emerald-500/40 dark:text-emerald-300'
+                            : 'bg-orange-100 text-orange-700 border-orange-300 dark:bg-orange-500/20 dark:text-orange-300 dark:border-orange-500/40'
+                    }`}
+                >
+                    {tag}
+                </span>
+                <span className="text-zinc-900 dark:text-white font-bold text-sm truncate">{rest}</span>
+            </div>
+        );
+    }
+    return (
+        <span className="text-zinc-900 dark:text-white font-bold text-sm truncate">{lotIndex}</span>
+    );
+}
+
 function EmptyPlaceholder() {
     return (
         <div className="flex items-center justify-center py-8">
@@ -596,7 +621,12 @@ export default function PropertyDetailsPage() {
                             <div className="bg-zinc-50 dark:bg-white/5 rounded-xl p-4 border border-zinc-100 dark:border-none">
                                 <p className="text-zinc-400 dark:text-white/40 text-sm">{t('Lot Index', '物業地段')}</p>
                                 <p className="font-medium mt-1 text-zinc-900 dark:text-white">
-                                    {property.lotIndex || '暫無。'}
+                                    {property.lotIndex
+                                        ? (() => {
+                                              const val = property.lotIndex.replace(/^新\s*:?\s*/, '').replace(/^舊\s*:?\s*/, '');
+                                              return val || '暫無。';
+                                          })()
+                                        : '暫無。'}
                                 </p>
                             </div>
                             <div className="bg-zinc-50 dark:bg-white/5 rounded-xl p-4 border border-zinc-100 dark:border-none">
@@ -757,12 +787,15 @@ export default function PropertyDetailsPage() {
                                     : rentHistoryTab === 'contract_lease_in'
                                       ? t('Proprietor', '業主')
                                       : t('Tenant', '承租人');
-                            const historyRowGrid = isRentingTab
-                                ? 'grid-cols-[2fr_4fr_2fr_4fr_2fr]'
-                                : 'grid-cols-[1fr_2fr_1fr_2fr_1fr]';
+                            const historyRowGrid =
+                                rentHistoryTab === 'rent_out' || rentHistoryTab === 'contract_lease_out'
+                                    ? 'grid-cols-[1fr_2fr_2fr_2fr_1fr]'
+                                    : isRentingTab
+                                      ? 'grid-cols-[2fr_4fr_2fr_4fr_2fr]'
+                                      : 'grid-cols-[1fr_2fr_1fr_2fr_1fr]';
                             return (
                                 <div className="overflow-x-auto">
-                                    <div className={isRentingTab ? 'min-w-[700px]' : 'min-w-[640px]'}>
+                                    <div className={isRentingTab ? 'min-w-[700px]' : 'min-w-[760px]'}>
                                         <div
                                             className={`grid ${historyRowGrid} gap-0 pb-3 border-b border-zinc-200 dark:border-white/10 text-xs font-bold text-zinc-900 dark:text-white`}
                                         >
@@ -860,11 +893,12 @@ export default function PropertyDetailsPage() {
                                                             >
                                                                 {property.code} {property.name}
                                                             </div>
-                                                            <div
-                                                                className="text-zinc-900 dark:text-white font-bold text-sm mt-1 truncate"
-                                                                title={property.lotIndex || undefined}
-                                                            >
-                                                                {property.lotIndex || '-'}
+                                                            <div className="mt-1 min-w-0" title={property.lotIndex || undefined}>
+                                                                {property.lotIndex ? (
+                                                                    <LotIndexBadge lotIndex={property.lotIndex} />
+                                                                ) : (
+                                                                    <span className="text-zinc-900 dark:text-white font-bold text-sm">-</span>
+                                                                )}
                                                             </div>
                                                         </div>
                                                         {isRentingTab ? (

@@ -12,7 +12,6 @@ import {
 import { formatLotArea, proprietorCategoryLabelZh } from '@/lib/formatters';
 import type { CurrentTenant, Property, Proprietor, Rent } from '@/lib/db';
 import {
-    hasRentCollectionPaidAmount,
     compareRentOutForListNewestFirst,
     getRentOutCollectionDisplayPeriod,
     getRentOutLesseeDisplayLabel,
@@ -348,18 +347,15 @@ export default function PropertyDetailsPage() {
                 </Link>
             </motion.div>
 
-            {/* 左圖右資訊：圖片窄(1/3) + 資訊寬(2/3)，圖庫置於主圖下方 */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-10 lg:items-stretch">
-                {/* 左列：主圖 + 圖庫（上下排列） */}
+            <div className="grid grid-cols-1 lg:grid-cols-[35%_1fr] gap-6 lg:gap-10 lg:items-stretch">
                 <motion.div
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
-                    className="lg:col-span-1 flex flex-col gap-4"
+                    className="flex flex-col gap-3 w-full lg:h-[calc(100dvh-11rem)] lg:min-h-0 lg:max-h-[calc(100dvh-11rem)] rounded-2xl overflow-hidden border border-zinc-200 dark:border-white/10 bg-zinc-100 dark:bg-white/5"
                 >
-                    {/* 主圖 */}
-                    <div className="relative w-full min-h-[300px] h-[min(45vh,420px)] lg:min-h-0 lg:h-auto lg:aspect-[4/3] rounded-2xl overflow-hidden border border-zinc-200 dark:border-white/10 bg-zinc-100 dark:bg-white/5">
-                        {property.images && property.images.length > 0 && !imageError ? (
-                            <>
+                    {property.images && property.images.length > 0 && !imageError ? (
+                        <>
+                            <div className="relative w-full flex-1 min-h-[200px] lg:min-h-0 overflow-hidden">
                                 <img
                                     src={property.images[currentImageIndex]}
                                     alt={`${property.name} - ${currentImageIndex + 1}`}
@@ -387,41 +383,36 @@ export default function PropertyDetailsPage() {
                                         </button>
                                     </>
                                 )}
-                            </>
-                        ) : (
-                            <div className="absolute inset-0 flex flex-col items-center justify-center gap-2">
-                                <ImageIcon className="w-16 h-16 text-zinc-300 dark:text-white/15" />
-                                <p className="text-zinc-400 dark:text-white/30 text-sm">暫無。</p>
                             </div>
-                        )}
-                    </div>
-
-                    {/* 圖庫縮圖（移至主圖下方） */}
-                    {property.images && property.images.length > 0 && (
-                        <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
-                            {property.images.map((url, idx) => (
-                                <button
-                                    key={idx}
-                                    type="button"
-                                    onClick={() => {
-                                        setCurrentImageIndex(idx);
-                                        setImageError(false);
-                                    }}
-                                    className={`relative shrink-0 w-16 h-16 sm:w-[72px] sm:h-[72px] rounded-xl overflow-hidden border-2 transition-colors ${idx === currentImageIndex ? 'border-zinc-900 dark:border-white ring-2 ring-zinc-900/20 dark:ring-white/20' : 'border-zinc-200 dark:border-white/15 opacity-80 hover:opacity-100'}`}
-                                >
-                                    <img src={url} alt="" className="w-full h-full object-cover" />
-                                </button>
-                            ))}
+                            <div className="shrink-0 flex gap-2 overflow-x-auto pb-2 px-2">
+                                {property.images.map((url, idx) => (
+                                    <button
+                                        key={idx}
+                                        type="button"
+                                        onClick={() => {
+                                            setCurrentImageIndex(idx);
+                                            setImageError(false);
+                                        }}
+                                        className={`relative shrink-0 w-14 h-14 rounded-lg overflow-hidden border-2 transition-colors ${idx === currentImageIndex ? 'border-zinc-900 dark:border-white ring-2 ring-zinc-900/20 dark:ring-white/20' : 'border-zinc-200 dark:border-white/15 opacity-70 hover:opacity-100'}`}
+                                    >
+                                        <img src={url} alt="" className="w-full h-full object-cover" />
+                                    </button>
+                                ))}
+                            </div>
+                        </>
+                    ) : (
+                        <div className="flex-1 flex flex-col items-center justify-center gap-2 min-h-[200px]">
+                            <ImageIcon className="w-16 h-16 text-zinc-300 dark:text-white/15" />
+                            <p className="text-zinc-400 dark:text-white/30 text-sm">暫無。</p>
                         </div>
                     )}
                 </motion.div>
 
-                {/* 右列：物業資訊 */}
                 <motion.div
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: 0.08 }}
-                    className="lg:col-span-2 flex min-h-0 flex-col gap-5 min-w-0 lg:h-auto lg:max-h-none overflow-visible"
+                    className="flex min-h-0 flex-col gap-5 min-w-0 lg:h-[calc(100dvh-11rem)] lg:max-h-[calc(100dvh-11rem)] lg:overflow-hidden"
                 >
                     <div className="shrink-0 flex flex-col gap-5">
                     <div className="flex justify-between items-start gap-4">
@@ -684,25 +675,22 @@ export default function PropertyDetailsPage() {
                                       ? t('Proprietor', '業主')
                                       : t('Tenant', '承租人');
                             const historyRowGrid = isRentingTab
-                                ? 'grid-cols-[1fr_2fr_1.1fr_1.1fr_2fr_1fr]'
-                                : 'grid-cols-[1fr_2fr_1.5fr_2fr_1fr]';
+                                ? 'grid-cols-[2fr_4fr_2fr_4fr_2fr]'
+                                : 'grid-cols-[1fr_2fr_1fr_2fr_1fr]';
                             return (
                                 <div className="overflow-x-auto">
-                                    <div className={isRentingTab ? 'min-w-[960px]' : 'min-w-[800px]'}>
+                                    <div className={isRentingTab ? 'min-w-[700px]' : 'min-w-[640px]'}>
                                         <div
                                             className={`grid ${historyRowGrid} gap-0 pb-3 border-b border-zinc-200 dark:border-white/10 text-xs font-bold text-zinc-900 dark:text-white`}
                                         >
                                             <div className="pr-4">{t('Number', '編號')}</div>
                                             <div className="px-4">{t('Property', '物業')}</div>
                                             {isRentingTab ? (
-                                                <>
-                                                    <div className="px-4">{t('Proprietor', '業主')}</div>
-                                                    <div className="px-4">{t('Lessee', '承租人')}</div>
-                                                </>
+                                                <div className="px-4">{t('Proprietor', '業主')}</div>
                                             ) : (
                                                 <div className="px-4">{partyHeader}</div>
                                             )}
-                                            <div className="px-4">{t('Lease Term & Location', '租期及地點')}</div>
+                                            <div className="px-4">{t('Lease Term', '租期')}</div>
                                             <div className="pl-4">{t('Rent', '租金')}</div>
                                         </div>
                                         <div className="divide-y divide-zinc-200 dark:divide-white/10">
@@ -749,15 +737,17 @@ export default function PropertyDetailsPage() {
                                                               ),
                                                           )
                                                         : periods;
+                                                const fmtYears = (m: number | null | undefined) => {
+                                                    if (!m) return null;
+                                                    const y = Math.floor(m / 12);
+                                                    const r = m % 12;
+                                                    if (y === 0) return `${r} 個月`;
+                                                    if (r === 0) return `${y} 年`;
+                                                    return `${y} 年 ${r} 個月`;
+                                                };
                                                 const monthlyRent = isRentOutOrContract
                                                     ? rent.rentOutMonthlyRental || rent.amount || 0
                                                     : rent.rentingMonthlyRental || rent.amount || 0;
-                                                const locationStr = isRentOutOrContract
-                                                    ? rent.location || (rent as any).rentOutAddressDetail
-                                                    : rent.location;
-                                                const showPaidBadge =
-                                                    (rent.type === 'rent_out' || rent.type === 'renting') &&
-                                                    hasRentCollectionPaidAmount(rent as any);
                                                 const partyForRentOut =
                                                     rent.type === 'rent_out'
                                                         ? rentOutLesseeLabel || otherParty?.name || '-'
@@ -795,14 +785,9 @@ export default function PropertyDetailsPage() {
                                                             </div>
                                                         </div>
                                                         {isRentingTab ? (
-                                                            <>
-                                                                <div className="py-4 px-4 border-l border-dashed border-zinc-200 dark:border-white/10 flex flex-col justify-center min-w-0 overflow-hidden">
-                                                                    <RentHistoryProprietorCell party={rent.tenant ?? null} />
-                                                                </div>
-                                                                <div className="py-4 px-4 border-l border-dashed border-zinc-200 dark:border-white/10 flex flex-col justify-center min-w-0 overflow-hidden">
-                                                                    <RentHistoryProprietorCell party={rent.proprietor ?? null} />
-                                                                </div>
-                                                            </>
+                                                            <div className="py-4 px-4 border-l border-dashed border-zinc-200 dark:border-white/10 flex flex-col justify-center min-w-0 overflow-hidden">
+                                                                <RentHistoryProprietorCell party={rent.tenant ?? null} />
+                                                            </div>
                                                         ) : (
                                                             <div className="py-4 px-4 border-l border-dashed border-zinc-200 dark:border-white/10 flex flex-col justify-center min-w-0 overflow-hidden">
                                                                 {rent.type === 'rent_out' ? (
@@ -878,29 +863,16 @@ export default function PropertyDetailsPage() {
                                                         )}
                                                         <div className="py-4 px-4 border-l border-dashed border-zinc-200 dark:border-white/10 flex flex-col justify-center min-w-0 overflow-hidden">
                                                             <div
-                                                                className="text-sm text-zinc-600 dark:text-white/70 truncate"
+                                                                className="text-sm text-zinc-600 dark:text-white/70"
                                                                 title={
-                                                                    `${formatEnDate(startDate)}${startDate && endDate ? ' ~ ' : ''}${formatEnDate(endDate)}${periodsDisplay ? `(${periodsDisplay}個月)` : ''}` ||
+                                                                    `${formatEnDate(startDate)}${startDate && endDate ? ' ~ ' : ''}${formatEnDate(endDate)}${periodsDisplay ? ` (${periodsDisplay}個月)` : ''}` ||
                                                                     undefined
                                                                 }
                                                             >
                                                                 {formatEnDate(startDate)}
                                                                 {startDate && endDate && ' ~ '}
                                                                 {formatEnDate(endDate)}
-                                                                {periodsDisplay ? `(${periodsDisplay}個月)` : ''}
-                                                            </div>
-                                                            <div className="flex items-center gap-2 mt-1 min-w-0 flex-nowrap">
-                                                                {showPaidBadge && (
-                                                                    <span className="text-[10px] px-1.5 py-0.5 bg-emerald-100 dark:bg-emerald-500/20 text-emerald-800 dark:text-emerald-300 rounded font-medium border border-emerald-200/70 dark:border-emerald-500/30 shrink-0">
-                                                                        {t('Paid', '已繳交')}
-                                                                    </span>
-                                                                )}
-                                                                <span
-                                                                    className="text-xs text-zinc-500 dark:text-white/40 min-w-0 flex-1 truncate"
-                                                                    title={locationStr || undefined}
-                                                                >
-                                                                    {locationStr}
-                                                                </span>
+                                                                {periodsDisplay ? ` (${fmtYears(periodsDisplay)})` : ''}
                                                             </div>
                                                         </div>
                                                         <div className="py-4 pl-4 border-l border-dashed border-zinc-200 dark:border-white/10 flex flex-col justify-center text-left">

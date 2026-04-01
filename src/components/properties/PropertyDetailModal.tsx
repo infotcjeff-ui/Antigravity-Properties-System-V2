@@ -222,6 +222,14 @@ export default function PropertyDetailModal({ propertyName, propertyId, onClose 
                                 return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
                             };
                             const periods = rent.type === 'rent_out' ? rent.rentOutPeriods : rent.rentingPeriods;
+                            const fmtYears = (m: number | null | undefined) => {
+                                if (!m) return null;
+                                const y = Math.floor(m / 12);
+                                const r = m % 12;
+                                if (y === 0) return `${r} 個月`;
+                                if (r === 0) return `${y} 年`;
+                                return `${y} 年 ${r} 個月`;
+                            };
 
                             const monthlyRent = rent.type === 'rent_out'
                                 ? (rent.rentOutMonthlyRental || rent.amount || 0)
@@ -301,7 +309,7 @@ export default function PropertyDetailModal({ propertyName, propertyId, onClose 
                                             {formatEnDate(endDate)}
                                             {periods ? (
                                                 <span className="text-sm font-medium text-zinc-600 dark:text-white/65 ml-1">
-                                                    （{periods} 個月）
+                                                    （{fmtYears(periods)}）
                                                 </span>
                                             ) : null}
                                         </div>
@@ -723,7 +731,7 @@ export default function PropertyDetailModal({ propertyName, propertyId, onClose 
                                                             {months !== null ? (
                                                                 <span className="inline-flex items-center gap-1 text-[11px] font-medium text-zinc-500 dark:text-white/45 bg-zinc-100 dark:bg-white/8 px-2 py-0.5 rounded-full">
                                                                     <Calendar className="w-3 h-3" />
-                                                                    {months} 個月
+                                                                    {fmtYears(months)}
                                                                 </span>
                                                             ) : (
                                                                 <span />
