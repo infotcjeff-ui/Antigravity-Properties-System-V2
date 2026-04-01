@@ -1456,6 +1456,18 @@ export default function RentModal({
                                             <input type="date" name="rentCollectionEndDate" value={formData.rentCollectionEndDate} onChange={handleChange} className={inputClass} />
                                         </div>
                                     </div>
+                                    {formData.rentCollectionDate && formData.rentCollectionEndDate && (() => {
+                                        const s = new Date(formData.rentCollectionDate);
+                                        const e = new Date(formData.rentCollectionEndDate);
+                                        if (!isNaN(s.getTime()) && !isNaN(e.getTime()) && e >= s) {
+                                            const m = Math.round((e.getTime() - s.getTime()) / (1000 * 60 * 60 * 24 * 30));
+                                            const y = Math.floor(m / 12);
+                                            const r = m % 12;
+                                            const label = y === 0 ? `${r} 個月` : r === 0 ? `${y} 年` : `${y} 年 ${r} 個月`;
+                                            return <div className="text-xs text-zinc-500 dark:text-white/50 px-1 -mt-1">租期：{label}</div>;
+                                        }
+                                        return null;
+                                    })()}
                                 </div>
                             </div>
 
@@ -1777,6 +1789,18 @@ export default function RentModal({
                                             <input type="date" name="rentCollectionEndDate" value={formData.rentCollectionEndDate} onChange={handleChange} className={inputClass} />
                                         </div>
                                     </div>
+                                    {formData.rentCollectionDate && formData.rentCollectionEndDate && (() => {
+                                        const s = new Date(formData.rentCollectionDate);
+                                        const e = new Date(formData.rentCollectionEndDate);
+                                        if (!isNaN(s.getTime()) && !isNaN(e.getTime()) && e >= s) {
+                                            const m = Math.round((e.getTime() - s.getTime()) / (1000 * 60 * 60 * 24 * 30));
+                                            const y = Math.floor(m / 12);
+                                            const r = m % 12;
+                                            const label = y === 0 ? `${r} 個月` : r === 0 ? `${y} 年` : `${y} 年 ${r} 個月`;
+                                            return <div className="text-xs text-zinc-500 dark:text-white/50 px-1 -mt-1">租期：{label}</div>;
+                                        }
+                                        return null;
+                                    })()}
                                 </div>
                             </div>
 
@@ -2089,6 +2113,22 @@ export default function RentModal({
                                     <input type="date" name="rentOutEndDate" value={formData.rentOutEndDate} onChange={handleChange} className={inputClass} />
                                 </div>
                             </div>
+                            {formData.rentOutStartDate && formData.rentOutEndDate && (() => {
+                                const s = new Date(formData.rentOutStartDate);
+                                const e = new Date(formData.rentOutEndDate);
+                                if (!isNaN(s.getTime()) && !isNaN(e.getTime()) && e >= s) {
+                                    const m = Math.round((e.getTime() - s.getTime()) / (1000 * 60 * 60 * 24 * 30));
+                                    const y = Math.floor(m / 12);
+                                    const r = m % 12;
+                                    const label = y === 0 ? `${r} 個月` : r === 0 ? `${y} 年` : `${y} 年 ${r} 個月`;
+                                    return (
+                                        <div className="text-xs text-zinc-500 dark:text-white/50 px-1 -mt-1">
+                                            租期：{label}
+                                        </div>
+                                    );
+                                }
+                                return null;
+                            })()}
 
                             <div className="space-y-2">
                                 <label className={labelClass}>合約性質</label>
@@ -2109,7 +2149,7 @@ export default function RentModal({
 
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div className="space-y-2">
-                                    <label className={labelClass}>租賃合約按金</label>
+                                    <label className={labelClass}>{contractSectionPrefix}按金</label>
                                     <input
                                         type="text"
                                         name="rentOutDepositReceived"
