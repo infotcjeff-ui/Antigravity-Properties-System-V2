@@ -349,6 +349,34 @@ export default function RentModal({
         leaseOutContractNumbers,
     ]);
 
+    /**
+     * 新增模式（僅收租）：當 contractsOnProperty 非同步就緒後，
+     * 若 rentCollectionContractNumber 已自動帶入，立即同步租賃性質。
+     * 避免依賴原本的自動帶入 useEffect（那時 contractsOnProperty 可能還是空的）。
+     */
+    const rentCollectionNatureAutoRef = useRef(false);
+    useEffect(() => {
+        if (rent?.id) {
+            rentCollectionNatureAutoRef.current = false;
+            return;
+        }
+        if (formData.type !== 'rent_out') {
+            rentCollectionNatureAutoRef.current = false;
+            return;
+        }
+        if (contractsOnProperty.length === 0) return;
+        const refNum = (formData.rentCollectionContractNumber || '').trim();
+        if (!refNum) return;
+        if (rentCollectionNatureAutoRef.current) return;
+        const matched = contractsOnProperty.find((c) => (c.rentOutTenancyNumber || '').trim() === refNum);
+        if (!matched) return;
+        const raw = matched as any;
+        const nature = raw?.rentOutContractNature || raw?.rent_out_contract_nature || '';
+        if (!nature) return;
+        rentCollectionNatureAutoRef.current = true;
+        setFormData((prev) => ({ ...prev, rentCollectionContractNature: nature }));
+    }, [rent?.id, formData.type, contractsOnProperty, formData.rentCollectionContractNumber]);
+
     const loadData = async () => {
         setLoadingData(true);
         const [propsData, propertiesData] = await Promise.all([
