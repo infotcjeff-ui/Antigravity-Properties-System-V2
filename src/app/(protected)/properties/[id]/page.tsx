@@ -367,7 +367,7 @@ export default function PropertyDetailsPage() {
                 >
                     {property.images && property.images.length > 0 && !imageError ? (
                         <>
-                            <div className="relative w-full flex-1 min-h-[280px] lg:min-h-0 overflow-hidden">
+                            <div className="relative w-full flex-1 min-h-80 lg:min-h-0 overflow-hidden">
                                 <img
                                     src={property.images[currentImageIndex]}
                                     alt={`${property.name} - ${currentImageIndex + 1}`}
@@ -412,12 +412,120 @@ export default function PropertyDetailsPage() {
                                     </button>
                                 ))}
                             </div>
+                            {/* 備註 - 左欄底部 */}
+                            <div className="shrink-0 mx-2 mb-2 p-3 border-l-[3px] border-purple-500 bg-purple-500/5 rounded-r-xl max-h-40 overflow-y-auto">
+                                <p className="text-xs font-semibold text-purple-500 uppercase tracking-wider mb-1.5">{t('Notes', '備註')}</p>
+                                {property.notes ? (
+                                    <div
+                                        ref={notesRef}
+                                        className={`text-zinc-700 dark:text-white/80 text-sm rich-text-content transition-all duration-300 ease-in-out overflow-hidden ${!isNotesExpanded && showNotesToggle ? 'max-h-16' : 'max-h-32'}`}
+                                        dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(property.notes) }}
+                                    />
+                                ) : (
+                                    <p className="text-zinc-400 dark:text-white/30 text-xs">暫無。</p>
+                                )}
+                                {showNotesToggle && (
+                                    <button
+                                        onClick={() => setIsNotesExpanded(!isNotesExpanded)}
+                                        className="mt-1.5 text-[11px] font-bold text-purple-600 dark:text-purple-400 hover:text-purple-700 dark:hover:text-purple-300 transition-colors flex items-center gap-1 cursor-pointer"
+                                    >
+                                        {isNotesExpanded
+                                            ? <><ChevronUp className="w-3 h-3" /> {t('Show Less', '收起')}</>
+                                            : <><ChevronDown className="w-3 h-3" /> {t('Show More', '顯示更多')}</>
+                                        }
+                                    </button>
+                                )}
+                            </div>
+                            <style jsx global>{`
+                                .rich-text-content ul {
+                                    list-style-type: disc;
+                                    margin-left: 1.5rem;
+                                    margin-top: 0.25rem;
+                                    margin-bottom: 0.25rem;
+                                }
+                                .rich-text-content ol {
+                                    list-style-type: decimal;
+                                    margin-left: 1.5rem;
+                                    margin-top: 0.25rem;
+                                    margin-bottom: 0.25rem;
+                                }
+                                .rich-text-content p {
+                                    margin-bottom: 0.25rem;
+                                }
+                                .rich-text-content a {
+                                    color: #a855f7;
+                                    text-decoration: underline;
+                                }
+                                .rich-text-content h1, .rich-text-content h2, .rich-text-content h3 {
+                                    font-weight: bold;
+                                    margin-top: 0.5rem;
+                                    margin-bottom: 0.25rem;
+                                }
+                                .rich-text-content h1 { font-size: 1.125rem; }
+                                .rich-text-content h2 { font-size: 1rem; }
+                                .rich-text-content h3 { font-size: 0.875rem; }
+                            `}</style>
                         </>
                     ) : (
-                        <div className="flex-1 flex flex-col items-center justify-center gap-2 min-h-[200px]">
-                            <ImageIcon className="w-16 h-16 text-zinc-300 dark:text-white/15" />
-                            <p className="text-zinc-400 dark:text-white/30 text-sm">暫無。</p>
-                        </div>
+                        <>
+                            <div className="flex-1 flex flex-col items-center justify-center gap-2 min-h-[200px]">
+                                <ImageIcon className="w-16 h-16 text-zinc-300 dark:text-white/15" />
+                                <p className="text-zinc-400 dark:text-white/30 text-sm">暫無。</p>
+                            </div>
+                            {/* 備註 - 無圖片時也顯示在底部 */}
+                            <div className="shrink-0 mx-2 mb-2 p-3 border-l-[3px] border-purple-500 bg-purple-500/5 rounded-r-xl max-h-40 overflow-y-auto">
+                                <p className="text-xs font-semibold text-purple-500 uppercase tracking-wider mb-1.5">{t('Notes', '備註')}</p>
+                                {property.notes ? (
+                                    <div
+                                        ref={notesRef}
+                                        className={`text-zinc-700 dark:text-white/80 text-sm rich-text-content transition-all duration-300 ease-in-out overflow-hidden ${!isNotesExpanded && showNotesToggle ? 'max-h-16' : 'max-h-32'}`}
+                                        dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(property.notes) }}
+                                    />
+                                ) : (
+                                    <p className="text-zinc-400 dark:text-white/30 text-xs">暫無。</p>
+                                )}
+                                {showNotesToggle && (
+                                    <button
+                                        onClick={() => setIsNotesExpanded(!isNotesExpanded)}
+                                        className="mt-1.5 text-[11px] font-bold text-purple-600 dark:text-purple-400 hover:text-purple-700 dark:hover:text-purple-300 transition-colors flex items-center gap-1 cursor-pointer"
+                                    >
+                                        {isNotesExpanded
+                                            ? <><ChevronUp className="w-3 h-3" /> {t('Show Less', '收起')}</>
+                                            : <><ChevronDown className="w-3 h-3" /> {t('Show More', '顯示更多')}</>
+                                        }
+                                    </button>
+                                )}
+                            </div>
+                            <style jsx global>{`
+                                .rich-text-content ul {
+                                    list-style-type: disc;
+                                    margin-left: 1.5rem;
+                                    margin-top: 0.25rem;
+                                    margin-bottom: 0.25rem;
+                                }
+                                .rich-text-content ol {
+                                    list-style-type: decimal;
+                                    margin-left: 1.5rem;
+                                    margin-top: 0.25rem;
+                                    margin-bottom: 0.25rem;
+                                }
+                                .rich-text-content p {
+                                    margin-bottom: 0.25rem;
+                                }
+                                .rich-text-content a {
+                                    color: #a855f7;
+                                    text-decoration: underline;
+                                }
+                                .rich-text-content h1, .rich-text-content h2, .rich-text-content h3 {
+                                    font-weight: bold;
+                                    margin-top: 0.5rem;
+                                    margin-bottom: 0.25rem;
+                                }
+                                .rich-text-content h1 { font-size: 1.125rem; }
+                                .rich-text-content h2 { font-size: 1rem; }
+                                .rich-text-content h3 { font-size: 0.875rem; }
+                            `}</style>
+                        </>
                     )}
                 </motion.div>
 
@@ -497,66 +605,6 @@ export default function PropertyDetailsPage() {
                                     {property.lotArea ? formatLotArea(property.lotArea) : '暫無。'}
                                 </p>
                             </div>
-                        </div>
-
-                        {/* Notes Section - always show */}
-                        <div className="mt-6 mb-4 p-[10px] border-l-[3px] border-purple-500 bg-purple-500/5 rounded-r-xl relative">
-                            <p className="text-xs font-semibold text-purple-500 uppercase tracking-wider mb-1">{t('Notes', '備註')}</p>
-                            {property.notes ? (
-                                <div className="relative">
-                                    <div
-                                        ref={notesRef}
-                                        className={`text-zinc-700 dark:text-white/80 text-sm rich-text-content transition-all duration-300 ease-in-out overflow-hidden ${!isNotesExpanded && showNotesToggle ? 'max-h-[48px]' : 'max-h-[2000px]'}`}
-                                        dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(property.notes) }}
-                                    />
-                                    {showNotesToggle && (
-                                        <button
-                                            onClick={() => setIsNotesExpanded(!isNotesExpanded)}
-                                            className="mt-2 text-xs font-bold text-purple-600 dark:text-purple-400 hover:text-purple-700 dark:hover:text-purple-300 transition-colors flex items-center gap-1 cursor-pointer"
-                                        >
-                                            {isNotesExpanded ? (
-                                                <><ChevronUp className="w-3 h-3" /> {t('Show Less', '收起')}</>
-                                            ) : (
-                                                <><ChevronDown className="w-3 h-3" /> {t('Show More', '顯示更多')}</>
-                                            )}
-                                        </button>
-                                    )}
-                                    {!isNotesExpanded && showNotesToggle && (
-                                        <div className="absolute bottom-0 left-0 right-0 h-6 bg-gradient-to-t from-purple-500/[0.03] to-transparent pointer-events-none" />
-                                    )}
-                                </div>
-                            ) : (
-                                <p className="text-zinc-400 dark:text-white/30 text-sm text-center py-2">暫無。</p>
-                            )}
-                            <style jsx global>{`
-                                .rich-text-content ul {
-                                    list-style-type: disc;
-                                    margin-left: 1.5rem;
-                                    margin-top: 0.5rem;
-                                    margin-bottom: 0.5rem;
-                                }
-                                .rich-text-content ol {
-                                    list-style-type: decimal;
-                                    margin-left: 1.5rem;
-                                    margin-top: 0.5rem;
-                                    margin-bottom: 0.5rem;
-                                }
-                                .rich-text-content p {
-                                    margin-bottom: 0.5rem;
-                                }
-                                .rich-text-content a {
-                                    color: #a855f7;
-                                    text-decoration: underline;
-                                }
-                                .rich-text-content h1, .rich-text-content h2, .rich-text-content h3 {
-                                    font-weight: bold;
-                                    margin-top: 1rem;
-                                    margin-bottom: 0.5rem;
-                                }
-                                .rich-text-content h1 { font-size: 1.25rem; }
-                                .rich-text-content h2 { font-size: 1.125rem; }
-                                .rich-text-content h3 { font-size: 1rem; }
-                            `}</style>
                         </div>
 
                     {/* 業主、二房東、現時租客 */}
@@ -772,6 +820,14 @@ export default function PropertyDetailsPage() {
                                                               ),
                                                           )
                                                         : periods;
+                                                const fmtYears = (m: number | null | undefined) => {
+                                                    if (!m) return null;
+                                                    const y = Math.floor(m / 12);
+                                                    const r = m % 12;
+                                                    if (y === 0) return `${r} 個月`;
+                                                    if (r === 0) return `${y} 年`;
+                                                    return `${y} 年 ${r} 個月`;
+                                                };
                                                 const monthlyRent = isRentOutOrContract
                                                     ? rent.rentOutMonthlyRental || rent.amount || 0
                                                     : rent.rentingMonthlyRental || rent.amount || 0;
@@ -889,17 +945,11 @@ export default function PropertyDetailsPage() {
                                                             </div>
                                                         )}
                                                         <div className="py-4 px-4 border-l border-dashed border-zinc-200 dark:border-white/10 flex flex-col justify-center min-w-0 overflow-hidden">
-                                                            <div
-                                                                className="text-sm text-zinc-600 dark:text-white/70"
-                                                                title={
-                                                                    `${formatEnDate(startDate)}${startDate && endDate ? ' ~ ' : ''}${formatEnDate(endDate)}${periodsDisplay ? ` (${periodsDisplay}個月)` : ''}` ||
-                                                                    undefined
-                                                                }
-                                                            >
-                                                                {formatEnDate(startDate)}
-                                                                {startDate && endDate && ' ~ '}
-                                                                {formatEnDate(endDate)}
-                                                                {periodsDisplay ? ` (${periodsDisplay}個月)` : ''}
+                                                            <div className="text-sm text-zinc-600 dark:text-white/70 leading-relaxed">
+                                                                <div>{formatEnDate(startDate)}{startDate && endDate ? ' ~' : ''}</div>
+                                                                {endDate && (
+                                                                    <div>~ {formatEnDate(endDate)}{periodsDisplay ? ` (${fmtYears(periodsDisplay)})` : ''}</div>
+                                                                )}
                                                             </div>
                                                         </div>
                                                         <div className="py-4 pl-4 border-l border-dashed border-zinc-200 dark:border-white/10 flex flex-col justify-center text-left">
