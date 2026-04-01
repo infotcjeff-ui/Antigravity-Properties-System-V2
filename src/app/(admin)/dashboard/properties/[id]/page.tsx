@@ -348,55 +348,80 @@ export default function PropertyDetailsPage() {
                 </Link>
             </motion.div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-10 lg:items-stretch">
+            {/* 左圖右資訊：圖片窄(1/3) + 資訊寬(2/3)，圖庫置於主圖下方 */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-10 lg:items-stretch">
+                {/* 左列：主圖 + 圖庫（上下排列） */}
                 <motion.div
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
-                    className="relative w-full min-h-[300px] h-[min(45vh,420px)] lg:h-[calc(100dvh-11rem)] lg:min-h-0 lg:max-h-[calc(100dvh-11rem)] rounded-2xl overflow-hidden border border-zinc-200 dark:border-white/10 bg-zinc-100 dark:bg-white/5"
+                    className="lg:col-span-1 flex flex-col gap-4"
                 >
-                    {property.images && property.images.length > 0 && !imageError ? (
-                        <>
-                            <img
-                                src={property.images[currentImageIndex]}
-                                alt={`${property.name} - ${currentImageIndex + 1}`}
-                                className="absolute inset-0 w-full h-full object-cover cursor-pointer"
-                                onClick={() => setLightboxImage(property.images[currentImageIndex])}
-                                onError={() => setImageError(true)}
-                            />
-                            {property.images.length > 1 && (
-                                <>
-                                    <button
-                                        type="button"
-                                        onClick={prevImage}
-                                        className="absolute left-3 top-1/2 -translate-y-1/2 p-2 bg-black/50 backdrop-blur-sm rounded-full text-white hover:bg-black/70 transition-colors z-10"
-                                        aria-label="Previous"
-                                    >
-                                        <ChevronLeft className="w-5 h-5" />
-                                    </button>
-                                    <button
-                                        type="button"
-                                        onClick={nextImage}
-                                        className="absolute right-3 top-1/2 -translate-y-1/2 p-2 bg-black/50 backdrop-blur-sm rounded-full text-white hover:bg-black/70 transition-colors z-10"
-                                        aria-label="Next"
-                                    >
-                                        <ChevronRight className="w-5 h-5" />
-                                    </button>
-                                </>
-                            )}
-                        </>
-                    ) : (
-                        <div className="absolute inset-0 flex flex-col items-center justify-center gap-2">
-                            <ImageIcon className="w-16 h-16 text-zinc-300 dark:text-white/15" />
-                            <p className="text-zinc-400 dark:text-white/30 text-sm">暫無。</p>
+                    {/* 主圖 */}
+                    <div className="relative w-full min-h-[300px] h-[min(45vh,420px)] lg:min-h-0 lg:h-auto lg:aspect-[4/3] rounded-2xl overflow-hidden border border-zinc-200 dark:border-white/10 bg-zinc-100 dark:bg-white/5">
+                        {property.images && property.images.length > 0 && !imageError ? (
+                            <>
+                                <img
+                                    src={property.images[currentImageIndex]}
+                                    alt={`${property.name} - ${currentImageIndex + 1}`}
+                                    className="absolute inset-0 w-full h-full object-cover cursor-pointer"
+                                    onClick={() => setLightboxImage(property.images[currentImageIndex])}
+                                    onError={() => setImageError(true)}
+                                />
+                                {property.images.length > 1 && (
+                                    <>
+                                        <button
+                                            type="button"
+                                            onClick={prevImage}
+                                            className="absolute left-3 top-1/2 -translate-y-1/2 p-2 bg-black/50 backdrop-blur-sm rounded-full text-white hover:bg-black/70 transition-colors z-10"
+                                            aria-label="Previous"
+                                        >
+                                            <ChevronLeft className="w-5 h-5" />
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={nextImage}
+                                            className="absolute right-3 top-1/2 -translate-y-1/2 p-2 bg-black/50 backdrop-blur-sm rounded-full text-white hover:bg-black/70 transition-colors z-10"
+                                            aria-label="Next"
+                                        >
+                                            <ChevronRight className="w-5 h-5" />
+                                        </button>
+                                    </>
+                                )}
+                            </>
+                        ) : (
+                            <div className="absolute inset-0 flex flex-col items-center justify-center gap-2">
+                                <ImageIcon className="w-16 h-16 text-zinc-300 dark:text-white/15" />
+                                <p className="text-zinc-400 dark:text-white/30 text-sm">暫無。</p>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* 圖庫縮圖（移至主圖下方） */}
+                    {property.images && property.images.length > 0 && (
+                        <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
+                            {property.images.map((url, idx) => (
+                                <button
+                                    key={idx}
+                                    type="button"
+                                    onClick={() => {
+                                        setCurrentImageIndex(idx);
+                                        setImageError(false);
+                                    }}
+                                    className={`relative shrink-0 w-16 h-16 sm:w-[72px] sm:h-[72px] rounded-xl overflow-hidden border-2 transition-colors ${idx === currentImageIndex ? 'border-zinc-900 dark:border-white ring-2 ring-zinc-900/20 dark:ring-white/20' : 'border-zinc-200 dark:border-white/15 opacity-80 hover:opacity-100'}`}
+                                >
+                                    <img src={url} alt="" className="w-full h-full object-cover" />
+                                </button>
+                            ))}
                         </div>
                     )}
                 </motion.div>
 
+                {/* 右列：物業資訊 */}
                 <motion.div
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: 0.08 }}
-                    className="flex min-h-0 flex-col gap-5 min-w-0 lg:h-[calc(100dvh-11rem)] lg:max-h-[calc(100dvh-11rem)] lg:overflow-hidden"
+                    className="lg:col-span-2 flex min-h-0 flex-col gap-5 min-w-0 lg:h-auto lg:max-h-none overflow-visible"
                 >
                     <div className="shrink-0 flex flex-col gap-5">
                     <div className="flex justify-between items-start gap-4">
@@ -418,24 +443,6 @@ export default function PropertyDetailsPage() {
                         <div className="flex items-start gap-2 text-zinc-400 dark:text-white/35 text-sm">
                             <MapPin className="w-4 h-4 shrink-0 mt-0.5" />
                             <span className="italic">暫無。</span>
-                        </div>
-                    )}
-
-                    {property.images && property.images.length > 0 && (
-                        <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
-                            {property.images.map((url, idx) => (
-                                <button
-                                    key={idx}
-                                    type="button"
-                                    onClick={() => {
-                                        setCurrentImageIndex(idx);
-                                        setImageError(false);
-                                    }}
-                                    className={`relative shrink-0 w-16 h-16 sm:w-[72px] sm:h-[72px] rounded-xl overflow-hidden border-2 transition-colors ${idx === currentImageIndex ? 'border-zinc-900 dark:border-white ring-2 ring-zinc-900/20 dark:ring-white/20' : 'border-zinc-200 dark:border-white/15 opacity-80 hover:opacity-100'}`}
-                                >
-                                    <img src={url} alt="" className="w-full h-full object-cover" />
-                                </button>
-                            ))}
                         </div>
                     )}
 
