@@ -744,6 +744,16 @@ export default function PropertyDetailModal({ propertyName, propertyId, onClose 
                                                                 </span>
                                                             ) : null}
                                                         </div>
+
+                                                        {/* 合約描述 */}
+                                                        {c.rentOutDescription ? (
+                                                            <div className="mt-3 px-4 pb-4">
+                                                                <div
+                                                                    className="text-xs text-zinc-500 dark:text-white/45 leading-relaxed line-clamp-2 prose prose-xs dark:prose-invert max-w-none"
+                                                                    dangerouslySetInnerHTML={{ __html: c.rentOutDescription }}
+                                                                />
+                                                            </div>
+                                                        ) : null}
                                                     </div>
                                                 </button>
                                             );
