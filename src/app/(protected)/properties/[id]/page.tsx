@@ -9,11 +9,9 @@ import { formatLotArea, proprietorCategoryLabelZh } from '@/lib/formatters';
 import type { CurrentTenant, Property, Proprietor, Rent } from '@/lib/db';
 import {
     compareRentOutForListNewestFirst,
-    hasRentCollectionPaidAmount,
     getRentOutCollectionDisplayPeriod,
     getRentOutLesseeDisplayLabel,
     getRentOutOrContractListNumber,
-    labelRentOutContractNatureZh,
     resolvePropertyCurrentTenantDisplay,
 } from '@/lib/rentPaymentDisplay';
 import {
@@ -359,46 +357,64 @@ export default function PropertyDetailsPage() {
                 </Link>
             </motion.div>
 
-            {/* 主版型：左側主圖 + 右側標題／縮圖／分頁；lg 時固定視窗高度，右欄內容區可獨立捲動 */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-10 lg:items-stretch">
-                {/* 左欄：主視覺（高度與右欄對齊） */}
+            {/* 主版型：左側 30%（主圖 + 縮圖）| 右側 70%（資訊） */}
+            <div className="grid grid-cols-1 lg:grid-cols-[35%_1fr] gap-6 lg:gap-10 lg:items-stretch">
+                {/* 左欄：主視覺 + 縮圖（高度與右欄對齊） */}
                 <motion.div
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
-                    className="relative w-full min-h-[300px] h-[min(45vh,420px)] lg:h-[calc(100dvh-11rem)] lg:min-h-0 lg:max-h-[calc(100dvh-11rem)] rounded-2xl overflow-hidden border border-zinc-200 dark:border-white/10 bg-zinc-100 dark:bg-white/5"
+                    className="flex flex-col gap-4 w-full lg:h-[calc(100dvh-10rem)] lg:min-h-0 lg:max-h-[calc(100dvh-10rem)] rounded-2xl overflow-hidden border border-zinc-200 dark:border-white/10 bg-zinc-100 dark:bg-white/5"
                 >
                     {property.images && property.images.length > 0 && !imageError ? (
                         <>
-                            <img
-                                src={property.images[currentImageIndex]}
-                                alt={`${property.name} - ${currentImageIndex + 1}`}
-                                className="absolute inset-0 w-full h-full object-cover cursor-pointer"
-                                onClick={() => setLightboxImage(property.images[currentImageIndex])}
-                                onError={() => setImageError(true)}
-                            />
-                            {property.images.length > 1 && (
-                                <>
+                            <div className="relative w-full flex-1 min-h-[280px] lg:min-h-0 overflow-hidden">
+                                <img
+                                    src={property.images[currentImageIndex]}
+                                    alt={`${property.name} - ${currentImageIndex + 1}`}
+                                    className="absolute inset-0 w-full h-full object-cover cursor-pointer"
+                                    onClick={() => setLightboxImage(property.images[currentImageIndex])}
+                                    onError={() => setImageError(true)}
+                                />
+                                {property.images.length > 1 && (
+                                    <>
+                                        <button
+                                            type="button"
+                                            onClick={prevImage}
+                                            className="absolute left-3 top-1/2 -translate-y-1/2 p-2 bg-black/50 backdrop-blur-sm rounded-full text-white hover:bg-black/70 transition-colors z-10"
+                                            aria-label={t('Previous image', '上一張')}
+                                        >
+                                            <ChevronLeft className="w-5 h-5" />
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={nextImage}
+                                            className="absolute right-3 top-1/2 -translate-y-1/2 p-2 bg-black/50 backdrop-blur-sm rounded-full text-white hover:bg-black/70 transition-colors z-10"
+                                            aria-label={t('Next image', '下一張')}
+                                        >
+                                            <ChevronRight className="w-5 h-5" />
+                                        </button>
+                                    </>
+                                )}
+                            </div>
+                            {/* 縮圖 gallery */}
+                            <div className="shrink-0 flex gap-2 overflow-x-auto pb-2 px-2">
+                                {property.images.map((url, idx) => (
                                     <button
+                                        key={idx}
                                         type="button"
-                                        onClick={prevImage}
-                                        className="absolute left-3 top-1/2 -translate-y-1/2 p-2 bg-black/50 backdrop-blur-sm rounded-full text-white hover:bg-black/70 transition-colors z-10"
-                                        aria-label={t('Previous image', '上一張')}
+                                        onClick={() => {
+                                            setCurrentImageIndex(idx);
+                                            setImageError(false);
+                                        }}
+                                        className={`relative shrink-0 w-20 h-20 rounded-lg overflow-hidden border-2 transition-colors ${idx === currentImageIndex ? 'border-zinc-900 dark:border-white ring-2 ring-zinc-900/20 dark:ring-white/20' : 'border-zinc-200 dark:border-white/15 opacity-70 hover:opacity-100'}`}
                                     >
-                                        <ChevronLeft className="w-5 h-5" />
+                                        <img src={url} alt="" className="w-full h-full object-cover" />
                                     </button>
-                                    <button
-                                        type="button"
-                                        onClick={nextImage}
-                                        className="absolute right-3 top-1/2 -translate-y-1/2 p-2 bg-black/50 backdrop-blur-sm rounded-full text-white hover:bg-black/70 transition-colors z-10"
-                                        aria-label={t('Next image', '下一張')}
-                                    >
-                                        <ChevronRight className="w-5 h-5" />
-                                    </button>
-                                </>
-                            )}
+                                ))}
+                            </div>
                         </>
                     ) : (
-                        <div className="absolute inset-0 flex flex-col items-center justify-center gap-2">
+                        <div className="flex-1 flex flex-col items-center justify-center gap-2 min-h-[200px]">
                             <ImageIcon className="w-16 h-16 text-zinc-300 dark:text-white/15" />
                             <p className="text-zinc-400 dark:text-white/30 text-sm">暫無。</p>
                         </div>
@@ -410,7 +426,7 @@ export default function PropertyDetailsPage() {
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: 0.08 }}
-                    className="flex min-h-0 flex-col gap-5 min-w-0 lg:h-[calc(100dvh-11rem)] lg:max-h-[calc(100dvh-11rem)] lg:overflow-hidden"
+                    className="flex min-h-0 flex-col gap-5 min-w-0 lg:h-[calc(100dvh-10rem)] lg:max-h-[calc(100dvh-10rem)] lg:overflow-hidden"
                 >
                     <div className="shrink-0 flex flex-col gap-5">
                     <div className="flex justify-between items-start gap-4">
@@ -434,24 +450,6 @@ export default function PropertyDetailsPage() {
                         <div className="flex items-start gap-2 text-zinc-400 dark:text-white/35 text-sm">
                             <MapPin className="w-4 h-4 flex-shrink-0 mt-0.5" />
                             <span className="italic">暫無。</span>
-                        </div>
-                    )}
-
-                    {property.images && property.images.length > 0 && (
-                        <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
-                            {property.images.map((url, idx) => (
-                                <button
-                                    key={idx}
-                                    type="button"
-                                    onClick={() => {
-                                        setCurrentImageIndex(idx);
-                                        setImageError(false);
-                                    }}
-                                    className={`relative shrink-0 w-16 h-16 sm:w-[72px] sm:h-[72px] rounded-xl overflow-hidden border-2 transition-colors ${idx === currentImageIndex ? 'border-zinc-900 dark:border-white ring-2 ring-zinc-900/20 dark:ring-white/20' : 'border-zinc-200 dark:border-white/15 opacity-80 hover:opacity-100'}`}
-                                >
-                                    <img src={url} alt="" className="w-full h-full object-cover" />
-                                </button>
-                            ))}
                         </div>
                     )}
 
@@ -712,26 +710,22 @@ export default function PropertyDetailsPage() {
                                       ? t('Proprietor', '業主')
                                       : t('Tenant', '承租人');
                             const historyRowGrid = isRentingTab
-                                ? 'grid-cols-[1fr_2fr_1.1fr_1.1fr_2fr_1fr]'
-                                : 'grid-cols-[1fr_2fr_1.5fr_1.2fr_2fr_1fr]';
+                                ? 'grid-cols-[2fr_4fr_2fr_4fr_2fr]'
+                                : 'grid-cols-[1fr_2fr_1fr_2fr_1fr]';
                             return (
                                 <div className="overflow-x-auto">
-                                    <div className={isRentingTab ? 'min-w-[960px]' : 'min-w-[800px]'}>
+                                    <div className={isRentingTab ? 'min-w-[700px]' : 'min-w-[640px]'}>
                                         <div
                                             className={`grid ${historyRowGrid} gap-0 pb-3 border-b border-zinc-200 dark:border-white/10 text-xs font-bold text-zinc-900 dark:text-white`}
                                         >
                                             <div className="pr-4">{t('Number', '編號')}</div>
                                             <div className="px-4">{t('Property', '物業')}</div>
                                             {isRentingTab ? (
-                                                <>
-                                                    <div className="px-4">{t('Proprietor', '業主')}</div>
-                                                    <div className="px-4">{t('Lessee', '承租人')}</div>
-                                                </>
+                                                <div className="px-4">{t('Proprietor', '業主')}</div>
                                             ) : (
                                                 <div className="px-4">{partyHeader}</div>
                                             )}
-                                            <div className="px-4">{t('Lease Type', '租賃性質')}</div>
-                                            <div className="px-4">{t('Lease Term & Location', '租期及地點')}</div>
+                                            <div className="px-4">{t('Lease Term', '租期')}</div>
                                             <div className="pl-4">{t('Rent', '租金')}</div>
                                         </div>
                                         <div className="divide-y divide-zinc-200 dark:divide-white/10">
@@ -781,12 +775,6 @@ export default function PropertyDetailsPage() {
                                                 const monthlyRent = isRentOutOrContract
                                                     ? rent.rentOutMonthlyRental || rent.amount || 0
                                                     : rent.rentingMonthlyRental || rent.amount || 0;
-                                                const locationStr = isRentOutOrContract
-                                                    ? rent.location || (rent as any).rentOutAddressDetail
-                                                    : rent.location;
-                                                const showPaidBadge =
-                                                    (rent.type === 'rent_out' || rent.type === 'renting') &&
-                                                    hasRentCollectionPaidAmount(rent as any);
                                                 const partyForRentOut =
                                                     rent.type === 'rent_out'
                                                         ? rentOutLesseeLabel || otherParty?.name || '-'
@@ -824,14 +812,9 @@ export default function PropertyDetailsPage() {
                                                             </div>
                                                         </div>
                                                         {isRentingTab ? (
-                                                            <>
-                                                                <div className="py-4 px-4 border-l border-dashed border-zinc-200 dark:border-white/10 flex flex-col justify-center min-w-0 overflow-hidden">
-                                                                    <RentHistoryProprietorCell party={rent.tenant ?? null} />
-                                                                </div>
-                                                                <div className="py-4 px-4 border-l border-dashed border-zinc-200 dark:border-white/10 flex flex-col justify-center min-w-0 overflow-hidden">
-                                                                    <RentHistoryProprietorCell party={rent.proprietor ?? null} />
-                                                                </div>
-                                                            </>
+                                                            <div className="py-4 px-4 border-l border-dashed border-zinc-200 dark:border-white/10 flex flex-col justify-center min-w-0 overflow-hidden">
+                                                                <RentHistoryProprietorCell party={rent.tenant ?? null} />
+                                                            </div>
                                                         ) : (
                                                             <div className="py-4 px-4 border-l border-dashed border-zinc-200 dark:border-white/10 flex flex-col justify-center min-w-0 overflow-hidden">
                                                                 {rent.type === 'rent_out' ? (
@@ -905,48 +888,18 @@ export default function PropertyDetailsPage() {
                                                                 )}
                                                             </div>
                                                         )}
-                                                        {isRentOutOrContract && (
-                                                            <div className="py-4 px-4 border-l border-dashed border-zinc-200 dark:border-white/10 flex flex-col justify-center min-w-0 overflow-hidden">
-                                                                    {(() => {
-                                                                    const r = rent as any;
-                                                                    const v = r.rentCollectionContractNature || r.rent_collection_contract_nature || r.rentOutContractNature || r.rent_out_contract_nature;
-                                                                    const label = labelRentOutContractNatureZh(v);
-                                                                    return (
-                                                                        <div
-                                                                            className="text-sm text-zinc-600 dark:text-white/70 truncate"
-                                                                            title={label === '—' ? undefined : label}
-                                                                        >
-                                                                            {label}
-                                                                        </div>
-                                                                    );
-                                                                })()}
-                                                            </div>
-                                                        )}
                                                         <div className="py-4 px-4 border-l border-dashed border-zinc-200 dark:border-white/10 flex flex-col justify-center min-w-0 overflow-hidden">
                                                             <div
-                                                                className="text-sm text-zinc-600 dark:text-white/70 truncate"
+                                                                className="text-sm text-zinc-600 dark:text-white/70"
                                                                 title={
-                                                                    `${formatEnDate(startDate)}${startDate && endDate ? ' ~ ' : ''}${formatEnDate(endDate)}${periodsDisplay ? `(${periodsDisplay}個月)` : ''}` ||
+                                                                    `${formatEnDate(startDate)}${startDate && endDate ? ' ~ ' : ''}${formatEnDate(endDate)}${periodsDisplay ? ` (${periodsDisplay}個月)` : ''}` ||
                                                                     undefined
                                                                 }
                                                             >
                                                                 {formatEnDate(startDate)}
                                                                 {startDate && endDate && ' ~ '}
                                                                 {formatEnDate(endDate)}
-                                                                {periodsDisplay ? `(${periodsDisplay}個月)` : ''}
-                                                            </div>
-                                                            <div className="flex items-center gap-2 mt-1 min-w-0 flex-nowrap">
-                                                                {showPaidBadge && (
-                                                                    <span className="text-[10px] px-1.5 py-0.5 bg-emerald-100 dark:bg-emerald-500/20 text-emerald-800 dark:text-emerald-300 rounded font-medium border border-emerald-200/70 dark:border-emerald-500/30 shrink-0">
-                                                                        {t('Paid', '已繳交')}
-                                                                    </span>
-                                                                )}
-                                                                <span
-                                                                    className="text-xs text-zinc-500 dark:text-white/40 min-w-0 flex-1 truncate"
-                                                                    title={locationStr || undefined}
-                                                                >
-                                                                    {locationStr}
-                                                                </span>
+                                                                {periodsDisplay ? ` (${periodsDisplay}個月)` : ''}
                                                             </div>
                                                         </div>
                                                         <div className="py-4 pl-4 border-l border-dashed border-zinc-200 dark:border-white/10 flex flex-col justify-center text-left">

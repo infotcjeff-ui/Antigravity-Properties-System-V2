@@ -400,7 +400,7 @@ export default function PropertyDetailModal({ propertyName, propertyId, onClose 
                         {/* Gallery and Basic Info */}
                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                             {/* Gallery */}
-                            <div className="relative h-64 md:h-80 bg-zinc-100 dark:bg-white/5 rounded-3xl overflow-hidden border border-zinc-200 dark:border-white/10">
+                            <div className="relative h-80 md:h-96 lg:h-[420px] bg-zinc-100 dark:bg-white/5 rounded-3xl overflow-hidden border border-zinc-200 dark:border-white/10">
                                 {property.images && property.images.length > 0 ? (
                                     <>
                                         <img
