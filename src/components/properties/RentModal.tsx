@@ -2109,7 +2109,7 @@ export default function RentModal({
 
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div className="space-y-2">
-                                    <label className={labelClass}>出租合約按金</label>
+                                    <label className={labelClass}>租賃合約按金</label>
                                     <input
                                         type="text"
                                         name="rentOutDepositReceived"

@@ -559,7 +559,7 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                     <div className="font-bold">租借位置</div>
                     <div className="font-bold">租期</div>
                     <div className="text-right font-bold">租金/月</div>
-                    <div className="font-bold">付款日期</div>
+                    <div className="font-bold">{isLeaseIn ? '已付按金' : '已收按金'}</div>
                     <div className="text-center font-bold">操作</div>
                 </div>
                 {records.map((rent) => {
@@ -641,9 +641,13 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                                 </span>
                             </div>
                             <div className="text-zinc-600 dark:text-white/65 text-sm tabular-nums min-w-0">
-                                {rent.rentCollectionPaymentDate
-                                    ? formatDateDMY(rent.rentCollectionPaymentDate)
-                                    : '—'}
+                                {isLeaseIn
+                                    ? rent.rentingDeposit != null && rent.rentingDeposit > 0
+                                        ? `$${rent.rentingDeposit.toLocaleString()}`
+                                        : '—'
+                                    : rent.rentOutDepositReceived != null && rent.rentOutDepositReceived > 0
+                                      ? `$${rent.rentOutDepositReceived.toLocaleString()}`
+                                      : '—'}
                             </div>
                             <div className="flex items-center justify-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
                                 <button
