@@ -210,7 +210,7 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
     const contractCurrentTenantId = latestContract?.rentOutTenantIds?.[0] || '';
 
     /** 收租表第二欄為現時租客；交租表第二、三欄為業主（tenant_id）、承租人（proprietor_id） */
-    const renderRentTable = (records: Rent[], partyMode: 'lessee' | 'landlord' | 'owner' = 'lessee') => {
+    const renderRentTable = (records: Rent[], partyMode: 'lessee' | 'landlord' | 'owner' | 'simple' = 'lessee') => {
         if (records.length === 0) {
             return (
                 <div className="p-6 bg-zinc-50 dark:bg-white/5 rounded-xl text-center text-zinc-600 dark:text-white/60 text-base">
@@ -220,11 +220,13 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
         }
 
         const rentGridClass =
-            partyMode === 'owner'
-                ? 'grid grid-cols-[100px_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.5fr)_minmax(0,1.15fr)_minmax(0,1.05fr)_minmax(76px,0.95fr)_minmax(0,1fr)_90px] gap-4 px-4'
-                : partyMode === 'landlord'
-                  ? 'grid grid-cols-[100px_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.5fr)_minmax(0,1.15fr)_minmax(0,1.05fr)_minmax(76px,0.95fr)_minmax(0,1fr)_90px] gap-4 px-4'
-                  : 'grid grid-cols-[100px_minmax(0,1fr)_minmax(0,1.5fr)_minmax(0,1.15fr)_minmax(0,1.05fr)_minmax(76px,0.95fr)_minmax(0,1fr)_90px] gap-4 px-4';
+            partyMode === 'simple'
+                ? 'grid grid-cols-[100px_minmax(0,1fr)_minmax(0,1.5fr)_minmax(0,1fr)_minmax(76px,0.95fr)_minmax(0,1fr)_90px] gap-4 px-4'
+                : partyMode === 'owner'
+                  ? 'grid grid-cols-[100px_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.5fr)_minmax(0,1fr)_minmax(76px,0.95fr)_minmax(0,1fr)_90px] gap-4 px-4'
+                  : partyMode === 'landlord'
+                    ? 'grid grid-cols-[100px_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.5fr)_minmax(0,1fr)_minmax(76px,0.95fr)_minmax(0,1fr)_90px] gap-4 px-4'
+                    : 'grid grid-cols-[100px_minmax(0,1fr)_minmax(0,1.5fr)_minmax(0,1.15fr)_minmax(0,1.05fr)_minmax(76px,0.95fr)_minmax(0,1fr)_90px] gap-4 px-4';
         /** 交租記錄「編號」欄：顯示所屬物業編號（與表單「編號」一致） */
         const propertyCodeForRentingRows = (formData.code || property?.code || '').trim() || '-';
 
@@ -244,11 +246,15 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                             <div className="font-bold">業主</div>
                             <div className="font-bold">現時租客</div>
                         </>
+                    ) : partyMode === 'simple' ? (
+                        <div className="font-bold">業主</div>
                     ) : (
                         <div className="font-bold">承租人</div>
                     )}
-                    <div className="font-bold">租借位置</div>
-                    <div className="font-bold">租期</div>
+                    <div className="font-bold">{partyMode === 'simple' || partyMode === 'landlord' || partyMode === 'owner' ? '地點' : '租借位置'}</div>
+                    {partyMode !== 'simple' && partyMode !== 'landlord' && partyMode !== 'owner' && (
+                        <div className="font-bold">租期</div>
+                    )}
                     <div className="font-bold">付款日期</div>
                     <div className="font-bold">繳付狀態</div>
                     <div className="text-right font-bold">租金/月</div>
@@ -372,16 +378,9 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                                             </span>
                                         ) : null}
                                     </div>
-                                    <div className="flex flex-col overflow-hidden min-w-0">
-                                        <span className="font-semibold text-zinc-900 dark:text-white truncate">
-                                            {rentingLesseeParty?.name || (rent.type === 'renting' ? '(暫缺)' : '-')}
-                                        </span>
-                                        {rentingLesseeParty?.shortName ? (
-                                            <span className="text-xs text-zinc-500 dark:text-white/50 truncate uppercase">
-                                                {rentingLesseeParty.shortName}
-                                            </span>
-                                        ) : null}
-                                    </div>
+                                    {/*
+                                     * 任務1：交租 tab（partyMode='simple'）隱藏承租人欄
+                                     */}
                                 </>
                             ) : partyMode === 'landlord' ? (
                                 <>
@@ -401,6 +400,17 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                                         </span>
                                     </div>
                                 </>
+                            ) : partyMode === 'simple' ? (
+                                <div className="flex flex-col overflow-hidden min-w-0">
+                                    <span className="font-semibold text-zinc-900 dark:text-white truncate">
+                                        {rentingOwnerParty?.name || (rent.type === 'renting' ? '(暫缺)' : '-')}
+                                    </span>
+                                    {rentingOwnerParty?.shortName ? (
+                                        <span className="text-xs text-zinc-500 dark:text-white/50 truncate uppercase">
+                                            {rentingOwnerParty.shortName}
+                                        </span>
+                                    ) : null}
+                                </div>
                             ) : (
                                 <div className="flex flex-col overflow-hidden min-w-0">
                                     <span className="font-semibold text-zinc-900 dark:text-white truncate">
@@ -415,28 +425,34 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                                     )}
                                 </div>
                             )}
+                            {/*
+                             * 任務2：收租 & 交租 tab（landlord/owner/simple），
+                             * 表頭改為「地點」，內容只顯示位置，隱藏租期
+                             */}
                             <div className="text-zinc-700 dark:text-white/80 text-sm leading-relaxed line-clamp-2">
                                 {rent.location || rent.rentOutAddressDetail || formData.name || '-'}
                             </div>
-                            <div className="flex flex-col">
-                                {startDate ? (
-                                    <>
-                                        <div className="text-zinc-800 dark:text-white/90 font-medium tabular-nums text-sm">
-                                            {startDate.toLocaleDateString('zh-TW')}
-                                        </div>
-                                        <div className="text-zinc-600 dark:text-white/60 flex items-center gap-1 tabular-nums text-xs">
-                                            <span>~</span> {endDate ? endDate.toLocaleDateString('zh-TW') : '-'}
-                                        </div>
-                                        <div className="mt-1 flex items-center gap-1">
-                                            <span className="text-xs px-2 py-0.5 bg-zinc-100 dark:bg-white/10 rounded font-semibold text-zinc-600 dark:text-white/60">
-                                                {months}個月
-                                            </span>
-                                        </div>
-                                    </>
-                                ) : (
-                                    <span className="text-zinc-500 dark:text-white/40 italic text-sm">未設定</span>
-                                )}
-                            </div>
+                            {partyMode !== 'simple' && partyMode !== 'landlord' && partyMode !== 'owner' && (
+                                <div className="flex flex-col">
+                                    {startDate ? (
+                                        <>
+                                            <div className="text-zinc-800 dark:text-white/90 font-medium tabular-nums text-sm">
+                                                {startDate.toLocaleDateString('zh-TW')}
+                                            </div>
+                                            <div className="text-zinc-600 dark:text-white/60 flex items-center gap-1 tabular-nums text-xs">
+                                                <span>~</span> {endDate ? endDate.toLocaleDateString('zh-TW') : '-'}
+                                            </div>
+                                            <div className="mt-1 flex items-center gap-1">
+                                                <span className="text-xs px-2 py-0.5 bg-zinc-100 dark:bg-white/10 rounded font-semibold text-zinc-600 dark:text-white/60">
+                                                    {months}個月
+                                                </span>
+                                            </div>
+                                        </>
+                                    ) : (
+                                        <span className="text-zinc-500 dark:text-white/40 italic text-sm">未設定</span>
+                                    )}
+                                </div>
+                            )}
                             <div className="flex flex-col justify-center min-w-0">
                                 {(rent as any).rentCollectionPaymentDate ? (
                                     <span
@@ -1736,7 +1752,7 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                                         <div className="w-2.5 h-2.5 rounded-full bg-indigo-500 shadow-[0_0_8px_rgba(99,102,241,0.5)]"></div>
                                         交租記錄 (Renting Records)
                                     </h4>
-                                    {renderRentTable(rentingRents, 'owner')}
+                                    {renderRentTable(rentingRents, 'simple')}
                                 </div>
 
                                 <div className="space-y-8">
