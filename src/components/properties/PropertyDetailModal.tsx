@@ -129,7 +129,7 @@ function RentDetailModalProprietorCell({ party }: { party?: Proprietor | null })
             placement="top"
             className="bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white p-3 rounded-xl shadow-xl border border-zinc-200 dark:border-white/10 max-w-xs"
         >
-            <div className="text-sm font-medium text-purple-600 dark:text-purple-400 border-b border-dashed border-purple-300 dark:border-purple-600/50 cursor-pointer w-fit inline-block max-w-full truncate">
+            <div className="text-sm font-medium text-purple-600 dark:text-purple-400 border-b border-dashed border-purple-300 dark:border-purple-600/50 cursor-pointer block max-w-full line-clamp-2">
                 {party.name}
             </div>
         </Tooltip>
@@ -653,7 +653,7 @@ export default function PropertyDetailModal({ propertyName, propertyId, onClose 
                                                     {ownerLine ? (
                                                         <div className="px-4 pb-2 flex items-center gap-1.5">
                                                             <User className="w-3 h-3 text-zinc-400 dark:text-white/40 shrink-0" />
-                                                            <span className="text-xs text-zinc-500 dark:text-white/50 truncate" title={ownerLine}>
+                                                            <span className="text-xs text-zinc-500 dark:text-white/50 line-clamp-2" title={ownerLine}>
                                                                 {ownerLine}
                                                             </span>
                                                         </div>

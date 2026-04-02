@@ -74,7 +74,7 @@ function RentHistoryProprietorCell({ party }: { party?: Proprietor | null }) {
             className="bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white p-3 rounded-xl shadow-xl border border-zinc-200 dark:border-white/10 max-w-xs"
         >
             <div
-                className="text-sm font-medium text-zinc-900 dark:text-white truncate min-w-0 max-w-full block"
+                className="text-sm font-medium text-zinc-900 dark:text-white line-clamp-2 min-w-0 max-w-full block"
                 title={party.name}
             >
                 {party.name}
@@ -101,7 +101,7 @@ function RentHistoryLeaseOutContractLesseeCell({
         return <RentHistoryProprietorCell party={proprietorFromRent} />;
     }
     const ct = currentTenants.find((c) => c.name?.trim() === dn);
-    const nameClass = 'text-sm font-medium text-zinc-900 dark:text-white truncate min-w-0 max-w-full block';
+    const nameClass = 'text-sm font-medium text-zinc-900 dark:text-white line-clamp-2 min-w-0 max-w-full block';
     if (ct) {
         return (
             <Tooltip
@@ -967,7 +967,7 @@ export default function PropertyDetailsPage() {
                                                                         className="bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white p-3 rounded-xl shadow-xl border border-zinc-200 dark:border-white/10 max-w-xs"
                                                                     >
                                                                         <div
-                                                                            className="text-sm font-medium text-zinc-900 dark:text-white truncate min-w-0 max-w-full block"
+                                                                            className="text-sm font-medium text-zinc-900 dark:text-white line-clamp-2 min-w-0 max-w-full block"
                                                                             title={otherParty.name}
                                                                         >
                                                                             {otherParty.name}
