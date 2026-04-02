@@ -1,6 +1,6 @@
 'use client';
 
-import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup, useMapEvents } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import type { Property } from '@/lib/db';
@@ -9,6 +9,8 @@ import { useEffect, useState } from 'react';
 
 interface SinglePropertyMapProps {
     property: Property;
+    onLocationChange?: (lat: number, lng: number) => void;
+    interactive?: boolean;
 }
 
 const statusColors: Record<string, string> = {
@@ -32,7 +34,19 @@ const createIcon = (color: string) => {
     });
 };
 
-export default function SinglePropertyMap({ property }: SinglePropertyMapProps) {
+/** 點擊地圖設定座標（當 interactive=true 時啟用） */
+function MapClickHandler({ onLocationChange }: { onLocationChange?: (lat: number, lng: number) => void }) {
+    useMapEvents({
+        click(e) {
+            if (onLocationChange) {
+                onLocationChange(e.latlng.lat, e.latlng.lng);
+            }
+        },
+    });
+    return null;
+}
+
+export default function SinglePropertyMap({ property, onLocationChange, interactive = false }: SinglePropertyMapProps) {
     const { theme } = useTheme();
     const isDark = theme === 'dark';
     const [center, setCenter] = useState<{ lat: number; lng: number } | null>(null);
@@ -51,20 +65,42 @@ export default function SinglePropertyMap({ property }: SinglePropertyMapProps) 
             }
 
             if (property.address) {
+                // 1) 先試 Nominatim（適用於市區）
                 try {
-                    const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(property.address + ', Hong Kong')}&limit=1`, {
-                        headers: {
-                            'Accept-Language': 'zh-TW,zh;q=0.9,en;q=0.8',
-                            'User-Agent': 'AntigravityPropSystem/1.0'
+                    const res = await fetch(
+                        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(property.address + ', Hong Kong')}&limit=1`,
+                        {
+                            headers: {
+                                'Accept-Language': 'zh-TW,zh;q=0.9,en;q=0.8',
+                                'User-Agent': 'AntigravityPropSystem/1.0'
+                            }
                         }
-                    });
-
+                    );
                     const data = await res.json();
                     if (data && data.length > 0 && isMounted) {
-                        setCenter({ lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) });
+                        const lat = parseFloat(data[0].lat);
+                        const lng = parseFloat(data[0].lon);
+                        if (Number.isFinite(lat) && Number.isFinite(lng)) {
+                            setCenter({ lat, lng });
+                            setLoading(false);
+                            return;
+                        }
                     }
                 } catch (error) {
-                    console.error('Geocoding fallback failed:', error);
+                    console.warn('Nominatim geocoding failed:', error);
+                }
+
+                // 2) Fallback：政府 ALS API（適用於新界鄉郊）
+                try {
+                    const alsRes = await fetch(`/api/geocode?q=${encodeURIComponent(property.address)}`);
+                    const alsData = await alsRes.json();
+                    if (alsData?.lat != null && alsData?.lng != null && isMounted) {
+                        setCenter({ lat: alsData.lat, lng: alsData.lng });
+                        setLoading(false);
+                        return;
+                    }
+                } catch (error) {
+                    console.warn('ALS geocoding failed:', error);
                 }
             }
 
@@ -96,6 +132,9 @@ export default function SinglePropertyMap({ property }: SinglePropertyMapProps) 
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
                 </svg>
                 <p className="text-zinc-400 dark:text-white/30 text-sm">暫無位置訊息。</p>
+                {interactive && onLocationChange && (
+                    <p className="text-zinc-400 dark:text-white/30 text-xs">點擊地圖以設定位置</p>
+                )}
             </div>
         );
     }
@@ -107,9 +146,11 @@ export default function SinglePropertyMap({ property }: SinglePropertyMapProps) 
             <MapContainer
                 center={center}
                 zoom={16}
-                scrollWheelZoom={false}
+                scrollWheelZoom={interactive}
+                dragging={interactive}
                 style={{ height: '100%', width: '100%', zIndex: 0 }}
             >
+                {interactive && <MapClickHandler onLocationChange={onLocationChange} />}
                 <TileLayer
                     attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
                     url={tileUrl}
@@ -122,6 +163,9 @@ export default function SinglePropertyMap({ property }: SinglePropertyMapProps) 
                         <div className="p-1 min-w-[200px]">
                             <h3 className="font-semibold text-base text-zinc-900">{property.name}</h3>
                             <p className="text-sm text-zinc-600 mt-1 line-clamp-2">{property.address}</p>
+                            {interactive && (
+                                <p className="text-[10px] text-zinc-400 mt-1">點擊地圖可移動標記</p>
+                            )}
                         </div>
                     </Popup>
                 </Marker>
