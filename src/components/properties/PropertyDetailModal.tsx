@@ -745,12 +745,16 @@ export default function PropertyDetailModal({ propertyName, propertyId, onClose 
                                                             ) : null}
                                                         </div>
 
-                                                        {/* 合約描述 */}
+                                                        {/* 合約備註 */}
                                                         {c.rentOutDescription ? (
-                                                            <div className="mt-3 px-4 pb-4">
+                                                            <div className="mt-3 mx-4 mb-4 bg-amber-50 dark:bg-amber-500/10 rounded-xl p-3 border border-amber-200/60 dark:border-amber-500/25">
+                                                                <div className="flex items-center gap-1.5 mb-2">
+                                                                    <FileText className="w-3 h-3 text-amber-500 dark:text-amber-400 shrink-0" />
+                                                                    <span className="text-[11px] font-semibold text-amber-700 dark:text-amber-300 tracking-wide uppercase">合約備註</span>
+                                                                </div>
                                                                 <div
-                                                                    className="text-xs text-zinc-500 dark:text-white/45 leading-relaxed line-clamp-2 prose prose-xs dark:prose-invert max-w-none"
-                                                                    dangerouslySetInnerHTML={{ __html: c.rentOutDescription }}
+                                                                    className="text-xs text-zinc-600 dark:text-white/65 leading-relaxed prose prose-xs dark:prose-invert max-w-none prose-p:my-0"
+                                                                    dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(c.rentOutDescription) }}
                                                                 />
                                                             </div>
                                                         ) : null}
