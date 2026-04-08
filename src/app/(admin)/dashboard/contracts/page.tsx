@@ -11,6 +11,7 @@ import { labelRentOutContractNatureZh } from '@/lib/rentPaymentDisplay';
 import { BentoCard } from '@/components/layout/BentoGrid';
 import RentModal from '@/components/properties/RentModal';
 import PropertyDetailModal from '@/components/properties/PropertyDetailModal';
+import { AdminListPagination, ADMIN_LIST_PAGE_SIZE } from '@/components/admin/AdminListPagination';
 
 export default function ContractsPage() {
     const queryClient = useQueryClient();
@@ -31,6 +32,7 @@ export default function ContractsPage() {
     } | null>(null);
     const [deleteBusy, setDeleteBusy] = useState(false);
     const [deletePortalReady, setDeletePortalReady] = useState(false);
+    const [listPage, setListPage] = useState(1);
     useEffect(() => {
         setDeletePortalReady(true);
     }, []);
@@ -47,6 +49,14 @@ export default function ContractsPage() {
     );
     const activeContracts = contractListTab === 'lease_out' ? leaseOutContracts : leaseInContracts;
     const isLeaseInTab = contractListTab === 'lease_in';
+
+    const totalListPages = Math.max(1, Math.ceil((activeContracts as any[]).length / ADMIN_LIST_PAGE_SIZE));
+    const effectiveListPage = Math.min(listPage, totalListPages);
+    const pagedActiveContracts = useMemo(() => {
+        const arr = activeContracts as any[];
+        const start = (effectiveListPage - 1) * ADMIN_LIST_PAGE_SIZE;
+        return arr.slice(start, start + ADMIN_LIST_PAGE_SIZE);
+    }, [activeContracts, effectiveListPage]);
 
     /** 合約表單：業主存 tenant_id（join 為 tenant）、現時租客存 rent_out_tenant_ids（API 附 currentTenant） */
     const contractOwnerDisplayName = (c: any) =>
@@ -288,7 +298,7 @@ export default function ContractsPage() {
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {(activeContracts as any[]).map((contract, index) => {
+                                    {pagedActiveContracts.map((contract, index) => {
                                         const property = contract.property;
                                         const startDate = contract.rentOutStartDate;
                                         const endDate = contract.rentOutEndDate;
@@ -435,7 +445,7 @@ export default function ContractsPage() {
                         </div>
 
                         <div className="md:hidden p-4 space-y-3">
-                            {(activeContracts as any[]).map((contract, index) => {
+                            {pagedActiveContracts.map((contract, index) => {
                                 const property = contract.property;
                                 const startDate = contract.rentOutStartDate;
                                 const endDate = contract.rentOutEndDate;
@@ -559,6 +569,18 @@ export default function ContractsPage() {
                                 );
                             })}
                         </div>
+
+                        <AdminListPagination
+                            listPage={effectiveListPage}
+                            totalPages={totalListPages}
+                            totalItems={(activeContracts as any[]).length}
+                            onPageChange={setListPage}
+                            activeButtonClassName={
+                                isLeaseInTab
+                                    ? 'bg-violet-600 text-white shadow-md'
+                                    : 'bg-amber-600 text-white shadow-md'
+                            }
+                        />
                     </>
                 )}
             </div>

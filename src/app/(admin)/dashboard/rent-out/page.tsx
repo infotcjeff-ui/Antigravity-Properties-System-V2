@@ -4,7 +4,7 @@ import { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useRentsWithRelationsQuery, useRents } from '@/hooks/useStorage';
 import { useQueryClient } from '@tanstack/react-query';
-import { Calendar, DollarSign, User, Building2, Pencil, Trash2, ChevronRight, LayoutList, TrendingUp } from 'lucide-react';
+import { Calendar, DollarSign, User, Building2, Pencil, Trash2, TrendingUp } from 'lucide-react';
 import type { Rent } from '@/lib/db';
 import {
     formatDateDMY,
@@ -23,6 +23,7 @@ import { BentoCard } from '@/components/layout/BentoGrid';
 import RentModal from '@/components/properties/RentModal';
 import PropertyDetailModal from '@/components/properties/PropertyDetailModal';
 import { useLanguage } from '@/components/common/LanguageSwitcher';
+import { AdminListPagination, ADMIN_LIST_PAGE_SIZE } from '@/components/admin/AdminListPagination';
 
 const filterSelectClass =
     'mt-1 block w-full min-w-[160px] rounded-xl border border-zinc-200 dark:border-white/10 bg-white dark:bg-[#1a1a2e] px-3 py-2 text-sm text-zinc-900 dark:text-white';
@@ -50,6 +51,7 @@ export default function RentOutPage() {
     const [filterContractNature, setFilterContractNature] = useState('');
     const [filterLeaseFrom, setFilterLeaseFrom] = useState('');
     const [filterLeaseTo, setFilterLeaseTo] = useState('');
+    const [listPage, setListPage] = useState(1);
     const { deleteRent } = useRents();
 
     const handleDelete = async (e: React.MouseEvent, id: string) => {
@@ -97,6 +99,13 @@ export default function RentOutPage() {
             return true;
         });
     }, [rents, filterPaymentMethod, filterRentOutPayStatus, filterCurrentTenant, filterContractNature, filterLeaseFrom, filterLeaseTo]);
+
+    const totalListPages = Math.max(1, Math.ceil(filteredRents.length / ADMIN_LIST_PAGE_SIZE));
+    const effectiveListPage = Math.min(listPage, totalListPages);
+    const pagedRents = useMemo(() => {
+        const start = (effectiveListPage - 1) * ADMIN_LIST_PAGE_SIZE;
+        return filteredRents.slice(start, start + ADMIN_LIST_PAGE_SIZE);
+    }, [filteredRents, effectiveListPage]);
 
     if (isLoading) {
         return (
@@ -198,8 +207,8 @@ export default function RentOutPage() {
                     </div>
                 ) : (
                     <>
-                        <div className="glass-card p-4 flex flex-col sm:flex-row flex-wrap gap-4 sm:items-end">
-                            <div className="flex-1 min-w-[160px]">
+                        <div className="glass-card p-4 flex flex-col lg:flex-row lg:flex-nowrap gap-4 lg:items-end lg:overflow-x-auto lg:pb-2 max-w-full">
+                            <div className="w-full min-w-0 lg:w-auto lg:shrink-0 lg:min-w-[160px]">
                                 <label className="text-xs font-medium text-zinc-500 dark:text-white/50">付款方式</label>
                                 <select
                                     value={filterPaymentMethod}
@@ -214,7 +223,7 @@ export default function RentOutPage() {
                                     <option value="bank_in">入數</option>
                                 </select>
                             </div>
-                            <div className="flex-1 min-w-[160px]">
+                            <div className="w-full min-w-0 lg:w-auto lg:shrink-0 lg:min-w-[160px]">
                                 <label className="text-xs font-medium text-zinc-500 dark:text-white/50">繳付狀態</label>
                                 <select
                                     value={filterRentOutPayStatus}
@@ -226,7 +235,7 @@ export default function RentOutPage() {
                                     <option value="unpaid">未繳付</option>
                                 </select>
                             </div>
-                            <div className="flex-1 min-w-[160px]">
+                            <div className="w-full min-w-0 lg:w-auto lg:shrink-0 lg:min-w-[160px]">
                                 <label className="text-xs font-medium text-zinc-500 dark:text-white/50">現時租客</label>
                                 <select
                                     value={filterCurrentTenant}
@@ -241,7 +250,7 @@ export default function RentOutPage() {
                                     ))}
                                 </select>
                             </div>
-                            <div className="flex-1 min-w-[160px]">
+                            <div className="w-full min-w-0 lg:w-auto lg:shrink-0 lg:min-w-[160px]">
                                 <label className="text-xs font-medium text-zinc-500 dark:text-white/50">租賃性質</label>
                                 <select
                                     value={filterContractNature}
@@ -256,14 +265,14 @@ export default function RentOutPage() {
                                     ))}
                                 </select>
                             </div>
-                            <div className="flex-1 min-w-[220px] sm:min-w-[280px]">
+                            <div className="w-full min-w-0 lg:w-auto lg:shrink-0 lg:min-w-[304px]">
                                 <label className="text-xs font-medium text-zinc-500 dark:text-white/50">租約期間</label>
-                                <div className="mt-1 flex flex-wrap items-center gap-2">
+                                <div className="mt-1 flex flex-nowrap items-center gap-2">
                                     <input
                                         type="date"
                                         value={filterLeaseFrom}
                                         onChange={(e) => setFilterLeaseFrom(e.target.value)}
-                                        className={`${filterSelectClass} mt-0 flex-1 min-w-[140px]`}
+                                        className={`${filterSelectClass} mt-0 w-[140px] shrink-0`}
                                         aria-label="租約期間開始"
                                     />
                                     <span className="text-zinc-400 dark:text-white/40 text-sm shrink-0">至</span>
@@ -271,7 +280,7 @@ export default function RentOutPage() {
                                         type="date"
                                         value={filterLeaseTo}
                                         onChange={(e) => setFilterLeaseTo(e.target.value)}
-                                        className={`${filterSelectClass} mt-0 flex-1 min-w-[140px]`}
+                                        className={`${filterSelectClass} mt-0 w-[140px] shrink-0`}
                                         aria-label="租約期間結束"
                                     />
                                 </div>
@@ -304,7 +313,7 @@ export default function RentOutPage() {
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {filteredRents.map((rent: any, index) => {
+                                    {pagedRents.map((rent: any, index) => {
                                         const property = rent.property;
                                         const proprietor = rent.proprietor;
                                         const tenant = rent.tenant;
@@ -414,7 +423,7 @@ export default function RentOutPage() {
 
                         {/* Mobile Card View */}
                         <div className="grid grid-cols-1 gap-4 md:hidden">
-                            {filteredRents.map((rent: any, index) => {
+                            {pagedRents.map((rent: any, index) => {
                                 const property = rent.property;
                                 const proprietor = rent.proprietor;
                                 const tenant = rent.tenant;
@@ -559,6 +568,13 @@ export default function RentOutPage() {
                                 );
                             })}
                         </div>
+
+                        <AdminListPagination
+                            listPage={effectiveListPage}
+                            totalPages={totalListPages}
+                            totalItems={filteredRents.length}
+                            onPageChange={setListPage}
+                        />
                             </>
                         )}
                     </>

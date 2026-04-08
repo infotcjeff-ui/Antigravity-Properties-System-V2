@@ -4,7 +4,7 @@ import { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useRentsWithRelationsQuery, useRents } from '@/hooks/useStorage';
 import { useQueryClient } from '@tanstack/react-query';
-import { Calendar, DollarSign, User, Building2, Pencil, Trash2, ChevronRight, LayoutList } from 'lucide-react';
+import { Calendar, DollarSign, User, Building2, Pencil, Trash2, LayoutList } from 'lucide-react';
 import type { Rent } from '@/lib/db';
 import {
     formatDateDMY,
@@ -21,6 +21,7 @@ import { BentoCard } from '@/components/layout/BentoGrid';
 import RentModal from '@/components/properties/RentModal';
 import PropertyDetailModal from '@/components/properties/PropertyDetailModal';
 import { useLanguage } from '@/components/common/LanguageSwitcher';
+import { AdminListPagination, ADMIN_LIST_PAGE_SIZE } from '@/components/admin/AdminListPagination';
 
 type RentingPayStatusFilter = '' | RentCollectionPayListStatus;
 
@@ -49,6 +50,7 @@ export default function RentingPage() {
     const [propertyDetailTarget, setPropertyDetailTarget] = useState<{ id?: string; name: string } | null>(null);
     const [filterPaymentMethod, setFilterPaymentMethod] = useState<RentPaymentMethodFilterValue>('');
     const [filterRentingPayStatus, setFilterRentingPayStatus] = useState<RentingPayStatusFilter>('');
+    const [listPage, setListPage] = useState(1);
     const { deleteRent } = useRents();
 
     const handleDelete = async (e: React.MouseEvent, id: string) => {
@@ -69,6 +71,13 @@ export default function RentingPage() {
             return true;
         });
     }, [rents, filterPaymentMethod, filterRentingPayStatus]);
+
+    const totalListPages = Math.max(1, Math.ceil(filteredRents.length / ADMIN_LIST_PAGE_SIZE));
+    const effectiveListPage = Math.min(listPage, totalListPages);
+    const pagedRents = useMemo(() => {
+        const start = (effectiveListPage - 1) * ADMIN_LIST_PAGE_SIZE;
+        return filteredRents.slice(start, start + ADMIN_LIST_PAGE_SIZE);
+    }, [filteredRents, effectiveListPage]);
 
     if (isLoading) {
         return (
@@ -209,7 +218,7 @@ export default function RentingPage() {
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {filteredRents.map((rent: any, index) => {
+                                    {pagedRents.map((rent: any, index) => {
                                         const property = rent.property;
                                         const tenant = rent.tenant;
                                         const proprietor = rent.proprietor;
@@ -301,7 +310,7 @@ export default function RentingPage() {
 
                         {/* Mobile Card View */}
                         <div className="grid grid-cols-1 gap-4 md:hidden">
-                            {filteredRents.map((rent: any, index) => {
+                            {pagedRents.map((rent: any, index) => {
                                 const property = rent.property;
                                 const tenant = rent.tenant;
                                 const proprietor = rent.proprietor;
@@ -436,6 +445,13 @@ export default function RentingPage() {
                                 );
                             })}
                         </div>
+
+                        <AdminListPagination
+                            listPage={effectiveListPage}
+                            totalPages={totalListPages}
+                            totalItems={filteredRents.length}
+                            onPageChange={setListPage}
+                        />
                             </>
                         )}
                     </>
