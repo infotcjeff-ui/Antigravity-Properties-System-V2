@@ -6,6 +6,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import DashboardSidebar from '@/components/layout/DashboardSidebar';
 import TopBar from '@/components/layout/TopBar';
 import ThemeToggle from '@/components/layout/ThemeToggle';
+import { useLanguage } from '@/components/common/LanguageSwitcher';
 
 export default function AdminLayout({
     children,
@@ -14,6 +15,9 @@ export default function AdminLayout({
 }) {
     const router = useRouter();
     const pathname = usePathname();
+    const lang = useLanguage();
+    const isZh = lang === 'zh-TW';
+    const t = (en: string, zh: string) => (isZh ? zh : en);
     const [isLoading, setIsLoading] = useState(true);
     const [isAuthenticated, setIsAuthenticated] = useState(false);
     const [userRole, setUserRole] = useState<string>('client');
@@ -67,7 +71,9 @@ export default function AdminLayout({
                         transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut" }}
                         className="w-12 h-12 rounded-full bg-purple-500"
                     />
-                    <p className="text-zinc-500 dark:text-white/70 text-sm">Loading Dashboard...</p>
+                    <p className="text-zinc-500 dark:text-white/70 text-sm">
+                        {t('Loading…', '載入中…')}
+                    </p>
                 </motion.div>
             </div>
         );

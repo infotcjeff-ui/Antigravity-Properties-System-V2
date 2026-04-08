@@ -20,6 +20,7 @@ import {
 import { BentoCard } from '@/components/layout/BentoGrid';
 import RentModal from '@/components/properties/RentModal';
 import PropertyDetailModal from '@/components/properties/PropertyDetailModal';
+import { useLanguage } from '@/components/common/LanguageSwitcher';
 
 type RentingPayStatusFilter = '' | RentCollectionPayListStatus;
 
@@ -38,6 +39,9 @@ const filterSelectClass =
 
 export default function RentingPage() {
     const queryClient = useQueryClient();
+    const lang = useLanguage();
+    const isZh = lang === 'zh-TW';
+    const t = (en: string, zh: string) => (isZh ? zh : en);
     const { data: rents = [], isLoading } = useRentsWithRelationsQuery({ type: 'renting' });
     const [showModal, setShowModal] = useState(false);
     const [showPropertyModal, setShowPropertyModal] = useState(false);
@@ -84,10 +88,12 @@ export default function RentingPage() {
             <div className="flex items-center justify-between">
                 <div>
                     <h1 className="text-2xl font-bold text-zinc-900 dark:text-white flex items-center gap-2">
-                        <LayoutList className="w-6 h-6 text-purple-500 md:hidden" />
-                        交租管理
+                        <LayoutList className="w-6 h-6 text-purple-500 md:hidden" aria-hidden />
+                        {t('Rent payment', '交租管理')}
                     </h1>
-                    <p className="text-zinc-500 dark:text-white/50 mt-1 hidden sm:block">管理需要支付的租金</p>
+                    <p className="text-zinc-500 dark:text-white/50 mt-1 hidden sm:block">
+                        {t('Manage rent payments due.', '管理需要支付的租金')}
+                    </p>
                 </div>
             </div>
 
@@ -96,7 +102,7 @@ export default function RentingPage() {
                 <BentoCard>
                     <div className="flex items-center justify-between">
                         <div>
-                            <p className="text-zinc-500 dark:text-white/50 text-sm">Total Records</p>
+                            <p className="text-zinc-500 dark:text-white/50 text-sm">{t('Total records', '總筆數')}</p>
                             <p className="text-2xl font-bold text-zinc-900 dark:text-white mt-1">{rents.length}</p>
                         </div>
                         <div className="p-3 rounded-xl bg-purple-50 dark:bg-purple-500/20">

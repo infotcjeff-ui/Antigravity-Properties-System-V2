@@ -1,35 +1,89 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
+import { useEffect, useMemo, useState } from 'react';
+import Link from 'next/link';
 import { motion } from 'framer-motion';
-import { useDashboardStatsQuery, useDatabase } from '@/hooks/useStorage';
-import {
-    Building2,
-    Users,
-    TrendingUp,
-    TrendingDown,
-    DollarSign,
-    Activity,
-    BarChart3,
-    PieChart,
-    Shield,
-    Settings,
-    Database,
-} from 'lucide-react';
-import { BentoCard, BentoGrid, StatCard } from '@/components/layout/BentoGrid';
-import type { Property, Proprietor, Rent } from '@/lib/db';
+import { useDashboardStatsQuery, useRentsWithRelationsQuery } from '@/hooks/useStorage';
+import { useLanguage } from '@/components/common/LanguageSwitcher';
+import { Building2, Users, TrendingUp, TrendingDown, Activity, PieChart } from 'lucide-react';
+import { BentoCard, StatCard } from '@/components/layout/BentoGrid';
+import { getRentOutCollectionDisplayPeriod, getRentOutOrContractListNumber } from '@/lib/rentPaymentDisplay';
+import { cn } from '@/lib/utils';
+
+/** 暫時隱藏「租務概覽」區塊；改為 true 可恢復顯示 */
+const SHOW_LEASE_OVERVIEW = false;
+
+const containerVariants = {
+    hidden: { opacity: 0 },
+    show: {
+        opacity: 1,
+        transition: { staggerChildren: 0.06, delayChildren: 0.05 },
+    },
+};
+
+const itemVariants = {
+    hidden: { opacity: 0, y: 16 },
+    show: { opacity: 1, y: 0, transition: { type: 'spring', stiffness: 380, damping: 28 } },
+};
+
+type LeaseTab = 'leasing' | 'rented_out' | 'unpaid';
+
+function formatListDate(d: unknown): string {
+    if (d == null || d === '') return '—';
+    const t = new Date(d as string | number | Date);
+    if (Number.isNaN(t.getTime())) return '—';
+    return t.toLocaleDateString('zh-TW', { year: 'numeric', month: '2-digit', day: '2-digit' });
+}
+
+/**
+ * 收／交租記錄是否已選付款方式（與 rentPaymentDisplay 列表「已繳付」之付款方式判斷一致）
+ */
+function hasRentCollectionPaymentMethodSelected(r: { rentCollectionPaymentMethod?: string | null }): boolean {
+    const m = r.rentCollectionPaymentMethod;
+    return m != null && String(m).trim() !== '';
+}
+
+/** 列表「月租」欄：與收租／交租主檔一致；無設定則顯示 — */
+function formatListMonthlyAmount(r: Record<string, unknown>): string {
+    if (r.type === 'rent_out') {
+        const m = (r as { rentOutMonthlyRental?: number | null; amount?: number | null }).rentOutMonthlyRental;
+        const a = (r as { amount?: number | null }).amount;
+        if (m == null && a == null) return '—';
+        const n = Number(m ?? a ?? 0);
+        return `$${n.toLocaleString()}`;
+    }
+    const m = (r as { rentingMonthlyRental?: number | null; amount?: number | null }).rentingMonthlyRental;
+    const a = (r as { amount?: number | null }).amount;
+    if (m == null && a == null) return '—';
+    const n = Number(m ?? a ?? 0);
+    return `$${n.toLocaleString()}`;
+}
+
+function leasePeriodEndForDisplay(r: Record<string, unknown>): unknown {
+    if (r.type === 'rent_out') {
+        const { end } = getRentOutCollectionDisplayPeriod(r as Parameters<typeof getRentOutCollectionDisplayPeriod>[0]);
+        return end ?? r.endDate ?? r.rentOutEndDate;
+    }
+    if (r.type === 'renting') {
+        return r.rentingEndDate ?? r.endDate;
+    }
+    return null;
+}
 
 export default function DashboardPage() {
-    const queryClient = useQueryClient();
-    const { data: stats, isLoading } = useDashboardStatsQuery();
+    const lang = useLanguage();
+    const isZh = lang === 'zh-TW';
+    const t = (en: string, zh: string) => (isZh ? zh : en);
 
-    const { seedData, clearDatabase, loading: dbLoading } = useDatabase();
+    const { data: stats, isLoading: statsLoading } = useDashboardStatsQuery();
+    const { data: rents = [], isLoading: rentsLoading } = useRentsWithRelationsQuery({
+        enabled: SHOW_LEASE_OVERVIEW,
+    });
 
     const [userRole, setUserRole] = useState<string>('client');
+    const [leaseTab, setLeaseTab] = useState<LeaseTab>('leasing');
 
     useEffect(() => {
-        // Get user role
         try {
             const authData = localStorage.getItem('pms_auth');
             if (authData) {
@@ -41,236 +95,277 @@ export default function DashboardPage() {
         }
     }, []);
 
-    const invalidateAll = useCallback(() => {
-        queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] });
-        queryClient.invalidateQueries({ queryKey: ['properties'] });
-        queryClient.invalidateQueries({ queryKey: ['proprietors'] });
-        queryClient.invalidateQueries({ queryKey: ['rents'] });
-    }, [queryClient]);
+    const { leasingRows, rentedOutRows, unpaidRows } = useMemo(() => {
+        const list = rents as Record<string, unknown>[];
+        /** 租賃中：交租（renting）且已選付款方式 */
+        const leasingRows = list.filter(
+            (r) => r.type === 'renting' && hasRentCollectionPaymentMethodSelected(r as { rentCollectionPaymentMethod?: string | null }),
+        );
+        /** 出租中：收租（rent_out）且已選付款方式 */
+        const rentedOutRows = list.filter(
+            (r) => r.type === 'rent_out' && hasRentCollectionPaymentMethodSelected(r as { rentCollectionPaymentMethod?: string | null }),
+        );
+        /** 未繳付：收租或交租，且尚未選付款方式 */
+        const unpaidRows = list.filter((r) => {
+            if (r.type !== 'rent_out' && r.type !== 'renting') return false;
+            return !hasRentCollectionPaymentMethodSelected(r as { rentCollectionPaymentMethod?: string | null });
+        });
+        return { leasingRows, rentedOutRows, unpaidRows };
+    }, [rents]);
 
-    const handleResetDatabase = async () => {
-        if (window.confirm('您確定要清除所有雲端和本地數據嗎？此操作無法撤銷。')) {
-            await clearDatabase();
-            invalidateAll();
-        }
-    };
+    const activeRows =
+        leaseTab === 'leasing' ? leasingRows : leaseTab === 'rented_out' ? rentedOutRows : unpaidRows;
 
-    const handleSeedData = async () => {
-        await seedData();
-        invalidateAll();
-    };
-
-
-    // Use stats from the query
     const totalProperties = stats?.totalProperties || 0;
     const totalProprietors = stats?.totalProprietors || 0;
-    const totalRents = stats?.totalRents || 0;
-    const rentingLeases = stats?.rentingLeases || 0;
-    const expiredLeases = stats?.expiredLeases || 0;
-    const totalIncome = stats?.totalIncome || 0;
-    const totalExpenses = stats?.totalExpenses || 0;
-    const netProfit = stats?.netProfit || 0;
-    const statusBreakdown = stats?.statusBreakdown || { holding: 0, renting: 0, sold: 0, suspended: 0 };
+    const monthlyRentCollected = stats?.monthlyRentCollected ?? 0;
+    const monthlyRentPaid = stats?.monthlyRentPaid ?? 0;
 
-    if (isLoading) {
+    if (statsLoading) {
         return (
             <div className="flex items-center justify-center min-h-[60vh]">
                 <motion.div
                     animate={{ opacity: [0.3, 1, 0.3] }}
-                    transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut" }}
-                    className="w-12 h-12 rounded-full bg-purple-500"
+                    transition={{ duration: 1.5, repeat: Infinity, ease: 'easeInOut' }}
+                    className="w-12 h-12 rounded-full bg-violet-500"
                 />
             </div>
         );
     }
 
+    const pageTitle =
+        userRole === 'admin' ? t('Overview', '總覽') : t('My overview', '我的總覽');
+    const pageSubtitle =
+        userRole === 'admin'
+            ? t('Full system snapshot and key metrics.', '即時掌握營運數據與物業概況。')
+            : t('Your properties and leasing at a glance.', '您的物業與租賃概覽。');
+
+    const tabActiveLeasing =
+        'bg-violet-500/15 text-violet-900 ring-1 ring-violet-500/30 dark:bg-violet-500/12 dark:text-violet-200 dark:ring-violet-400/25';
+    const tabActiveRentedOut =
+        'bg-emerald-500/15 text-emerald-800 ring-1 ring-emerald-500/25 dark:bg-emerald-500/10 dark:text-emerald-300 dark:ring-emerald-400/20';
+    const tabActiveUnpaid =
+        'bg-amber-500/15 text-amber-900 ring-1 ring-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200 dark:ring-amber-400/25';
+
     return (
-        <div className="space-y-6">
-            {/* Page Header */}
-            <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-8">
-                <div>
-                    <h1 className="text-4xl font-black text-zinc-900 dark:text-white flex items-center gap-4 tracking-tight">
-                        {userRole === 'admin' ? '管理儀表板' : '我的儀表板'}
-                        <span className="px-3 py-1 bg-blue-500/10 text-blue-500 dark:text-blue-400 text-xs font-bold rounded-full border border-blue-500/20 uppercase tracking-widest animate-pulse">
-                            Live Sync
-                        </span>
-                    </h1>
-                    <p className="text-zinc-500 dark:text-white/40 mt-2 text-lg font-medium">
-                        {userRole === 'admin'
-                            ? '完整的系統概覽與管理'
-                            : '您的物業與租賃概覽'}
-                    </p>
+        <motion.div
+            className="space-y-8 max-w-[1600px] mx-auto"
+            variants={containerVariants}
+            initial="hidden"
+            animate="show"
+        >
+            <motion.section
+                variants={itemVariants}
+                className="relative overflow-hidden rounded-[1.75rem] border border-zinc-200/90 bg-white/90 p-8 shadow-sm ring-1 ring-zinc-900/[0.04] dark:border-white/[0.08] dark:bg-zinc-900/40 dark:ring-white/[0.06] md:p-10"
+            >
+                <div
+                    className="pointer-events-none absolute inset-0 opacity-[0.55] dark:opacity-40"
+                    style={{
+                        background: `
+              radial-gradient(ellipse 90% 55% at 10% -10%, rgba(139, 92, 246, 0.18), transparent 55%),
+              radial-gradient(ellipse 70% 45% at 90% 0%, rgba(59, 130, 246, 0.12), transparent 50%),
+              radial-gradient(ellipse 50% 35% at 50% 100%, rgba(16, 185, 129, 0.06), transparent 45%)
+            `,
+                    }}
+                />
+                <div className="relative flex flex-col gap-5 md:flex-row md:items-end md:justify-between">
+                    <div className="min-w-0 space-y-3">
+                        <h1 className="text-3xl font-semibold tracking-tight text-zinc-900 dark:text-white md:text-4xl">
+                            {pageTitle}
+                        </h1>
+                        <p className="max-w-xl text-base leading-relaxed text-zinc-600 dark:text-white/55">{pageSubtitle}</p>
+                    </div>
                 </div>
-            </div>
+            </motion.section>
 
-            {/* Stats Row */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <motion.div variants={itemVariants} className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
                 <StatCard
-                    label="物業總數"
+                    label={t('Properties', '物業總數')}
                     value={totalProperties}
-                    icon={<Building2 className="w-6 h-6 text-white" />}
+                    icon={<Building2 className="h-6 w-6 text-white" />}
                     gradient="purple"
+                    href="/dashboard/properties"
                 />
                 <StatCard
-                    label="業主"
+                    label={t('Owners', '業主')}
                     value={totalProprietors}
-                    icon={<Users className="w-6 h-6 text-white" />}
+                    icon={<Users className="h-6 w-6 text-white" />}
                     gradient="blue"
+                    href="/dashboard/tenants"
                 />
                 <StatCard
-                    label="總收入"
-                    value={`$${totalIncome.toLocaleString()}`}
-                    icon={<TrendingUp className="w-6 h-6 text-white" />}
+                    label={t('Monthly rent collected', '每月收租')}
+                    value={`$${monthlyRentCollected.toLocaleString()}`}
+                    icon={<TrendingUp className="h-6 w-6 text-white" />}
                     gradient="green"
+                    href="/dashboard/rent-out"
                 />
                 <StatCard
-                    label="總支出"
-                    value={`$${totalExpenses.toLocaleString()}`}
-                    icon={<TrendingDown className="w-6 h-6 text-white" />}
+                    label={t('Monthly rent paid', '每月交租')}
+                    value={`$${monthlyRentPaid.toLocaleString()}`}
+                    icon={<TrendingDown className="h-6 w-6 text-white" />}
                     gradient="orange"
+                    href="/dashboard/renting"
                 />
-            </div>
+            </motion.div>
 
-            {/* Bento Grid */}
-            <BentoGrid>
-                {/* Net Profit */}
-                <BentoCard
-                    title="淨利潤"
-                    subtitle="收入減去支出"
-                    icon={<DollarSign className="w-5 h-5" />}
-                    size="wide"
-                    gradient={netProfit >= 0 ? 'green' : 'orange'}
-                >
-                    <div className="flex items-end gap-2">
-                        <span className={`text-4xl font-bold ${netProfit >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-                            ${Math.abs(netProfit).toLocaleString()}
-                        </span>
-                        <span className={`mb-1 ${netProfit >= 0 ? 'text-emerald-400/70' : 'text-red-400/70'}`}>
-                            {netProfit >= 0 ? '盈餘' : '虧損'}
-                        </span>
-                    </div>
-                </BentoCard>
-
-                {/* Renting Leases */}
-                <BentoCard
-                    title="租賃中"
-                    subtitle="當前活躍租約"
-                    icon={<Activity className="w-5 h-5" />}
-                    gradient="green"
-                >
-                    <span className="text-3xl font-bold text-emerald-400">{rentingLeases}</span>
-                </BentoCard>
-
-                {/* Expired Leases */}
-                <BentoCard
-                    title="已過期"
-                    subtitle="需續約或處理"
-                    icon={<Activity className="w-5 h-5" />}
-                    gradient="orange"
-                >
-                    <span className="text-3xl font-bold text-red-400">{expiredLeases}</span>
-                </BentoCard>
-
-                {/* Property Status Breakdown */}
-                <BentoCard
-                    title="狀態分佈"
-                    subtitle="物業狀態佔比"
-                    icon={<PieChart className="w-5 h-5" />}
-                    size="tall"
-                >
-                    <div className="space-y-3 mt-2">
-                        {[
-                            { label: '持有中', value: statusBreakdown.holding, color: 'bg-blue-500', textColor: 'text-blue-400' },
-                            { label: '出租中', value: statusBreakdown.renting, color: 'bg-green-500', textColor: 'text-green-400' },
-                            { label: '已售出', value: statusBreakdown.sold, color: 'bg-gray-500', textColor: 'text-gray-400' },
-                            { label: '已暫停', value: statusBreakdown.suspended, color: 'bg-red-500', textColor: 'text-red-400' },
-                        ].map((item) => (
-                            <div key={item.label} className="flex items-center gap-3">
-                                <div className={`w-3 h-3 rounded-full ${item.color}`} />
-                                <span className="text-zinc-600 dark:text-white/70 text-sm flex-1">{item.label}</span>
-                                <span className={`font-semibold ${item.textColor}`}>{item.value}</span>
-                                <div className="w-16 h-2 bg-zinc-100 dark:bg-white/10 rounded-full overflow-hidden">
-                                    <motion.div
-                                        initial={{ width: 0 }}
-                                        animate={{ width: `${totalProperties > 0 ? (item.value / totalProperties) * 100 : 0}%` }}
-                                        transition={{ duration: 0.5, delay: 0.2 }}
-                                        className={`h-full ${item.color}`}
-                                    />
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                </BentoCard>
-
-                {/* Admin-Only Widgets */}
-                {userRole === 'admin' && (
-                    <>
-                        {/* System Health */}
-                        <BentoCard
-                            title="系統狀態"
-                            subtitle="所有系統運行正常"
-                            icon={<Shield className="w-5 h-5" />}
-                            gradient="green"
-                        >
-                            <div className="flex items-center gap-2">
-                                <div className="w-3 h-3 rounded-full bg-emerald-500 animate-pulse" />
-                                <span className="text-emerald-400 font-medium">良好</span>
-                            </div>
-                        </BentoCard>
-
-                        {/* Database Stats */}
-                        <BentoCard
-                            title="資料庫"
-                            subtitle="本地儲存統計"
-                            icon={<Database className="w-5 h-5" />}
-                            size="wide"
-                            gradient="blue"
-                        >
-                            <div className="flex gap-6 text-sm">
-                                <div>
-                                    <p className="text-zinc-500 dark:text-white/50">物業</p>
-                                    <p className="text-zinc-900 dark:text-white font-semibold">{totalProperties} 筆記錄</p>
-                                </div>
-                                <div>
-                                    <p className="text-zinc-500 dark:text-white/50">業主</p>
-                                    <p className="text-zinc-900 dark:text-white font-semibold">{totalProprietors} 筆記錄</p>
-                                </div>
-                                <div>
-                                    <p className="text-zinc-500 dark:text-white/50">出租記錄</p>
-                                    <p className="text-zinc-900 dark:text-white font-semibold">{totalRents} 筆記錄</p>
-                                </div>
-                            </div>
-                        </BentoCard>
-
-                    </>
-                )}
-
-                {/* Client-Only Summary */}
-                {userRole !== 'admin' && (
+            <motion.div variants={itemVariants}>
+                {SHOW_LEASE_OVERVIEW && (
                     <BentoCard
-                        title="我的概覽"
-                        subtitle="您的個人數據統計"
-                        icon={<BarChart3 className="w-5 h-5" />}
+                        title={t('Lease activity', '租務概覽')}
+                        subtitle={t(
+                            'Rent payment with method, rent collection with method, or payment method not yet selected.',
+                            '租賃中：交租已選付款方式；出租中：收租已選付款方式；未繳付：尚未選擇付款方式。',
+                        )}
+                        icon={<Activity className="h-5 w-5" />}
                         size="wide"
-                        gradient="purple"
+                        gradient="green"
                     >
-                        <div className="grid grid-cols-3 gap-4 text-center">
-                            <div>
-                                <p className="text-2xl font-bold text-zinc-900 dark:text-white">{totalProperties}</p>
-                                <p className="text-zinc-500 dark:text-white/50 text-sm">我的物業</p>
-                            </div>
-                            <div>
-                                <p className="text-2xl font-bold text-green-600 dark:text-green-400">${totalIncome.toLocaleString()}</p>
-                                <p className="text-zinc-500 dark:text-white/50 text-sm">我的收入</p>
-                            </div>
-                            <div>
-                                <p className="text-2xl font-bold text-red-600 dark:text-red-400">${totalExpenses.toLocaleString()}</p>
-                                <p className="text-zinc-500 dark:text-white/50 text-sm">我的支出</p>
-                            </div>
+                        <div className="flex flex-wrap gap-2 border-b border-zinc-200/80 pb-3 dark:border-white/10">
+                            <button
+                                type="button"
+                                onClick={() => setLeaseTab('leasing')}
+                                className={cn(
+                                    'rounded-lg px-3 py-1.5 text-sm font-medium transition-colors',
+                                    leaseTab === 'leasing' ? tabActiveLeasing : 'text-zinc-500 hover:bg-zinc-100 dark:hover:bg-white/5',
+                                )}
+                            >
+                                {t('Leasing', '租賃中')}
+                                <span className="ml-1.5 tabular-nums text-zinc-400">({leasingRows.length})</span>
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setLeaseTab('rented_out')}
+                                className={cn(
+                                    'rounded-lg px-3 py-1.5 text-sm font-medium transition-colors',
+                                    leaseTab === 'rented_out' ? tabActiveRentedOut : 'text-zinc-500 hover:bg-zinc-100 dark:hover:bg-white/5',
+                                )}
+                            >
+                                {t('Rented out', '出租中')}
+                                <span className="ml-1.5 tabular-nums text-zinc-400">({rentedOutRows.length})</span>
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setLeaseTab('unpaid')}
+                                className={cn(
+                                    'rounded-lg px-3 py-1.5 text-sm font-medium transition-colors',
+                                    leaseTab === 'unpaid' ? tabActiveUnpaid : 'text-zinc-500 hover:bg-zinc-100 dark:hover:bg-white/5',
+                                )}
+                            >
+                                {t('Unpaid', '未繳付')}
+                                <span className="ml-1.5 tabular-nums text-zinc-400">({unpaidRows.length})</span>
+                            </button>
+                        </div>
+
+                        <div className="mt-4 overflow-x-auto rounded-xl border border-zinc-200/80 dark:border-white/10">
+                            {rentsLoading ? (
+                                <div className="flex items-center justify-center py-16 text-sm text-zinc-500 dark:text-white/45">
+                                    {t('Loading…', '載入中…')}
+                                </div>
+                            ) : activeRows.length === 0 ? (
+                                <div className="flex items-center justify-center py-16 text-sm text-zinc-500 dark:text-white/45">
+                                    {t('No records', '暫無資料')}
+                                </div>
+                            ) : (
+                                <table className="w-full min-w-[640px] text-left text-sm">
+                                    <thead>
+                                        <tr className="border-b border-zinc-200/80 bg-zinc-50/80 text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:border-white/10 dark:bg-white/[0.03] dark:text-white/45">
+                                            <th className="px-4 py-3">{t('Property', '物業')}</th>
+                                            <th className="px-4 py-3">{t('Ref. no.', '編號')}</th>
+                                            <th className="px-4 py-3">{t('Monthly / amount', '月租／金額')}</th>
+                                            <th className="px-4 py-3">{t('Lease until', '租期至')}</th>
+                                            {leaseTab === 'unpaid' && (
+                                                <th className="px-4 py-3">{t('Type', '類型')}</th>
+                                            )}
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-zinc-100 dark:divide-white/[0.06]">
+                                        {activeRows.map((r) => {
+                                            const prop = r.property as { id?: string; name?: string; code?: string } | undefined;
+                                            const propLabel = String(prop?.name || prop?.code || '—').trim() || '—';
+                                            const propId = prop?.id;
+                                            const refNo = getRentOutOrContractListNumber(
+                                                r as Parameters<typeof getRentOutOrContractListNumber>[0],
+                                            );
+                                            const isOut = r.type === 'rent_out';
+                                            const amountLabel = formatListMonthlyAmount(r);
+                                            const endRaw = leasePeriodEndForDisplay(r);
+                                            return (
+                                                <tr
+                                                    key={String(r.id)}
+                                                    className="bg-white/40 hover:bg-zinc-50/90 dark:bg-transparent dark:hover:bg-white/[0.04]"
+                                                >
+                                                    <td className="px-4 py-3 font-medium text-zinc-900 dark:text-white">
+                                                        {propId ? (
+                                                            <Link
+                                                                href={`/dashboard/properties/${propId}`}
+                                                                className="text-emerald-700 underline-offset-2 hover:underline dark:text-emerald-400"
+                                                            >
+                                                                {propLabel}
+                                                            </Link>
+                                                        ) : (
+                                                            propLabel
+                                                        )}
+                                                    </td>
+                                                    <td className="px-4 py-3 tabular-nums text-zinc-600 dark:text-white/70">
+                                                        {refNo || '—'}
+                                                    </td>
+                                                    <td className="px-4 py-3 tabular-nums text-zinc-800 dark:text-white/85">
+                                                        {amountLabel}
+                                                    </td>
+                                                    <td className="px-4 py-3 text-zinc-600 dark:text-white/65">
+                                                        {formatListDate(endRaw)}
+                                                    </td>
+                                                    {leaseTab === 'unpaid' && (
+                                                        <td className="px-4 py-3 text-zinc-600 dark:text-white/65">
+                                                            {isOut ? t('Rent collection', '收租') : t('Rent payment', '交租')}
+                                                        </td>
+                                                    )}
+                                                </tr>
+                                            );
+                                        })}
+                                    </tbody>
+                                </table>
+                            )}
                         </div>
                     </BentoCard>
                 )}
-            </BentoGrid>
-        </div>
+
+                {userRole !== 'admin' && (
+                    <div className="mt-5">
+                        <BentoCard
+                            title={t('My snapshot', '我的概覽')}
+                            subtitle={t('Your personal figures', '您的個人數據統計')}
+                            icon={<PieChart className="h-5 w-5" />}
+                            size="wide"
+                            gradient="purple"
+                        >
+                            <div className="grid grid-cols-3 gap-4 text-center">
+                                <div>
+                                    <p className="text-2xl font-semibold text-zinc-900 dark:text-white">{totalProperties}</p>
+                                    <p className="text-sm text-zinc-500 dark:text-white/50">{t('My properties', '我的物業')}</p>
+                                </div>
+                                <div>
+                                    <p className="text-2xl font-semibold text-emerald-600 dark:text-emerald-400">
+                                        ${monthlyRentCollected.toLocaleString()}
+                                    </p>
+                                    <p className="text-sm text-zinc-500 dark:text-white/50">
+                                        {t('Monthly rent collected', '每月收租')}
+                                    </p>
+                                </div>
+                                <div>
+                                    <p className="text-2xl font-semibold text-rose-600 dark:text-rose-400">
+                                        ${monthlyRentPaid.toLocaleString()}
+                                    </p>
+                                    <p className="text-sm text-zinc-500 dark:text-white/50">
+                                        {t('Monthly rent paid', '每月交租')}
+                                    </p>
+                                </div>
+                            </div>
+                        </BentoCard>
+                    </div>
+                )}
+            </motion.div>
+        </motion.div>
     );
 }

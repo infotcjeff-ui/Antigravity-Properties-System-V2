@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import Link from 'next/link';
 import { motion, useMotionValue } from 'framer-motion';
 
 interface BentoGridProps {
@@ -119,9 +120,11 @@ interface StatCardProps {
         isPositive: boolean;
     };
     gradient?: 'purple' | 'blue' | 'green' | 'orange';
+    /** 若設定則整卡可點進對應後台頁 */
+    href?: string;
 }
 
-export function StatCard({ label, value, icon, trend, gradient = 'purple' }: StatCardProps) {
+export function StatCard({ label, value, icon, trend, gradient = 'purple', href }: StatCardProps) {
     const gradientIconClasses = {
         purple: 'from-purple-500 to-purple-600 shadow-purple-500/20',
         blue: 'from-blue-500 to-blue-600 shadow-blue-500/20',
@@ -129,11 +132,14 @@ export function StatCard({ label, value, icon, trend, gradient = 'purple' }: Sta
         orange: 'from-orange-500 to-orange-600 shadow-orange-500/20',
     };
 
-    return (
-        <BentoCard gradient={gradient} className="bg-white dark:bg-zinc-900">
+    const card = (
+        <BentoCard
+            gradient={gradient}
+            className={`bg-white dark:bg-zinc-900 ${href ? 'h-full transition-[transform,box-shadow] hover:-translate-y-0.5 hover:shadow-md' : ''}`}
+        >
             <div className="flex items-center justify-between">
                 <div>
-                    <p className="text-zinc-500 dark:text-white/50 text-sm font-medium mb-1 uppercase tracking-wider">{label}</p>
+                    <p className="text-zinc-500 dark:text-white/50 text-sm font-medium mb-1 tracking-wide">{label}</p>
                     <motion.p
                         initial={{ scale: 0.9, opacity: 0 }}
                         animate={{ scale: 1, opacity: 1 }}
@@ -162,4 +168,17 @@ export function StatCard({ label, value, icon, trend, gradient = 'purple' }: Sta
             </div>
         </BentoCard>
     );
+
+    if (href) {
+        return (
+            <Link
+                href={href}
+                className="block h-full rounded-[1.5rem] focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500/60 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-[#0f0f1a]"
+            >
+                {card}
+            </Link>
+        );
+    }
+
+    return card;
 }

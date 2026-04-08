@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '@/contexts/AuthContext';
+import { useLanguage } from '@/components/common/LanguageSwitcher';
 
 interface NavItem {
     label: string;
@@ -17,7 +18,7 @@ interface NavItem {
 const navItems: NavItem[] = [
     {
         label: 'Dashboard',
-        labelZh: '儀表板',
+        labelZh: '總覽',
         href: '/admin/dashboard',
         icon: (
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -82,6 +83,9 @@ const navItems: NavItem[] = [
 export default function AdminSidebar() {
     const pathname = usePathname();
     const { user, logout } = useAuth();
+    const lang = useLanguage();
+    const isZh = lang === 'zh-TW';
+    const t = (en: string, zh: string) => (isZh ? zh : en);
     const [expandedItems, setExpandedItems] = useState<string[]>(['Properties']);
 
     const toggleExpand = (label: string) => {
@@ -166,7 +170,7 @@ export default function AdminSidebar() {
                                                             }`}
                                                     >
                                                         <div className={`w-1.5 h-1.5 rounded-full ${isActive(item.href) ? 'bg-purple-500' : 'bg-white/30'}`} />
-                                                        <span className="text-sm">All Properties</span>
+                                                        <span className="text-sm">{t('All properties', '全部物業')}</span>
                                                     </Link>
                                                 </li>
                                                 {item.children.map((child) => (

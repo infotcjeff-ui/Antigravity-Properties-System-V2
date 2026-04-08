@@ -325,10 +325,10 @@ export default function PropertyDetailsPage() {
         return (
             <div className="flex flex-col items-center justify-center min-h-[60vh] text-white/50">
                 <Building2 className="w-16 h-16 mb-4" />
-                <h2 className="text-xl font-semibold text-white">Property Not Found</h2>
-                <p className="mt-2">The property you are looking for does not exist.</p>
+                <h2 className="text-xl font-semibold text-white">{t('Property not found', '找不到物業')}</h2>
+                <p className="mt-2">{t('This property does not exist or was removed.', '查無此物業或已被移除。')}</p>
                 <Link href="/dashboard/properties" className="mt-4 text-purple-400 hover:text-purple-300">
-                    ← Back to Properties
+                    ← {t('Back to properties', '返回物業列表')}
                 </Link>
             </div>
         );
@@ -418,7 +418,9 @@ export default function PropertyDetailsPage() {
                     <div className="flex justify-between items-start gap-4">
                         <div className="min-w-0 flex-1">
                             <h1 className="text-2xl sm:text-3xl font-bold text-zinc-900 dark:text-white leading-tight">{property.name}</h1>
-                            <p className="text-sm text-zinc-500 dark:text-white/50 mt-1">Code: {property.code}</p>
+                            <p className="text-sm text-zinc-500 dark:text-white/50 mt-1">
+                                {t('Code', '編號')}: {property.code}
+                            </p>
                         </div>
                         <span className={`shrink-0 px-4 py-2 rounded-full text-sm font-semibold border shadow-sm whitespace-nowrap ${statusColors[property.status]}`}>
                             {statusLabels[property.status]}

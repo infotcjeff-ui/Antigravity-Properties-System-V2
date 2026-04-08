@@ -19,6 +19,7 @@ import {
     FileText,
 } from 'lucide-react';
 import ThemeToggle from './ThemeToggle';
+import { useLanguage } from '@/components/common/LanguageSwitcher';
 
 interface DashboardNavItem {
     label: string;
@@ -79,6 +80,9 @@ interface DashboardSidebarProps {
 export default function DashboardSidebar({ userRole = 'client' }: DashboardSidebarProps) {
     const pathname = usePathname();
     const router = useRouter();
+    const lang = useLanguage();
+    const isZh = lang === 'zh-TW';
+    const t = (en: string, zh: string) => (isZh ? zh : en);
 
     const isActive = (href: string) => {
         if (href === '/dashboard/tenants') {
@@ -125,8 +129,10 @@ export default function DashboardSidebar({ userRole = 'client' }: DashboardSideb
                         <Settings className="w-5 h-5 text-white" />
                     </div>
                     <div>
-                        <h1 className="font-bold text-zinc-900 dark:text-white text-lg">Backend</h1>
-                        <p className="text-zinc-500 dark:text-white/40 text-xs font-medium">管理控制台</p>
+                        <h1 className="font-bold text-zinc-900 dark:text-white text-lg">{t('Backend', '後台')}</h1>
+                        <p className="text-zinc-500 dark:text-white/40 text-xs font-medium">
+                            {t('Management console', '管理控制台')}
+                        </p>
                     </div>
                 </div>
 
@@ -227,8 +233,10 @@ export default function DashboardSidebar({ userRole = 'client' }: DashboardSideb
                         </div>
                         <div>
                             <p className="text-zinc-900 dark:text-white text-sm font-medium">{user.username}</p>
-                            <p className="text-zinc-500 dark:text-white/40 text-xs capitalize">
-                                {user.role === 'admin' ? '🔐 Admin' : '👤 Client'}
+                            <p className="text-zinc-500 dark:text-white/40 text-xs">
+                                {user.role === 'admin'
+                                    ? `🔐 ${t('Admin', '管理員')}`
+                                    : `👤 ${t('Client', '客戶')}`}
                             </p>
                         </div>
                     </div>

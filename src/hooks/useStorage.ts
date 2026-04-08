@@ -542,13 +542,30 @@ export const fetchUserStats = async (userId: string) => {
     }
 };
 
+/** 單一日期是否落在 ref 的同一曆月（用於本月實際收／交租加總） */
+function dateInCalendarMonth(d: unknown, ref: Date): boolean {
+    if (d == null) return false;
+    const t = new Date(d as string | number | Date);
+    if (Number.isNaN(t.getTime())) return false;
+    return t.getFullYear() === ref.getFullYear() && t.getMonth() === ref.getMonth();
+}
+
+/** 本月實際收／交租入帳日：繳付日優先，否則記帳日 */
+function rentMonthTransactionAnchor(r: Record<string, unknown>): unknown {
+    return r.rentCollectionPaymentDate ?? r.rentCollectionDate ?? null;
+}
+
 export const fetchDashboardStats = async (user?: any) => {
     try {
         // Base queries
         let propertiesQuery = supabase.from('properties').select('*', { count: 'exact', head: true });
         let proprietorsQuery = supabase.from('proprietors').select('*', { count: 'exact', head: true });
         let rentsQuery = supabase.from('rents').select('*', { count: 'exact', head: true });
-        let rentsDataQuery = supabase.from('rents').select('type, status, renting_end_date, rent_out_end_date, rent_out_status, renting_monthly_rental, rent_out_monthly_rental, amount, renting_periods, rent_out_periods');
+        let rentsDataQuery = supabase
+            .from('rents')
+            .select(
+                'type, status, renting_end_date, rent_out_end_date, rent_out_status, renting_monthly_rental, rent_out_monthly_rental, amount, renting_periods, rent_out_periods, rent_collection_date, rent_collection_amount, rent_collection_payment_date, rent_collection_payment_method, start_date, end_date, rent_out_start_date, renting_start_date, renting_end_date',
+            );
 
         let holdingQuery = supabase.from('properties').select('*', { count: 'exact', head: true }).eq('status', 'holding');
         let rentingQuery = supabase.from('properties').select('*', { count: 'exact', head: true }).eq('status', 'renting');
@@ -607,36 +624,24 @@ export const fetchDashboardStats = async (user?: any) => {
         const rents = (rentsData || []).map(r => toCamel(r));
         const now = new Date();
 
-        const rentingLeases = rents.filter(r => {
-            if (r.type !== 'rent_out') return false;
-            if (r.status !== 'active' && r.rentOutStatus !== 'renting') return false;
-            const endDate = r.endDate || r.rentOutEndDate;
-            return !endDate || new Date(endDate) >= now;
-        }).length;
+        /** 本月份實際收租金額（$）：繳付日或記帳日落於本月之 rent_collection_amount 加總 */
+        const monthlyRentCollected = rents
+            .filter((r) => r.type === 'rent_out')
+            .filter((r) => dateInCalendarMonth(rentMonthTransactionAnchor(r as Record<string, unknown>), now))
+            .reduce((sum, r) => sum + Number((r as any).rentCollectionAmount ?? 0), 0);
 
-        const expiredLeases = rents.filter(r => {
-            if (r.type !== 'rent_out') return false;
-            const endDate = r.endDate || r.rentOutEndDate;
-            return endDate && new Date(endDate) < now;
-        }).length;
-
-        const totalIncome = rents
-            .filter(r => r.type === 'rent_out')
-            .reduce((sum, r) => sum + ((r.rentOutMonthlyRental || r.amount || 0) * (r.rentOutPeriods || 1)), 0);
-
-        const totalExpenses = rents
-            .filter(r => r.type === 'renting')
-            .reduce((sum, r) => sum + ((r.rentingMonthlyRental || r.amount || 0) * (r.rentingPeriods || 1)), 0);
+        /** 本月份實際交租金額（$）：同上，租入（renting）記錄 */
+        const monthlyRentPaid = rents
+            .filter((r) => r.type === 'renting')
+            .filter((r) => dateInCalendarMonth(rentMonthTransactionAnchor(r as Record<string, unknown>), now))
+            .reduce((sum, r) => sum + Number((r as any).rentCollectionAmount ?? 0), 0);
 
         return {
             totalProperties: totalProperties || 0,
             totalProprietors: totalProprietors || 0,
             totalRents: totalRents || 0,
-            rentingLeases,
-            expiredLeases,
-            totalIncome,
-            totalExpenses,
-            netProfit: totalIncome - totalExpenses,
+            monthlyRentCollected,
+            monthlyRentPaid,
             statusBreakdown: {
                 holding: holdingCount || 0,
                 renting: rentingCount || 0,
@@ -654,11 +659,8 @@ export const fetchDashboardStats = async (user?: any) => {
             totalProperties: 0,
             totalProprietors: 0,
             totalRents: 0,
-            rentingLeases: 0,
-            expiredLeases: 0,
-            totalIncome: 0,
-            totalExpenses: 0,
-            netProfit: 0,
+            monthlyRentCollected: 0,
+            monthlyRentPaid: 0,
             statusBreakdown: {
                 holding: 0,
                 renting: 0,
@@ -2019,12 +2021,18 @@ export function useRentsQuery() {
     });
 }
 
-export function useRentsWithRelationsQuery(options?: { type?: 'renting' | 'rent_out' | 'contract' }) {
+export function useRentsWithRelationsQuery(options?: {
+    type?: 'renting' | 'rent_out' | 'contract';
+    /** 設為 false 時不發請求（例如總覽暫時隱藏租務區塊） */
+    enabled?: boolean;
+}) {
     const { user } = useAuth();
+    const { enabled: enabledOpt, ...fetchOpts } = options ?? {};
     return useQuery({
-        queryKey: ['rents-with-relations', user?.id, options?.type],
-        queryFn: () => fetchRentsWithRelations(user, options),
+        queryKey: ['rents-with-relations', user?.id, fetchOpts?.type],
+        queryFn: () => fetchRentsWithRelations(user, fetchOpts),
         staleTime: 2 * 60 * 1000,
+        enabled: enabledOpt !== false,
     });
 }
 

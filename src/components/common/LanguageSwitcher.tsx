@@ -52,12 +52,13 @@ export default function LanguageSwitcher({ isAdmin = false }: LanguageSwitcherPr
 
 // Export a hook for other components to use
 export function useLanguage() {
-    const [language, setLanguage] = useState<Language>('zh-TW');
+    const [language, setLanguage] = useState<Language>(() => {
+        if (typeof window === 'undefined') return 'zh-TW';
+        const saved = localStorage.getItem('app-language') as Language | null;
+        return saved === 'en' ? 'en' : 'zh-TW';
+    });
 
     useEffect(() => {
-        const saved = localStorage.getItem('app-language') as Language | null;
-        if (saved) setLanguage(saved);
-
         const handleChange = (e: CustomEvent<Language>) => {
             setLanguage(e.detail);
         };

@@ -7,6 +7,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Search, Bell, Check, Trash2, LayoutDashboard, LogIn, LogOut, Database, Cloud, Menu, X, Building2, Users, ArrowUpFromLine, ArrowDownToLine, Network, Settings, FileText } from 'lucide-react';
 import { useNotifications } from '@/contexts/NotificationContext';
 import ThemeToggle from './ThemeToggle';
+import LanguageSwitcher, { useLanguage } from '@/components/common/LanguageSwitcher';
 
 interface TopBarProps {
     onSearch?: (query: string) => void;
@@ -17,6 +18,9 @@ interface TopBarProps {
 
 export default function TopBar({ onSearch, placeholder = '搜尋...', isAuthenticated = false, isAdmin = false }: TopBarProps) {
     const router = useRouter();
+    const lang = useLanguage();
+    const isZh = lang === 'zh-TW';
+    const t = (en: string, zh: string) => (isZh ? zh : en);
     const [searchValue, setSearchValue] = useState('');
     const [showNotifications, setShowNotifications] = useState(false);
     const [showMobileMenu, setShowMobileMenu] = useState(false);
@@ -96,7 +100,7 @@ export default function TopBar({ onSearch, placeholder = '搜尋...', isAuthenti
                         {showMobileMenu ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
                     </button>
                     {isAdmin && (
-                        <div className="font-bold text-zinc-900 dark:text-white text-sm">Backend</div>
+                        <div className="font-bold text-zinc-900 dark:text-white text-sm">{t('Backend', '後台')}</div>
                     )}
                 </div>
 
@@ -120,6 +124,7 @@ export default function TopBar({ onSearch, placeholder = '搜尋...', isAuthenti
                 <div className="flex items-center gap-3">
                     {/* Theme Toggle */}
                     <ThemeToggle />
+                    {isAdmin ? <LanguageSwitcher isAdmin /> : null}
 
                     {isAuthenticated ? (
                         <>
@@ -276,7 +281,9 @@ export default function TopBar({ onSearch, placeholder = '搜尋...', isAuthenti
                                     <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 to-blue-600 flex items-center justify-center text-white font-bold">
                                         {isAdmin ? 'B' : 'P'}
                                     </div>
-                                    <span className="font-bold text-zinc-900 dark:text-white">{isAdmin ? 'Backend' : 'PMS'}</span>
+                                    <span className="font-bold text-zinc-900 dark:text-white">
+                                        {isAdmin ? t('Backend', '後台') : 'PMS'}
+                                    </span>
                                 </div>
                                 <button onClick={() => setShowMobileMenu(false)} className="p-2 rounded-lg hover:bg-zinc-100 dark:hover:bg-white/5 text-zinc-500">
                                     <X className="w-6 h-6" />

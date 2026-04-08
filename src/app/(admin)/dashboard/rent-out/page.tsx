@@ -22,6 +22,7 @@ import {
 import { BentoCard } from '@/components/layout/BentoGrid';
 import RentModal from '@/components/properties/RentModal';
 import PropertyDetailModal from '@/components/properties/PropertyDetailModal';
+import { useLanguage } from '@/components/common/LanguageSwitcher';
 
 const filterSelectClass =
     'mt-1 block w-full min-w-[160px] rounded-xl border border-zinc-200 dark:border-white/10 bg-white dark:bg-[#1a1a2e] px-3 py-2 text-sm text-zinc-900 dark:text-white';
@@ -34,6 +35,9 @@ function adminRentOutLesseeLabel(rent: { currentTenant?: { name?: string | null 
 
 export default function RentOutPage() {
     const queryClient = useQueryClient();
+    const lang = useLanguage();
+    const isZh = lang === 'zh-TW';
+    const t = (en: string, zh: string) => (isZh ? zh : en);
     const { data: rents = [], isLoading } = useRentsWithRelationsQuery({ type: 'rent_out' });
 
     const [showModal, setShowModal] = useState(false);
@@ -112,10 +116,12 @@ export default function RentOutPage() {
             <div className="flex items-center justify-between">
                 <div>
                     <h1 className="text-2xl font-bold text-zinc-900 dark:text-white flex items-center gap-2">
-                        <TrendingUp className="w-6 h-6 text-emerald-500 md:hidden" />
-                        收租管理
+                        <TrendingUp className="w-6 h-6 text-emerald-500 md:hidden" aria-hidden />
+                        {t('Rent collection', '收租管理')}
                     </h1>
-                    <p className="text-zinc-500 dark:text-white/50 mt-1 hidden sm:block">管理物業的租金收入與記錄</p>
+                    <p className="text-zinc-500 dark:text-white/50 mt-1 hidden sm:block">
+                        {t('Manage rental income and records.', '管理物業的租金收入與記錄')}
+                    </p>
                 </div>
             </div>
 
@@ -124,7 +130,7 @@ export default function RentOutPage() {
                 <BentoCard>
                     <div className="flex items-center justify-between">
                         <div>
-                            <p className="text-zinc-500 dark:text-white/50 text-sm">Total Income</p>
+                            <p className="text-zinc-500 dark:text-white/50 text-sm">{t('Total income', '總收入')}</p>
                             <p className="text-2xl font-bold text-green-600 dark:text-green-400 mt-1">
                                 HKD {totalIncome.toLocaleString()}
                             </p>
@@ -139,7 +145,7 @@ export default function RentOutPage() {
                 <BentoCard>
                     <div className="flex items-center justify-between">
                         <div>
-                            <p className="text-zinc-500 dark:text-white/50 text-sm">Total Records</p>
+                            <p className="text-zinc-500 dark:text-white/50 text-sm">{t('Total records', '總筆數')}</p>
                             <p className="text-2xl font-bold text-zinc-900 dark:text-white mt-1">{rents.length}</p>
                         </div>
                         <div className="p-3 rounded-xl bg-purple-50 dark:bg-purple-500/20">
@@ -152,7 +158,7 @@ export default function RentOutPage() {
                 <BentoCard>
                     <div className="flex items-center justify-between">
                         <div>
-                            <p className="text-zinc-500 dark:text-white/50 text-sm">Active Leases</p>
+                            <p className="text-zinc-500 dark:text-white/50 text-sm">{t('Active leases', '生效租約')}</p>
                             <p className="text-2xl font-bold text-zinc-900 dark:text-white mt-1">
                                 {rents.filter(r => r.status === 'active').length}
                             </p>
@@ -167,7 +173,7 @@ export default function RentOutPage() {
                 <BentoCard>
                     <div className="flex items-center justify-between">
                         <div>
-                            <p className="text-zinc-500 dark:text-white/50 text-sm">Pending</p>
+                            <p className="text-zinc-500 dark:text-white/50 text-sm">{t('Pending', '待處理')}</p>
                             <p className="text-2xl font-bold text-zinc-900 dark:text-white mt-1">
                                 {rents.filter(r => r.status === 'pending').length}
                             </p>

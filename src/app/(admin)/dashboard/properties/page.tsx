@@ -11,6 +11,7 @@ import { Building2, Plus, Search, Pencil, Trash2, Eye, CheckSquare, Square, User
 import { useAuth } from '@/contexts/AuthContext';
 import AnimatedSelect from '@/components/ui/AnimatedSelect';
 import { formatLotArea } from '@/lib/formatters';
+import { useLanguage } from '@/components/common/LanguageSwitcher';
 
 const statusColors: Record<string, string> = {
     holding: 'bg-emerald-600 dark:bg-emerald-500/80 text-white',
@@ -35,6 +36,9 @@ const typeLabels: Record<string, string> = {
 
 export default function ManagePropertiesPage() {
     const queryClient = useQueryClient();
+    const lang = useLanguage();
+    const isZh = lang === 'zh-TW';
+    const t = (en: string, zh: string) => (isZh ? zh : en);
     const { data: qProperties, isLoading: propertiesLoading } = usePropertiesQuery();
     const { data: users, isLoading: usersLoading } = useUsersQuery();
     const isLoading = propertiesLoading || usersLoading;
@@ -433,22 +437,27 @@ export default function ManagePropertiesPage() {
                             exit={{ opacity: 0, scale: 0.95 }}
                             className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-md bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-white/10 p-6 z-50 shadow-2xl"
                         >
-                            <h3 className="text-xl font-bold text-zinc-900 dark:text-white">Delete Property?</h3>
+                            <h3 className="text-xl font-bold text-zinc-900 dark:text-white">
+                                {t('Delete this property?', '刪除此物業？')}
+                            </h3>
                             <p className="text-zinc-500 dark:text-white/50 mt-2">
-                                Are you sure you want to delete this property? This action cannot be undone.
+                                {t(
+                                    'This cannot be undone.',
+                                    '確定要刪除嗎？此操作無法復原。',
+                                )}
                             </p>
                             <div className="flex justify-end gap-3 mt-6">
                                 <button
                                     onClick={() => setDeleteConfirm(null)}
                                     className="px-4 py-2 rounded-xl text-zinc-500 dark:text-white/70 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-white/10 transition-all"
                                 >
-                                    Cancel
+                                    {t('Cancel', '取消')}
                                 </button>
                                 <button
                                     onClick={() => handleDelete(deleteConfirm)}
                                     className="px-4 py-2 bg-red-500 rounded-xl text-white font-medium hover:bg-red-600 transition-colors"
                                 >
-                                    Delete
+                                    {t('Delete', '刪除')}
                                 </button>
                             </div>
                         </motion.div>
