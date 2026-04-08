@@ -471,7 +471,16 @@ export default function PropertyDetailsPage() {
                             <div className="bg-zinc-50 dark:bg-white/5 rounded-xl p-4 border border-zinc-100 dark:border-none">
                                 <p className="text-zinc-400 dark:text-white/40 text-sm">{t('Lot Index', '物業地段')}</p>
                                 <p className="font-medium mt-1 text-zinc-900 dark:text-white">
-                                    {property.lotIndex || '暫無。'}
+                                    {property.lotIndex
+                                        ? (() => {
+                                              const val = property.lotIndex
+                                                  .split(/(?:新|舊):/)
+                                                  .map((s) => s.trim())
+                                                  .filter(Boolean)
+                                                  .join(' , ');
+                                              return val || '暫無。';
+                                          })()
+                                        : '暫無。'}
                                 </p>
                             </div>
                             <div className="bg-zinc-50 dark:bg-white/5 rounded-xl p-4 border border-zinc-100 dark:border-none">

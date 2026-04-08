@@ -128,6 +128,8 @@ export interface Rent {
   rentCollectionContractNumber?: string | null;
   /** 收據號碼（現金／FPS／入數等非支票付款方式） */
   rentCollectionReceiptNumber?: string | null;
+  /** 收租／交租記錄所選之物業地段（對應該物業 lot_index 中之一段） */
+  rentPropertyLot?: string | null;
 
   // ===== RENTING (交租) Fields =====
   rentingNumber?: string;              // 我方租約號碼
@@ -161,6 +163,7 @@ export interface Rent {
   property?: Property;
   proprietor?: Proprietor;
   tenant?: Proprietor;
+  subLandlord?: { id: string; name: string };
 }
 
 /** 二房東 (Sub-landlord) - admin-managed, mirrors rent_out contract fields */

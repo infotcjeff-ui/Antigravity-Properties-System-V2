@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
-import { useProperties, useProprietorsQuery, useRents, useRentsQuery, useRentsWithRelationsQuery, useUsersQuery } from '@/hooks/useStorage';
+import { useProperties, useProprietorsQuery, usePropertiesWithRelationsQuery, useRents, useRentsQuery, useRentsWithRelationsQuery, useSubLandlordsQuery, useUsersQuery } from '@/hooks/useStorage';
 import { fileToBase64, validateImageUpload, compressImage } from '@/lib/imageUtils';
 import type { Property, Proprietor, Rent } from '@/lib/db';
 import { useNotifications } from '@/contexts/NotificationContext';
@@ -93,6 +93,8 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
     const { data: allRents, isLoading: rentsLoading } = useRentsQuery();
     /** 合約記錄需 join tenant（業主）與 current_tenants（現時租客），與管理合約頁一致 */
     const { data: allContractsWithRelations = [] } = useRentsWithRelationsQuery({ type: 'contract' });
+    const { data: subLandlords = [] } = useSubLandlordsQuery();
+    const { data: allProperties = [] } = usePropertiesWithRelationsQuery();
     const { updateRent, deleteRent } = useRents();
     const { addNotification } = useNotifications();
     const { isAuthenticated, user: currentUser } = useAuth();
@@ -209,7 +211,13 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
     const contractSubLandlordId = (latestContract as any)?.rentOutSubLandlordId || '';
     const contractCurrentTenantId = latestContract?.rentOutTenantIds?.[0] || '';
 
-    /** 收租表第二欄為現時租客；交租表第二、三欄為業主（tenant_id）、承租人（proprietor_id） */
+    /** 子物業列表（parentPropertyId === 当前物业 id） */
+    const subProperties = useMemo(
+        () => (allProperties as any[]).filter(p => p.parentPropertyId === property?.id),
+        [allProperties, property?.id],
+    );
+
+    /** 收租表：業主、二房東、現時租客；交租表第二、三欄為業主（tenant_id）、承租人（proprietor_id） */
 
     /** 月份轉換為「X年X個月」格式 */
     const formatMonthsToYearMonth = (totalMonths: number): string => {
@@ -234,7 +242,7 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
             partyMode === 'owner'
                 ? 'grid grid-cols-[100px_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.5fr)_minmax(0,1.15fr)_minmax(0,1.05fr)_minmax(76px,0.95fr)_minmax(0,1fr)_90px] gap-4 px-4'
                 : partyMode === 'landlord'
-                  ? 'grid grid-cols-[100px_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.5fr)_minmax(0,1.15fr)_minmax(0,1.05fr)_minmax(76px,0.95fr)_minmax(0,1fr)_90px] gap-4 px-4'
+                  ? 'grid grid-cols-[100px_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.5fr)_minmax(0,1.15fr)_minmax(0,1.05fr)_minmax(76px,0.95fr)_minmax(0,1fr)_90px] gap-4 px-4'
                   : 'grid grid-cols-[100px_minmax(0,1fr)_minmax(0,1.5fr)_minmax(0,1.15fr)_minmax(0,1.05fr)_minmax(76px,0.95fr)_minmax(0,1fr)_90px] gap-4 px-4';
         /** 交租記錄「編號」欄：顯示所屬物業編號（與表單「編號」一致） */
         const propertyCodeForRentingRows = (formData.code || property?.code || '').trim() || '-';
@@ -253,6 +261,7 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                     ) : partyMode === 'landlord' ? (
                         <>
                             <div className="font-bold">業主</div>
+                            <div className="font-bold">二房東</div>
                             <div className="font-bold">現時租客</div>
                         </>
                     ) : (
@@ -349,6 +358,23 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                                   : undefined)
                             : undefined;
 
+                    const rentOutSubLandlordLabel = (() => {
+                        if (rent.subLandlord?.name) {
+                            const n = String(rent.subLandlord.name).trim();
+                            if (n) return n;
+                        }
+                        if ((rent as any).rentOutSubLandlord) {
+                            const n = String((rent as any).rentOutSubLandlord).trim();
+                            if (n) return n;
+                        }
+                        const slId = (rent as any).rentOutSubLandlordId;
+                        if (slId) {
+                            const found = subLandlords.find(sl => sl.id === slId);
+                            if (found?.name) return found.name;
+                        }
+                        return '';
+                    })();
+
                     const payStatus =
                         rent.type === 'rent_out' || rent.type === 'renting'
                             ? getRentCollectionPayListStatus(rent as any)
@@ -408,6 +434,11 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                                     </div>
                                     <div className="flex flex-col overflow-hidden min-w-0">
                                         <span className="font-semibold text-zinc-900 dark:text-white truncate">
+                                            {rentOutSubLandlordLabel || '—'}
+                                        </span>
+                                    </div>
+                                    <div className="flex flex-col overflow-hidden min-w-0">
+                                        <span className="font-semibold text-zinc-900 dark:text-white truncate">
                                             {rentOutCurrentTenantLabel || '—'}
                                         </span>
                                     </div>
@@ -419,11 +450,11 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                                             ? (rent.rentOutLessor || otherPartyLessee?.name || '-')
                                             : (otherPartyLessee?.name || '-')}
                                     </span>
-                                    {otherPartyLessee?.shortName && (
+                                    {otherPartyLessee?.shortName ? (
                                         <span className="text-xs text-zinc-500 dark:text-white/50 truncate uppercase">
                                             {otherPartyLessee.shortName}
                                         </span>
-                                    )}
+                                    ) : null}
                                 </div>
                             )}
                             <div className="text-zinc-700 dark:text-white/80 text-sm leading-relaxed line-clamp-2">
@@ -1644,7 +1675,8 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                     )}
 
                     {/* Rent Records (only show when editing) */}
-                    {property?.id && (
+                    {property?.id ? (
+                        <>
                         <div className="space-y-6">
                             <div className="flex items-center justify-between">
                                 <label className="block text-base font-bold text-zinc-900 dark:text-white uppercase tracking-wider">租務管理</label>
@@ -1763,9 +1795,70 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                                     </div>
                                 </div>
                             </div>
-                        </div>
-                    )}
 
+                            {/* Sub-properties Section */}
+                            <div className="space-y-3">
+                                <div className="flex items-center justify-between">
+                                    <h4 className="text-base font-bold text-teal-700 dark:text-teal-400 flex items-center gap-2 px-1">
+                                        <div className="w-2.5 h-2.5 rounded-full bg-teal-500 shadow-[0_0_8px_rgba(20,184,166,0.5)]"></div>
+                                        子物業地段
+                                    </h4>
+                                    {isAuthenticated && (
+                                        <button
+                                            type="button"
+                                            onClick={() => {/* TODO: open add sub-property modal */}}
+                                            className="px-4 py-2 bg-teal-50 dark:bg-teal-500/20 text-teal-600 dark:text-teal-400 rounded-xl hover:bg-teal-100 dark:hover:bg-teal-500/30 border border-teal-100 dark:border-teal-500/30 text-sm font-medium transition-all duration-300"
+                                        >
+                                            + 新增子物業
+                                        </button>
+                                    )}
+                                </div>
+                                <div className="border border-zinc-200 dark:border-white/10 rounded-xl overflow-hidden shadow-sm">
+                                    <div className="grid grid-cols-[80px_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.5fr)_100px] gap-4 px-4 py-3 bg-zinc-100/80 dark:bg-white/5 text-sm font-semibold text-zinc-700 dark:text-white/80 uppercase tracking-wider border-b border-zinc-200 dark:border-white/10">
+                                        <div className="font-bold">編號</div>
+                                        <div className="font-bold">名稱</div>
+                                        <div className="font-bold">地段</div>
+                                        <div className="font-bold">地址</div>
+                                        <div className="text-center font-bold">操作</div>
+                                    </div>
+                                    {subProperties.length === 0 ? (
+                                        <div className="px-4 py-6 text-center text-sm text-zinc-400 dark:text-white/40">
+                                            尚未新增子物業
+                                        </div>
+                                    ) : (
+                                        subProperties.map((sp: any) => (
+                                            <div key={sp.id} className="grid grid-cols-[80px_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.5fr)_100px] gap-4 px-4 py-4 border-b border-zinc-100 dark:border-white/5 hover:bg-zinc-50/80 dark:hover:bg-white/[0.02] transition-colors items-center last:border-0 group">
+                                                <div>
+                                                    <span className="font-mono text-xs font-bold text-zinc-600 dark:text-white/70">{sp.code || '—'}</span>
+                                                </div>
+                                                <div className="flex flex-col overflow-hidden min-w-0">
+                                                    <span className="font-semibold text-zinc-900 dark:text-white truncate">{sp.name || '—'}</span>
+                                                </div>
+                                                <div className="flex flex-col overflow-hidden min-w-0">
+                                                    <span className="text-sm text-zinc-700 dark:text-white/80 truncate">{sp.lotIndex || '—'}</span>
+                                                </div>
+                                                <div className="text-sm text-zinc-700 dark:text-white/80 truncate">
+                                                    {sp.address || sp.location?.address || '—'}
+                                                </div>
+                                                <div className="flex items-center justify-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                    <button
+                                                        type="button"
+                                                        className="p-2 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-500/20 rounded-lg transition-all"
+                                                        title="編輯子物業"
+                                                    >
+                                                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                                        </svg>
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        ))
+                                    )}
+                                </div>
+                            </div>
+                            </div>
+                        </>
+                    ) : null}
 
                     {/* Google Drive URL and Planning Permission */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

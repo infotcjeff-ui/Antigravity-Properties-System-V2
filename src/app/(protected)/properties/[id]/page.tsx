@@ -623,7 +623,11 @@ export default function PropertyDetailsPage() {
                                 <p className="font-medium mt-1 text-zinc-900 dark:text-white">
                                     {property.lotIndex
                                         ? (() => {
-                                              const val = property.lotIndex.replace(/^新\s*:?\s*/, '').replace(/^舊\s*:?\s*/, '');
+                                              const val = property.lotIndex
+                                                  .split(/(?:新|舊):/)
+                                                  .map((s) => s.trim())
+                                                  .filter(Boolean)
+                                                  .join(' , ');
                                               return val || '暫無。';
                                           })()
                                         : '暫無。'}

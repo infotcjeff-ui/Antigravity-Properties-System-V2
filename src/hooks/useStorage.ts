@@ -51,6 +51,71 @@ const firstRentOutTenantIdFromRow = (row: { rent_out_tenant_ids?: unknown }): st
     return undefined;
 };
 
+type SubLandlordTenancyRow = { id: string; name: string; tenancy_number: string | null };
+
+/**
+ * 二房東「出租號碼」單一段是否與物業編號關聯（與 removePropertyFromSubLandlordTenancyNumber 之保留邏輯對應：若會被視為該物業則為 true）
+ */
+function tenancyPartLinkedToPropertyCode(part: string, propertyCode: string): boolean {
+    const normalizedPart = part.trim();
+    const normalizedPropertyCode = propertyCode.trim();
+    if (!normalizedPart || !normalizedPropertyCode) return false;
+
+    if (normalizedPart === normalizedPropertyCode) return true;
+    if (normalizedPart.startsWith(normalizedPropertyCode + '-')) return true;
+    if (normalizedPropertyCode.startsWith(normalizedPart + '-')) return true;
+
+    const firstDashIndex = normalizedPart.indexOf('-');
+    const propertyFirstDash = normalizedPropertyCode.indexOf('-');
+
+    if (firstDashIndex > 0) {
+        const afterDash = normalizedPart.substring(firstDashIndex + 1);
+        if (afterDash.match(/^[A-Z]{2,3}\d+$/)) {
+            const partCode = normalizedPart.substring(0, firstDashIndex);
+            if (propertyFirstDash === -1) {
+                return partCode === normalizedPropertyCode;
+            }
+            const propertyPrefix = normalizedPropertyCode.substring(0, propertyFirstDash);
+            return partCode === propertyPrefix;
+        }
+        if (propertyFirstDash > 0) {
+            const propertyPrefix = normalizedPropertyCode.substring(0, propertyFirstDash);
+            const partPrefix = normalizedPart.substring(0, firstDashIndex);
+            if (partPrefix === propertyPrefix) {
+                return true;
+            }
+        }
+    }
+
+    if (propertyFirstDash === -1 && firstDashIndex > 0) {
+        const partPrefix = normalizedPart.substring(0, firstDashIndex);
+        if (partPrefix === normalizedPropertyCode) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+/** 依物業 code 從二房東列表中找「出租號碼」含該物業者（多名時取名稱排序第一筆，輸出穩定） */
+function findSubLandlordForPropertyCode(
+    rows: SubLandlordTenancyRow[],
+    propertyCode: string,
+): { id: string; name: string } | undefined {
+    const code = propertyCode.trim();
+    if (!code || !rows.length) return undefined;
+    const sorted = [...rows].sort((a, b) => (a.name || '').localeCompare(b.name || '', 'zh-HK'));
+    for (const sl of sorted) {
+        const tn = sl.tenancy_number;
+        if (!tn?.trim()) continue;
+        const parts = tn.split(',').map((p) => p.trim()).filter(Boolean);
+        if (parts.some((p) => tenancyPartLinkedToPropertyCode(p, code))) {
+            return { id: sl.id, name: sl.name ?? '' };
+        }
+    }
+    return undefined;
+}
+
 /**
  * 從 Supabase／PostgREST／PostgreSQL 錯誤訊息擷取「不存在的欄位」snake_case 名稱，供略過寫入。
  */
@@ -286,15 +351,56 @@ export const fetchRentsWithRelations = async (user?: any, options?: { type?: 're
             }
         }
 
+        let subLandlordsWithTenancy: SubLandlordTenancyRow[] = [];
+        const { data: slAllRows, error: slAllError } = await supabase
+            .from('sub_landlords')
+            .select('id,name,tenancy_number')
+            .eq('is_deleted', false);
+
+        if (slAllError) {
+            const se = slAllError as { message?: string; details?: string; code?: string };
+            console.error('sub_landlords fetch error:', se.message, se.details, se.code);
+        } else {
+            subLandlordsWithTenancy = (slAllRows || []).filter((x): x is SubLandlordTenancyRow => Boolean(x?.id));
+        }
+
+        const subLandlordMap = new Map<string, { id: string; name: string }>();
+        for (const sl of subLandlordsWithTenancy) {
+            subLandlordMap.set(sl.id, { id: sl.id, name: sl.name ?? '' });
+        }
+
         return rows.map(r => {
             const tid = firstRentOutTenantIdFromRow(r);
             const currentTenant = tid ? tenantMap.get(tid) : undefined;
+            const slIdRaw = (r as any).rent_out_sub_landlord_id as string | undefined;
+            let subLandlord = slIdRaw ? subLandlordMap.get(slIdRaw) : undefined;
+
+            const legacySlName = String((r as any).rent_out_sub_landlord ?? '').trim();
+            if (!subLandlord && legacySlName) {
+                subLandlord = { id: '', name: legacySlName };
+            }
+
+            const propCode = String((r.property as { code?: string } | null)?.code ?? '').trim();
+            if (!subLandlord && propCode) {
+                const byTenancy = findSubLandlordForPropertyCode(subLandlordsWithTenancy, propCode);
+                if (byTenancy) subLandlord = byTenancy;
+            }
+
+            const camelRent = toCamel(r) as Record<string, unknown>;
+            const { rentOutSubLandlordOrdId: _badCamelSubLandlordId, ...camelRentClean } = camelRent as Record<string, unknown> & {
+                rentOutSubLandlordOrdId?: unknown;
+            };
+            void _badCamelSubLandlordId;
             return {
-                ...toCamel(r),
+                ...camelRentClean,
+                // toCamel 會把 rent_out_sub_landlord_id 錯誤轉成 rentOutSubLandlordOrdId，需以原始 snake_case 覆寫
+                rentOutSubLandlordId: slIdRaw ?? camelRentClean.rentOutSubLandlordId,
+                rentOutSubLandlord: (r as any).rent_out_sub_landlord ?? camelRentClean.rentOutSubLandlord,
                 property: toCamel(r.property),
                 proprietor: toCamel(r.proprietor),
                 tenant: toCamel(r.tenant),
                 currentTenant: currentTenant ? toCamel(currentTenant) : undefined,
+                subLandlord: subLandlord ? toCamel(subLandlord) : undefined,
             };
         });
     } catch (err: any) {
@@ -362,7 +468,7 @@ export const fetchCurrentTenant = async (id: string): Promise<CurrentTenant | un
 
 export const fetchPropertiesWithRelations = async (user?: any): Promise<PropertyWithRelations[]> => {
     try {
-        const fields = 'id, name, code, address, type, status, land_use, lot_index, lot_area, location, google_drive_plan_url, has_planning_permission, proprietor_id, tenant_id, created_by, created_at, updated_at, images';
+        const fields = 'id, name, code, address, type, status, land_use, lot_index, lot_area, location, google_drive_plan_url, has_planning_permission, proprietor_id, tenant_id, created_by, created_at, updated_at, images, parent_property_id';
         let pQuery = supabase.from('properties').select(fields);
         let oQuery = supabase.from('proprietors').select('*');
         let rQuery = supabase.from('rents').select('*');
@@ -1158,6 +1264,9 @@ export function useRents() {
             if (rc.rentCollectionContractNature !== undefined) {
                 rentData.rent_collection_contract_nature = rc.rentCollectionContractNature || null;
             }
+            if (rc.rentPropertyLot !== undefined) {
+                rentData.rent_property_lot = rc.rentPropertyLot?.trim() || null;
+            }
 
             // Add Renting (交租) fields
             if (rent.rentingNumber) rentData.renting_number = rent.rentingNumber;
@@ -1398,6 +1507,9 @@ export function useRents() {
             }
             if (urc.rentCollectionContractNature !== undefined) {
                 rentData.rent_collection_contract_nature = urc.rentCollectionContractNature || null;
+            }
+            if (urc.rentPropertyLot !== undefined) {
+                rentData.rent_property_lot = urc.rentPropertyLot?.trim() || null;
             }
 
             // RENTING fields

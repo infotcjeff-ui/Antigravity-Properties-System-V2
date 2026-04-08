@@ -19,7 +19,7 @@ import { RENT_OUT_CONTRACT_STATUS_OPTIONS, getRentOutOrContractListNumber } from
 import ProprietorModal from '@/components/properties/ProprietorModal';
 import RentOutFormModal from '@/components/properties/RentOutFormModal';
 import CurrentTenantDetailModal from '@/components/properties/CurrentTenantDetailModal';
-import { dedupeRecordsByDisplayName, formatNumberWithCommas, parsePriceInput } from '@/lib/formatters';
+import { dedupeRecordsByDisplayName, formatNumberWithCommas, parsePriceInput, parsePropertyLotSegments } from '@/lib/formatters';
 import dynamic from 'next/dynamic';
 import 'react-quill-new/dist/quill.snow.css';
 
@@ -85,7 +85,7 @@ export default function RentModal({
     const queryClient = useQueryClient();
     const { addRent, updateRent } = useRents();
     const { getProprietors } = useProprietors();
-    const { getProperties, addProperty } = useProperties();
+    const { getProperties, addProperty, updateProperty } = useProperties();
     const [saving, setSaving] = useState(false);
     const [loadingData, setLoadingData] = useState(true);
     const [error, setError] = useState('');
@@ -104,8 +104,11 @@ export default function RentModal({
     const [showCurrentTenantDetail, setShowCurrentTenantDetail] = useState<CurrentTenant | null>(null);
     const [showChildPropertyModal, setShowChildPropertyModal] = useState(false);
     const [childPropertySaving, setChildPropertySaving] = useState(false);
-    const [childPropertyForm, setChildPropertyForm] = useState({ parentId: '', name: '', code: '' });
+    const [childPropertyForm, setChildPropertyForm] = useState({ parentId: '', name: '', code: '', lotIndex: '' });
     const [childPropertyError, setChildPropertyError] = useState('');
+    const [showChildLotAreaModal, setShowChildLotAreaModal] = useState(false);
+    const [childLotAreaForm, setChildLotAreaForm] = useState({ name: '', area: '' });
+    const [childLotAreaSaving, setChildLotAreaSaving] = useState(false);
     const { data: subLandlords = [] } = useSubLandlordsQuery();
     const { data: currentTenants = [] } = useCurrentTenantsQuery();
     const { data: allProperties = [] } = usePropertiesQuery();
@@ -213,6 +216,11 @@ export default function RentModal({
                     if (snake && String(snake).trim()) return String(snake).trim();
                     return '';
                 })(),
+                rentPropertyLot: (() => {
+                    const r = rent as any;
+                    const v = r.rentPropertyLot ?? r.rent_property_lot;
+                    return typeof v === 'string' ? v.trim() : '';
+                })(),
             };
         }
 
@@ -277,6 +285,7 @@ export default function RentModal({
             rentCollectionContractNumber: '',
             rentCollectionReceiptNumber: '',
             rentCollectionContractNature: '',
+            rentPropertyLot: '',
         };
     });
 
@@ -305,6 +314,8 @@ export default function RentModal({
 
     const lastContractAutoPropertyIdRef = useRef<string | undefined>(undefined);
     const rentCollectionContractAutoSigRef = useRef('');
+    /** 收／交租：物業切換時同步「物業地段」選項 */
+    const lastLotSyncPropertyIdRef = useRef<string | undefined>(undefined);
 
     /** 新增模式：切換物業時清空已選合約編號，避免帶到錯誤物業 */
     useEffect(() => {
@@ -449,12 +460,17 @@ export default function RentModal({
         [properties]
     );
 
+    const propertyLotSegmentOptions = useMemo(
+        () => parsePropertyLotSegments(properties.find((p) => p.id === formData.propertyId)?.lotIndex),
+        [properties, formData.propertyId],
+    );
+
     const openChildPropertyModal = () => {
         const focusId = propertyId || formData.propertyId;
         const p = focusId ? properties.find(x => x.id === focusId) : undefined;
         const defaultParent = p ? (p.parentPropertyId || p.id || '') : '';
         setChildPropertyError('');
-        setChildPropertyForm({ parentId: defaultParent, name: '', code: '' });
+        setChildPropertyForm({ parentId: defaultParent, name: '', code: '', lotIndex: '' });
         setShowChildPropertyModal(true);
     };
 
@@ -480,7 +496,7 @@ export default function RentModal({
                 name: childPropertyForm.name.trim(),
                 code: childPropertyForm.code.trim(),
                 address: parent.address || '',
-                lotIndex: parent.lotIndex || '',
+                lotIndex: childPropertyForm.lotIndex ? `新:${childPropertyForm.lotIndex}` : parent.lotIndex || '',
                 lotArea: parent.lotArea || '',
                 type: parent.type,
                 status: parent.status || 'renting',
@@ -499,7 +515,7 @@ export default function RentModal({
                 await queryClient.invalidateQueries({ queryKey: ['properties'] });
                 setFormData(prev => ({ ...prev, propertyId: newId }));
                 setShowChildPropertyModal(false);
-                setChildPropertyForm({ parentId: '', name: '', code: '' });
+                setChildPropertyForm({ parentId: '', name: '', code: '', lotIndex: '' });
             } else {
                 setChildPropertyError('子物業建立失敗');
             }
@@ -614,6 +630,30 @@ export default function RentModal({
             return { ...prev, rentCollectionTenantName: ownerName };
         });
     }, [formData.type, formData.tenantId, proprietors]);
+
+    useEffect(() => {
+        if (formData.type !== 'rent_out' && formData.type !== 'renting') return;
+        if (loadingData) return;
+        const pid = formData.propertyId;
+        if (!pid) {
+            lastLotSyncPropertyIdRef.current = undefined;
+            return;
+        }
+        const prop = properties.find((p) => p.id === pid);
+        if (!prop) return;
+        const segments = parsePropertyLotSegments(prop.lotIndex);
+        const changed = lastLotSyncPropertyIdRef.current !== pid;
+        if (!changed) return;
+        lastLotSyncPropertyIdRef.current = pid;
+        setFormData((prev) => {
+            if (segments.length === 0) {
+                return prev.rentPropertyLot === '' ? prev : { ...prev, rentPropertyLot: '' };
+            }
+            const cur = (prev.rentPropertyLot || '').trim();
+            if (cur && segments.includes(cur)) return prev;
+            return { ...prev, rentPropertyLot: segments[0] };
+        });
+    }, [formData.propertyId, formData.type, properties, loadingData]);
 
     useEffect(() => {
         if (rent) return;
@@ -813,6 +853,7 @@ export default function RentModal({
                             ? formData.rentCollectionReceiptNumber?.trim() || null
                             : null,
                     rentCollectionContractNature: formData.rentCollectionContractNature || null,
+                    rentPropertyLot: formData.rentPropertyLot?.trim() || null,
                 };
             } else if (formData.type === 'renting') {
                 const paidRaw = String(formData.rentCollectionAmount || '').replace(/,/g, '').trim();
@@ -856,6 +897,7 @@ export default function RentModal({
                     rentingStartDate: formData.rentingStartDate ? new Date(formData.rentingStartDate) : undefined,
                     rentingEndDate: formData.rentingEndDate ? new Date(formData.rentingEndDate) : undefined,
                     rentingDeposit: parseFloat(formData.rentingDeposit) || undefined,
+                    rentPropertyLot: formData.rentPropertyLot?.trim() || null,
                 };
             } else if (formData.type === 'contract') {
                 // 合約記錄：以 rentOut* 欄位儲存（已移除實際結束日／出租人／租借地址欄位，寫入時清空舊值）
@@ -1031,7 +1073,8 @@ export default function RentModal({
     );
 
     const showOwnerSelect = formData.type === 'contract' || formData.type === 'renting';
-    const showSubLandlordSelect = formData.type === 'contract';
+    /** 合約與收租（出租記錄）均需可選二房東；儲存欄位同為 rent_out_sub_landlord_id */
+    const showSubLandlordSelect = formData.type === 'contract' || formData.type === 'rent_out';
     const showCurrentTenantSelect = formData.type === 'contract' || formData.type === 'rent_out';
     /** 合約類型：第一列 物業｜業主，第二列 二房東｜現時租客 */
     const isContractLayout = formData.type === 'contract';
@@ -1143,53 +1186,16 @@ export default function RentModal({
                             </option>
                         ))}
                     </select>
-                    {formData.rentOutSubLandlordId && (
-                        <div className="flex items-center gap-2">
-                            <button
-                                type="button"
-                                onClick={() => {
-                                    const sl = subLandlords.find(s => s.id === formData.rentOutSubLandlordId);
-                                    if (sl) {
-                                        setEditSubLandlord(sl);
-                                        setShowSubLandlordModal(true);
-                                    }
-                                }}
-                                className="p-2 text-zinc-400 hover:text-purple-500 rounded-lg shrink-0"
-                                title="新增二房東資料"
-                            >
-                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path
-                                        strokeLinecap="round"
-                                        strokeLinejoin="round"
-                                        strokeWidth={2}
-                                        d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
-                                    />
-                                </svg>
-                            </button>
-                            <button
-                                type="button"
-                                onClick={() => {
-                                    const sl = subLandlords.find(s => s.id === formData.rentOutSubLandlordId);
-                                    if (sl) setShowSubLandlordDetail(sl);
-                                }}
-                                className="px-3 py-1.5 text-sm text-purple-600 dark:text-purple-400 hover:bg-purple-50 dark:hover:bg-purple-500/20 rounded-lg border border-purple-200 dark:border-purple-500/30 transition-all"
-                            >
-                                二房東資料
-                            </button>
-                        </div>
-                    )}
-                    {!formData.rentOutSubLandlordId && (
-                        <button
-                            type="button"
-                            onClick={() => {
-                                setEditSubLandlord(null);
-                                setShowSubLandlordModal(true);
-                            }}
-                            className="px-4 py-2 bg-purple-50 dark:bg-purple-500/20 text-purple-600 dark:text-purple-400 rounded-xl hover:bg-purple-100 dark:hover:bg-purple-500/30 border border-purple-100 dark:border-purple-500/30 text-sm font-medium transition-all duration-300 h-11 whitespace-nowrap shrink-0"
-                        >
-                            + 新增
-                        </button>
-                    )}
+                    <button
+                        type="button"
+                        onClick={() => {
+                            setEditSubLandlord(null);
+                            setShowSubLandlordModal(true);
+                        }}
+                        className="px-4 py-2 bg-purple-50 dark:bg-purple-500/20 text-purple-600 dark:text-purple-400 rounded-xl hover:bg-purple-100 dark:hover:bg-purple-500/30 border border-purple-100 dark:border-purple-500/30 text-sm font-medium transition-all duration-300 h-11 whitespace-nowrap shrink-0"
+                    >
+                        + 新增
+                    </button>
                 </div>
             </div>
         ) : null;
@@ -1212,31 +1218,6 @@ export default function RentModal({
                             </option>
                         ))}
                     </select>
-                    {formData.rentOutTenantId && (
-                        <div className="flex items-center gap-1">
-                            <button
-                                type="button"
-                                onClick={() => {
-                                    const ct = currentTenants.find(t => t.id === formData.rentOutTenantId);
-                                    if (ct) {
-                                        setEditCurrentTenant(ct);
-                                        setShowCurrentTenantModal(true);
-                                    }
-                                }}
-                                className="p-2 text-zinc-400 hover:text-purple-500 rounded-lg shrink-0"
-                                title="編輯"
-                            >
-                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path
-                                        strokeLinecap="round"
-                                        strokeLinejoin="round"
-                                        strokeWidth={2}
-                                        d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
-                                    />
-                                </svg>
-                            </button>
-                        </div>
-                    )}
                     <button
                         type="button"
                         onClick={() => {
@@ -1349,7 +1330,7 @@ export default function RentModal({
                                             <optgroup label="主物業">
                                                 {propertiesRoot.map(p => (
                                                     <option key={p.id} value={p.id} className="bg-white dark:bg-[#1a1a2e]">
-                                                        {p.name} ({p.code})
+                                                        {p.name}
                                                     </option>
                                                 ))}
                                             </optgroup>
@@ -1360,7 +1341,7 @@ export default function RentModal({
                                                     const par = properties.find(x => x.id === p.parentPropertyId);
                                                     return (
                                                         <option key={p.id} value={p.id} className="bg-white dark:bg-[#1a1a2e]">
-                                                            {par ? `${par.name} › ` : ''}{p.name} ({p.code})
+                                                            {par ? `${par.name} › ` : ''}{p.name}
                                                         </option>
                                                     );
                                                 })}
@@ -1385,22 +1366,46 @@ export default function RentModal({
 
                         {isContractLayout ? (
                             ownerSelectField
+                        ) : formData.type === 'rent_out' ? (
+                            subLandlordSelectBlock
                         ) : (
-                            <>
-                                {(showSubLandlordSelect || showCurrentTenantSelect) && (
-                                    <div className="space-y-3">
-                                        {subLandlordSelectBlock}
-                                        {currentTenantSelectBlock}
-                                    </div>
-                                )}
-                                {ownerSelectField}
-                            </>
+                            ownerSelectField
                         )}
                     </div>
                     {isContractLayout && (
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             {subLandlordSelectBlock}
                             {currentTenantSelectBlock}
+                        </div>
+                    )}
+                    {formData.type === 'rent_out' && (
+                        currentTenantSelectBlock
+                    )}
+                    {(formData.type === 'rent_out' || formData.type === 'renting') && (
+                        <div className="space-y-2">
+                            <label className={labelClass}>物業地段</label>
+                            <select
+                                name="rentPropertyLot"
+                                value={formData.rentPropertyLot}
+                                onChange={handleChange}
+                                disabled={!formData.propertyId || propertyLotSegmentOptions.length === 0}
+                                className={inputClass}
+                            >
+                                {propertyLotSegmentOptions.length === 0 ? (
+                                    <option value="">
+                                        {formData.propertyId ? '此物業暫無地段資料' : '請先選擇物業'}
+                                    </option>
+                                ) : (
+                                    propertyLotSegmentOptions.map((seg) => (
+                                        <option key={seg} value={seg} className="bg-white dark:bg-[#1a1a2e]">
+                                            {seg}
+                                        </option>
+                                    ))
+                                )}
+                            </select>
+                            <p className="text-xs text-zinc-400 dark:text-white/40">
+                                選項來自該物業之地段資料；多段時請選擇對應地段。
+                            </p>
                         </div>
                     )}
                     </div>
@@ -2417,15 +2422,50 @@ export default function RentModal({
                                 <label className={labelClass}>主物業 *</label>
                                 <select
                                     value={childPropertyForm.parentId}
-                                    onChange={(e) => setChildPropertyForm(prev => ({ ...prev, parentId: e.target.value }))}
+                                    onChange={(e) => setChildPropertyForm(prev => ({ ...prev, parentId: e.target.value, lotIndex: '' }))}
                                     className={inputClass}
                                     required
                                 >
                                     <option value="">請選擇主物業…</option>
                                     {propertiesRoot.map(p => (
-                                        <option key={p.id} value={p.id}>{p.name} ({p.code})</option>
+                                        <option key={p.id} value={p.id}>{p.name}</option>
                                     ))}
                                 </select>
+                            </div>
+                            <div className="space-y-2">
+                                <label className={labelClass}>物業地段</label>
+                                <div className="flex gap-2">
+                                    <select
+                                        value={childPropertyForm.lotIndex}
+                                        onChange={(e) => setChildPropertyForm(prev => ({ ...prev, lotIndex: e.target.value }))}
+                                        className={inputClass}
+                                    >
+                                        <option value="">請選擇地段…</option>
+                                        {(() => {
+                                            const parent = propertiesRoot.find(p => p.id === childPropertyForm.parentId);
+                                            if (!parent?.lotIndex) return null;
+                                            return parent.lotIndex
+                                                .split('\n')
+                                                .map(line => line.trim())
+                                                .filter(Boolean)
+                                                .map((line, idx) => {
+                                                    const colonIdx = line.indexOf(':');
+                                                    const display = colonIdx >= 0 ? line.substring(colonIdx + 1).trim() : line;
+                                                    return <option key={idx} value={display}>{display}</option>;
+                                                });
+                                        })()}
+                                    </select>
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setChildLotAreaForm({ name: '', area: '' });
+                                            setShowChildLotAreaModal(true);
+                                        }}
+                                        className="px-3 py-2 bg-teal-50 dark:bg-teal-500/20 text-teal-600 dark:text-teal-400 rounded-xl hover:bg-teal-100 dark:hover:bg-teal-500/30 border border-teal-100 dark:border-teal-500/30 text-sm font-medium transition-all whitespace-nowrap"
+                                    >
+                                        + 新增
+                                    </button>
+                                </div>
                             </div>
                             <div className="space-y-2">
                                 <label className={labelClass}>子物業名稱 *</label>
@@ -2462,6 +2502,77 @@ export default function RentModal({
                                     className="px-5 py-2 rounded-xl bg-purple-600 text-white font-medium disabled:opacity-50"
                                 >
                                     {childPropertySaving ? '建立中…' : '建立子物業'}
+                                </button>
+                            </div>
+                        </form>
+                    </motion.div>
+                </div>
+            )}
+
+            {/* 新增地段 Modal */}
+            {showChildLotAreaModal && (
+                <div className="fixed inset-0 z-[80] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm" role="dialog" aria-modal="true">
+                    <motion.div
+                        initial={{ opacity: 0, scale: 0.96 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        className="w-full max-w-sm rounded-2xl bg-white dark:bg-[#1a1a2e] border border-zinc-200 dark:border-white/10 shadow-xl overflow-hidden"
+                    >
+                        <div className="p-5 border-b border-zinc-100 dark:border-white/5 flex items-center justify-between">
+                            <h3 className="text-lg font-bold text-zinc-900 dark:text-white">新增地段</h3>
+                            <button
+                                type="button"
+                                onClick={() => setShowChildLotAreaModal(false)}
+                                className="p-2 rounded-lg text-zinc-400 hover:bg-zinc-100 dark:hover:bg-white/10"
+                            >
+                                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                            </button>
+                        </div>
+                        <form
+                            onSubmit={async (e) => {
+                                e.preventDefault();
+                                if (!childLotAreaForm.name.trim()) return;
+                                const parent = properties.find(p => p.id === childPropertyForm.parentId);
+                                if (!parent) return;
+                                const existing = parent.lotIndex || '';
+                                const newEntry = `新:${childLotAreaForm.name.trim()}`;
+                                const updated = existing ? `${existing}\n${newEntry}` : newEntry;
+                                setChildLotAreaSaving(true);
+                                try {
+                                    await updateProperty(parent.id!, { lotIndex: updated });
+                                    await loadData();
+                                    await queryClient.invalidateQueries({ queryKey: ['properties'] });
+                                    setChildPropertyForm(prev => ({ ...prev, lotIndex: childLotAreaForm.name.trim() }));
+                                    setShowChildLotAreaModal(false);
+                                } finally {
+                                    setChildLotAreaSaving(false);
+                                }
+                            }}
+                            className="p-5 space-y-4"
+                        >
+                            <div className="space-y-2">
+                                <label className={labelClass}>地段名稱 *</label>
+                                <input
+                                    value={childLotAreaForm.name}
+                                    onChange={(e) => setChildLotAreaForm(prev => ({ ...prev, name: e.target.value }))}
+                                    className={inputClass}
+                                    placeholder="例如：地段 A"
+                                    required
+                                />
+                            </div>
+                            <div className="flex justify-end gap-2 pt-2">
+                                <button
+                                    type="button"
+                                    onClick={() => setShowChildLotAreaModal(false)}
+                                    className="px-4 py-2 rounded-xl text-zinc-500 hover:bg-zinc-100 dark:hover:bg-white/10"
+                                >
+                                    取消
+                                </button>
+                                <button
+                                    type="submit"
+                                    disabled={childLotAreaSaving}
+                                    className="px-5 py-2 rounded-xl bg-teal-600 text-white font-medium disabled:opacity-50"
+                                >
+                                    {childLotAreaSaving ? '儲存中…' : '新增地段'}
                                 </button>
                             </div>
                         </form>

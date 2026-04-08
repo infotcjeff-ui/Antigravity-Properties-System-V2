@@ -41,6 +41,17 @@ export function parsePriceInput(value: string): string {
     return isNaN(num) ? value : String(num);
 }
 
+/**
+ * 將物業 lot_index 拆成多個地段（與物業單頁「物業地段」顯示邏輯一致：以 新:/舊: 分段）。
+ */
+export function parsePropertyLotSegments(lotIndex: string | null | undefined): string[] {
+    if (!lotIndex?.trim()) return [];
+    return lotIndex
+        .split(/(?:新|舊):/)
+        .map((s) => s.trim())
+        .filter(Boolean);
+}
+
 /** Parse lotIndex string into entries with 新/舊 type. Handles legacy format. */
 export function parseLotEntries(lotIndex: string | null | undefined): { type: 'new' | 'old'; value: string }[] {
     if (!lotIndex?.trim()) return [];

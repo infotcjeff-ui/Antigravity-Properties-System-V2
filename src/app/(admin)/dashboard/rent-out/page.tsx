@@ -285,6 +285,7 @@ export default function RentOutPage() {
                                 <thead>
                                     <tr className="text-left text-zinc-500 dark:text-white/50 text-sm border-b border-zinc-100 dark:border-white/5">
                                         <th className="p-4 font-medium">物業</th>
+                                        <th className="p-4 font-medium">二房東</th>
                                         <th className="p-4 font-medium">現時租客</th>
                                         <th className="p-4 font-medium">租賃性質</th>
                                         <th className="p-4 font-medium">繳付金額</th>
@@ -327,6 +328,7 @@ export default function RentOutPage() {
                                                 className="border-b border-zinc-100 dark:border-white/5 hover:bg-zinc-50 dark:hover:bg-white/5 transition-colors cursor-pointer"
                                             >
                                                 <td className="p-4 text-zinc-900 dark:text-white font-medium">{property?.name || '-'}</td>
+                                                <td className="p-4 text-zinc-600 dark:text-white/70">{rent.subLandlord?.name || ((): string => (rent as any).rentOutSubLandlord || '-')()}</td>
                                                 <td className="p-4 text-zinc-600 dark:text-white/70">{rent.currentTenant?.name || tenant?.name || '-'}</td>
                                                 <td className="p-4 text-zinc-500 dark:text-white/50 text-sm">{((): string => {
                                                     const raw = rent as any;
