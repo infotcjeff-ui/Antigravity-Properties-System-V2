@@ -262,6 +262,9 @@ export default function PropertyDetailsPage() {
     const [rentHistoryTab, setRentHistoryTab] = useState<RentHistoryTabKey>('rent_out');
     const [mainTab, setMainTab] = useState<'overview' | 'location' | 'policy' | 'booking'>('overview');
     const [showNotesToggle, setShowNotesToggle] = useState(false);
+    const [rentPage, setRentPage] = useState(1);
+
+    const RENT_HISTORY_PAGE_SIZE = 5;
     const notesRef = useRef<HTMLDivElement>(null);
 
     const mainTabs = [
@@ -284,20 +287,48 @@ export default function PropertyDetailsPage() {
 
     const proprietor = property?.proprietor || activeRenting?.proprietor || null;
     const rents = property?.rents || [];
-    const contractRents = rents.filter((r: Rent) => r.type === 'contract');
-    const rentOutRents = useMemo(
+
+    const allContractRents = rents.filter((r: Rent) => r.type === 'contract');
+    const allRentOutRents = useMemo(
         () => [...rents.filter((r: Rent) => r.type === 'rent_out')].sort(compareRentOutForListNewestFirst).reverse(),
         [rents],
     );
-    const rentingRents = rents.filter((r: Rent) => r.type === 'renting');
-    const leaseInContractRents = useMemo(
-        () => contractRents.filter((c: Rent) => (c.rentOutStatus || c.status) === 'leasing_in'),
-        [contractRents],
+    const allRentingRents = rents.filter((r: Rent) => r.type === 'renting');
+    const allLeaseInContractRents = useMemo(
+        () => allContractRents.filter((c: Rent) => (c.rentOutStatus || c.status) === 'leasing_in'),
+        [allContractRents],
     );
-    const leaseOutContractRents = useMemo(
-        () => contractRents.filter((c: Rent) => (c.rentOutStatus || c.status) !== 'leasing_in'),
-        [contractRents],
+    const allLeaseOutContractRents = useMemo(
+        () => allContractRents.filter((c: Rent) => (c.rentOutStatus || c.status) !== 'leasing_in'),
+        [allContractRents],
     );
+
+    const contractRents = allContractRents;
+    const rentOutRents = allRentOutRents;
+    const rentingRents = allRentingRents;
+    const leaseInContractRents = allLeaseInContractRents;
+    const leaseOutContractRents = allLeaseOutContractRents;
+
+    const rentHistoryAllLists = useMemo(
+        (): Record<RentHistoryTabKey, Rent[]> => ({
+            rent_out: allRentOutRents,
+            renting: allRentingRents,
+            contract_lease_in: allLeaseInContractRents,
+            contract_lease_out: allLeaseOutContractRents,
+        }),
+        [allRentOutRents, allRentingRents, allLeaseInContractRents, allLeaseOutContractRents],
+    );
+
+    const paginatedRentList = useMemo(() => {
+        const all = rentHistoryAllLists[rentHistoryTab];
+        const totalPages = Math.max(1, Math.ceil(all.length / RENT_HISTORY_PAGE_SIZE));
+        const safePage = Math.min(Math.max(1, rentPage), totalPages);
+        return {
+            list: all.slice((safePage - 1) * RENT_HISTORY_PAGE_SIZE, safePage * RENT_HISTORY_PAGE_SIZE),
+            totalPages,
+            safePage,
+        };
+    }, [rentHistoryAllLists, rentHistoryTab, rentPage]);
 
     const subLandlordCard = useMemo(() => {
         if (!property) return null;
@@ -747,7 +778,7 @@ export default function PropertyDetailsPage() {
                                         <button
                                             key={tab}
                                             type="button"
-                                            onClick={() => setRentHistoryTab(tab)}
+                                            onClick={() => { setRentHistoryTab(tab); setRentPage(1); }}
                                             className={`px-3 sm:px-4 py-2 rounded-lg text-sm font-medium transition-all ${
                                                 isActive ? styles.active : styles.inactive
                                             }`}
@@ -760,15 +791,8 @@ export default function PropertyDetailsPage() {
                         </div>
 
                         {(() => {
-                            const list =
-                                rentHistoryTab === 'rent_out'
-                                    ? rentOutRents
-                                    : rentHistoryTab === 'renting'
-                                      ? rentingRents
-                                      : rentHistoryTab === 'contract_lease_in'
-                                        ? leaseInContractRents
-                                        : leaseOutContractRents;
-                            if (list.length === 0) return <EmptyPlaceholder />;
+                            const { list: pageList, totalPages, safePage } = paginatedRentList;
+                            if (pageList.length === 0) return <EmptyPlaceholder />;
                             const isRentingTab = rentHistoryTab === 'renting';
                             const partyHeader =
                                 rentHistoryTab === 'rent_out'
@@ -799,7 +823,7 @@ export default function PropertyDetailsPage() {
                                             <div className="pl-4">{t('Rent', '租金')}</div>
                                         </div>
                                         <div className="divide-y divide-zinc-200 dark:divide-white/10">
-                                            {list.map((rent: Rent) => {
+                                            {pageList.map((rent: Rent) => {
                                                 const isRentOutOrContract = rent.type === 'rent_out' || rent.type === 'contract';
                                                 const otherParty = isRentOutOrContract ? rent.tenant : rent.proprietor || rent.tenant;
                                                 const rentOutLesseeLabel =
@@ -985,6 +1009,30 @@ export default function PropertyDetailsPage() {
                                                 );
                                             })}
                                         </div>
+
+                                        {totalPages > 1 && (
+                                            <div className="flex items-center justify-center gap-3 pt-3 text-sm text-zinc-500 dark:text-white/50">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setRentPage((p) => Math.max(1, p - 1))}
+                                                    disabled={safePage <= 1}
+                                                    className="px-3 py-1.5 rounded-lg border border-zinc-200 dark:border-white/15 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-zinc-50 dark:hover:bg-white/5"
+                                                >
+                                                    ‹
+                                                </button>
+                                                <span>
+                                                    {safePage} / {totalPages}
+                                                </span>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setRentPage((p) => Math.min(totalPages, p + 1))}
+                                                    disabled={safePage >= totalPages}
+                                                    className="px-3 py-1.5 rounded-lg border border-zinc-200 dark:border-white/15 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-zinc-50 dark:hover:bg-white/5"
+                                                >
+                                                    ›
+                                                </button>
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
                             );
