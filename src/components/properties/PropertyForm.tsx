@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useRef, useMemo, type ReactNode } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
 import { useProperties, useProprietorsQuery, usePropertiesWithRelationsQuery, useRents, useRentsQuery, useRentsWithRelationsQuery, useSubLandlordsQuery, useUsersQuery } from '@/hooks/useStorage';
@@ -30,6 +30,82 @@ import {
     getRentOutCollectionDisplayPeriod,
     getRentOutOrContractListNumber,
 } from '@/lib/rentPaymentDisplay';
+
+const RENT_LIST_PAGE_SIZE = 5;
+
+/** 列表顯示時去掉物業地段儲存用的「新:」「舊:」前綴（例：新:DD111 → DD111） */
+function stripLotNewOldPrefixes(text: string): string {
+    let s = text.trim();
+    if (!s) return '';
+    // 開頭或空白／頓號後的 新: / 舊:
+    s = s.replace(/(^|[\s、])新:/g, '$1');
+    s = s.replace(/(^|[\s、])舊:/g, '$1');
+    return s.replace(/\s+/g, ' ').trim();
+}
+
+/** 租務列表「租借位置」欄：優先顯示記錄所選物業地段，否則顯示該物業之地段 */
+function formatRentListLotCell(rent: Rent, propertyLotIndex: string): string {
+    const r = rent as unknown as Record<string, unknown>;
+    const raw = r.rentPropertyLot ?? r.rent_property_lot;
+    let joined = '';
+    if (Array.isArray(raw) && raw.length) {
+        joined = raw.map((x) => stripLotNewOldPrefixes(String(x))).filter(Boolean).join('、');
+    } else if (typeof raw === 'string' && raw.trim()) {
+        try {
+            const p = JSON.parse(raw);
+            if (Array.isArray(p)) {
+                joined = p.map((x: unknown) => stripLotNewOldPrefixes(String(x))).filter(Boolean).join('、');
+            }
+        } catch {
+            joined = raw
+                .split(',')
+                .map((s) => stripLotNewOldPrefixes(s))
+                .filter(Boolean)
+                .join('、');
+        }
+    }
+    if (joined) return stripLotNewOldPrefixes(joined) || '—';
+    const li = stripLotNewOldPrefixes((propertyLotIndex || '').trim());
+    return li || '—';
+}
+
+function RentListPagination({
+    page,
+    pageSize,
+    total,
+    onPageChange,
+}: {
+    page: number;
+    pageSize: number;
+    total: number;
+    onPageChange: (p: number) => void;
+}): ReactNode {
+    const totalPages = Math.max(1, Math.ceil(total / pageSize));
+    if (total <= pageSize) return null;
+    return (
+        <div className="flex items-center justify-center gap-3 pt-3 text-sm text-zinc-600 dark:text-white/60">
+            <button
+                type="button"
+                onClick={() => onPageChange(Math.max(1, page - 1))}
+                disabled={page <= 1}
+                className="px-3 py-1.5 rounded-lg border border-zinc-200 dark:border-white/15 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-zinc-50 dark:hover:bg-white/5"
+            >
+                上一頁
+            </button>
+            <span className="tabular-nums">
+                {page} / {totalPages}
+            </span>
+            <button
+                type="button"
+                onClick={() => onPageChange(Math.min(totalPages, page + 1))}
+                disabled={page >= totalPages}
+                className="px-3 py-1.5 rounded-lg border border-zinc-200 dark:border-white/15 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-zinc-50 dark:hover:bg-white/5"
+            >
+                下一頁
+            </button>
+        </div>
+    );
+}
 
 /** 由物業資料建立表單狀態；地址欄優先使用 address 欄，否則沿用 location 內文字 */
 function formStateFromProperty(p: Property | null | undefined) {
@@ -103,6 +179,10 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
 
     const [editingRent, setEditingRent] = useState<Rent | null>(null);
     const [unlinkingRentId, setUnlinkingRentId] = useState<string | null>(null);
+    const [rentOutPage, setRentOutPage] = useState(1);
+    const [rentingPage, setRentingPage] = useState(1);
+    const [leaseInContractPage, setLeaseInContractPage] = useState(1);
+    const [leaseOutContractPage, setLeaseOutContractPage] = useState(1);
 
     const [showProprietorModal, setShowProprietorModal] = useState(false);
     const [showRentModal, setShowRentModal] = useState(false);
@@ -216,6 +296,13 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
         () => (allProperties as any[]).filter(p => p.parentPropertyId === property?.id),
         [allProperties, property?.id],
     );
+
+    useEffect(() => {
+        setRentOutPage(1);
+        setRentingPage(1);
+        setLeaseInContractPage(1);
+        setLeaseOutContractPage(1);
+    }, [property?.id]);
 
     /** 收租表：業主、二房東、現時租客；交租表第二、三欄為業主（tenant_id）、承租人（proprietor_id） */
 
@@ -458,7 +545,7 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                                 </div>
                             )}
                             <div className="text-zinc-700 dark:text-white/80 text-sm leading-relaxed line-clamp-2">
-                                {rent.location || rent.rentOutAddressDetail || formData.name || '-'}
+                                {formatRentListLotCell(rent, formData.lotIndex || property?.lotIndex || '')}
                             </div>
                             <div className="flex flex-col">
                                 {startDate ? (
@@ -650,7 +737,7 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                                 </span>
                             </div>
                             <div className="text-zinc-700 dark:text-white/80 text-sm leading-relaxed line-clamp-2">
-                                {rent.location || rent.rentOutAddressDetail || formData.name || '-'}
+                                {formatRentListLotCell(rent as Rent, formData.lotIndex || property?.lotIndex || '')}
                             </div>
                             <div className="flex flex-col">
                                 {startDate ? (
@@ -905,6 +992,7 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                 status: formData.status as Property['status'],
                 landUse: formData.landUse.join(',') as Property['landUse'],
                 proprietorId: formData.proprietorId || undefined,
+                proprietorIds: formData.proprietorIds || [],
                 tenantId: formData.tenantId || undefined,
                 googleDrivePlanUrl: formData.googleDrivePlanUrl.trim(),
                 hasPlanningPermission: formData.hasPlanningPermission || '',
@@ -1536,6 +1624,34 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                         </div>
                     </div>
 
+                    {/* Google Drive URL and Planning Permission（置於業主區塊之上） */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                            <label className="block text-sm font-medium text-zinc-700 dark:text-white/80">Google Drive 規劃圖 URL</label>
+                            <input
+                                type="url"
+                                name="googleDrivePlanUrl"
+                                value={formData.googleDrivePlanUrl}
+                                onChange={handleChange}
+                                className="w-full px-4 py-3 bg-zinc-50 dark:bg-white/5 border border-zinc-200 dark:border-white/10 rounded-xl text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-purple-500/50 transition-all"
+                                placeholder="https://drive.google.com/..."
+                            />
+                        </div>
+                        <div className="flex-1 space-y-2">
+                            <label className="block text-sm font-medium text-zinc-700 dark:text-white/80">
+                                最新規劃許可申請
+                            </label>
+                            <input
+                                type="text"
+                                name="hasPlanningPermission"
+                                value={formData.hasPlanningPermission}
+                                onChange={handleChange}
+                                className="w-full px-4 py-3 bg-zinc-50 dark:bg-white/5 border border-zinc-200 dark:border-white/10 rounded-xl text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-purple-500/50 transition-all font-medium"
+                                placeholder="請輸入最新的規劃許可申請詳情..."
+                            />
+                        </div>
+                    </div>
+
                     {/* Proprietor Section (Multi-Select) */}
                     {property && (
                         <div className="space-y-3">
@@ -1767,7 +1883,19 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                                         <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]"></div>
                                         收租記錄 (Rent Out Records)
                                     </h4>
-                                    {renderRentTable(rentOutRents, 'landlord')}
+                                    {renderRentTable(
+                                        rentOutRents.slice(
+                                            (rentOutPage - 1) * RENT_LIST_PAGE_SIZE,
+                                            rentOutPage * RENT_LIST_PAGE_SIZE,
+                                        ),
+                                        'landlord',
+                                    )}
+                                    <RentListPagination
+                                        page={rentOutPage}
+                                        pageSize={RENT_LIST_PAGE_SIZE}
+                                        total={rentOutRents.length}
+                                        onPageChange={setRentOutPage}
+                                    />
                                 </div>
 
                                 <div>
@@ -1775,7 +1903,19 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                                         <div className="w-2.5 h-2.5 rounded-full bg-indigo-500 shadow-[0_0_8px_rgba(99,102,241,0.5)]"></div>
                                         交租記錄 (Renting Records)
                                     </h4>
-                                    {renderRentTable(rentingRents, 'owner')}
+                                    {renderRentTable(
+                                        rentingRents.slice(
+                                            (rentingPage - 1) * RENT_LIST_PAGE_SIZE,
+                                            rentingPage * RENT_LIST_PAGE_SIZE,
+                                        ),
+                                        'owner',
+                                    )}
+                                    <RentListPagination
+                                        page={rentingPage}
+                                        pageSize={RENT_LIST_PAGE_SIZE}
+                                        total={rentingRents.length}
+                                        onPageChange={setRentingPage}
+                                    />
                                 </div>
 
                                 <div className="space-y-8">
@@ -1784,14 +1924,38 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                                             <div className="w-2.5 h-2.5 rounded-full bg-violet-500 shadow-[0_0_8px_rgba(139,92,246,0.45)]"></div>
                                             租賃合約
                                         </h4>
-                                        {renderContractTable(leaseInContractRents, 'lease_in')}
+                                        {renderContractTable(
+                                            leaseInContractRents.slice(
+                                                (leaseInContractPage - 1) * RENT_LIST_PAGE_SIZE,
+                                                leaseInContractPage * RENT_LIST_PAGE_SIZE,
+                                            ),
+                                            'lease_in',
+                                        )}
+                                        <RentListPagination
+                                            page={leaseInContractPage}
+                                            pageSize={RENT_LIST_PAGE_SIZE}
+                                            total={leaseInContractRents.length}
+                                            onPageChange={setLeaseInContractPage}
+                                        />
                                     </div>
                                     <div>
                                         <h4 className="text-base font-bold text-amber-900 dark:text-amber-100 mb-3 flex items-center gap-2 px-1">
                                             <div className="w-2.5 h-2.5 rounded-full bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.5)]"></div>
                                             出租合約
                                         </h4>
-                                        {renderContractTable(leaseOutContractRents, 'lease_out')}
+                                        {renderContractTable(
+                                            leaseOutContractRents.slice(
+                                                (leaseOutContractPage - 1) * RENT_LIST_PAGE_SIZE,
+                                                leaseOutContractPage * RENT_LIST_PAGE_SIZE,
+                                            ),
+                                            'lease_out',
+                                        )}
+                                        <RentListPagination
+                                            page={leaseOutContractPage}
+                                            pageSize={RENT_LIST_PAGE_SIZE}
+                                            total={leaseOutContractRents.length}
+                                            onPageChange={setLeaseOutContractPage}
+                                        />
                                     </div>
                                 </div>
                             </div>
@@ -1859,34 +2023,6 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                             </div>
                         </>
                     ) : null}
-
-                    {/* Google Drive URL and Planning Permission */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                            <label className="block text-sm font-medium text-zinc-700 dark:text-white/80">Google Drive 規劃圖 URL</label>
-                            <input
-                                type="url"
-                                name="googleDrivePlanUrl"
-                                value={formData.googleDrivePlanUrl}
-                                onChange={handleChange}
-                                className="w-full px-4 py-3 bg-zinc-50 dark:bg-white/5 border border-zinc-200 dark:border-white/10 rounded-xl text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-purple-500/50 transition-all"
-                                placeholder="https://drive.google.com/..."
-                            />
-                        </div>
-                        <div className="flex-1 space-y-2">
-                            <label className="block text-sm font-medium text-zinc-700 dark:text-white/80">
-                                最新規劃許可申請
-                            </label>
-                            <input
-                                type="text"
-                                name="hasPlanningPermission"
-                                value={formData.hasPlanningPermission}
-                                onChange={handleChange}
-                                className="w-full px-4 py-3 bg-zinc-50 dark:bg-white/5 border border-zinc-200 dark:border-white/10 rounded-xl text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-purple-500/50 transition-all font-medium"
-                                placeholder="請輸入最新的規劃許可申請詳情..."
-                            />
-                        </div>
-                    </div>
 
                     {/* Notes Field (Rich Text) */}
                     <div className="space-y-2">
@@ -1984,6 +2120,7 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
             {/* Edit Rent Modal */}
             {editingRent && (
                 <RentModal
+                    key={editingRent.id}
                     propertyId={property?.id}
                     defaultLocation={formData.name}
                     rent={editingRent}

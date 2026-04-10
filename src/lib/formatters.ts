@@ -52,6 +52,90 @@ export function parsePropertyLotSegments(lotIndex: string | null | undefined): s
         .filter(Boolean);
 }
 
+/**
+ * 列表／租務記錄用：去掉各段 新:/舊: 前綴，多段以「 , 」連接（與物業單頁「物業地段」區塊一致）。
+ */
+export function formatLotIndexPlainJoined(lotIndex: string | null | undefined): string {
+    if (!lotIndex?.trim()) return '';
+    const segs = parsePropertyLotSegments(lotIndex);
+    return segs.length > 0 ? segs.join(' , ') : lotIndex.trim();
+}
+
+/** 從 API／DB 列讀取 rent_property_lot_partial（JSON 字串或物件） */
+export function parseRentPropertyLotPartialFromRow(raw: unknown): Record<string, boolean> {
+    if (raw == null) return {};
+    if (typeof raw === 'object' && !Array.isArray(raw)) return raw as Record<string, boolean>;
+    if (typeof raw === 'string' && raw.trim()) {
+        try {
+            const p = JSON.parse(raw) as unknown;
+            if (p && typeof p === 'object' && !Array.isArray(p)) return p as Record<string, boolean>;
+        } catch {
+            /* ignore */
+        }
+    }
+    return {};
+}
+
+/**
+ * 正規化租務記錄的 rent_property_lot（陣列、JSON 陣列字串、或以逗號分隔儲存的字串）。
+ */
+export function normalizeRentPropertyLotSelection(raw: unknown): string[] {
+    if (raw == null) return [];
+    if (Array.isArray(raw)) return raw.map((s) => String(s).trim()).filter(Boolean);
+    if (typeof raw === 'string') {
+        const t = raw.trim();
+        if (!t) return [];
+        try {
+            const p = JSON.parse(t) as unknown;
+            if (Array.isArray(p)) return p.map((s) => String(s).trim()).filter(Boolean);
+        } catch {
+            /* fall through */
+        }
+        return t.split(',').map((s) => s.trim()).filter(Boolean);
+    }
+    return [];
+}
+
+function rentHistoryPartialAppliesToLot(partial: Record<string, boolean>, lot: string): boolean {
+    const t = lot.trim();
+    if (!t) return false;
+    if (partial[t] === true) return true;
+    const norm = t.replace(/\s+/g, ' ');
+    for (const [k, v] of Object.entries(partial)) {
+        if (v !== true) continue;
+        const kt = k.trim();
+        if (kt === t || kt.replace(/\s+/g, ' ') === norm) return true;
+    }
+    return false;
+}
+
+/** 單筆租務在「租務記錄」物業欄的地段顯示：無 新:/舊:；勾選部份地方者後綴「 (部份地方)」。 */
+export function formatRentHistoryLotCellText(
+    propertyLotIndex: string | null | undefined,
+    rent: {
+        rentPropertyLot?: string | string[] | null;
+        rentPropertyLotPartial?: Record<string, boolean> | string | null;
+        rent_property_lot?: string | null;
+        rent_property_lot_partial?: Record<string, boolean> | string | null;
+    },
+): string {
+    const partialRaw = rent.rentPropertyLotPartial ?? rent.rent_property_lot_partial;
+    const partial = parseRentPropertyLotPartialFromRow(partialRaw);
+    const selectedRaw = rent.rentPropertyLot ?? rent.rent_property_lot;
+    const selected = normalizeRentPropertyLotSelection(selectedRaw);
+    const allSegs = parsePropertyLotSegments(propertyLotIndex);
+    const lotsToShow = selected.length > 0 ? selected : allSegs;
+    const suffix = ' (部份地方)';
+    const parts = lotsToShow
+        .map((lot) => {
+            const trimmed = lot.trim();
+            if (!trimmed) return '';
+            return rentHistoryPartialAppliesToLot(partial, trimmed) ? `${trimmed}${suffix}` : trimmed;
+        })
+        .filter(Boolean);
+    return parts.join(' , ');
+}
+
 /** Parse lotIndex string into entries with 新/舊 type. Handles legacy format. */
 export function parseLotEntries(lotIndex: string | null | undefined): { type: 'new' | 'old'; value: string }[] {
     if (!lotIndex?.trim()) return [];

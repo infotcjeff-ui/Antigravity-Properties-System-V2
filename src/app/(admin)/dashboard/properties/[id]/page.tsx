@@ -9,7 +9,12 @@ import {
     useSubLandlordsQuery,
     useCurrentTenantsQuery,
 } from '@/hooks/useStorage';
-import { formatLotArea, proprietorCategoryLabelZh } from '@/lib/formatters';
+import {
+    formatLotArea,
+    formatLotIndexPlainJoined,
+    formatRentHistoryLotCellText,
+    proprietorCategoryLabelZh,
+} from '@/lib/formatters';
 import type { CurrentTenant, Property, Proprietor, Rent } from '@/lib/db';
 import {
     compareRentOutForListNewestFirst,
@@ -474,14 +479,7 @@ export default function PropertyDetailsPage() {
                                 <p className="text-zinc-400 dark:text-white/40 text-sm">{t('Lot Index', '物業地段')}</p>
                                 <p className="font-medium mt-1 text-zinc-900 dark:text-white">
                                     {property.lotIndex
-                                        ? (() => {
-                                              const val = property.lotIndex
-                                                  .split(/(?:新|舊):/)
-                                                  .map((s) => s.trim())
-                                                  .filter(Boolean)
-                                                  .join(' , ');
-                                              return val || '暫無。';
-                                          })()
+                                        ? formatLotIndexPlainJoined(property.lotIndex) || '暫無。'
                                         : '暫無。'}
                                 </p>
                             </div>
@@ -763,6 +761,7 @@ export default function PropertyDetailsPage() {
                                                     rent.type === 'rent_out'
                                                         ? rentOutLesseeLabel || otherParty?.name || '-'
                                                         : null;
+                                                const rentLotRowText = formatRentHistoryLotCellText(property.lotIndex, rent);
                                                 return (
                                                     <div
                                                         key={rent.id}
@@ -789,10 +788,10 @@ export default function PropertyDetailsPage() {
                                                                 {property.code} {property.name}
                                                             </div>
                                                             <div
-                                                                className="text-zinc-900 dark:text-white font-bold text-sm mt-1 truncate"
-                                                                title={property.lotIndex || undefined}
+                                                                className="text-zinc-900 dark:text-white font-bold text-sm mt-1 min-w-0 max-w-full truncate"
+                                                                title={rentLotRowText || undefined}
                                                             >
-                                                                {property.lotIndex || '-'}
+                                                                {rentLotRowText || '-'}
                                                             </div>
                                                         </div>
                                                         {isRentingTab ? (

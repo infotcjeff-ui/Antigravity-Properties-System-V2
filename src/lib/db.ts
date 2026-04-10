@@ -128,8 +128,17 @@ export interface Rent {
   rentCollectionContractNumber?: string | null;
   /** 收據號碼（現金／FPS／入數等非支票付款方式） */
   rentCollectionReceiptNumber?: string | null;
-  /** 收租／交租記錄所選之物業地段（對應該物業 lot_index 中之一段） */
-  rentPropertyLot?: string | null;
+  /** 收租／交租記錄所選之物業地段（對應 properties.lot_index 中的一段或多段，格式如 "地段A" 或 ["地段A","地段B"]） */
+  rentPropertyLot?: string | string[] | null;
+  /** 勾選「部分地方」（選中的地段值後顯示「（部分地方）」後綴） */
+  rentPropertyLotStandalone?: boolean;
+  /**
+   * 各選中地段是否為「部分地方」模式（以地段名為 key，value 為 true 表示該地段是部分地方）
+   * 例：{ "地段A": true, "地段B": false } 表示地段A有後綴，地段B沒有
+   */
+  rentPropertyLotPartial?: Record<string, boolean> | null;
+  /** 免租期（單一日期，選填） */
+  rentFreePeriodDate?: Date;
 
   // ===== RENTING (交租) Fields =====
   rentingNumber?: string;              // 我方租約號碼

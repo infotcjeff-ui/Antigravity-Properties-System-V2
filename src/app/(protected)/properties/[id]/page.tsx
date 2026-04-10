@@ -5,7 +5,12 @@ import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { usePropertyWithRelationsQuery, useSubLandlordsQuery, useCurrentTenantsQuery } from '@/hooks/useStorage';
-import { formatLotArea, proprietorCategoryLabelZh } from '@/lib/formatters';
+import {
+    formatLotArea,
+    formatLotIndexPlainJoined,
+    formatRentHistoryLotCellText,
+    proprietorCategoryLabelZh,
+} from '@/lib/formatters';
 import type { CurrentTenant, Property, Proprietor, Rent } from '@/lib/db';
 import {
     compareRentOutForListNewestFirst,
@@ -208,28 +213,15 @@ const landUseLabels: Record<string, string> = {
     recreation_use: '休憩用地',
 };
 
-function LotIndexBadge({ lotIndex }: { lotIndex: string }) {
-    const match = lotIndex.match(/^(新|舊)\s*:?\s*(.*?)\s*:?\s*$/);
-    if (match) {
-        const tag = match[1];
-        const rest = match[2];
-        return (
-            <div className="flex items-center gap-1 truncate">
-                <span
-                    className={`shrink-0 text-[10px] font-bold px-1.5 py-0.5 rounded-sm border ${
-                        tag === '新'
-                            ? 'text-[oklch(59.6%_0.145_163.225)] bg-[color-mix(in_oklab,var(--color-emerald-500)_20%,transparent)] border-emerald-300 dark:border-emerald-500/40 dark:text-emerald-300'
-                            : 'bg-orange-100 text-orange-700 border-orange-300 dark:bg-orange-500/20 dark:text-orange-300 dark:border-orange-500/40'
-                    }`}
-                >
-                    {tag}
-                </span>
-                <span className="text-zinc-900 dark:text-white font-bold text-sm truncate">{rest}</span>
-            </div>
-        );
-    }
+/** 租務記錄列表物業欄：已格式化的地段字串（逗號分隔、無 新:/舊:），單行省略 */
+function RentHistoryLotLine({ display }: { display: string }) {
     return (
-        <span className="text-zinc-900 dark:text-white font-bold text-sm truncate">{lotIndex}</span>
+        <span
+            className="block min-w-0 max-w-full truncate text-zinc-900 dark:text-white font-bold text-sm"
+            title={display}
+        >
+            {display}
+        </span>
     );
 }
 
@@ -622,14 +614,7 @@ export default function PropertyDetailsPage() {
                                 <p className="text-zinc-400 dark:text-white/40 text-sm">{t('Lot Index', '物業地段')}</p>
                                 <p className="font-medium mt-1 text-zinc-900 dark:text-white">
                                     {property.lotIndex
-                                        ? (() => {
-                                              const val = property.lotIndex
-                                                  .split(/(?:新|舊):/)
-                                                  .map((s) => s.trim())
-                                                  .filter(Boolean)
-                                                  .join(' , ');
-                                              return val || '暫無。';
-                                          })()
+                                        ? formatLotIndexPlainJoined(property.lotIndex) || '暫無。'
                                         : '暫無。'}
                                 </p>
                             </div>
@@ -872,6 +857,7 @@ export default function PropertyDetailsPage() {
                                                     rent.type === 'rent_out'
                                                         ? rentOutLesseeLabel || otherParty?.name || '-'
                                                         : null;
+                                                const rentLotRowText = formatRentHistoryLotCellText(property.lotIndex, rent);
                                                 return (
                                                     <div
                                                         key={rent.id}
@@ -897,9 +883,9 @@ export default function PropertyDetailsPage() {
                                                             >
                                                                 {property.code} {property.name}
                                                             </div>
-                                                            <div className="mt-1 min-w-0" title={property.lotIndex || undefined}>
-                                                                {property.lotIndex ? (
-                                                                    <LotIndexBadge lotIndex={property.lotIndex} />
+                                                            <div className="mt-1 min-w-0 max-w-full overflow-hidden">
+                                                                {rentLotRowText ? (
+                                                                    <RentHistoryLotLine display={rentLotRowText} />
                                                                 ) : (
                                                                     <span className="text-zinc-900 dark:text-white font-bold text-sm">-</span>
                                                                 )}

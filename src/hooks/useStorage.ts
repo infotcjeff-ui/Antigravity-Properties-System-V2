@@ -29,6 +29,29 @@ const toSnake = (obj: any) => {
     return newObj;
 };
 
+/**
+ * RentModal 傳入的 rentPropertyLotPartial 為 JSON.stringify 後的字串或 Record；
+ * updateRent 先前只接受 object，字串會被誤判為無效並寫入 null，導致「部分地方」更新後遺失。
+ */
+const parseRentPropertyLotPartialForSave = (input: unknown): Record<string, boolean> | null => {
+    if (input == null) return null;
+    if (typeof input === 'string') {
+        const t = input.trim();
+        if (!t) return null;
+        try {
+            const p = JSON.parse(t) as unknown;
+            if (p && typeof p === 'object' && !Array.isArray(p)) return p as Record<string, boolean>;
+        } catch {
+            return null;
+        }
+        return null;
+    }
+    if (typeof input === 'object' && !Array.isArray(input)) {
+        return input as Record<string, boolean>;
+    }
+    return null;
+};
+
 /** 統一正規化物業 location，避免 JSONB 內為 latitude/longitude 等格式時表單／地圖讀不到座標 */
 const mapPropertyRow = (row: any): Property => {
     const p = toCamel(row) as Property;
@@ -203,7 +226,14 @@ export const fetchProperties = async (user?: any, options?: { query?: string; by
             .order('code', { ascending: true });
 
         if (sbError) throw sbError;
-        return (data || []).map(mapPropertyRow);
+        return (data || []).map(row => {
+            const prop = mapPropertyRow(row);
+            // 如果資料庫沒有 proprietor_ids 欄位，保留既有值或空陣列
+            if (prop.proprietorIds === undefined) {
+                prop.proprietorIds = [];
+            }
+            return prop;
+        });
     } catch (err: any) {
         if (err instanceof TypeError && err.message === 'Failed to fetch') {
             console.error('Network Error: Unable to reach Supabase. Check your URL and internet connection.');
@@ -716,6 +746,7 @@ export function useProperties() {
                 has_planning_permission: property.hasPlanningPermission,
                 notes: property.notes,
                 proprietor_id: property.proprietorId,
+                // proprietor_ids 需要資料庫遷移後才能使用
                 tenant_id: property.tenantId,
                 parent_property_id: property.parentPropertyId,
                 created_by: property.createdBy || user?.id,
@@ -751,16 +782,23 @@ export function useProperties() {
         setError(null);
         try {
             const updateData = toSnake(updates);
-            // Full set of allowed fields for safety
-            const allowed = [
+            // Base allowed fields (always exist in DB)
+            const baseAllowed = [
                 'name', 'type', 'status', 'address', 'code',
                 'lot_index', 'lot_area', 'land_use',
                 'images', 'geo_maps', 'location',
                 'google_drive_plan_url', 'has_planning_permission', 'notes',
                 'proprietor_id', 'tenant_id', 'parent_property_id', 'created_by'
             ];
+            // Extended fields (may not exist in older DB schemas)
+            const extendedAllowed = [
+                'proprietor_ids'
+            ];
+            const allAllowed = [...baseAllowed, ...extendedAllowed];
             const filtered: any = {};
-            Object.keys(updateData).forEach(k => { if (allowed.includes(k)) filtered[k] = updateData[k]; });
+            Object.keys(updateData).forEach(k => {
+                if (allAllowed.includes(k)) filtered[k] = updateData[k];
+            });
 
             const { error: sbError } = await supabase
                 .from('properties')
@@ -1266,8 +1304,29 @@ export function useRents() {
             if (rc.rentCollectionContractNature !== undefined) {
                 rentData.rent_collection_contract_nature = rc.rentCollectionContractNature || null;
             }
+            if ((rent as any).rentFreePeriodDate) {
+                rentData.rent_free_period_date = (rent as any).rentFreePeriodDate;
+            }
             if (rc.rentPropertyLot !== undefined) {
-                rentData.rent_property_lot = rc.rentPropertyLot?.trim() || null;
+                const v = rc.rentPropertyLot;
+                if (Array.isArray(v)) {
+                    rentData.rent_property_lot = v.map(String).join(',') || null;
+                } else if (typeof v === 'string') {
+                    rentData.rent_property_lot = v.trim() || null;
+                } else {
+                    rentData.rent_property_lot = null;
+                }
+            }
+            if (rc.rentPropertyLotStandalone !== undefined) {
+                rentData.rent_property_lot_standalone = rc.rentPropertyLotStandalone ? true : null;
+            }
+            if (rc.rentPropertyLotPartial !== undefined) {
+                const obj = parseRentPropertyLotPartialForSave(rc.rentPropertyLotPartial);
+                if (obj && Object.values(obj).some(Boolean)) {
+                    rentData.rent_property_lot_partial = JSON.stringify(obj);
+                } else {
+                    rentData.rent_property_lot_partial = null;
+                }
             }
 
             // Add Renting (交租) fields
@@ -1510,8 +1569,29 @@ export function useRents() {
             if (urc.rentCollectionContractNature !== undefined) {
                 rentData.rent_collection_contract_nature = urc.rentCollectionContractNature || null;
             }
+            if (Object.prototype.hasOwnProperty.call(updates, 'rentFreePeriodDate')) {
+                rentData.rent_free_period_date = (updates as any).rentFreePeriodDate || null;
+            }
             if (urc.rentPropertyLot !== undefined) {
-                rentData.rent_property_lot = urc.rentPropertyLot?.trim() || null;
+                const v = urc.rentPropertyLot;
+                if (Array.isArray(v)) {
+                    rentData.rent_property_lot = v.map(String).join(',') || null;
+                } else if (typeof v === 'string') {
+                    rentData.rent_property_lot = v.trim() || null;
+                } else {
+                    rentData.rent_property_lot = null;
+                }
+            }
+            if (urc.rentPropertyLotStandalone !== undefined) {
+                rentData.rent_property_lot_standalone = urc.rentPropertyLotStandalone ? true : null;
+            }
+            if (urc.rentPropertyLotPartial !== undefined) {
+                const obj = parseRentPropertyLotPartialForSave(urc.rentPropertyLotPartial);
+                if (obj && Object.values(obj).some(Boolean)) {
+                    rentData.rent_property_lot_partial = JSON.stringify(obj);
+                } else {
+                    rentData.rent_property_lot_partial = null;
+                }
             }
 
             // RENTING fields
@@ -1651,7 +1731,7 @@ export function useRelations() {
         setLoading(true);
         setError(null);
         try {
-            const queryFields = 'id, name, code, address, type, status, land_use, lot_index, lot_area, location, google_drive_plan_url, has_planning_permission, proprietor_id, tenant_id, created_by, created_at, updated_at, images, geo_maps, notes';
+            const queryFields = 'id, name, code, address, type, status, land_use, lot_index, lot_area, location, google_drive_plan_url, has_planning_permission, proprietor_id, proprietor_ids, tenant_id, created_by, created_at, updated_at, images, geo_maps, notes';
 
             const { data: records, error: pError } = await supabase
                 .from('properties')
