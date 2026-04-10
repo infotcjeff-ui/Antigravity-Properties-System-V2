@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
@@ -242,6 +242,10 @@ export default function PropertyDetailsPage() {
     const { data: subLandlords = [] } = useSubLandlordsQuery();
     const { data: currentTenants = [] } = useCurrentTenantsQuery();
 
+    const [rentHistoryTab, setRentHistoryTab] = useState<RentHistoryTabKey>('rent_out');
+    const [rentPage, setRentPage] = useState(1);
+    const RENT_HISTORY_PAGE_SIZE = 5;
+
     const activeRentOut = property?.rents?.find((r: Rent) => r.type === 'rent_out' && ['listing', 'renting'].includes(r.rentOutStatus || ''));
     const activeRenting = property?.rents?.find((r: Rent) => r.type === 'renting');
 
@@ -267,23 +271,33 @@ export default function PropertyDetailsPage() {
     const leaseInContractRents = allLeaseInContractRents;
     const leaseOutContractRents = allLeaseOutContractRents;
 
-    const rentHistoryAllLists: Record<RentHistoryTabKey, Rent[]> = {
-        rent_out: allRentOutRents,
-        renting: allRentingRents,
-        contract_lease_in: allLeaseInContractRents,
-        contract_lease_out: allLeaseOutContractRents,
-    };
+    const rentHistoryAllLists = useMemo(
+        (): Record<RentHistoryTabKey, Rent[]> => ({
+            rent_out: allRentOutRents,
+            renting: allRentingRents,
+            contract_lease_in: allLeaseInContractRents,
+            contract_lease_out: allLeaseOutContractRents,
+        }),
+        [allRentOutRents, allRentingRents, allLeaseInContractRents, allLeaseOutContractRents],
+    );
+
+    const getRentPageSlice = useCallback(
+        (all: Rent[]) => {
+            const totalPages = Math.max(1, Math.ceil(all.length / RENT_HISTORY_PAGE_SIZE));
+            const safePage = Math.min(Math.max(1, rentPage), totalPages);
+            return {
+                list: all.slice((safePage - 1) * RENT_HISTORY_PAGE_SIZE, safePage * RENT_HISTORY_PAGE_SIZE),
+                totalPages,
+                safePage,
+            };
+        },
+        [rentPage],
+    );
 
     const paginatedRentList = useMemo(() => {
         const all = rentHistoryAllLists[rentHistoryTab];
-        const totalPages = Math.max(1, Math.ceil(all.length / RENT_HISTORY_PAGE_SIZE));
-        const safePage = Math.min(Math.max(1, rentPage), totalPages);
-        return {
-            list: all.slice((safePage - 1) * RENT_HISTORY_PAGE_SIZE, safePage * RENT_HISTORY_PAGE_SIZE),
-            totalPages,
-            safePage,
-        };
-    }, [rentHistoryAllLists, rentHistoryTab, rentPage]);
+        return getRentPageSlice(all);
+    }, [rentHistoryAllLists, rentHistoryTab, getRentPageSlice]);
 
     const subLandlordCard = useMemo(() => {
         if (!property) return null;
@@ -310,9 +324,6 @@ export default function PropertyDetailsPage() {
     const [lightboxImage, setLightboxImage] = useState<string | null>(null);
     const [selectedRent, setSelectedRent] = useState<Rent | null>(null);
     const [imageError, setImageError] = useState(false);
-    const [rentHistoryTab, setRentHistoryTab] = useState<RentHistoryTabKey>('rent_out');
-    const [rentPage, setRentPage] = useState(1);
-    const RENT_HISTORY_PAGE_SIZE = 5;
     const [mainTab, setMainTab] = useState<'overview' | 'location' | 'policy' | 'booking'>('overview');
 
     const mainTabs = [
