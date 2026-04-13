@@ -2410,7 +2410,7 @@ export default function RentModal({
                                         </div>
                                     </div>
                                     <div className="space-y-2">
-                                        <label className={labelClass}>付款日期</label>
+                                        <label className={labelClass}>支票日期</label>
                                         <input
                                             type="date"
                                             name="rentOutDepositPaymentDate"

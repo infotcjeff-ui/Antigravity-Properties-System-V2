@@ -75,20 +75,6 @@ export default function RentDetailsModal({ rent, property, onClose }: RentDetail
     const rentingDisplayNumber =
         (property?.code?.trim() || rent.rentingNumber?.trim() || '-');
 
-    let statusValueRentOut: React.ReactNode =
-        rent.rentOutStatus === 'listing' ? '放盤中' :
-        rent.rentOutStatus === 'renting' ? '出租中' :
-        rent.rentOutStatus === 'leasing_in' ? '租入中' :
-        rent.rentOutStatus === 'completed' ? '已完租' : rent.rentOutStatus;
-    if (isExpired) {
-        statusValueRentOut = <span className="text-red-500 font-bold whitespace-nowrap">已過期</span>;
-    }
-
-    let statusValueRenting: React.ReactNode = '生效中';
-    if (isExpired) {
-        statusValueRenting = <span className="text-red-500 font-bold whitespace-nowrap">已過期</span>;
-    }
-
     const contractNatureLabelZh = (v: string | undefined) => {
         const map: Record<string, string> = {
             parking: '車位',
@@ -98,6 +84,26 @@ export default function RentDetailsModal({ rent, property, onClose }: RentDetail
         if (!v?.trim()) return '';
         return map[v] || v;
     };
+
+    /** 收租/合約記錄根據繳付資料計算狀態 */
+    const paymentStatus = (() => {
+        const isContract = rent.type === 'contract';
+        const isRenting = rent.type === 'renting';
+        if (isRenting) {
+            return isExpired
+                ? <span className="text-red-500 font-bold whitespace-nowrap">已過期</span>
+                : '生效中';
+        }
+        const hasAmount = !!(isContract
+            ? (rent as any).rentOutDepositReceived
+            : (rent as any).rentCollectionAmount);
+        const hasMethod = !!(isContract
+            ? (rent as any).rentOutDepositPaymentMethod
+            : (rent as any).rentCollectionPaymentMethod);
+        if (hasAmount && hasMethod) return '已繳交';
+        if (hasAmount && !hasMethod) return '未知';
+        return '未繳交';
+    })();
 
     return (
         <motion.div
@@ -146,6 +152,12 @@ export default function RentDetailsModal({ rent, property, onClose }: RentDetail
                             <DetailRow label={t('Listing Price', '放盤價')} value={formatCurrency(rent.rentOutPricing)} />
                             <DetailRow label={t('Periods', '期數')} value={rent.rentOutPeriods} />
                             <DetailRow label={t('Total Amount', '總額')} value={formatCurrency(rent.rentOutTotalAmount)} />
+                            {rent.type !== 'contract' && (rent as any).rentCollectionPaymentMethod ? (
+                                <DetailRow
+                                    label={t('Payment Method', '付款方式')}
+                                    value={labelRentCollectionPaymentMethod((rent as any).rentCollectionPaymentMethod)}
+                                />
+                            ) : null}
                             <DetailRow
                                 label={t('Start Date', '開始日期')}
                                 value={formatDate(
@@ -196,7 +208,10 @@ export default function RentDetailsModal({ rent, property, onClose }: RentDetail
                             <DetailRow label={t('Deposit Receive Date', '按金收取日期')} value={formatDate(rent.rentOutDepositReceiveDate)} />
                             <DetailRow label={t('Deposit Return Date', '按金退回日期')} value={formatDate(rent.rentOutDepositReturnDate)} />
                             <DetailRow label={t('Deposit Return Amount', '按金退回金額')} value={formatCurrency(rent.rentOutDepositReturnAmount)} />
-                            <DetailRow label={t('Status', '狀態')} value={statusValueRentOut} />
+                            <DetailRow
+                                label={t('Payment Status', '付款狀態')}
+                                value={paymentStatus}
+                            />
 
                             {property && (
                                 <DetailRow
@@ -259,7 +274,7 @@ export default function RentDetailsModal({ rent, property, onClose }: RentDetail
                             <DetailRow label={t('Start Date', '開始日期')} value={formatDate(rent.rentingStartDate)} />
                             <DetailRow label={t('End Date', '結束日期')} value={formatDate(rent.rentingEndDate)} />
                             <DetailRow label={t('Deposit', '押金')} value={formatCurrency(rent.rentingDeposit)} />
-                            <DetailRow label={t('Status', '狀態')} value={statusValueRenting} />
+                            <DetailRow label={t('Payment Status', '付款狀態')} value={paymentStatus} />
 
                             {property && (
                                 <DetailRow
