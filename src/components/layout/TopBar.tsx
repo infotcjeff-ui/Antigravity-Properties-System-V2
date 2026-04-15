@@ -14,9 +14,18 @@ interface TopBarProps {
     placeholder?: string;
     isAuthenticated?: boolean;
     isAdmin?: boolean;
+    showLanguageSwitcher?: boolean;
+    showNotifications?: boolean;
 }
 
-export default function TopBar({ onSearch, placeholder = '搜尋...', isAuthenticated = false, isAdmin = false }: TopBarProps) {
+export default function TopBar({
+    onSearch,
+    placeholder = '搜尋...',
+    isAuthenticated = false,
+    isAdmin = false,
+    showLanguageSwitcher,
+    showNotifications,
+}: TopBarProps) {
     const router = useRouter();
     const lang = useLanguage();
     const isZh = lang === 'zh-TW';
@@ -122,12 +131,11 @@ export default function TopBar({ onSearch, placeholder = '搜尋...', isAuthenti
 
                 {/* Right side actions */}
                 <div className="flex items-center gap-3">
-                    {/* Theme Toggle - Hidden for now */}
-                    {/* <ThemeToggle /> */}
-                    {/* Language Switcher - Hidden for now */}
-                    {/* {isAdmin ? <LanguageSwitcher isAdmin /> : null} */}
+                    {/* Theme Toggle */}
+                    <ThemeToggle />
+                    {isAdmin && showLanguageSwitcher !== false ? <LanguageSwitcher isAdmin /> : null}
 
-                    {isAuthenticated ? (
+                    {isAuthenticated && showNotifications !== false ? (
                         <>
                             {/* Notification Bell - Only for authenticated users */}
                             <div className="relative" ref={notificationRef}>
