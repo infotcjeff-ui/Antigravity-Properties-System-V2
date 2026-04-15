@@ -236,11 +236,11 @@ export function getPropertyCurrentTenantsWithLots(
             const ct = currentTenants.find((c) => c.id === tid);
             if (ct) {
                 seenIds.add(tid);
-                // 獲取該租客關聯的地段
-                const rawLot = rent.rentPropertyLot ?? (rent as Record<string, unknown>).rent_property_lot;
+                // 獲取該租客關聯的地段（兼容 snake_case 和 camelCase）
+                const rawLot = (rent as unknown as Record<string, unknown>).rent_property_lot ?? rent.rentPropertyLot;
                 const lots = normalizeRentPropertyLotSelection(rawLot);
                 // 獲取部分地段標記
-                const rawPartial = rent.rentPropertyLotPartial ?? (rent as Record<string, unknown>).rent_property_lot_partial;
+                const rawPartial = (rent as unknown as Record<string, unknown>).rent_property_lot_partial ?? rent.rentPropertyLotPartial;
                 const partialMap = parseRentPropertyLotPartialFromRow(rawPartial);
                 const partialLots = lots.filter((lot) => partialMap[lot] === true);
                 // 如果沒有特定地段，使用物业全部地段
