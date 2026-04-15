@@ -122,9 +122,10 @@ export default function TopBar({ onSearch, placeholder = '搜尋...', isAuthenti
 
                 {/* Right side actions */}
                 <div className="flex items-center gap-3">
-                    {/* Theme Toggle */}
-                    <ThemeToggle />
-                    {isAdmin ? <LanguageSwitcher isAdmin /> : null}
+                    {/* Theme Toggle - Hidden for now */}
+                    {/* <ThemeToggle /> */}
+                    {/* Language Switcher - Hidden for now */}
+                    {/* {isAdmin ? <LanguageSwitcher isAdmin /> : null} */}
 
                     {isAuthenticated ? (
                         <>
