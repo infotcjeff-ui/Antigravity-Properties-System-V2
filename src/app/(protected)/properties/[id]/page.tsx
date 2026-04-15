@@ -1,7 +1,7 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useEffect, useMemo, useState, useRef } from 'react';
+import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { usePropertyWithRelationsQuery, useSubLandlordsQuery, useCurrentTenantsQuery } from '@/hooks/useStorage';
@@ -11,13 +11,14 @@ import {
     formatRentHistoryLotCellText,
     proprietorCategoryLabelZh,
 } from '@/lib/formatters';
-import type { CurrentTenant, Property, Proprietor, Rent } from '@/lib/db';
+import type { CurrentTenant, Proprietor, Rent } from '@/lib/db';
 import {
     compareRentOutForListNewestFirst,
     getRentOutCollectionDisplayPeriod,
     getRentOutLesseeDisplayLabel,
     getRentOutOrContractListNumber,
     resolvePropertyCurrentTenantDisplay,
+    getPropertyCurrentTenantsWithLots,
 } from '@/lib/rentPaymentDisplay';
 import {
     ArrowLeft,
@@ -36,7 +37,6 @@ import {
     ChevronUp,
     Users,
 } from 'lucide-react';
-import { useRef } from 'react';
 import DOMPurify from 'dompurify';
 import { useLanguage } from '@/components/common/LanguageSwitcher';
 import RentDetailsModal from '@/components/properties/RentDetailsModal';
@@ -88,47 +88,63 @@ function RentHistoryProprietorCell({ party }: { party?: Proprietor | null }) {
     );
 }
 
-/** 出租合約分頁：承租人與物業「現時租客」摘要一致（收租記錄優先於合約 FK） */
+/** 出租合約分頁：承租人與物業「現時租客」摘要一致（收租記錄優先於合約 FK）
+ * 支援從 rentOutTenantIds 陣列中查找正確的租客
+ */
 function RentHistoryLeaseOutContractLesseeCell({
     displayName,
     currentTenants,
     proprietorFromRent,
+    rentTenantIds,
 }: {
     displayName: string;
     currentTenants: CurrentTenant[];
     proprietorFromRent?: Proprietor | null;
+    rentTenantIds?: string[];
 }) {
     if (!displayName || displayName === '-') {
         return <div className="text-zinc-600 dark:text-white/70 text-sm">-</div>;
     }
     const dn = displayName.trim();
-    if (proprietorFromRent?.name?.trim() === dn) {
-        return <RentHistoryProprietorCell party={proprietorFromRent} />;
+
+    // 優先：檢查 rentTenantIds 中是否有與 displayName 匹配的租客
+    let matchedTenant: CurrentTenant | undefined;
+    if (rentTenantIds && rentTenantIds.length > 0) {
+        // 嘗試通過 ID 匹配
+        matchedTenant = currentTenants.find((ct) => rentTenantIds.includes(ct.id || ''));
+        // 如果沒找到，嘗試通過名稱匹配
+        if (!matchedTenant) {
+            matchedTenant = currentTenants.find((ct) => ct.name?.trim() === dn);
+        }
+    } else {
+        // 沒有 tenantIds 時使用原有邏輯
+        matchedTenant = currentTenants.find((c) => c.name?.trim() === dn);
     }
-    const ct = currentTenants.find((c) => c.name?.trim() === dn);
+
     const nameClass = 'text-sm font-medium text-zinc-900 dark:text-white line-clamp-2 min-w-0 max-w-full block';
-    if (ct) {
+
+    if (matchedTenant) {
         return (
             <Tooltip
                 content={
                     <div className="flex flex-col gap-1.5 w-full">
                         <div className="flex items-center gap-2 mb-1">
                             <User className="w-4 h-4 text-blue-500" />
-                            <span className="font-bold">{ct.name}</span>
-                            {ct.code ? (
+                            <span className="font-bold">{matchedTenant.name}</span>
+                            {matchedTenant.code ? (
                                 <span className="bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-300 px-1.5 py-0.5 rounded text-[10px] ml-auto">
-                                    {ct.code}
+                                    {matchedTenant.code}
                                 </span>
                             ) : null}
                         </div>
-                        {ct.englishName ? (
+                        {matchedTenant.englishName ? (
                             <div className="text-xs text-zinc-500 dark:text-white/60">
                                 公司名稱:{' '}
-                                <span className="text-zinc-900 dark:text-white text-[10px]">{ct.englishName}</span>
+                                <span className="text-zinc-900 dark:text-white text-[10px]">{matchedTenant.englishName}</span>
                             </div>
                         ) : null}
-                        {ct.tenancyNumber ? (
-                            <div className="text-xs text-zinc-500 dark:text-white/60">出租號碼: {ct.tenancyNumber}</div>
+                        {matchedTenant.tenancyNumber ? (
+                            <div className="text-xs text-zinc-500 dark:text-white/60">出租號碼: {matchedTenant.tenancyNumber}</div>
                         ) : null}
                     </div>
                 }
@@ -141,11 +157,50 @@ function RentHistoryLeaseOutContractLesseeCell({
             </Tooltip>
         );
     }
+
+    // 退回到 proprietorFromRent
+    if (proprietorFromRent?.name?.trim() === dn) {
+        return <RentHistoryProprietorCell party={proprietorFromRent} />;
+    }
+
     return (
         <div className={nameClass} title={displayName}>
             {displayName}
         </div>
     );
+}
+
+/**
+ * 獲取合約記錄的承租人顯示名稱
+ * 優先使用 rentOutTenantIds 查找，否則退回到名稱匹配
+ */
+function getContractLesseeDisplayName(
+    rent: Rent,
+    currentTenants: CurrentTenant[],
+): { displayName: string; matchedTenant: CurrentTenant | null } {
+    const tenantIds = rent.rentOutTenantIds || [];
+
+    if (tenantIds.length > 0) {
+        // 通過 ID 查找
+        const matched = currentTenants.find((ct) => tenantIds.includes(ct.id || ''));
+        if (matched) {
+            return { displayName: matched.name, matchedTenant: matched };
+        }
+    }
+
+    // 退回到 rentOutTenants 或其他名稱欄位
+    const otherNames = rent.rentOutTenants || [];
+    for (const name of otherNames) {
+        if (name?.trim()) {
+            const matched = currentTenants.find((ct) => ct.name?.trim() === name.trim());
+            if (matched) {
+                return { displayName: matched.name, matchedTenant: matched };
+            }
+            return { displayName: name.trim(), matchedTenant: null };
+        }
+    }
+
+    return { displayName: '-', matchedTenant: null };
 }
 
 const statusColors: Record<string, string> = {
@@ -233,16 +288,6 @@ function EmptyPlaceholder() {
     );
 }
 
-function DetailRow({ label, value }: { label: string; value: any }) {
-    if (value == null || value === '' || value === '-') return null;
-    return (
-        <div className="flex justify-between items-start gap-4 py-2 border-b border-zinc-50 dark:border-white/5 last:border-none">
-            <span className="text-sm text-zinc-500 dark:text-white/50 whitespace-nowrap">{label}</span>
-            <span className="text-sm font-medium text-zinc-900 dark:text-white text-right">{String(value)}</span>
-        </div>
-    );
-}
-
 export default function PropertyDetailsPage() {
     const { user } = useAuth();
     const params = useParams();
@@ -263,6 +308,7 @@ export default function PropertyDetailsPage() {
     const [mainTab, setMainTab] = useState<'overview' | 'location' | 'policy' | 'booking'>('overview');
     const [showNotesToggle, setShowNotesToggle] = useState(false);
     const [rentPage, setRentPage] = useState(1);
+    const [currentTenantIndex, setCurrentTenantIndex] = useState(0);
 
     const RENT_HISTORY_PAGE_SIZE = 5;
     const notesRef = useRef<HTMLDivElement>(null);
@@ -302,12 +348,6 @@ export default function PropertyDetailsPage() {
         () => allContractRents.filter((c: Rent) => (c.rentOutStatus || c.status) !== 'leasing_in'),
         [allContractRents],
     );
-
-    const contractRents = allContractRents;
-    const rentOutRents = allRentOutRents;
-    const rentingRents = allRentingRents;
-    const leaseInContractRents = allLeaseInContractRents;
-    const leaseOutContractRents = allLeaseOutContractRents;
 
     const rentHistoryAllLists = useMemo(
         (): Record<RentHistoryTabKey, Rent[]> => ({
@@ -352,6 +392,12 @@ export default function PropertyDetailsPage() {
         [property, currentTenants, activeRentOut],
     );
 
+    // 獲取物业的所有現時租客（帶地段信息）
+    const propertyCurrentTenantsWithLots = useMemo(
+        () => getPropertyCurrentTenantsWithLots(property, currentTenants),
+        [property, currentTenants],
+    );
+
     const nextImage = () => {
         if (property?.images && property.images.length > 0) {
             setCurrentImageIndex((prev) => (prev + 1) % property.images.length);
@@ -365,9 +411,6 @@ export default function PropertyDetailsPage() {
             setImageError(false);
         }
     };
-
-    const formatDate = (d: any) => d ? new Date(d).toLocaleDateString() : '-';
-    const formatCurrency = (v: any) => v != null ? `$${Number(v).toLocaleString()}` : '-';
 
     if (loading) {
         return (
@@ -728,7 +771,88 @@ export default function PropertyDetailsPage() {
                                 <User className="w-5 h-5 text-blue-500" />
                                 {t('Current tenant', '現時租客')}
                             </h2>
-                            {propertyCurrentTenantDisplay ? (
+                            {propertyCurrentTenantsWithLots.length > 0 ? (
+                                <div className="flex flex-col">
+                                    {/* 當前租客卡片 */}
+                                    {(() => {
+                                        const currentCT = propertyCurrentTenantsWithLots[currentTenantIndex];
+                                        const ct = currentCT.tenant;
+                                        return (
+                                            <div className="flex items-start gap-4">
+                                                <div className="w-12 h-12 shrink-0 rounded-full bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center text-white font-semibold">
+                                                    {(ct.name || '?').charAt(0).toUpperCase()}
+                                                </div>
+                                                <div className="min-w-0 flex-1 overflow-hidden">
+                                                    <p
+                                                        className="text-zinc-900 dark:text-white font-medium truncate"
+                                                        title={ct.name}
+                                                    >
+                                                        {ct.name}
+                                                    </p>
+                                                    {ct.tenancyNumber && (
+                                                        <p
+                                                            className="text-zinc-500 dark:text-white/50 text-sm font-mono truncate"
+                                                            title={ct.tenancyNumber}
+                                                        >
+                                                            {ct.tenancyNumber}
+                                                        </p>
+                                                    )}
+
+                                                    {/* 關聯地段顯示 - 同一行 */}
+                                                    {currentCT.lots.length > 0 && (
+                                                        <p className="text-xs text-blue-600 dark:text-blue-400 mt-1 truncate" title={currentCT.lots.join(' , ')}>
+                                                            地段：
+                                                            {currentCT.lots.map((lot, idx) => (
+                                                                <span key={idx}>
+                                                                    {currentCT.partialLots.includes(lot) ? `${lot} (部分)` : lot}
+                                                                    {idx < currentCT.lots.length - 1 ? ' , ' : ''}
+                                                                </span>
+                                                            ))}
+                                                        </p>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        );
+                                    })()}
+
+                                    {/* Slider 導航區 - 移到底部 */}
+                                    {propertyCurrentTenantsWithLots.length > 1 && (
+                                        <div className="flex items-center justify-center gap-3 mt-4 pt-3 border-t border-zinc-100 dark:border-white/10">
+                                            <button
+                                                type="button"
+                                                onClick={() => setCurrentTenantIndex((i) => Math.max(0, i - 1))}
+                                                disabled={currentTenantIndex === 0}
+                                                className="p-1.5 rounded-full bg-zinc-100 dark:bg-white/10 disabled:opacity-30 hover:bg-zinc-200 dark:hover:bg-white/20 transition-colors disabled:cursor-not-allowed"
+                                            >
+                                                <ChevronLeft className="w-4 h-4 text-zinc-600 dark:text-white" />
+                                            </button>
+                                            <div className="flex gap-1.5 items-center">
+                                                {propertyCurrentTenantsWithLots.map((_, idx) => (
+                                                    <button
+                                                        key={idx}
+                                                        type="button"
+                                                        onClick={() => setCurrentTenantIndex(idx)}
+                                                        className={`w-2 h-2 rounded-full transition-all ${
+                                                            idx === currentTenantIndex
+                                                                ? 'bg-blue-500 w-4'
+                                                                : 'bg-zinc-300 dark:bg-white/30 hover:bg-zinc-400 dark:hover:bg-white/50'
+                                                        }`}
+                                                        aria-label={`Go to tenant ${idx + 1}`}
+                                                    />
+                                                ))}
+                                            </div>
+                                            <button
+                                                type="button"
+                                                onClick={() => setCurrentTenantIndex((i) => Math.min(propertyCurrentTenantsWithLots.length - 1, i + 1))}
+                                                disabled={currentTenantIndex >= propertyCurrentTenantsWithLots.length - 1}
+                                                className="p-1.5 rounded-full bg-zinc-100 dark:bg-white/10 disabled:opacity-30 hover:bg-zinc-200 dark:hover:bg-white/20 transition-colors disabled:cursor-not-allowed"
+                                            >
+                                                <ChevronRight className="w-4 h-4 text-zinc-600 dark:text-white" />
+                                            </button>
+                                        </div>
+                                    )}
+                                </div>
+                            ) : propertyCurrentTenantDisplay ? (
                                 <div className="flex items-center gap-4 min-w-0">
                                     <div className="w-12 h-12 shrink-0 rounded-full bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center text-white font-semibold">
                                         {(propertyCurrentTenantDisplay.name || '?').charAt(0).toUpperCase()}
@@ -932,21 +1056,56 @@ export default function PropertyDetailsPage() {
                                                                                     ? otherParty
                                                                                     : null
                                                                             }
+                                                                            rentTenantIds={rent.rentOutTenantIds}
                                                                         />
                                                                     ) : (
                                                                         <div className="text-zinc-600 dark:text-white/70 text-sm">-</div>
                                                                     )
                                                                 ) : rent.type === 'contract' &&
                                                                   rentHistoryTab === 'contract_lease_out' ? (
-                                                                    <RentHistoryLeaseOutContractLesseeCell
-                                                                        displayName={
-                                                                            propertyCurrentTenantDisplay?.name ||
-                                                                            otherParty?.name ||
-                                                                            '-'
+                                                                    (() => {
+                                                                        const { displayName, matchedTenant } = getContractLesseeDisplayName(rent, currentTenants);
+                                                                        if (matchedTenant) {
+                                                                            return (
+                                                                                <Tooltip
+                                                                                    content={
+                                                                                        <div className="flex flex-col gap-1.5 w-full">
+                                                                                            <div className="flex items-center gap-2 mb-1">
+                                                                                                <User className="w-4 h-4 text-blue-500" />
+                                                                                                <span className="font-bold">{matchedTenant.name}</span>
+                                                                                                {matchedTenant.code && (
+                                                                                                    <span className="bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-300 px-1.5 py-0.5 rounded text-[10px] ml-auto">
+                                                                                                        {matchedTenant.code}
+                                                                                                    </span>
+                                                                                                )}
+                                                                                            </div>
+                                                                                            {matchedTenant.englishName && (
+                                                                                                <div className="text-xs text-zinc-500 dark:text-white/60">
+                                                                                                    公司名稱: <span className="text-zinc-900 dark:text-white text-[10px]">{matchedTenant.englishName}</span>
+                                                                                                </div>
+                                                                                            )}
+                                                                                            {matchedTenant.tenancyNumber && (
+                                                                                                <div className="text-xs text-zinc-500 dark:text-white/60">出租號碼: {matchedTenant.tenancyNumber}</div>
+                                                                                            )}
+                                                                                        </div>
+                                                                                    }
+                                                                                    placement="top"
+                                                                                    className="bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white p-3 rounded-xl shadow-xl border border-zinc-200 dark:border-white/10 max-w-xs"
+                                                                                >
+                                                                                    <div className="text-sm font-medium text-zinc-900 dark:text-white line-clamp-2 min-w-0 max-w-full block" title={displayName}>
+                                                                                        {displayName}
+                                                                                    </div>
+                                                                                </Tooltip>
+                                                                            );
                                                                         }
-                                                                        currentTenants={currentTenants}
-                                                                        proprietorFromRent={otherParty ?? null}
-                                                                    />
+                                                                        return displayName !== '-' ? (
+                                                                            <div className="text-sm font-medium text-zinc-900 dark:text-white line-clamp-2 min-w-0 max-w-full block" title={displayName}>
+                                                                                {displayName}
+                                                                            </div>
+                                                                        ) : (
+                                                                            <div className="text-zinc-600 dark:text-white/70 text-sm">-</div>
+                                                                        );
+                                                                    })()
                                                                 ) : otherParty ? (
                                                                     <Tooltip
                                                                         content={
@@ -1009,31 +1168,31 @@ export default function PropertyDetailsPage() {
                                                 );
                                             })}
                                         </div>
-
-                                        {totalPages > 1 && (
-                                            <div className="flex items-center justify-center gap-3 pt-3 text-sm text-zinc-500 dark:text-white/50">
-                                                <button
-                                                    type="button"
-                                                    onClick={() => setRentPage((p) => Math.max(1, p - 1))}
-                                                    disabled={safePage <= 1}
-                                                    className="px-3 py-1.5 rounded-lg border border-zinc-200 dark:border-white/15 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-zinc-50 dark:hover:bg-white/5"
-                                                >
-                                                    ‹
-                                                </button>
-                                                <span>
-                                                    {safePage} / {totalPages}
-                                                </span>
-                                                <button
-                                                    type="button"
-                                                    onClick={() => setRentPage((p) => Math.min(totalPages, p + 1))}
-                                                    disabled={safePage >= totalPages}
-                                                    className="px-3 py-1.5 rounded-lg border border-zinc-200 dark:border-white/15 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-zinc-50 dark:hover:bg-white/5"
-                                                >
-                                                    ›
-                                                </button>
-                                            </div>
-                                        )}
                                     </div>
+
+                                    {totalPages > 1 && (
+                                        <div className="flex items-center justify-center gap-3 pt-3 text-sm text-zinc-500 dark:text-white/50">
+                                            <button
+                                                type="button"
+                                                onClick={() => setRentPage((p) => Math.max(1, p - 1))}
+                                                disabled={safePage <= 1}
+                                                className="px-3 py-1.5 rounded-lg border border-zinc-200 dark:border-white/15 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-zinc-50 dark:hover:bg-white/5"
+                                            >
+                                                ‹
+                                            </button>
+                                            <span>
+                                                {safePage} / {totalPages}
+                                            </span>
+                                            <button
+                                                type="button"
+                                                onClick={() => setRentPage((p) => Math.min(totalPages, p + 1))}
+                                                disabled={safePage >= totalPages}
+                                                className="px-3 py-1.5 rounded-lg border border-zinc-200 dark:border-white/15 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-zinc-50 dark:hover:bg-white/5"
+                                            >
+                                                ›
+                                            </button>
+                                        </div>
+                                    )}
                                 </div>
                             );
                         })()}

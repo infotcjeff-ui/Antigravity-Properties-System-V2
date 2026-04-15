@@ -1,4 +1,5 @@
 import type { CurrentTenant, Property, Proprietor, Rent } from '@/lib/db';
+import { normalizeRentPropertyLotSelection, parseRentPropertyLotPartialFromRow } from '@/lib/formatters';
 
 /**
  * 交／收租列表顯示：dd/mm/yyyy、期間字串、繳付金額是否已填（含 0）
@@ -160,6 +161,15 @@ export type PropertyCurrentTenantDisplay =
     | { mode: 'ct'; name: string; subtitle: string }
     | { mode: 'proprietor'; name: string; subtitle: string; proprietor: Proprietor };
 
+/** 物业单页「现时租客」扩展显示：包含租客对象和关联地段信息 */
+export type PropertyCurrentTenantWithLots = {
+    tenant: CurrentTenant;
+    /** 该租客关联的物业地段（来自 rentPropertyLot 或全部物业地段） */
+    lots: string[];
+    /** 部分地段模式的地段（来自 rentPropertyLotPartial） */
+    partialLots: string[];
+};
+
 export function resolvePropertyCurrentTenantDisplay(
     property: Property | null | undefined,
     currentTenants: CurrentTenant[],
@@ -202,6 +212,61 @@ export function resolvePropertyCurrentTenantDisplay(
     }
 
     return null;
+}
+
+/**
+ * 獲取物业的所有現時租客（包含关联地段信息）
+ * 優先從 rentOutTenantIds 查找，再退回到名稱匹配
+ */
+export function getPropertyCurrentTenantsWithLots(
+    property: Property | null | undefined,
+    currentTenants: CurrentTenant[],
+): PropertyCurrentTenantWithLots[] {
+    if (!property) return [];
+
+    const allRents = property.rents || [];
+    const rentOuts = allRents.filter((r: Rent) => r.type === 'rent_out' || r.type === 'contract');
+    const result: PropertyCurrentTenantWithLots[] = [];
+    const seenIds = new Set<string>();
+
+    for (const rent of rentOuts) {
+        const tenantIds = rent.rentOutTenantIds || [];
+        for (const tid of tenantIds) {
+            if (!tid || seenIds.has(tid)) continue;
+            const ct = currentTenants.find((c) => c.id === tid);
+            if (ct) {
+                seenIds.add(tid);
+                // 獲取該租客關聯的地段
+                const rawLot = rent.rentPropertyLot ?? (rent as Record<string, unknown>).rent_property_lot;
+                const lots = normalizeRentPropertyLotSelection(rawLot);
+                // 獲取部分地段標記
+                const rawPartial = rent.rentPropertyLotPartial ?? (rent as Record<string, unknown>).rent_property_lot_partial;
+                const partialMap = parseRentPropertyLotPartialFromRow(rawPartial);
+                const partialLots = lots.filter((lot) => partialMap[lot] === true);
+                // 如果沒有特定地段，使用物业全部地段
+                const displayLots = lots.length > 0 ? lots : (property.lotIndex
+                    ? property.lotIndex.split(/(?:新|舊):/).map((s) => s.trim()).filter(Boolean)
+                    : []);
+                result.push({ tenant: ct, lots: displayLots, partialLots });
+            }
+        }
+
+        // 退回到 rentOutTenants 名稱匹配
+        const rtNames = rent.rentOutTenants || [];
+        for (const name of rtNames) {
+            if (!name?.trim()) continue;
+            const ct = currentTenants.find((c) => c.name?.trim() === name.trim());
+            if (ct && !seenIds.has(ct.id || '')) {
+                seenIds.add(ct.id || '');
+                const lots = property.lotIndex
+                    ? property.lotIndex.split(/(?:新|舊):/).map((s) => s.trim()).filter(Boolean)
+                    : [];
+                result.push({ tenant: ct, lots, partialLots: [] });
+            }
+        }
+    }
+
+    return result;
 }
 
 /** 收／交租表單之付款方式（含按金方式、出租合約按金方式） */
