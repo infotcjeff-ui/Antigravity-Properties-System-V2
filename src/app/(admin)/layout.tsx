@@ -97,7 +97,7 @@ export default function AdminLayout({
                     isAdmin={true}
                     placeholder="搜尋物業..."
                     showLanguageSwitcher={false}
-                    showNotifications={false}
+                    showNotificationBell={false}
                 />
 
                 {/* Content */}

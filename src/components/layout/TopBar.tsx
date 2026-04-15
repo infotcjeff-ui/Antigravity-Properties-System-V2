@@ -15,7 +15,7 @@ interface TopBarProps {
     isAuthenticated?: boolean;
     isAdmin?: boolean;
     showLanguageSwitcher?: boolean;
-    showNotifications?: boolean;
+    showNotificationBell?: boolean;
 }
 
 export default function TopBar({
@@ -24,7 +24,7 @@ export default function TopBar({
     isAuthenticated = false,
     isAdmin = false,
     showLanguageSwitcher,
-    showNotifications,
+    showNotificationBell,
 }: TopBarProps) {
     const router = useRouter();
     const lang = useLanguage();
@@ -135,7 +135,7 @@ export default function TopBar({
                     <ThemeToggle />
                     {isAdmin && showLanguageSwitcher !== false ? <LanguageSwitcher isAdmin /> : null}
 
-                    {isAuthenticated && showNotifications !== false ? (
+                    {isAuthenticated && showNotificationBell !== false ? (
                         <>
                             {/* Notification Bell - Only for authenticated users */}
                             <div className="relative" ref={notificationRef}>
