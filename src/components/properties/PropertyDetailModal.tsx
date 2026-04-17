@@ -103,36 +103,36 @@ function RentDetailModalProprietorCell({ party }: { party?: Proprietor | null })
         return <div className="text-zinc-600 dark:text-white/70 text-sm">-</div>;
     }
     return (
-        <Tooltip
-            content={
-                <div className="flex flex-col gap-1.5 w-full">
-                    <div className="flex items-center gap-2 mb-1">
-                        <User className="w-4 h-4 text-blue-500" />
-                        <span className="font-bold">{party.name}</span>
-                        <span className="bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-300 px-1.5 py-0.5 rounded text-[10px] ml-auto">
-                            {party.code}
-                        </span>
+            <Tooltip
+                content={
+                    <div className="flex flex-col gap-1.5 w-full text-sm">
+                        <div className="flex items-center gap-2 mb-1">
+                            <User className="w-4 h-4 text-blue-500" />
+                            <span className="font-bold">{party.name}</span>
+                            <span className="bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-300 px-1.5 py-0.5 rounded text-xs ml-auto">
+                                {party.code}
+                            </span>
+                        </div>
+                        <div className="text-xs text-zinc-500 dark:text-white/60">
+                            英文名稱: <span className="text-zinc-900 dark:text-white">{party.englishName || '-'}</span>
+                        </div>
+                        <div className="text-xs text-zinc-500 dark:text-white/60 flex items-center justify-between">
+                            <span>
+                                類型: <span className="text-zinc-900 dark:text-white">{party.type === 'company' ? '公司' : '個人'}</span>
+                            </span>
+                            <span className="bg-zinc-100 dark:bg-white/10 px-1.5 py-0.5 rounded text-xs text-zinc-600 dark:text-white/70">
+                                {proprietorCategoryLabelZh(party.category, 'card')}
+                            </span>
+                        </div>
                     </div>
-                    <div className="text-xs text-zinc-500 dark:text-white/60">
-                        英文名稱: <span className="text-zinc-900 dark:text-white text-[10px]">{party.englishName || '-'}</span>
-                    </div>
-                    <div className="text-xs text-zinc-500 dark:text-white/60 flex items-center justify-between">
-                        <span>
-                            類型: <span className="text-zinc-900 dark:text-white">{party.type === 'company' ? '公司' : '個人'}</span>
-                        </span>
-                        <span className="bg-zinc-100 dark:bg-white/10 px-1.5 py-0.5 rounded text-[10px] text-zinc-600 dark:text-white/70">
-                            {proprietorCategoryLabelZh(party.category, 'card')}
-                        </span>
-                    </div>
+                }
+                placement="top"
+                className="bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white p-3 rounded-xl shadow-xl border border-zinc-200 dark:border-white/10 max-w-xs"
+            >
+                <div className="text-sm font-medium text-purple-600 dark:text-purple-400 border-b border-dashed border-purple-300 dark:border-purple-600/50 cursor-pointer block max-w-full line-clamp-2">
+                    {party.name}
                 </div>
-            }
-            placement="top"
-            className="bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white p-3 rounded-xl shadow-xl border border-zinc-200 dark:border-white/10 max-w-xs"
-        >
-            <div className="text-sm font-medium text-purple-600 dark:text-purple-400 border-b border-dashed border-purple-300 dark:border-purple-600/50 cursor-pointer block max-w-full line-clamp-2">
-                {party.name}
-            </div>
-        </Tooltip>
+            </Tooltip>
     );
 }
 
@@ -270,18 +270,18 @@ export default function PropertyDetailModal({ propertyName, propertyId, onClose 
                                             {otherParty ? (
                                                 <Tooltip
                                                     content={
-                                                        <div className="flex flex-col gap-1.5 w-full">
+                                                        <div className="flex flex-col gap-1.5 w-full text-sm">
                                                             <div className="flex items-center gap-2 mb-1">
                                                                 <User className="w-4 h-4 text-blue-500" />
                                                                 <span className="font-bold">{otherParty.name}</span>
-                                                                <span className="bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-300 px-1.5 py-0.5 rounded text-[10px] ml-auto">{otherParty.code}</span>
+                                                                <span className="bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-300 px-1.5 py-0.5 rounded text-xs ml-auto">{otherParty.code}</span>
                                                             </div>
                                                             <div className="text-xs text-zinc-500 dark:text-white/60">
-                                                                英文名稱: <span className="text-zinc-900 dark:text-white text-[10px]">{otherParty.englishName || '-'}</span>
+                                                                英文名稱: <span className="text-zinc-900 dark:text-white">{otherParty.englishName || '-'}</span>
                                                             </div>
                                                             <div className="text-xs text-zinc-500 dark:text-white/60 flex items-center justify-between">
                                                                 <span>類型: <span className="text-zinc-900 dark:text-white">{otherParty.type === 'company' ? '公司' : '個人'}</span></span>
-                                                                <span className="bg-zinc-100 dark:bg-white/10 px-1.5 py-0.5 rounded text-[10px] text-zinc-600 dark:text-white/70">
+                                                                <span className="bg-zinc-100 dark:bg-white/10 px-1.5 py-0.5 rounded text-xs text-zinc-600 dark:text-white/70">
                                                                     {proprietorCategoryLabelZh(otherParty.category, 'card')}
                                                                 </span>
                                                             </div>

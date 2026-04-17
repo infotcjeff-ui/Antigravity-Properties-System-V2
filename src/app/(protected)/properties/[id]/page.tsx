@@ -52,24 +52,24 @@ function RentHistoryProprietorCell({ party }: { party?: Proprietor | null }) {
     return (
         <Tooltip
             content={
-                <div className="flex flex-col gap-1.5 w-full">
+                <div className="flex flex-col gap-1.5 w-full text-sm">
                     <div className="flex items-center gap-2 mb-1">
                         <User className="w-4 h-4 text-blue-500" />
                         <span className="font-bold">{party.name}</span>
-                        <span className="bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-300 px-1.5 py-0.5 rounded text-[10px] ml-auto">
+                        <span className="bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-300 px-1.5 py-0.5 rounded text-xs ml-auto">
                             {party.code}
                         </span>
                     </div>
                     <div className="text-xs text-zinc-500 dark:text-white/60">
                         英文名稱:{' '}
-                        <span className="text-zinc-900 dark:text-white text-[10px]">{party.englishName || '-'}</span>
+                        <span className="text-zinc-900 dark:text-white">{party.englishName || '-'}</span>
                     </div>
                     <div className="text-xs text-zinc-500 dark:text-white/60 flex items-center justify-between">
                         <span>
                             類型:{' '}
                             <span className="text-zinc-900 dark:text-white">{party.type === 'company' ? '公司' : '個人'}</span>
                         </span>
-                        <span className="bg-zinc-100 dark:bg-white/10 px-1.5 py-0.5 rounded text-[10px] text-zinc-600 dark:text-white/70">
+                        <span className="bg-zinc-100 dark:bg-white/10 px-1.5 py-0.5 rounded text-xs text-zinc-600 dark:text-white/70">
                             {proprietorCategoryLabelZh(party.category, 'card')}
                         </span>
                     </div>
@@ -132,7 +132,7 @@ function RentHistoryLeaseOutContractLesseeCell({
                             <User className="w-4 h-4 text-blue-500" />
                             <span className="font-bold">{matchedTenant.name}</span>
                             {matchedTenant.code ? (
-                                <span className="bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-300 px-1.5 py-0.5 rounded text-[10px] ml-auto">
+                                <span className="bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-300 px-1.5 py-0.5 rounded text-xs ml-auto">
                                     {matchedTenant.code}
                                 </span>
                             ) : null}
@@ -140,7 +140,7 @@ function RentHistoryLeaseOutContractLesseeCell({
                         {matchedTenant.englishName ? (
                             <div className="text-xs text-zinc-500 dark:text-white/60">
                                 公司名稱:{' '}
-                                <span className="text-zinc-900 dark:text-white text-[10px]">{matchedTenant.englishName}</span>
+                                <span className="text-zinc-900 dark:text-white">{matchedTenant.englishName}</span>
                             </div>
                         ) : null}
                         {matchedTenant.tenancyNumber ? (
@@ -1014,30 +1014,30 @@ export default function PropertyDetailsPage() {
                                                         <div className="py-4 px-4 border-l border-dashed border-zinc-200 dark:border-white/10 flex flex-col justify-center min-w-0 overflow-hidden">
                                                             <Tooltip
                                                                 content={
-                                                                    <div className="flex flex-col gap-1.5 w-full">
+                                                                    <div className="flex flex-col gap-1.5 w-full text-sm">
                                                                         <div className="flex items-center gap-2 mb-1">
                                                                             <Building2 className="w-4 h-4 text-emerald-500" />
                                                                             <span className="font-bold">{property.name}</span>
-                                                                            <span className="bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 px-1.5 py-0.5 rounded text-[10px] ml-auto">
+                                                                            <span className="bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 px-1.5 py-0.5 rounded text-xs ml-auto">
                                                                                 {property.code}
                                                                             </span>
                                                                         </div>
                                                                         <div className="text-xs text-zinc-500 dark:text-white/60">
                                                                             {t('Lot Index', '地段')}:{' '}
-                                                                            <span className="text-zinc-900 dark:text-white text-[10px]">
+                                                                            <span className="text-zinc-900 dark:text-white">
                                                                                 {formatLotIndexPlainJoined(property.lotIndex) || '-'}
                                                                             </span>
                                                                         </div>
                                                                         <div className="text-xs text-zinc-500 dark:text-white/60">
                                                                             {t('Lot Area', '面積')}:{' '}
-                                                                            <span className="text-zinc-900 dark:text-white text-[10px]">
+                                                                            <span className="text-zinc-900 dark:text-white">
                                                                                 {property.lotArea ? formatLotArea(property.lotArea) : '-'}
                                                                             </span>
                                                                         </div>
                                                                         {property.address ? (
                                                                             <div className="text-xs text-zinc-500 dark:text-white/60">
                                                                                 {t('Address', '地址')}:{' '}
-                                                                                <span className="text-zinc-900 dark:text-white text-[10px]">{property.address}</span>
+                                                                                <span className="text-zinc-900 dark:text-white">{property.address}</span>
                                                                             </div>
                                                                         ) : null}
                                                                         {(() => {
@@ -1045,7 +1045,7 @@ export default function PropertyDetailsPage() {
                                                                             return lotText ? (
                                                                                 <div className="text-xs text-zinc-500 dark:text-white/60">
                                                                                     {t('Contract Lot', '合約地段')}:{' '}
-                                                                                    <span className="text-emerald-600 dark:text-emerald-400 text-[10px] font-medium">
+                                                                                    <span className="text-emerald-600 dark:text-emerald-400 font-medium">
                                                                                         {lotText}
                                                                                     </span>
                                                                                 </div>
@@ -1105,19 +1105,19 @@ export default function PropertyDetailsPage() {
                                                                             return (
                                                                                 <Tooltip
                                                                                     content={
-                                                                                        <div className="flex flex-col gap-1.5 w-full">
+                                                                                        <div className="flex flex-col gap-1.5 w-full text-sm">
                                                                                             <div className="flex items-center gap-2 mb-1">
                                                                                                 <User className="w-4 h-4 text-blue-500" />
                                                                                                 <span className="font-bold">{matchedTenant.name}</span>
                                                                                                 {matchedTenant.code && (
-                                                                                                    <span className="bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-300 px-1.5 py-0.5 rounded text-[10px] ml-auto">
+                                                                                                    <span className="bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-300 px-1.5 py-0.5 rounded text-xs ml-auto">
                                                                                                         {matchedTenant.code}
                                                                                                     </span>
                                                                                                 )}
                                                                                             </div>
                                                                                             {matchedTenant.englishName && (
                                                                                                 <div className="text-xs text-zinc-500 dark:text-white/60">
-                                                                                                    公司名稱: <span className="text-zinc-900 dark:text-white text-[10px]">{matchedTenant.englishName}</span>
+                                                                                                    公司名稱: <span className="text-zinc-900 dark:text-white">{matchedTenant.englishName}</span>
                                                                                                 </div>
                                                                                             )}
                                                                                             {matchedTenant.tenancyNumber && (
@@ -1145,17 +1145,17 @@ export default function PropertyDetailsPage() {
                                                                 ) : otherParty ? (
                                                                     <Tooltip
                                                                         content={
-                                                                            <div className="flex flex-col gap-1.5 w-full">
+                                                                            <div className="flex flex-col gap-1.5 w-full text-sm">
                                                                                 <div className="flex items-center gap-2 mb-1">
                                                                                     <User className="w-4 h-4 text-blue-500" />
                                                                                     <span className="font-bold">{otherParty.name}</span>
-                                                                                    <span className="bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-300 px-1.5 py-0.5 rounded text-[10px] ml-auto">
+                                                                                    <span className="bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-300 px-1.5 py-0.5 rounded text-xs ml-auto">
                                                                                         {otherParty.code}
                                                                                     </span>
                                                                                 </div>
                                                                                 <div className="text-xs text-zinc-500 dark:text-white/60">
                                                                                     英文名稱:{' '}
-                                                                                    <span className="text-zinc-900 dark:text-white text-[10px]">
+                                                                                    <span className="text-zinc-900 dark:text-white">
                                                                                         {otherParty.englishName || '-'}
                                                                                     </span>
                                                                                 </div>
@@ -1166,7 +1166,7 @@ export default function PropertyDetailsPage() {
                                                                                             {otherParty.type === 'company' ? '公司' : '個人'}
                                                                                         </span>
                                                                                     </span>
-                                                                                    <span className="bg-zinc-100 dark:bg-white/10 px-1.5 py-0.5 rounded text-[10px] text-zinc-600 dark:text-white/70">
+                                                                                    <span className="bg-zinc-100 dark:bg-white/10 px-1.5 py-0.5 rounded text-xs text-zinc-600 dark:text-white/70">
                                                                                         {proprietorCategoryLabelZh(otherParty.category, 'card')}
                                                                                     </span>
                                                                                 </div>

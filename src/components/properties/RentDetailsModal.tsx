@@ -30,7 +30,7 @@ function DetailRow({ label, value, tooltipContent }: { label: string; value: any
         <div className="flex justify-between items-start gap-4 py-2 border-b border-zinc-50 dark:border-white/5 last:border-none">
             <span className="text-sm text-zinc-500 dark:text-white/50 whitespace-nowrap">{label}</span>
             {tooltipContent ? (
-                <Tooltip content={tooltipContent} placement="top" className="bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white p-3 rounded-xl shadow-xl border border-zinc-200 dark:border-white/10 max-w-xs">
+                <Tooltip content={tooltipContent} placement="top" className="bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white p-3 rounded-xl shadow-xl border border-zinc-200 dark:border-white/10 max-w-xs text-sm">
                     {valueNode}
                 </Tooltip>
             ) : (
@@ -218,11 +218,11 @@ export default function RentDetailsModal({ rent, property, onClose }: RentDetail
                                     label={t('Property', '物業')}
                                     value={property.name}
                                     tooltipContent={
-                                        <div className="flex flex-col gap-1.5 w-full">
+                                        <div className="flex flex-col gap-1.5 w-full text-sm">
                                             <div className="flex items-center gap-2 mb-1">
                                                 <Building2 className="w-4 h-4 text-purple-500" />
                                                 <span className="font-bold">{property.name}</span>
-                                                <span className="bg-purple-100 dark:bg-purple-500/20 text-purple-700 dark:text-purple-300 px-1.5 py-0.5 rounded text-[10px] ml-auto">{property.code}</span>
+                                                <span className="bg-purple-100 dark:bg-purple-500/20 text-purple-700 dark:text-purple-300 px-1.5 py-0.5 rounded text-xs ml-auto">{property.code}</span>
                                             </div>
                                             <div className="text-xs text-zinc-500 dark:text-white/60">
                                                 地段: <span className="text-zinc-900 dark:text-white">{property.lotIndex || '-'}</span>
@@ -239,18 +239,18 @@ export default function RentDetailsModal({ rent, property, onClose }: RentDetail
                                     label={t('Tenant', '承租人')}
                                     value={rent.tenant.name}
                                     tooltipContent={
-                                        <div className="flex flex-col gap-1.5 w-full">
+                                        <div className="flex flex-col gap-1.5 w-full text-sm">
                                             <div className="flex items-center gap-2 mb-1">
                                                 <User className="w-4 h-4 text-blue-500" />
                                                 <span className="font-bold">{rent.tenant.name}</span>
-                                                <span className="bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-300 px-1.5 py-0.5 rounded text-[10px] ml-auto">{rent.tenant.code}</span>
+                                                <span className="bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-300 px-1.5 py-0.5 rounded text-xs ml-auto">{rent.tenant.code}</span>
                                             </div>
                                             <div className="text-xs text-zinc-500 dark:text-white/60">
-                                                英文名稱: <span className="text-zinc-900 dark:text-white text-[10px]">{rent.tenant.englishName || '-'}</span>
+                                                英文名稱: <span className="text-zinc-900 dark:text-white">{rent.tenant.englishName || '-'}</span>
                                             </div>
                                             <div className="text-xs text-zinc-500 dark:text-white/60 flex items-center justify-between">
                                                 <span>類型: <span className="text-zinc-900 dark:text-white">{rent.tenant.type === 'company' ? '公司' : '個人'}</span></span>
-                                                <span className="bg-zinc-100 dark:bg-white/10 px-1.5 py-0.5 rounded text-[10px] text-zinc-600 dark:text-white/70">
+                                                <span className="bg-zinc-100 dark:bg-white/10 px-1.5 py-0.5 rounded text-xs text-zinc-600 dark:text-white/70">
                                                     {proprietorCategoryLabelZh(rent.tenant.category, 'card')}
                                                 </span>
                                             </div>
@@ -281,11 +281,11 @@ export default function RentDetailsModal({ rent, property, onClose }: RentDetail
                                     label={t('Property', '物業')}
                                     value={property.name}
                                     tooltipContent={
-                                        <div className="flex flex-col gap-1.5 w-full">
+                                        <div className="flex flex-col gap-1.5 w-full text-sm">
                                             <div className="flex items-center gap-2 mb-1">
                                                 <Building2 className="w-4 h-4 text-purple-500" />
                                                 <span className="font-bold">{property.name}</span>
-                                                <span className="bg-purple-100 dark:bg-purple-500/20 text-purple-700 dark:text-purple-300 px-1.5 py-0.5 rounded text-[10px] ml-auto">{property.code}</span>
+                                                <span className="bg-purple-100 dark:bg-purple-500/20 text-purple-700 dark:text-purple-300 px-1.5 py-0.5 rounded text-xs ml-auto">{property.code}</span>
                                             </div>
                                             <div className="text-xs text-zinc-500 dark:text-white/60">
                                                 地段: <span className="text-zinc-900 dark:text-white">{property.lotIndex || '-'}</span>
@@ -302,18 +302,18 @@ export default function RentDetailsModal({ rent, property, onClose }: RentDetail
                                     label={t('Proprietor', '業主')}
                                     value={(rent.proprietor || rent.tenant)?.name}
                                     tooltipContent={
-                                        <div className="flex flex-col gap-1.5 w-full">
+                                        <div className="flex flex-col gap-1.5 w-full text-sm">
                                             <div className="flex items-center gap-2 mb-1">
                                                 <User className="w-4 h-4 text-emerald-500" />
                                                 <span className="font-bold">{(rent.proprietor || rent.tenant)?.name}</span>
-                                                <span className="bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 px-1.5 py-0.5 rounded text-[10px] ml-auto">{(rent.proprietor || rent.tenant)?.code}</span>
+                                                <span className="bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 px-1.5 py-0.5 rounded text-xs ml-auto">{(rent.proprietor || rent.tenant)?.code}</span>
                                             </div>
                                             <div className="text-xs text-zinc-500 dark:text-white/60">
-                                                英文名稱: <span className="text-zinc-900 dark:text-white text-[10px]">{(rent.proprietor || rent.tenant)?.englishName || '-'}</span>
+                                                英文名稱: <span className="text-zinc-900 dark:text-white">{(rent.proprietor || rent.tenant)?.englishName || '-'}</span>
                                             </div>
                                             <div className="text-xs text-zinc-500 dark:text-white/60 flex items-center justify-between">
                                                 <span>類型: <span className="text-zinc-900 dark:text-white">{(rent.proprietor || rent.tenant)?.type === 'company' ? '公司' : '個人'}</span></span>
-                                                <span className="bg-zinc-100 dark:bg-white/10 px-1.5 py-0.5 rounded text-[10px] text-zinc-600 dark:text-white/70">
+                                                <span className="bg-zinc-100 dark:bg-white/10 px-1.5 py-0.5 rounded text-xs text-zinc-600 dark:text-white/70">
                                                     {proprietorCategoryLabelZh((rent.proprietor || rent.tenant)?.category, 'card')}
                                                 </span>
                                             </div>

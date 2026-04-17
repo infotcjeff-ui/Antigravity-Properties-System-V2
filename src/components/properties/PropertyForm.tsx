@@ -163,13 +163,13 @@ function LotCellWithTooltip({
     const nonPartialLots = rentLots.filter(lot => !partial[lot]);
 
     const tooltipContent = (
-        <div className="space-y-2">
+        <div className="space-y-2 text-sm">
             <div className="text-xs font-semibold text-zinc-500 dark:text-white/60 uppercase tracking-wider border-b border-zinc-100 dark:border-white/10 pb-1.5">
                 租借位置詳情
             </div>
             {nonPartialLots.length > 0 && (
                 <div>
-                    <div className="text-[10px] text-zinc-400 dark:text-white/40 font-medium mb-1">整個地方</div>
+                    <div className="text-xs text-zinc-400 dark:text-white/40 font-medium mb-1">整個地方</div>
                     <div className="space-y-1">
                         {nonPartialLots.map((lot, i) => (
                             <div key={i} className="text-sm text-zinc-800 dark:text-white font-medium">{lot}</div>
@@ -179,12 +179,12 @@ function LotCellWithTooltip({
             )}
             {partialLots.length > 0 && (
                 <div>
-                    <div className="text-[10px] text-amber-600 dark:text-amber-400 font-medium mb-1">部分地方</div>
+                    <div className="text-xs text-amber-600 dark:text-amber-400 font-medium mb-1">部分地方</div>
                     <div className="space-y-1">
                         {partialLots.map((lot, i) => (
                             <div key={i} className="text-sm text-zinc-800 dark:text-white font-medium">
                                 {lot}
-                                <span className="ml-1.5 text-[11px] text-amber-600 dark:text-amber-400 font-medium">（部分）</span>
+                                <span className="ml-1.5 text-xs text-amber-600 dark:text-amber-400 font-medium">（部分）</span>
                             </div>
                         ))}
                     </div>

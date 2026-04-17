@@ -1,0 +1,7 @@
+# 提交訊息
+feat(property page): show partial lots in current tenant section
+
+- Fix contract lessee display to use rentOutTenantIds from contract record
+- Move pagination to bottom of rent history table
+- Show lots in single line with "(部分)" suffix for partial lots
+- Remove "+X 項記錄" text from current tenant card
