@@ -11,6 +11,7 @@ import {
     useCurrentTenantsQuery,
     usePropertiesQuery,
     useRentsWithRelationsQuery,
+    syncContractLotsToRentOutRecords,
 } from '@/hooks/useStorage';
 import { X, ExternalLink, Building2, Calendar } from 'lucide-react';
 import { fileToBase64, compressImage, validateImageUpload } from '@/lib/imageUtils';
@@ -268,7 +269,8 @@ export default function RentModal({
                     }
                     return {} as Record<string, boolean>;
                 })(),
-                rentFreePeriodDate: formatDate((rent as any).rentFreePeriodDate ?? (rent as any).rent_free_period_date),
+                rentFreePeriodStartDate: formatDate((rent as any).rentFreePeriodStartDate ?? (rent as any).rent_free_period_start_date),
+                rentFreePeriodEndDate: formatDate((rent as any).rentFreePeriodEndDate ?? (rent as any).rent_free_period_end_date),
             };
         }
 
@@ -336,7 +338,8 @@ export default function RentModal({
             rentPropertyLot: [] as string[],
             rentPropertyLotStandalone: false,
             rentPropertyLotPartial: {} as Record<string, boolean>,
-            rentFreePeriodDate: '',
+            rentFreePeriodStartDate: '',
+            rentFreePeriodEndDate: '',
         };
     });
 
@@ -364,11 +367,10 @@ export default function RentModal({
     }, [contractsOnProperty]);
 
     const lastContractAutoPropertyIdRef = useRef<string | undefined>(undefined);
-    const rentCollectionContractAutoSigRef = useRef('');
     /** 收／交租：物業切換時同步「物業地段」選項 */
     const lastLotSyncPropertyIdRef = useRef<string | undefined>(undefined);
 
-    /** 新增模式：切換物業時清空已選合約編號，避免帶到錯誤物業 */
+    /** 新增模式：切換物業時清空已選合約編號 */
     useEffect(() => {
         if (rent?.id) {
             lastContractAutoPropertyIdRef.current = formData.propertyId;
@@ -376,40 +378,9 @@ export default function RentModal({
         }
         if (lastContractAutoPropertyIdRef.current !== formData.propertyId) {
             lastContractAutoPropertyIdRef.current = formData.propertyId;
-            rentCollectionContractAutoSigRef.current = '';
             setFormData((prev) => ({ ...prev, rentCollectionContractNumber: '' }));
         }
     }, [formData.propertyId, rent?.id]);
-
-    /**
-     * 新增模式（僅收租）：自動帶入該物業「最新一筆」出租合約編號（清單已依合約新舊排序，首項即最新）。
-     * 交租記錄不使用「收租記錄編號」欄位，故不帶入。
-     */
-    useEffect(() => {
-        if (rent?.id) return;
-        if (formData.type !== 'rent_out') return;
-        const nums = leaseOutContractNumbers;
-        if (nums.length === 0) {
-            rentCollectionContractAutoSigRef.current = '';
-            return;
-        }
-        const preferred = nums[0];
-        const sig = `${formData.propertyId}|${formData.type}|${preferred}`;
-        const cur = (formData.rentCollectionContractNumber || '').trim();
-        if (cur) {
-            rentCollectionContractAutoSigRef.current = `${formData.propertyId}|${formData.type}|${cur}`;
-            return;
-        }
-        if (rentCollectionContractAutoSigRef.current === sig) return;
-        rentCollectionContractAutoSigRef.current = sig;
-        setFormData((prev) => ({ ...prev, rentCollectionContractNumber: preferred }));
-    }, [
-        rent?.id,
-        formData.type,
-        formData.propertyId,
-        formData.rentCollectionContractNumber,
-        leaseOutContractNumbers,
-    ]);
 
     /**
      * 新增模式（僅收租）：當 contractsOnProperty 非同步就緒後，
@@ -437,6 +408,47 @@ export default function RentModal({
         if (!nature) return;
         rentCollectionNatureAutoRef.current = true;
         setFormData((prev) => ({ ...prev, rentCollectionContractNature: nature }));
+    }, [rent?.id, formData.type, contractsOnProperty, formData.rentCollectionContractNumber]);
+
+    /**
+     * 收租記錄編輯模式：當選擇「收租記錄編號」時，
+     * 自動填入該出租合約的「物業地段」與「部分地方」設定。
+     */
+    const rentCollectionLotAutoRef = useRef(false);
+    useEffect(() => {
+        if (rent?.id) return; // 僅新增模式
+        if (formData.type !== 'rent_out') return;
+        const refNum = (formData.rentCollectionContractNumber || '').trim();
+        if (!refNum) return;
+        if (rentCollectionLotAutoRef.current) return;
+        const matched = contractsOnProperty.find((c) => (c.rentOutTenancyNumber || '').trim() === refNum);
+        if (!matched) return;
+        const raw = matched as any;
+        const v = raw.rentPropertyLot ?? raw.rent_property_lot;
+        let lots: string[] = [];
+        if (Array.isArray(v)) {
+            lots = v.map(String);
+        } else if (typeof v === 'string' && v.trim()) {
+            try {
+                const parsed = JSON.parse(v);
+                if (Array.isArray(parsed)) lots = parsed.map(String);
+            } catch {
+                lots = [v.trim()];
+            }
+        }
+        const partialRaw = raw.rentPropertyLotPartial ?? raw.rent_property_lot_partial;
+        let partial: Record<string, boolean> = {};
+        if (typeof partialRaw === 'object' && partialRaw !== null) {
+            partial = partialRaw as Record<string, boolean>;
+        } else if (typeof partialRaw === 'string' && partialRaw.trim()) {
+            try { partial = JSON.parse(partialRaw); } catch { /* ignore */ }
+        }
+        rentCollectionLotAutoRef.current = true;
+        setFormData((prev) => ({
+            ...prev,
+            rentPropertyLot: lots,
+            rentPropertyLotPartial: partial,
+        }));
     }, [rent?.id, formData.type, contractsOnProperty, formData.rentCollectionContractNumber]);
 
     const loadData = async () => {
@@ -529,6 +541,38 @@ export default function RentModal({
             .map(lot => partial[lot] ? `${lot}（部分地方）` : lot)
             .join('、');
     }, [formData.rentPropertyLot, formData.rentPropertyLotPartial]);
+
+    /**
+     * 收租記錄：根據選擇的合約編號取得對應的物业租借位置資料（只用於顯示）
+     */
+    const selectedContractLotInfo = useMemo(() => {
+        if (formData.type !== 'rent_out') return null;
+        const refNum = (formData.rentCollectionContractNumber || '').trim();
+        if (!refNum) return null;
+        const matched = contractsOnProperty.find((c) => (c.rentOutTenancyNumber || '').trim() === refNum);
+        if (!matched) return null;
+        const raw = matched as any;
+        const v = raw.rentPropertyLot ?? raw.rent_property_lot;
+        let lots: string[] = [];
+        if (Array.isArray(v)) {
+            lots = v.map(String);
+        } else if (typeof v === 'string' && v.trim()) {
+            try {
+                const parsed = JSON.parse(v);
+                if (Array.isArray(parsed)) lots = parsed.map(String);
+            } catch {
+                lots = [v.trim()];
+            }
+        }
+        const partialRaw = raw.rentPropertyLotPartial ?? raw.rent_property_lot_partial;
+        let partial: Record<string, boolean> = {};
+        if (typeof partialRaw === 'object' && partialRaw !== null) {
+            partial = partialRaw as Record<string, boolean>;
+        } else if (typeof partialRaw === 'string' && partialRaw.trim()) {
+            try { partial = JSON.parse(partialRaw); } catch { /* ignore */ }
+        }
+        return { lots, partial };
+    }, [formData.type, formData.rentCollectionContractNumber, contractsOnProperty]);
 
     /** 地段多選下拉選項 */
     const propertyLotSelectOptions = useMemo(
@@ -796,6 +840,29 @@ export default function RentModal({
         }
     }, [rent?.id, contractsOnProperty, formData.rentCollectionContractNumber]);
 
+    /**
+     * 收租記錄：當選擇的合約變化時，自動同步合約的物业地段到 formData.rentPropertyLot
+     * （避免 PropertyForm 列表顯示時 fallback 到整個 lotIndex）
+     */
+    const lotSyncRef = useRef(false);
+    useEffect(() => {
+        if (formData.type !== 'rent_out') return;
+        if (!selectedContractLotInfo) {
+            lotSyncRef.current = false;
+            return;
+        }
+        if (selectedContractLotInfo.lots.length === 0) return;
+        // 只在尚未同步過時自動填入（避免覆蓋用戶手動修改的結果）
+        if (!lotSyncRef.current) {
+            lotSyncRef.current = true;
+            setFormData((prev) => ({
+                ...prev,
+                rentPropertyLot: selectedContractLotInfo!.lots,
+                rentPropertyLotPartial: selectedContractLotInfo!.partial,
+            }));
+        }
+    }, [formData.type, selectedContractLotInfo]);
+
     // Auto-generate rentOutTenancyNumber based on property code and sub-landlord (僅合約記錄)
     useEffect(() => {
         if (formData.type !== 'contract') return;
@@ -916,13 +983,20 @@ export default function RentModal({
                 return Number.isNaN(d.getTime()) ? null : d;
             };
             const rentCollectionPaymentDateForSave = parseRentCollectionPaymentDate();
-            const parseRentFreePeriodDate = (): Date | null => {
-                const raw = String((formData as { rentFreePeriodDate?: string }).rentFreePeriodDate || '').trim();
+            const parseRentFreePeriodStartDate = (): Date | null => {
+                const raw = String((formData as { rentFreePeriodStartDate?: string }).rentFreePeriodStartDate || '').trim();
                 if (!raw) return null;
                 const d = new Date(raw);
                 return Number.isNaN(d.getTime()) ? null : d;
             };
-            const rentFreePeriodDateForSave = parseRentFreePeriodDate();
+            const parseRentFreePeriodEndDate = (): Date | null => {
+                const raw = String((formData as { rentFreePeriodEndDate?: string }).rentFreePeriodEndDate || '').trim();
+                if (!raw) return null;
+                const d = new Date(raw);
+                return Number.isNaN(d.getTime()) ? null : d;
+            };
+            const rentFreePeriodStartDateForSave = parseRentFreePeriodStartDate();
+            const rentFreePeriodEndDateForSave = parseRentFreePeriodEndDate();
 
             let rentData: any = { ...baseData };
 
@@ -969,7 +1043,8 @@ export default function RentModal({
                             ? formData.rentCollectionReceiptNumber?.trim() || null
                             : null,
                     rentCollectionContractNature: formData.rentCollectionContractNature || null,
-                    rentFreePeriodDate: rentFreePeriodDateForSave,
+                    rentFreePeriodStartDate: rentFreePeriodStartDateForSave,
+                    rentFreePeriodEndDate: rentFreePeriodEndDateForSave,
                     rentPropertyLot: (() => {
                         const arr: string[] = Array.isArray(formData.rentPropertyLot)
                             ? formData.rentPropertyLot.map(v => String(v).trim()).filter(Boolean)
@@ -1016,7 +1091,8 @@ export default function RentModal({
                             ? formData.rentCollectionReceiptNumber?.trim() || null
                             : null,
                     rentCollectionContractNature: formData.rentCollectionContractNature || null,
-                    rentFreePeriodDate: rentFreePeriodDateForSave,
+                    rentFreePeriodStartDate: rentFreePeriodStartDateForSave,
+                    rentFreePeriodEndDate: rentFreePeriodEndDateForSave,
                     location: formData.location || defaultLocation,
                     rentingNumber: formData.rentingNumber,
                     rentingReferenceNumber: formData.rentingReferenceNumber,
@@ -1099,7 +1175,8 @@ export default function RentModal({
                         ? [currentTenants.find(ct => ct.id === formData.rentOutTenantId)?.name || formData.rentOutTenantId]
                         : (formData.rentOutTenants || []).filter(Boolean).length > 0 ? formData.rentOutTenants : undefined,
                     rentOutTenantIds: formData.rentOutTenantId ? [formData.rentOutTenantId] : undefined,
-                    rentFreePeriodDate: rentFreePeriodDateForSave,
+                    rentFreePeriodStartDate: rentFreePeriodStartDateForSave,
+                    rentFreePeriodEndDate: rentFreePeriodEndDateForSave,
                     rentPropertyLot: (() => {
                         const arr: string[] = Array.isArray(formData.rentPropertyLot)
                             ? formData.rentPropertyLot.map(v => String(v).trim()).filter(Boolean)
@@ -1117,6 +1194,17 @@ export default function RentModal({
             if (rent?.id) {
                 const success = await updateRent(rent.id, rentData);
                 if (success) {
+                    // 合約保存成功後，同步地段到所有關聯的收租記錄
+                    if (formData.type === 'contract') {
+                        const lots = Array.isArray(formData.rentPropertyLot)
+                            ? formData.rentPropertyLot.map(v => String(v).trim()).filter(Boolean)
+                            : [];
+                        await syncContractLotsToRentOutRecords(
+                            rent.id,
+                            lots,
+                            formData.rentPropertyLotPartial || null
+                        );
+                    }
                     // 使租務列表／物業關聯快取失效，避免編輯後仍用舊 rent（例如收租記錄編號看似未儲存）
                     await queryClient.invalidateQueries({ queryKey: ['rents'] });
                     await queryClient.invalidateQueries({ queryKey: ['rents-with-relations'] });
@@ -1129,6 +1217,17 @@ export default function RentModal({
             } else {
                 const id = await addRent(rentData);
                 if (id) {
+                    // 合約新建成功後，同步地段到所有關聯的收租記錄
+                    if (formData.type === 'contract') {
+                        const lots = Array.isArray(formData.rentPropertyLot)
+                            ? formData.rentPropertyLot.map(v => String(v).trim()).filter(Boolean)
+                            : [];
+                        await syncContractLotsToRentOutRecords(
+                            id,
+                            lots,
+                            formData.rentPropertyLotPartial || null
+                        );
+                    }
                     await queryClient.invalidateQueries({ queryKey: ['rents'] });
                     await queryClient.invalidateQueries({ queryKey: ['rents-with-relations'] });
                     await queryClient.invalidateQueries({ queryKey: ['properties-with-relations'] });
@@ -1531,7 +1630,7 @@ export default function RentModal({
                     {formData.type === 'rent_out' && (
                         currentTenantSelectBlock
                     )}
-                    {(formData.type === 'rent_out' || formData.type === 'renting') && (
+                    {(formData.type === 'renting' || formData.type === 'contract') && (
                         <div className="space-y-3">
                             <label className={labelClass}>物業地段</label>
 
@@ -1614,6 +1713,30 @@ export default function RentModal({
 
                             <div className="space-y-4">
                                 {renderCollectionContractRefField()}
+                                {/* 根據選擇的合約顯示只讀的物业地段 */}
+                                {selectedContractLotInfo && selectedContractLotInfo.lots.length > 0 && (
+                                    <div className="space-y-2">
+                                        <label className={labelClass}>物業租借位置</label>
+                                        <div className="space-y-2">
+                                            {selectedContractLotInfo.lots.map((lot) => {
+                                                const isPartial = !!selectedContractLotInfo.partial[lot];
+                                                return (
+                                                    <div
+                                                        key={lot}
+                                                        className="flex items-center gap-3 bg-zinc-50 dark:bg-white/5 rounded-lg px-3 py-2 border border-zinc-200 dark:border-white/10"
+                                                    >
+                                                        <span className={`text-sm flex-1 ${isPartial ? 'text-purple-600 dark:text-purple-400 font-medium' : 'text-zinc-700 dark:text-white/80'}`}>
+                                                            {lot}{isPartial && '（部分地方）'}
+                                                        </span>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                        <p className="text-xs text-zinc-400 dark:text-white/40 italic">
+                                            已選：{selectedContractLotInfo.lots.map(lot => selectedContractLotInfo.partial[lot] ? `${lot}（部分地方）` : lot).join('、')}
+                                        </p>
+                                    </div>
+                                )}
                                 <div className="space-y-2">
                                     <label className={labelClass}>租客名稱 *</label>
                                     <input
@@ -1644,13 +1767,29 @@ export default function RentModal({
                                 </div>
                                 <div className="space-y-2">
                                     <label className={labelClass}>免租期</label>
-                                    <input
-                                        type="date"
-                                        name="rentFreePeriodDate"
-                                        value={(formData as any).rentFreePeriodDate}
-                                        onChange={handleChange}
-                                        className={inputClass}
-                                    />
+                                    <div className="flex flex-col sm:flex-row gap-3 sm:items-end">
+                                        <div className="flex-1 space-y-1">
+                                            <span className="text-xs text-zinc-500 dark:text-white/50">開始</span>
+                                            <input
+                                                type="date"
+                                                name="rentFreePeriodStartDate"
+                                                value={(formData as any).rentFreePeriodStartDate}
+                                                onChange={handleChange}
+                                                className={inputClass}
+                                            />
+                                        </div>
+                                        <span className="hidden sm:inline text-zinc-400 dark:text-white/40 pb-3 shrink-0">至</span>
+                                        <div className="flex-1 space-y-1">
+                                            <span className="text-xs text-zinc-500 dark:text-white/50">結束</span>
+                                            <input
+                                                type="date"
+                                                name="rentFreePeriodEndDate"
+                                                value={(formData as any).rentFreePeriodEndDate}
+                                                onChange={handleChange}
+                                                className={inputClass}
+                                            />
+                                        </div>
+                                    </div>
                                 </div>
                                 <div className="space-y-2">
                                     <label className={labelClass}>收租日期（日／月／年 至 日／月／年）</label>
@@ -1975,13 +2114,29 @@ export default function RentModal({
                                 </div>
                                 <div className="space-y-2">
                                     <label className={labelClass}>免租期</label>
-                                    <input
-                                        type="date"
-                                        name="rentFreePeriodDate"
-                                        value={(formData as any).rentFreePeriodDate}
-                                        onChange={handleChange}
-                                        className={inputClass}
-                                    />
+                                    <div className="flex flex-col sm:flex-row gap-3 sm:items-end">
+                                        <div className="flex-1 space-y-1">
+                                            <span className="text-xs text-zinc-500 dark:text-white/50">開始</span>
+                                            <input
+                                                type="date"
+                                                name="rentFreePeriodStartDate"
+                                                value={(formData as any).rentFreePeriodStartDate}
+                                                onChange={handleChange}
+                                                className={inputClass}
+                                            />
+                                        </div>
+                                        <span className="hidden sm:inline text-zinc-400 dark:text-white/40 pb-3 shrink-0">至</span>
+                                        <div className="flex-1 space-y-1">
+                                            <span className="text-xs text-zinc-500 dark:text-white/50">結束</span>
+                                            <input
+                                                type="date"
+                                                name="rentFreePeriodEndDate"
+                                                value={(formData as any).rentFreePeriodEndDate}
+                                                onChange={handleChange}
+                                                className={inputClass}
+                                            />
+                                        </div>
+                                    </div>
                                 </div>
                                 <div className="space-y-2">
                                     <label className={labelClass}>交租日期（日／月／年 至 日／月／年）</label>
@@ -2312,13 +2467,29 @@ export default function RentModal({
 
                             <div className="space-y-2">
                                 <label className={labelClass}>免租期</label>
-                                <input
-                                    type="date"
-                                    name="rentFreePeriodDate"
-                                    value={(formData as any).rentFreePeriodDate}
-                                    onChange={handleChange}
-                                    className={inputClass}
-                                />
+                                <div className="flex flex-col sm:flex-row gap-3 sm:items-end">
+                                    <div className="flex-1 space-y-1">
+                                        <span className="text-xs text-zinc-500 dark:text-white/50">開始</span>
+                                        <input
+                                            type="date"
+                                            name="rentFreePeriodStartDate"
+                                            value={(formData as any).rentFreePeriodStartDate}
+                                            onChange={handleChange}
+                                            className={inputClass}
+                                        />
+                                    </div>
+                                    <span className="hidden sm:inline text-zinc-400 dark:text-white/40 pb-3 shrink-0">至</span>
+                                    <div className="flex-1 space-y-1">
+                                        <span className="text-xs text-zinc-500 dark:text-white/50">結束</span>
+                                        <input
+                                            type="date"
+                                            name="rentFreePeriodEndDate"
+                                            value={(formData as any).rentFreePeriodEndDate}
+                                            onChange={handleChange}
+                                            className={inputClass}
+                                        />
+                                    </div>
+                                </div>
                             </div>
 
                             <div className="space-y-2">

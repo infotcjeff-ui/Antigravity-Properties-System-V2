@@ -96,8 +96,6 @@ export default function AdminLayout({
                     isAuthenticated={isAuthenticated}
                     isAdmin={true}
                     placeholder="搜尋物業..."
-                    showLanguageSwitcher={false}
-                    showNotificationBell={false}
                 />
 
                 {/* Content */}

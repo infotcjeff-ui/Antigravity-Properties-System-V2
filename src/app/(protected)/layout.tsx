@@ -123,7 +123,6 @@ export default function ProtectedLayout({
                         <TopBar
                             isAuthenticated={isAuthenticated}
                             placeholder="搜尋物業..."
-                            showNotificationBell={false}
                         />
                         <AnimatePresence mode="wait">
                             <motion.main

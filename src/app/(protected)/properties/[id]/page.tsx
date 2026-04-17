@@ -8,8 +8,8 @@ import { usePropertyWithRelationsQuery, useSubLandlordsQuery, useCurrentTenantsQ
 import {
     formatLotArea,
     formatLotIndexPlainJoined,
-    formatRentHistoryLotCellText,
     proprietorCategoryLabelZh,
+    formatRentHistoryLotCellText,
 } from '@/lib/formatters';
 import type { CurrentTenant, Proprietor, Rent } from '@/lib/db';
 import {
@@ -267,18 +267,6 @@ const landUseLabels: Record<string, string> = {
     residential_c: '住宅(丙類)',
     recreation_use: '休憩用地',
 };
-
-/** 租務記錄列表物業欄：已格式化的地段字串（逗號分隔、無 新:/舊:），單行省略 */
-function RentHistoryLotLine({ display }: { display: string }) {
-    return (
-        <span
-            className="block min-w-0 max-w-full truncate text-zinc-900 dark:text-white font-bold text-sm"
-            title={display}
-        >
-            {display}
-        </span>
-    );
-}
 
 function EmptyPlaceholder() {
     return (
@@ -1005,7 +993,6 @@ export default function PropertyDetailsPage() {
                                                     rent.type === 'rent_out'
                                                         ? rentOutLesseeLabel || otherParty?.name || '-'
                                                         : null;
-                                                const rentLotRowText = formatRentHistoryLotCellText(property.lotIndex, rent);
                                                 return (
                                                     <div
                                                         key={rent.id}
@@ -1025,19 +1012,68 @@ export default function PropertyDetailsPage() {
                                                             </div>
                                                         </div>
                                                         <div className="py-4 px-4 border-l border-dashed border-zinc-200 dark:border-white/10 flex flex-col justify-center min-w-0 overflow-hidden">
-                                                            <div
-                                                                className="text-zinc-600 dark:text-white/70 text-sm truncate"
-                                                                title={`${property.code} ${property.name}`.trim()}
+                                                            <Tooltip
+                                                                content={
+                                                                    <div className="flex flex-col gap-1.5 w-full">
+                                                                        <div className="flex items-center gap-2 mb-1">
+                                                                            <Building2 className="w-4 h-4 text-emerald-500" />
+                                                                            <span className="font-bold">{property.name}</span>
+                                                                            <span className="bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 px-1.5 py-0.5 rounded text-[10px] ml-auto">
+                                                                                {property.code}
+                                                                            </span>
+                                                                        </div>
+                                                                        <div className="text-xs text-zinc-500 dark:text-white/60">
+                                                                            {t('Lot Index', '地段')}:{' '}
+                                                                            <span className="text-zinc-900 dark:text-white text-[10px]">
+                                                                                {formatLotIndexPlainJoined(property.lotIndex) || '-'}
+                                                                            </span>
+                                                                        </div>
+                                                                        <div className="text-xs text-zinc-500 dark:text-white/60">
+                                                                            {t('Lot Area', '面積')}:{' '}
+                                                                            <span className="text-zinc-900 dark:text-white text-[10px]">
+                                                                                {property.lotArea ? formatLotArea(property.lotArea) : '-'}
+                                                                            </span>
+                                                                        </div>
+                                                                        {property.address ? (
+                                                                            <div className="text-xs text-zinc-500 dark:text-white/60">
+                                                                                {t('Address', '地址')}:{' '}
+                                                                                <span className="text-zinc-900 dark:text-white text-[10px]">{property.address}</span>
+                                                                            </div>
+                                                                        ) : null}
+                                                                        {(() => {
+                                                                            const lotText = formatRentHistoryLotCellText(property.lotIndex, rent);
+                                                                            return lotText ? (
+                                                                                <div className="text-xs text-zinc-500 dark:text-white/60">
+                                                                                    {t('Contract Lot', '合約地段')}:{' '}
+                                                                                    <span className="text-emerald-600 dark:text-emerald-400 text-[10px] font-medium">
+                                                                                        {lotText}
+                                                                                    </span>
+                                                                                </div>
+                                                                            ) : null;
+                                                                        })()}
+                                                                    </div>
+                                                                }
+                                                                placement="top"
+                                                                className="bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white p-3 rounded-xl shadow-xl border border-zinc-200 dark:border-white/10 max-w-xs"
                                                             >
-                                                                {property.code} {property.name}
-                                                            </div>
-                                                            <div className="mt-1 min-w-0 max-w-full overflow-hidden">
-                                                                {rentLotRowText ? (
-                                                                    <RentHistoryLotLine display={rentLotRowText} />
-                                                                ) : (
-                                                                    <span className="text-zinc-900 dark:text-white font-bold text-sm">-</span>
-                                                                )}
-                                                            </div>
+                                                                <div className="flex flex-col">
+                                                                    <div
+                                                                        className="text-zinc-600 dark:text-white/70 text-sm truncate cursor-default"
+                                                                        title={`${property.code} ${property.name}`.trim()}
+                                                                    >
+                                                                        {property.code} {property.name}
+                                                                    </div>
+                                                                    <div
+                                                                        className="text-zinc-400 dark:text-white/40 text-xs truncate mt-0.5"
+                                                                        title={formatRentHistoryLotCellText(property.lotIndex, rent)}
+                                                                    >
+                                                                        {(() => {
+                                                                            const lotText = formatRentHistoryLotCellText(property.lotIndex, rent);
+                                                                            return lotText ? `地段：${lotText}` : null;
+                                                                        })()}
+                                                                    </div>
+                                                                </div>
+                                                            </Tooltip>
                                                         </div>
                                                         {isRentingTab ? (
                                                             <div className="py-4 px-4 border-l border-dashed border-zinc-200 dark:border-white/10 flex flex-col justify-center min-w-0 overflow-hidden">

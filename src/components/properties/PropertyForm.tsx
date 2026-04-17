@@ -3,6 +3,8 @@
 import { useState, useEffect, useRef, useMemo, type ReactNode } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
+import { Info } from 'lucide-react';
+import { Tooltip } from '@heroui/react';
 import { useProperties, useProprietorsQuery, usePropertiesWithRelationsQuery, useRents, useRentsQuery, useRentsWithRelationsQuery, useSubLandlordsQuery, useUsersQuery } from '@/hooks/useStorage';
 import { fileToBase64, validateImageUpload, compressImage } from '@/lib/imageUtils';
 import type { Property, Proprietor, Rent } from '@/lib/db';
@@ -33,40 +35,180 @@ import {
 
 const RENT_LIST_PAGE_SIZE = 5;
 
-/** 列表顯示時去掉物業地段儲存用的「新:」「舊:」前綴（例：新:DD111 → DD111） */
+/** 列表顯示時去掉「新:」「舊:」前綴及樓盤前綴（如 A01-、B01-、C33- 等） */
+const LOT_PREFIXES = ['A01-', 'B01-', 'C01-', 'C04-', 'C21-', 'C33-', 'A02-'];
 function stripLotNewOldPrefixes(text: string): string {
     let s = text.trim();
     if (!s) return '';
     // 開頭或空白／頓號後的 新: / 舊:
     s = s.replace(/(^|[\s、])新:/g, '$1');
     s = s.replace(/(^|[\s、])舊:/g, '$1');
+    // 移除樓盤前綴
+    for (const prefix of LOT_PREFIXES) {
+        if (s.startsWith(prefix)) {
+            s = s.slice(prefix.length).trim();
+            break;
+        }
+    }
     return s.replace(/\s+/g, ' ').trim();
 }
 
-/** 租務列表「租借位置」欄：優先顯示記錄所選物業地段，否則顯示該物業之地段 */
-function formatRentListLotCell(rent: Rent, propertyLotIndex: string): string {
+
+/**
+ * 租務列表「租借位置」欄：優先顯示記錄所選地段，否則顯示該物業之地段。
+ * 若記錄所選地段為「部分地方」，則在該地段後附加「（部分地方）」標示。
+ */
+function formatRentListLotCell(
+    rent: Rent,
+    propertyLotIndex: string,
+): ReactNode {
     const r = rent as unknown as Record<string, unknown>;
     const raw = r.rentPropertyLot ?? r.rent_property_lot;
-    let joined = '';
+    const partialRaw = r.rentPropertyLotPartial ?? r.rent_property_lot_partial;
+    let partial: Record<string, boolean> = {};
+    if (typeof partialRaw === 'object' && partialRaw !== null) {
+        partial = partialRaw as Record<string, boolean>;
+    } else if (typeof partialRaw === 'string' && partialRaw.trim()) {
+        try { partial = JSON.parse(partialRaw); } catch { /* ignore */ }
+    }
+
+    let rentLots: string[] = [];
     if (Array.isArray(raw) && raw.length) {
-        joined = raw.map((x) => stripLotNewOldPrefixes(String(x))).filter(Boolean).join('、');
+        rentLots = raw.map((x) => stripLotNewOldPrefixes(String(x))).filter(Boolean);
     } else if (typeof raw === 'string' && raw.trim()) {
         try {
             const p = JSON.parse(raw);
             if (Array.isArray(p)) {
-                joined = p.map((x: unknown) => stripLotNewOldPrefixes(String(x))).filter(Boolean).join('、');
+                rentLots = p.map((x: unknown) => stripLotNewOldPrefixes(String(x))).filter(Boolean);
             }
         } catch {
-            joined = raw
-                .split(',')
-                .map((s) => stripLotNewOldPrefixes(s))
-                .filter(Boolean)
-                .join('、');
+            rentLots = raw.split(',').map(s => stripLotNewOldPrefixes(s.trim())).filter(Boolean);
         }
     }
-    if (joined) return stripLotNewOldPrefixes(joined) || '—';
+
+    if (rentLots.length) {
+        const hasPartial = rentLots.some(lot => partial[lot]);
+        if (!hasPartial) return rentLots.join('、') || '—';
+        return (
+            <>
+                {rentLots.map((lot, i) => (
+                    <span key={i}>
+                        {lot}
+                        {partial[lot] && (
+                            <span className="text-amber-600 dark:text-amber-400 font-medium">（部分地方）</span>
+                        )}
+                        {i < rentLots.length - 1 && '、'}
+                    </span>
+                ))}
+            </>
+        );
+    }
+
     const li = stripLotNewOldPrefixes((propertyLotIndex || '').trim());
     return li || '—';
+}
+
+/** 租借位置單元格：hover tooltip 顯示詳細地段資訊 */
+function LotCellWithTooltip({
+    rent,
+    propertyLotIndex,
+}: {
+    rent: Rent;
+    propertyLotIndex: string;
+}) {
+    const r = rent as unknown as Record<string, unknown>;
+    const raw = r.rentPropertyLot ?? r.rent_property_lot;
+    const partialRaw = r.rentPropertyLotPartial ?? r.rent_property_lot_partial;
+    let partial: Record<string, boolean> = {};
+    if (typeof partialRaw === 'object' && partialRaw !== null) {
+        partial = partialRaw as Record<string, boolean>;
+    } else if (typeof partialRaw === 'string' && partialRaw.trim()) {
+        try { partial = JSON.parse(partialRaw); } catch { /* ignore */ }
+    }
+
+    const rentLots: string[] = (() => {
+        if (Array.isArray(raw) && raw.length) {
+            return raw.map(x => stripLotNewOldPrefixes(String(x))).filter(Boolean);
+        }
+        if (typeof raw === 'string' && raw.trim()) {
+            try {
+                const p = JSON.parse(raw);
+                if (Array.isArray(p)) return p.map((x: unknown) => stripLotNewOldPrefixes(String(x))).filter(Boolean);
+            } catch {
+                return raw.split(',').map(s => stripLotNewOldPrefixes(s.trim())).filter(Boolean);
+            }
+        }
+        return [];
+    })();
+
+    const propertyLots: string[] = (() => {
+        const entries = (propertyLotIndex || '').split('\n').map(l => l.trim()).filter(Boolean);
+        return entries.map(e => {
+            const val = e.startsWith('新:') ? e.slice(1) : e.startsWith('舊:') ? e.slice(1) : e;
+            return stripLotNewOldPrefixes(val.trim());
+        }).filter(Boolean);
+    })();
+
+    const display = formatRentListLotCell(rent, propertyLotIndex);
+
+    if (!rentLots.length) {
+        return (
+            <div className="text-zinc-700 dark:text-white/80 text-sm leading-relaxed line-clamp-2">
+                {display}
+            </div>
+        );
+    }
+
+    const partialLots = rentLots.filter(lot => partial[lot]);
+    const nonPartialLots = rentLots.filter(lot => !partial[lot]);
+
+    const tooltipContent = (
+        <div className="space-y-2">
+            <div className="text-xs font-semibold text-zinc-500 dark:text-white/60 uppercase tracking-wider border-b border-zinc-100 dark:border-white/10 pb-1.5">
+                租借位置詳情
+            </div>
+            {nonPartialLots.length > 0 && (
+                <div>
+                    <div className="text-[10px] text-zinc-400 dark:text-white/40 font-medium mb-1">整個地方</div>
+                    <div className="space-y-1">
+                        {nonPartialLots.map((lot, i) => (
+                            <div key={i} className="text-sm text-zinc-800 dark:text-white font-medium">{lot}</div>
+                        ))}
+                    </div>
+                </div>
+            )}
+            {partialLots.length > 0 && (
+                <div>
+                    <div className="text-[10px] text-amber-600 dark:text-amber-400 font-medium mb-1">部分地方</div>
+                    <div className="space-y-1">
+                        {partialLots.map((lot, i) => (
+                            <div key={i} className="text-sm text-zinc-800 dark:text-white font-medium">
+                                {lot}
+                                <span className="ml-1.5 text-[11px] text-amber-600 dark:text-amber-400 font-medium">（部分）</span>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+
+    return (
+        <div className="text-zinc-700 dark:text-white/80 text-sm leading-relaxed line-clamp-2">
+            <Tooltip
+                content={tooltipContent}
+                placement="top"
+                classNames={{
+                    content: 'bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white p-3 rounded-xl shadow-xl border border-zinc-200 dark:border-white/10 max-w-xs',
+                }}
+            >
+                <span className="cursor-default group-hover:underline decoration-dashed decoration-zinc-400/50 underline-offset-2">
+                    {display}
+                    <Info className="inline-block ml-1 w-3 h-3 text-zinc-400 dark:text-white/40 align-middle opacity-0 group-hover:opacity-100 transition-opacity" />
+                </span>
+            </Tooltip>
+        </div>
+    );
 }
 
 function RentListPagination({
@@ -327,10 +469,10 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
 
         const rentGridClass =
             partyMode === 'owner'
-                ? 'grid grid-cols-[100px_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.5fr)_minmax(0,1.15fr)_minmax(0,1.05fr)_minmax(76px,0.95fr)_minmax(0,1fr)_90px] gap-4 px-4'
+                ? 'grid grid-cols-[120px_1fr_1fr_1.5fr_1fr_80px_auto_90px] gap-4 px-4'
                 : partyMode === 'landlord'
-                  ? 'grid grid-cols-[100px_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.5fr)_minmax(0,1.15fr)_minmax(0,1.05fr)_minmax(76px,0.95fr)_minmax(0,1fr)_90px] gap-4 px-4'
-                  : 'grid grid-cols-[100px_minmax(0,1fr)_minmax(0,1.5fr)_minmax(0,1.15fr)_minmax(0,1.05fr)_minmax(76px,0.95fr)_minmax(0,1fr)_90px] gap-4 px-4';
+                  ? 'grid grid-cols-[120px_1fr_1fr_1fr_1.5fr_1fr_80px_auto_90px] gap-4 px-4'
+                  : 'grid grid-cols-[120px_1fr_1.5fr_1fr_80px_auto_90px] gap-4 px-4';
         /** 交租記錄「編號」欄：顯示所屬物業編號（與表單「編號」一致） */
         const propertyCodeForRentingRows = (formData.code || property?.code || '').trim() || '-';
 
@@ -356,7 +498,6 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                     )}
                     <div className="font-bold">租借位置</div>
                     <div className="font-bold">租期</div>
-                    <div className="font-bold">已付按金</div>
                     <div className="font-bold">繳付狀態</div>
                     <div className="text-right font-bold">租金/月</div>
                     <div className="text-center font-bold">操作</div>
@@ -544,9 +685,10 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                                     ) : null}
                                 </div>
                             )}
-                            <div className="text-zinc-700 dark:text-white/80 text-sm leading-relaxed line-clamp-2">
-                                {formatRentListLotCell(rent, formData.lotIndex || property?.lotIndex || '')}
-                            </div>
+                            <LotCellWithTooltip
+                                rent={rent}
+                                propertyLotIndex={formData.lotIndex || property?.lotIndex || ''}
+                            />
                             <div className="flex flex-col">
                                 {startDate ? (
                                     <>
@@ -564,18 +706,6 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                                     </>
                                 ) : (
                                     <span className="text-zinc-500 dark:text-white/40 italic text-sm">未設定</span>
-                                )}
-                            </div>
-                            <div className="flex flex-col justify-center min-w-0">
-                                {(rent as any).rentingDeposit != null && (rent as any).rentingDeposit !== '' ? (
-                                    <span
-                                        className="font-semibold text-zinc-800 dark:text-white/90 tabular-nums text-sm"
-                                        title="已付按金"
-                                    >
-                                        ${Number((rent as any).rentingDeposit).toLocaleString()}
-                                    </span>
-                                ) : (
-                                    <span className="text-zinc-400 dark:text-white/35 text-sm font-medium">—</span>
                                 )}
                             </div>
                             <div className="flex items-center min-w-0">
@@ -680,10 +810,11 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
         return (
             <div className={`border rounded-xl overflow-hidden shadow-sm ${shellClass}`}>
                 <div
-                    className={`grid grid-cols-[100px_1fr_1fr_1.5fr_1.2fr_1fr_minmax(0,1fr)_90px] gap-4 px-4 py-3 text-sm font-semibold uppercase tracking-wider border-b ${headClass} text-zinc-700 dark:text-white/80`}
+                    className={`grid grid-cols-[100px_1fr_1fr_1fr_1.5fr_1.2fr_1fr_minmax(0,1fr)_90px] gap-4 px-4 py-3 text-sm font-semibold uppercase tracking-wider border-b ${headClass} text-zinc-700 dark:text-white/80`}
                 >
                     <div className="flex items-center gap-1.5 font-bold">編號</div>
                     <div className="font-bold">業主</div>
+                    <div className="font-bold">二房東</div>
                     <div className="font-bold">現時租客</div>
                     <div className="font-bold">租借位置</div>
                     <div className="font-bold">租期</div>
@@ -702,12 +833,13 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                     const contractNumber = rent.rentOutTenancyNumber || '—';
                     const isExpired = endDate ? endDate < new Date() : false;
                     const ownerName = contractOwnerDisplayName(rent);
+                    const subLandlordName = rent.subLandlord?.name || '';
                     const tenantName = contractLesseeDisplayName(rent);
 
                     return (
                         <div
                             key={rent.id}
-                            className={`grid grid-cols-[100px_1fr_1fr_1.5fr_1.2fr_1fr_minmax(0,1fr)_90px] gap-4 px-4 py-4 border-b text-sm transition-colors items-center last:border-0 group ${rowBorderHover} ${
+                            className={`grid grid-cols-[100px_1fr_1fr_1fr_1.5fr_1.2fr_1fr_minmax(0,1fr)_90px] gap-4 px-4 py-4 border-b text-sm transition-colors items-center last:border-0 group ${rowBorderHover} ${
                                 isExpired ? 'bg-red-50/50 dark:bg-red-500/5' : ''
                             }`}
                         >
@@ -732,13 +864,19 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                                 </span>
                             </div>
                             <div className="flex flex-col overflow-hidden min-w-0">
+                                <span className="font-semibold text-zinc-900 dark:text-white truncate" title={subLandlordName || undefined}>
+                                    {subLandlordName || '—'}
+                                </span>
+                            </div>
+                            <div className="flex flex-col overflow-hidden min-w-0">
                                 <span className="font-semibold text-zinc-900 dark:text-white truncate" title={tenantName || undefined}>
                                     {tenantName || '—'}
                                 </span>
                             </div>
-                            <div className="text-zinc-700 dark:text-white/80 text-sm leading-relaxed line-clamp-2">
-                                {formatRentListLotCell(rent as Rent, formData.lotIndex || property?.lotIndex || '')}
-                            </div>
+                            <LotCellWithTooltip
+                                rent={rent as Rent}
+                                propertyLotIndex={formData.lotIndex || property?.lotIndex || ''}
+                            />
                             <div className="flex flex-col">
                                 {startDate ? (
                                     <>

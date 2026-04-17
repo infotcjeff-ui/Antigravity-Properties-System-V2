@@ -137,7 +137,11 @@ export interface Rent {
    * 例：{ "地段A": true, "地段B": false } 表示地段A有後綴，地段B沒有
    */
   rentPropertyLotPartial?: Record<string, boolean> | null;
-  /** 免租期（單一日期，選填） */
+  /** 免租期開始日期（選填） */
+  rentFreePeriodStartDate?: Date;
+  /** 免租期結束日期（選填） */
+  rentFreePeriodEndDate?: Date;
+  /** 免租期（單一日期，舊欄位，遷移期保留） */
   rentFreePeriodDate?: Date;
 
   // ===== RENTING (交租) Fields =====

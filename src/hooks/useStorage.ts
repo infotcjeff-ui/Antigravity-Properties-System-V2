@@ -208,7 +208,7 @@ const withSchemaFallbackUpdate = async (
 export const fetchProperties = async (user?: any, options?: { query?: string; bypassIsolation?: boolean }): Promise<Property[]> => {
     try {
         // Select all fields needed for both list and edit views
-        const fields = 'id, name, code, address, type, status, land_use, lot_index, lot_area, location, google_drive_plan_url, has_planning_permission, proprietor_id, tenant_id, parent_property_id, created_by, created_at, updated_at, images, geo_maps, notes';
+        const fields = 'id, name, code, address, type, status, land_use, lot_index, lot_area, location, google_drive_plan_url, has_planning_permission, proprietor_id, proprietor_ids, tenant_id, parent_property_id, created_by, created_at, updated_at, images, geo_maps, notes';
         let queryBuilder = supabase.from('properties').select(fields);
 
         if (options?.query) {
@@ -444,6 +444,90 @@ export const fetchRentsWithRelations = async (user?: any, options?: { type?: 're
     }
 };
 
+/**
+ * 同步合約的地段（rentPropertyLot）到所有關聯的收租記錄。
+ * 當合約的地段發生變化時，自動更新所有引用該合約號碼的收租記錄。
+ *
+ * @param contractId 合約記錄的 ID
+ * @param newLots 新的地段陣列（如 ["地段A", "地段B"]）
+ * @param newPartial 各地段是否為「部分地方」
+ */
+export const syncContractLotsToRentOutRecords = async (
+    contractId: string,
+    newLots: string[],
+    newPartial: Record<string, boolean> | null
+): Promise<void> => {
+    try {
+        const contractTenancyNumber = (() => {
+            // 從 rents 表直接查合約的 rentOutTenancyNumber
+            // 不通過 fetchRentsWithRelations 以避免不必要的 joined data
+            return null as string | null;
+        })();
+
+        // 查詢所有關聯的收租記錄（type='rent_out'）
+        // 匹配條件：rent_collection_contract_number === 合約的 rentOutTenancyNumber
+        // 由於 contractId 已確認，可直接以 id 查合約以取得 tenancyNumber
+        const { data: contractRow, error: contractErr } = await supabase
+            .from('rents')
+            .select('id, rent_out_tenancy_number')
+            .eq('id', contractId)
+            .single();
+
+        if (contractErr || !contractRow) {
+            console.warn('[syncContractLotsToRentOutRecords] 無法取得合約記錄:', contractErr);
+            return;
+        }
+
+        const tenancyNumber = (contractRow as any).rent_out_tenancy_number as string | null;
+        if (!tenancyNumber) return;
+
+        // 查詢所有引用該合約號碼的收租記錄
+        const { data: rentOutRows, error: rentOutErr } = await supabase
+            .from('rents')
+            .select('id, rent_collection_contract_number')
+            .eq('type', 'rent_out')
+            .eq('rent_collection_contract_number', tenancyNumber)
+            .eq('is_deleted', false);
+
+        if (rentOutErr) {
+            console.error('[syncContractLotsToRentOutRecords] 查詢收租記錄失敗:', rentOutErr);
+            return;
+        }
+
+        if (!rentOutRows || rentOutRows.length === 0) return;
+
+        // 準備同步數據
+        const lotsValue = newLots.length > 0 ? JSON.stringify(newLots) : null;
+        const partialValue = (() => {
+            const obj = newPartial || {};
+            const hasAny = Object.values(obj).some(Boolean);
+            return hasAny ? JSON.stringify(obj) : null;
+        })();
+
+        const updates = {
+            rent_property_lot: lotsValue,
+            rent_property_lot_partial: partialValue,
+            updated_at: new Date().toISOString(),
+        };
+
+        // 批量更新所有關聯的收租記錄
+        const idsToUpdate = rentOutRows.map((r: any) => r.id);
+
+        const { error: updateErr } = await supabase
+            .from('rents')
+            .update(updates)
+            .in('id', idsToUpdate);
+
+        if (updateErr) {
+            console.error('[syncContractLotsToRentOutRecords] 批量更新失敗:', updateErr);
+        } else {
+            console.log(`[syncContractLotsToRentOutRecords] 已同步 ${idsToUpdate.length} 條收租記錄的地段資料`);
+        }
+    } catch (err) {
+        console.error('[syncContractLotsToRentOutRecords] 同步失敗:', err);
+    }
+};
+
 // Admin-only: 二房東 (Sub-landlords)
 export const fetchSubLandlords = async (): Promise<SubLandlord[]> => {
     try {
@@ -498,7 +582,7 @@ export const fetchCurrentTenant = async (id: string): Promise<CurrentTenant | un
 
 export const fetchPropertiesWithRelations = async (user?: any): Promise<PropertyWithRelations[]> => {
     try {
-        const fields = 'id, name, code, address, type, status, land_use, lot_index, lot_area, location, google_drive_plan_url, has_planning_permission, proprietor_id, tenant_id, created_by, created_at, updated_at, images, parent_property_id';
+        const fields = 'id, name, code, address, type, status, land_use, lot_index, lot_area, location, google_drive_plan_url, has_planning_permission, proprietor_id, proprietor_ids, tenant_id, created_by, created_at, updated_at, images, parent_property_id';
         let pQuery = supabase.from('properties').select(fields);
         let oQuery = supabase.from('proprietors').select('*');
         let rQuery = supabase.from('rents').select('*');
@@ -1304,7 +1388,10 @@ export function useRents() {
             if (rc.rentCollectionContractNature !== undefined) {
                 rentData.rent_collection_contract_nature = rc.rentCollectionContractNature || null;
             }
-            if ((rent as any).rentFreePeriodDate) {
+            if (rc.rentFreePeriodStartDate !== undefined || rc.rentFreePeriodEndDate !== undefined) {
+                rentData.rent_free_period_start_date = rc.rentFreePeriodStartDate || null;
+                rentData.rent_free_period_end_date = rc.rentFreePeriodEndDate || null;
+            } else if ((rent as any).rentFreePeriodDate) {
                 rentData.rent_free_period_date = (rent as any).rentFreePeriodDate;
             }
             if (rc.rentPropertyLot !== undefined) {
@@ -1569,7 +1656,10 @@ export function useRents() {
             if (urc.rentCollectionContractNature !== undefined) {
                 rentData.rent_collection_contract_nature = urc.rentCollectionContractNature || null;
             }
-            if (Object.prototype.hasOwnProperty.call(updates, 'rentFreePeriodDate')) {
+            if (urc.rentFreePeriodStartDate !== undefined || urc.rentFreePeriodEndDate !== undefined) {
+                rentData.rent_free_period_start_date = urc.rentFreePeriodStartDate || null;
+                rentData.rent_free_period_end_date = urc.rentFreePeriodEndDate || null;
+            } else if (Object.prototype.hasOwnProperty.call(updates, 'rentFreePeriodDate')) {
                 rentData.rent_free_period_date = (updates as any).rentFreePeriodDate || null;
             }
             if (urc.rentPropertyLot !== undefined) {

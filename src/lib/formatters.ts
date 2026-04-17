@@ -43,17 +43,31 @@ export function parsePriceInput(value: string): string {
 
 /**
  * 將物業 lot_index 拆成多個地段（與物業單頁「物業地段」顯示邏輯一致：以 新:/舊: 分段）。
+ * 同時移除常見的樓盤前綴（如 A01-、B01-、C33- 等），確保地段值與收租記錄存儲格式一致。
  */
+const KNOWN_PROPERTY_CODE_PREFIXES = ['A01-', 'B01-', 'C01-', 'C04-', 'C21-', 'C33-', 'A02-', 'A01-P', 'B01-P', 'C01-E', 'C04-E', 'C21-E', 'C33-E', 'A02-P'];
+
+function stripPropertyCodePrefix(text: string): string {
+    let s = text.trim();
+    for (const prefix of KNOWN_PROPERTY_CODE_PREFIXES) {
+        if (s.startsWith(prefix)) {
+            s = s.slice(prefix.length).trim();
+            break;
+        }
+    }
+    return s;
+}
+
 export function parsePropertyLotSegments(lotIndex: string | null | undefined): string[] {
     if (!lotIndex?.trim()) return [];
     return lotIndex
         .split(/(?:新|舊):/)
-        .map((s) => s.trim())
+        .map((s) => stripPropertyCodePrefix(s.trim()))
         .filter(Boolean);
 }
 
 /**
- * 列表／租務記錄用：去掉各段 新:/舊: 前綴，多段以「 , 」連接（與物業單頁「物業地段」區塊一致）。
+ * 列表／租務記錄用：去掉各段 新:/舊: 前綴及樓盤前綴，多段以「 , 」連接（與物業單頁「物業地段」區塊一致）。
  */
 export function formatLotIndexPlainJoined(lotIndex: string | null | undefined): string {
     if (!lotIndex?.trim()) return '';
@@ -78,20 +92,21 @@ export function parseRentPropertyLotPartialFromRow(raw: unknown): Record<string,
 
 /**
  * 正規化租務記錄的 rent_property_lot（陣列、JSON 陣列字串、或以逗號分隔儲存的字串）。
+ * 同時移除樓盤前綴，確保與 parsePropertyLotSegments 輸出格式一致。
  */
 export function normalizeRentPropertyLotSelection(raw: unknown): string[] {
     if (raw == null) return [];
-    if (Array.isArray(raw)) return raw.map((s) => String(s).trim()).filter(Boolean);
+    if (Array.isArray(raw)) return raw.map((s) => stripPropertyCodePrefix(String(s).trim())).filter(Boolean);
     if (typeof raw === 'string') {
         const t = raw.trim();
         if (!t) return [];
         try {
             const p = JSON.parse(t) as unknown;
-            if (Array.isArray(p)) return p.map((s) => String(s).trim()).filter(Boolean);
+            if (Array.isArray(p)) return p.map((s) => stripPropertyCodePrefix(String(s).trim())).filter(Boolean);
         } catch {
             /* fall through */
         }
-        return t.split(',').map((s) => s.trim()).filter(Boolean);
+        return t.split(',').map((s) => stripPropertyCodePrefix(s.trim())).filter(Boolean);
     }
     return [];
 }
