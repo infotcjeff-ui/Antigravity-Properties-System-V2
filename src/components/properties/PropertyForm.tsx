@@ -6,8 +6,25 @@ import { motion } from 'framer-motion';
 import { Info } from 'lucide-react';
 import { Tooltip } from '@heroui/react';
 import { useProperties, useProprietorsQuery, usePropertiesWithRelationsQuery, useRents, useRentsQuery, useRentsWithRelationsQuery, useSubLandlordsQuery, useUsersQuery } from '@/hooks/useStorage';
-import { fileToBase64, validateImageUpload, compressImage } from '@/lib/imageUtils';
+import { compressImage } from '@/lib/imageUtils';
 import type { Property, Proprietor, Rent } from '@/lib/db';
+/** 帶有 relations 的 Rent（join proprietor、tenant、subLandlord 等） */
+interface RentWithRelations extends Rent {
+    rentCollectionDate?: Date;
+    rentCollectionTenantName?: string;
+    rentOutTenants?: string[];
+    rentOutSubLandlord?: string;
+    rentOutSubLandlordId?: string;
+    proprietor?: Proprietor;
+    tenant?: Proprietor;
+    currentTenant?: Proprietor;
+    subLandlord?: { id: string; name: string };
+    rentCreatedAt?: string | Date;
+}
+/** 帶有 parentPropertyId 的 Property */
+interface PropertyWithRelations extends Property {
+    parentPropertyId?: string;
+}
 import { useNotifications } from '@/contexts/NotificationContext';
 import { useAuth } from '@/contexts/AuthContext';
 import ProprietorModal from '@/components/properties/ProprietorModal';
@@ -27,7 +44,6 @@ import {
 import { normalizePropertyLocation } from '@/lib/propertyLocation';
 import {
     compareRentOutForListNewestFirst,
-    formatDateDMY,
     getRentCollectionPayListStatus,
     getRentOutCollectionDisplayPeriod,
     getRentOutOrContractListNumber,
@@ -141,14 +157,6 @@ function LotCellWithTooltip({
         return [];
     })();
 
-    const propertyLots: string[] = (() => {
-        const entries = (propertyLotIndex || '').split('\n').map(l => l.trim()).filter(Boolean);
-        return entries.map(e => {
-            const val = e.startsWith('新:') ? e.slice(1) : e.startsWith('舊:') ? e.slice(1) : e;
-            return stripLotNewOldPrefixes(val.trim());
-        }).filter(Boolean);
-    })();
-
     const display = formatRentListLotCell(rent, propertyLotIndex);
 
     if (!rentLots.length) {
@@ -194,7 +202,7 @@ function LotCellWithTooltip({
     );
 
     return (
-        <div className="text-zinc-700 dark:text-white/80 text-sm leading-relaxed line-clamp-2">
+        <div className="text-zinc-700 dark:text-white/80 text-sm leading-relaxed line-clamp-2 overflow-hidden group">
             <Tooltip
                 content={tooltipContent}
                 placement="top"
@@ -202,7 +210,7 @@ function LotCellWithTooltip({
                     content: 'bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white p-3 rounded-xl shadow-xl border border-zinc-200 dark:border-white/10 max-w-xs',
                 }}
             >
-                <span className="cursor-default group-hover:underline decoration-dashed decoration-zinc-400/50 underline-offset-2">
+                <span className="cursor-default hover:underline decoration-dashed decoration-zinc-400/50 underline-offset-2">
                     {display}
                     <Info className="inline-block ml-1 w-3 h-3 text-zinc-400 dark:text-white/40 align-middle opacity-0 group-hover:opacity-100 transition-opacity" />
                 </span>
@@ -307,16 +315,16 @@ const landUseTypes = [
 export default function PropertyForm({ property, onClose, onSuccess }: PropertyFormProps) {
     const queryClient = useQueryClient();
     const { addProperty, updateProperty, error: propertiesError } = useProperties();
-    const { data: proprietors, isLoading: propsLoading } = useProprietorsQuery();
+    const { data: proprietors } = useProprietorsQuery();
     const { data: allRents, isLoading: rentsLoading } = useRentsQuery();
     /** 合約記錄需 join tenant（業主）與 current_tenants（現時租客），與管理合約頁一致 */
     const { data: allContractsWithRelations = [] } = useRentsWithRelationsQuery({ type: 'contract' });
     const { data: subLandlords = [] } = useSubLandlordsQuery();
     const { data: allProperties = [] } = usePropertiesWithRelationsQuery();
-    const { updateRent, deleteRent } = useRents();
+    const { updateRent } = useRents();
     const { addNotification } = useNotifications();
     const { isAuthenticated, user: currentUser } = useAuth();
-    const { data: users, isLoading: usersLoading } = useUsersQuery();
+    const { data: users } = useUsersQuery();
     const isAdmin = currentUser?.role === 'admin';
 
     const [editingRent, setEditingRent] = useState<Rent | null>(null);
@@ -342,9 +350,23 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
     const [pendingProprietors, setPendingProprietors] = useState<Record<string, Partial<Proprietor>>>({});
     /** 非 null 時為「編輯業主」；null 為新增業主 */
     const [proprietorModalInitial, setProprietorModalInitial] = useState<Proprietor | null>(null);
+    /** 展開模式（Chrome 風格全螢幕） */
+    const [isExpanded, setIsExpanded] = useState(false);
 
     // Form state（編輯時由 formStateFromProperty 帶入，並正規化 location）
     const [formData, setFormData] = useState(() => formStateFromProperty(property));
+
+    // F11 快捷鍵切換展開模式
+    useEffect(() => {
+        const handler = (e: KeyboardEvent) => {
+            if (e.key === 'F11') {
+                e.preventDefault();
+                setIsExpanded(prev => !prev);
+            }
+        };
+        window.addEventListener('keydown', handler);
+        return () => window.removeEventListener('keydown', handler);
+    }, []);
 
     // Unified ordered list: string = URL, object = pending upload
     const [orderedImages, setOrderedImages] = useState<(string | { file: File; preview: string })[]>([]);
@@ -354,7 +376,6 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
         const owners = (proprietors || []).filter(p => !p.code?.startsWith('T'));
         return dedupeRecordsByDisplayName(owners);
     }, [proprietors]);
-    const tenantsList = useMemo(() => (proprietors || []).filter(p => p.code?.startsWith('T')), [proprietors]);
 
     const serializeLotEntries = (entries: { type: 'new' | 'old'; value: string }[]): string =>
         entries.map(e => `${e.type === 'new' ? '新' : '舊'}:${e.value}`).join('\n');
@@ -414,28 +435,28 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
     const rentingRents = useMemo(() => rents.filter(r => r.type === 'renting'), [rents]);
     const contractRents = useMemo(() => {
         if (!property?.id) return [];
-        return (allContractsWithRelations as any[])
+        return (allContractsWithRelations as RentWithRelations[])
             .filter((r) => r.propertyId === property.id)
             .sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
     }, [property?.id, allContractsWithRelations]);
     /** 與 dashboard/contracts 一致：leasing_in 為租賃合約，其餘為出租合約 */
     const leaseOutContractRents = useMemo(
-        () => contractRents.filter((c: any) => (c.rentOutStatus || c.status) !== 'leasing_in'),
+        () => contractRents.filter((c) => (c.rentOutStatus || c.status) !== 'leasing_in'),
         [contractRents],
     );
     const leaseInContractRents = useMemo(
-        () => contractRents.filter((c: any) => (c.rentOutStatus || c.status) === 'leasing_in'),
+        () => contractRents.filter((c) => (c.rentOutStatus || c.status) === 'leasing_in'),
         [contractRents],
     );
     const latestContract = useMemo(() => contractRents[0], [contractRents]);
     const hasContractRecord = contractRents.length > 0;
     const contractOwnerId = latestContract?.tenantId || '';
-    const contractSubLandlordId = (latestContract as any)?.rentOutSubLandlordId || '';
+    const contractSubLandlordId = latestContract?.rentOutSubLandlordId || '';
     const contractCurrentTenantId = latestContract?.rentOutTenantIds?.[0] || '';
 
     /** 子物業列表（parentPropertyId === 当前物业 id） */
     const subProperties = useMemo(
-        () => (allProperties as any[]).filter(p => p.parentPropertyId === property?.id),
+        () => (allProperties as PropertyWithRelations[]).filter(p => p.parentPropertyId === property?.id),
         [allProperties, property?.id],
     );
 
@@ -469,19 +490,19 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
 
         const rentGridClass =
             partyMode === 'owner'
-                ? 'grid grid-cols-[120px_1fr_1fr_1.5fr_1fr_80px_auto_90px] gap-4 px-4'
+                ? 'grid grid-cols-[90px_1fr_1fr_1.2fr_1fr_100px_80px] gap-4 px-4'
                 : partyMode === 'landlord'
-                  ? 'grid grid-cols-[120px_1fr_1fr_1fr_1.5fr_1fr_80px_auto_90px] gap-4 px-4'
-                  : 'grid grid-cols-[120px_1fr_1.5fr_1fr_80px_auto_90px] gap-4 px-4';
+                  ? 'grid grid-cols-[90px_1fr_1fr_1fr_1.2fr_1fr_100px_100px_80px] gap-4 px-4'
+                  : 'grid grid-cols-[90px_1fr_1.2fr_1fr_80px] gap-4 px-4';
         /** 交租記錄「編號」欄：顯示所屬物業編號（與表單「編號」一致） */
         const propertyCodeForRentingRows = (formData.code || property?.code || '').trim() || '-';
 
         return (
             <div className="border border-zinc-200 dark:border-white/10 rounded-xl overflow-hidden shadow-sm">
                 <div
-                    className={`${rentGridClass} py-3 bg-zinc-100/80 dark:bg-white/5 text-sm font-semibold text-zinc-700 dark:text-white/80 uppercase tracking-wider border-b border-zinc-200 dark:border-white/10`}
+                    className={`${rentGridClass} py-3 items-start bg-zinc-100/80 dark:bg-white/5 text-sm font-semibold text-zinc-700 dark:text-white/80 uppercase tracking-wider border-b border-zinc-200 dark:border-white/10`}
                 >
-                    <div className="flex items-center gap-1.5 font-bold">編號</div>
+                    <div className="font-bold">編號</div>
                     {partyMode === 'owner' ? (
                         <>
                             <div className="font-bold">業主</div>
@@ -499,8 +520,8 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                     <div className="font-bold">租借位置</div>
                     <div className="font-bold">租期</div>
                     <div className="font-bold">繳付狀態</div>
-                    <div className="text-right font-bold">租金/月</div>
-                    <div className="text-center font-bold">操作</div>
+                    <div className="font-bold">租金/月</div>
+                    <div className="font-bold">操作</div>
                 </div>
                 {records.map((rent) => {
                     const otherPartyLessee =
@@ -517,8 +538,8 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                             ? new Date(rent.rentOutStartDate)
                             : rent.startDate
                               ? new Date(rent.startDate)
-                              : (rent as any).rentCollectionDate
-                                ? new Date((rent as any).rentCollectionDate)
+                              : (rent as RentWithRelations).rentCollectionDate
+                                ? new Date((rent as RentWithRelations).rentCollectionDate!)
                                 : null;
                         endDate = rent.rentOutEndDate
                             ? new Date(rent.rentOutEndDate)
@@ -564,9 +585,9 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                             : undefined;
 
                     const rentOutCurrentTenantLabel = (() => {
-                        const rcName = (rent as any).rentCollectionTenantName;
+                        const rcName = (rent as RentWithRelations).rentCollectionTenantName;
                         if (rcName != null && String(rcName).trim()) return String(rcName).trim();
-                        const rt = (rent as any).rentOutTenants;
+                        const rt = (rent as RentWithRelations).rentOutTenants;
                         if (Array.isArray(rt) && rt.length > 0) {
                             const joined = rt.map((x: unknown) => String(x).trim()).filter(Boolean).join('、');
                             if (joined) return joined;
@@ -591,11 +612,11 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                             const n = String(rent.subLandlord.name).trim();
                             if (n) return n;
                         }
-                        if ((rent as any).rentOutSubLandlord) {
-                            const n = String((rent as any).rentOutSubLandlord).trim();
+                        if ((rent as RentWithRelations).rentOutSubLandlord) {
+                            const n = String((rent as RentWithRelations).rentOutSubLandlord).trim();
                             if (n) return n;
                         }
-                        const slId = (rent as any).rentOutSubLandlordId;
+                        const slId = (rent as RentWithRelations).rentOutSubLandlordId;
                         if (slId) {
                             const found = subLandlords.find(sl => sl.id === slId);
                             if (found?.name) return found.name;
@@ -605,13 +626,16 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
 
                     const payStatus =
                         rent.type === 'rent_out' || rent.type === 'renting'
-                            ? getRentCollectionPayListStatus(rent as any)
+                            ? getRentCollectionPayListStatus({
+                                rentCollectionAmount: rent.rentCollectionAmount,
+                                rentCollectionPaymentMethod: rent.rentCollectionPaymentMethod,
+                              })
                             : null;
 
                     return (
                         <div
                             key={rent.id}
-                            className={`${rentGridClass} py-4 border-b border-zinc-100 dark:border-white/5 text-sm hover:bg-zinc-50/80 dark:hover:bg-white/[0.02] transition-colors items-center last:border-0 group`}
+                            className={`${rentGridClass} py-4 border-b border-zinc-100 dark:border-white/5 text-sm hover:bg-zinc-50/80 dark:hover:bg-white/2 transition-colors last:border-0 group`}
                         >
                             <div className="flex flex-col gap-1">
                                 <span className="font-mono text-xs font-bold text-zinc-600 dark:text-white/70 tracking-tight">{contractNumber}</span>
@@ -685,10 +709,12 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                                     ) : null}
                                 </div>
                             )}
-                            <LotCellWithTooltip
-                                rent={rent}
-                                propertyLotIndex={formData.lotIndex || property?.lotIndex || ''}
-                            />
+                            <div className="flex flex-col overflow-hidden min-w-0">
+                                <LotCellWithTooltip
+                                    rent={rent}
+                                    propertyLotIndex={formData.lotIndex || property?.lotIndex || ''}
+                                />
+                            </div>
                             <div className="flex flex-col">
                                 {startDate ? (
                                     <>
@@ -708,7 +734,7 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                                     <span className="text-zinc-500 dark:text-white/40 italic text-sm">未設定</span>
                                 )}
                             </div>
-                            <div className="flex items-center min-w-0">
+                            <div className="min-w-0">
                                 {payStatus === 'paid' ? (
                                     <span className="text-[10px] sm:text-xs px-2 py-0.5 rounded-full font-semibold bg-emerald-100 text-emerald-900 border border-emerald-300/60 dark:bg-emerald-950/50 dark:text-emerald-100 dark:border-emerald-500/40">
                                         已繳付
@@ -721,12 +747,10 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                                     <span className="text-zinc-400 dark:text-white/35 text-sm">—</span>
                                 )}
                             </div>
-                            <div className="text-right min-w-0">
-                                <span className="inline-block text-sm font-semibold text-zinc-900 dark:text-white tabular-nums whitespace-nowrap">
-                                    ${monthlyRent.toLocaleString()}/月
-                                </span>
+                            <div className="text-sm font-semibold text-zinc-900 dark:text-white tabular-nums whitespace-nowrap">
+                                ${monthlyRent.toLocaleString()}/月
                             </div>
-                            <div className="flex items-center justify-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <div className="flex gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
                                 <button
                                     type="button"
                                     onClick={() => setEditingRent(rent)}
@@ -761,7 +785,7 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
     };
 
     /** 與 dashboard/contracts 相同：合約業主為 tenant_id join（tenant），現時租客為 current_tenants */
-    const contractOwnerDisplayName = (c: any) => {
+    const contractOwnerDisplayName = (c: RentWithRelations) => {
         const fromJoin =
             (c.tenant?.name && String(c.tenant.name).trim()) ||
             (c.proprietor?.name && String(c.proprietor.name).trim());
@@ -769,7 +793,7 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
         const p = (proprietors || []).find((x) => x.id === c.tenantId);
         return (p?.name && String(p.name).trim()) || '';
     };
-    const contractLesseeDisplayName = (c: any) => {
+    const contractLesseeDisplayName = (c: RentWithRelations) => {
         const fromCt = c.currentTenant?.name && String(c.currentTenant.name).trim();
         if (fromCt) return fromCt;
         const rt = c.rentOutTenants;
@@ -778,7 +802,7 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
     };
 
     /** 合約記錄：分出租（amber）／租賃（violet），欄位與管理合約頁一致 */
-    const renderContractTable = (records: any[], variant: 'lease_out' | 'lease_in') => {
+    const renderContractTable = (records: RentWithRelations[], variant: 'lease_out' | 'lease_in') => {
         const isLeaseIn = variant === 'lease_in';
         const shellClass = isLeaseIn
             ? 'border-violet-200 dark:border-violet-500/35'
@@ -810,17 +834,17 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
         return (
             <div className={`border rounded-xl overflow-hidden shadow-sm ${shellClass}`}>
                 <div
-                    className={`grid grid-cols-[100px_1fr_1fr_1fr_1.5fr_1.2fr_1fr_minmax(0,1fr)_90px] gap-4 px-4 py-3 text-sm font-semibold uppercase tracking-wider border-b ${headClass} text-zinc-700 dark:text-white/80`}
+                    className={`grid grid-cols-[90px_1fr_1fr_1fr_1.2fr_1fr_100px_100px_80px] gap-4 px-4 items-start py-3 text-sm font-semibold uppercase tracking-wider border-b ${headClass} text-zinc-700 dark:text-white/80`}
                 >
-                    <div className="flex items-center gap-1.5 font-bold">編號</div>
+                    <div className="font-bold">編號</div>
                     <div className="font-bold">業主</div>
                     <div className="font-bold">二房東</div>
                     <div className="font-bold">現時租客</div>
                     <div className="font-bold">租借位置</div>
                     <div className="font-bold">租期</div>
-                    <div className="text-right font-bold">租金/月</div>
+                    <div className="font-bold">租金/月</div>
                     <div className="font-bold">已收按金</div>
-                    <div className="text-center font-bold">操作</div>
+                    <div className="font-bold">操作</div>
                 </div>
                 {records.map((rent) => {
                     const startDate = rent.rentOutStartDate ? new Date(rent.rentOutStartDate) : null;
@@ -839,7 +863,7 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                     return (
                         <div
                             key={rent.id}
-                            className={`grid grid-cols-[100px_1fr_1fr_1fr_1.5fr_1.2fr_1fr_minmax(0,1fr)_90px] gap-4 px-4 py-4 border-b text-sm transition-colors items-center last:border-0 group ${rowBorderHover} ${
+                            className={`grid grid-cols-[90px_1fr_1fr_1fr_1.2fr_1fr_100px_100px_80px] gap-4 px-4 py-4 border-b text-sm transition-colors items-center last:border-0 group ${rowBorderHover} ${
                                 isExpired ? 'bg-red-50/50 dark:bg-red-500/5' : ''
                             }`}
                         >
@@ -873,10 +897,12 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                                     {tenantName || '—'}
                                 </span>
                             </div>
-                            <LotCellWithTooltip
-                                rent={rent as Rent}
-                                propertyLotIndex={formData.lotIndex || property?.lotIndex || ''}
-                            />
+                            <div className="flex flex-col overflow-hidden min-w-0">
+                                <LotCellWithTooltip
+                                    rent={rent as Rent}
+                                    propertyLotIndex={formData.lotIndex || property?.lotIndex || ''}
+                                />
+                            </div>
                             <div className="flex flex-col">
                                 {startDate ? (
                                     <>
@@ -896,23 +922,19 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                                     <span className="text-zinc-500 dark:text-white/40 italic text-sm">未設定</span>
                                 )}
                             </div>
-                            <div className="text-right min-w-0">
-                                <span
-                                    className={`inline-block text-sm font-semibold tabular-nums whitespace-nowrap ${
+                            <div className={`text-sm font-semibold tabular-nums whitespace-nowrap ${
                                         isLeaseIn
                                             ? 'text-violet-800 dark:text-violet-200'
                                             : 'text-amber-800 dark:text-amber-200'
-                                    }`}
-                                >
+                                    }`}>
                                     ${monthlyRent.toLocaleString()}/月
-                                </span>
                             </div>
-                            <div className="text-zinc-600 dark:text-white/65 text-sm tabular-nums min-w-0">
-                                {rent.rentOutDepositReceived != null && rent.rentOutDepositReceived !== ''
+                            <div className="text-zinc-600 dark:text-white/65 text-sm tabular-nums">
+                                {rent.rentOutDepositReceived != null && rent.rentOutDepositReceived > 0
                                     ? `$${Number(rent.rentOutDepositReceived).toLocaleString()}`
                                     : '—'}
                             </div>
-                            <div className="flex items-center justify-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <div className="flex gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
                                 <button
                                     type="button"
                                     onClick={() => setEditingRent(rent as Rent)}
@@ -995,8 +1017,8 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
         setFormData(formStateFromProperty(property));
         setOrderedImages(property.images || []);
         setOrderedGeoMaps(property.geoMaps || []);
-    }, [property?.id]);
-
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [property?.id, property?.images, property?.geoMaps]);
     // Cleanup object URLs on unmount
     const orderedImagesRef = useRef(orderedImages);
     const orderedGeoMapsRef = useRef(orderedGeoMaps);
@@ -1169,9 +1191,9 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
             }
 
             onSuccess();
-        } catch (err: any) {
+        } catch (err) {
             console.error('Submit error:', err);
-            setError(`Save failed: ${err.message || 'Unknown error'}`);
+            setError(`Save failed: ${err instanceof Error ? err.message : 'Unknown error'}`);
         } finally {
             setSaving(false);
         }
@@ -1237,12 +1259,6 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
         }
     };
 
-    const handleUnlinkTenant = () => {
-        if (window.confirm('確定要取消承租人連結嗎？/ Are you sure you want to unlink the tenant?')) {
-            setFormData(prev => ({ ...prev, tenantId: '' }));
-        }
-    };
-
     const handleUnlinkRent = async (rentId: string) => {
         if (!window.confirm('確定要取消與此物業的連結嗎？租務記錄將會保留。/ Are you sure you want to unlink this rent record? The record will be kept.')) {
             return;
@@ -1250,7 +1266,7 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
 
         setUnlinkingRentId(rentId);
         try {
-            const success = await updateRent(rentId, { propertyId: null } as any);
+            const success = await updateRent(rentId, { propertyId: null } as unknown as Parameters<typeof updateRent>[1]);
             if (success) {
                 queryClient.invalidateQueries({ queryKey: ['rents'] });
                 queryClient.invalidateQueries({ queryKey: ['properties-with-relations'] });
@@ -1280,9 +1296,13 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                 initial={{ opacity: 0, scale: 0.95, y: 20 }}
                 animate={{ opacity: 1, scale: 1, y: 0 }}
                 exit={{ opacity: 0, scale: 0.95, y: 20 }}
-                className="fixed inset-4 md:inset-auto md:left-1/2 md:top-1/2 md:-translate-x-1/2 md:-translate-y-1/2 md:w-full md:max-w-5xl lg:max-w-6xl md:max-h-[90vh] bg-white dark:bg-[#1a1a2e] rounded-2xl shadow-2xl z-50 overflow-hidden flex flex-col"
+                className={
+                    isExpanded
+                        ? 'fixed inset-2 md:inset-4 w-[calc(100vw-1rem)] md:w-[calc(100vw-2rem)] h-[calc(100vh-1rem)] md:h-[calc(100vh-2rem)] bg-white dark:bg-[#1a1a2e] rounded-2xl shadow-2xl z-50 overflow-hidden flex flex-col'
+                        : 'fixed inset-4 md:inset-auto md:left-1/2 md:top-1/2 md:-translate-x-1/2 md:-translate-y-1/2 md:w-full md:max-w-5xl lg:max-w-6xl md:max-h-[90vh] bg-white dark:bg-[#1a1a2e] rounded-2xl shadow-2xl z-50 overflow-hidden flex flex-col'
+                }
             >
-                {/* Header */}
+                    {/* Header */}
                 <div className="flex items-center justify-between p-6 border-b border-zinc-100 dark:border-white/5">
                     <div>
                         <h2 className="text-xl font-bold text-zinc-900 dark:text-white">
@@ -1290,14 +1310,37 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                         </h2>
                         <p className="text-zinc-500 dark:text-white/50 text-sm mt-1">請在下方填寫物業詳情</p>
                     </div>
-                    <button
-                        onClick={onClose}
-                        className="p-2 rounded-lg text-zinc-400 dark:text-white/40 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-white/10 transition-all"
-                    >
-                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                        </svg>
-                    </button>
+                    <div className="flex items-center gap-1">
+                        {/* 展開 / 收合按鈕 */}
+                        <Tooltip content={isExpanded ? '收合 (F11)' : '展開全螢幕 (F11)'} placement="bottom">
+                            <button
+                                type="button"
+                                onClick={() => setIsExpanded(prev => !prev)}
+                                className="p-2 rounded-lg text-zinc-400 dark:text-white/40 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-white/10 transition-all"
+                                aria-label={isExpanded ? '收合' : '展開全螢幕'}
+                            >
+                                {isExpanded ? (
+                                    /* 收合圖示：四角向內 */
+                                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="M9 9V4.5M9 9H4.5M9 9L3.75 3.75M9 15v4.5M9 15H4.5M9 15l-5.25 5.25M15 9h4.5M15 9V4.5M15 9l5.25-5.25M15 15h4.5M15 15v4.5m0-4.5l5.25 5.25" />
+                                    </svg>
+                                ) : (
+                                    /* 展開圖示：四角向外 */
+                                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 3.75v4.5m0-4.5h4.5m-4.5 0L9 9M3.75 20.25v-4.5m0 4.5h4.5m-4.5 0L9 15M20.25 3.75h-4.5m4.5 0v4.5m0-4.5L15 9m5.25 11.25h-4.5m4.5 0v-4.5m0 4.5L15 15" />
+                                    </svg>
+                                )}
+                            </button>
+                        </Tooltip>
+                        <button
+                            onClick={onClose}
+                            className="p-2 rounded-lg text-zinc-400 dark:text-white/40 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-white/10 transition-all"
+                        >
+                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                        </button>
+                    </div>
                 </div>
 
                 {/* Form */}
@@ -1335,6 +1378,7 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                                         }}
                                         className="relative group aspect-square cursor-grab active:cursor-grabbing rounded-xl border border-zinc-200 dark:border-white/10 transition-all"
                                     >
+                                        {/* eslint-disable-next-line @next/next/no-img-element */}
                                         <img
                                             src={typeof item === 'string' ? item : item.preview}
                                             alt={`Property ${index + 1}`}
@@ -1359,7 +1403,7 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                                 {orderedImages.length < 5 && (
                                     <div className="w-full h-full aspect-square relative rounded-xl overflow-hidden hover:bg-zinc-50 dark:hover:bg-white/5 transition-colors">
                                         <FileUpload onChange={(files) => {
-                                            if (files.length > 0) handleImageUpload({ target: { files } } as any, 'images');
+                                            if (files.length > 0) handleImageUpload({ target: { files } } as unknown as React.ChangeEvent<HTMLInputElement>, 'images');
                                         }} />
                                     </div>
                                 )}
@@ -1391,6 +1435,7 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                                         }}
                                         className="relative group aspect-square cursor-grab active:cursor-grabbing rounded-xl border border-zinc-200 dark:border-white/10 transition-all"
                                     >
+                                        {/* eslint-disable-next-line @next/next/no-img-element */}
                                         <img
                                             src={typeof item === 'string' ? item : item.preview}
                                             alt={`Geo Map ${index + 1}`}
@@ -1415,7 +1460,7 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                                 {orderedGeoMaps.length < 2 && (
                                     <div className="w-full h-full aspect-square relative rounded-xl overflow-hidden hover:bg-zinc-50 dark:hover:bg-white/5 transition-colors">
                                         <FileUpload onChange={(files) => {
-                                            if (files.length > 0) handleImageUpload({ target: { files } } as any, 'geoMaps');
+                                            if (files.length > 0) handleImageUpload({ target: { files } } as unknown as React.ChangeEvent<HTMLInputElement>, 'geoMaps');
                                         }} />
                                     </div>
                                 )}
@@ -1542,7 +1587,7 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                                 </button>
                             )}
                         </div>
-                        <div className="min-h-[48px] px-4 py-3 bg-zinc-50 dark:bg-white/5 border border-zinc-200 dark:border-white/10 rounded-xl space-y-2">
+                        <div className="min-h-12 px-4 py-3 bg-zinc-50 dark:bg-white/5 border border-zinc-200 dark:border-white/10 rounded-xl space-y-2">
                             {lotEntries.length === 0 ? (
                                 <p className="text-sm text-zinc-400 dark:text-white/40">尚未新增地段</p>
                             ) : (
@@ -1716,7 +1761,7 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                             <AnimatedSelect
                                 name="type"
                                 value={formData.type}
-                                onChange={(value) => handleChange({ target: { name: 'type', value } } as any)}
+                                onChange={(value) => handleChange({ target: { name: 'type', value } } as unknown as React.ChangeEvent<HTMLInputElement>)}
                                 options={propertyTypes}
                                 placeholder="選擇類型"
                             />
@@ -1726,7 +1771,7 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                             <AnimatedSelect
                                 name="status"
                                 value={formData.status}
-                                onChange={(value) => handleChange({ target: { name: 'status', value } } as any)}
+                                onChange={(value) => handleChange({ target: { name: 'status', value } } as unknown as React.ChangeEvent<HTMLInputElement>)}
                                 options={propertyStatuses}
                                 placeholder="選擇狀態"
                             />
@@ -1736,7 +1781,7 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                             <AnimatedMultiSelect
                                 name="landUse"
                                 values={formData.landUse}
-                                onChange={(values) => handleChange({ target: { name: 'landUse', value: values } } as any)}
+                                onChange={(values) => handleChange({ target: { name: 'landUse', value: values } } as unknown as React.ChangeEvent<HTMLInputElement>)}
                                 options={landUseTypes}
                                 placeholder="請選擇"
                             />
@@ -1870,7 +1915,7 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                                             : '-';
 
                                         return (
-                                            <div key={propId} className="grid grid-cols-[4rem_minmax(0,1fr)_6rem_minmax(0,1fr)_4.5rem] gap-x-2.5 gap-y-1 px-3 py-3 border-b border-zinc-100 dark:border-white/5 text-sm hover:bg-zinc-50/50 dark:hover:bg-white/[0.01] transition-colors items-center last:border-0">
+                                            <div key={propId} className="grid grid-cols-[4rem_minmax(0,1fr)_6rem_minmax(0,1fr)_4.5rem] gap-x-2.5 gap-y-1 px-3 py-3 border-b border-zinc-100 dark:border-white/5 text-sm hover:bg-zinc-50/50 dark:hover:bg-white/1 transition-colors items-center last:border-0">
                                                 {/* 代碼 */}
                                                 <div className="text-zinc-600 dark:text-white/60 font-mono text-sm font-medium shrink-0">
                                                     {selectedProprietor?.code || '-'}
@@ -1993,7 +2038,7 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                                     options={[
                                         { value: '', label: rentsLoading ? '載入中...' : '選擇現有租金記錄以連結...' },
                                         ...((allRents || [])
-                                            .filter(r => !r.propertyId || r.propertyId === '' || r.propertyId === 'null' || (r as any).propertyId == null)
+                                            .filter(r => !r.propertyId || r.propertyId === '' || r.propertyId === 'null' || r.propertyId == null)
                                             .map(r => {
                                                 const monthlyRent = r.type === 'rent_out' ? r.rentOutMonthlyRental : r.rentingMonthlyRental;
                                                 const tenantName = r.type === 'rent_out'
@@ -2002,7 +2047,7 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                                                 const endDate =
                                                     r.type === 'rent_out'
                                                         ? getRentOutCollectionDisplayPeriod(r as Rent).end || r.rentOutEndDate
-                                                        : r.rentingEndDate || (r as any).endDate;
+                                                        : r.rentingEndDate || r.endDate;
                                                 const isExpired = endDate ? new Date(endDate) < new Date(new Date().setHours(0, 0, 0, 0)) : false;
 
                                                 return {
@@ -2128,8 +2173,8 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                                             尚未新增子物業
                                         </div>
                                     ) : (
-                                        subProperties.map((sp: any) => (
-                                            <div key={sp.id} className="grid grid-cols-[80px_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.5fr)_100px] gap-4 px-4 py-4 border-b border-zinc-100 dark:border-white/5 hover:bg-zinc-50/80 dark:hover:bg-white/[0.02] transition-colors items-center last:border-0 group">
+                                        subProperties.map((sp: PropertyWithRelations) => (
+                                            <div key={sp.id} className="grid grid-cols-[80px_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.5fr)_100px] gap-4 px-4 py-4 border-b border-zinc-100 dark:border-white/5 hover:bg-zinc-50/80 dark:hover:bg-white/2 transition-colors items-center last:border-0 group">
                                                 <div>
                                                     <span className="font-mono text-xs font-bold text-zinc-600 dark:text-white/70">{sp.code || '—'}</span>
                                                 </div>
@@ -2142,7 +2187,7 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                                                 <div className="text-sm text-zinc-700 dark:text-white/80 truncate">
                                                     {sp.address || sp.location?.address || '—'}
                                                 </div>
-                                                <div className="flex items-center justify-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                <div className="flex gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
                                                     <button
                                                         type="button"
                                                         className="p-2 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-500/20 rounded-lg transition-all"
@@ -2188,7 +2233,7 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                         whileTap={{ scale: 0.98 }}
                         onClick={handleSubmit}
                         disabled={saving}
-                        className="px-5 py-2.5 bg-gradient-to-r from-purple-600 to-blue-600 rounded-xl text-white font-medium shadow-lg shadow-purple-500/20 disabled:opacity-50 flex items-center gap-2"
+                        className="px-5 py-2.5 bg-linear-to-r from-purple-600 to-blue-600 rounded-xl text-white font-medium shadow-lg shadow-purple-500/20 disabled:opacity-50 flex items-center gap-2"
                     >
                         {saving ? (
                             <motion.div
