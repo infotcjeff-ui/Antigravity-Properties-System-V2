@@ -13,7 +13,7 @@ import {
     useRentsWithRelationsQuery,
     syncContractLotsToRentOutRecords,
 } from '@/hooks/useStorage';
-import { X, ExternalLink, Building2, Calendar } from 'lucide-react';
+import { X, ExternalLink, Building2, FileText } from 'lucide-react';
 import { fileToBase64, compressImage, validateImageUpload } from '@/lib/imageUtils';
 import type { Proprietor, Property, Rent, RentCollectionPaymentMethod, SubLandlord, CurrentTenant } from '@/lib/db';
 import { RENT_OUT_CONTRACT_STATUS_OPTIONS, getRentOutOrContractListNumber } from '@/lib/rentPaymentDisplay';
@@ -133,6 +133,7 @@ export default function RentModal({
     const { data: currentTenants = [] } = useCurrentTenantsQuery();
     const { data: allProperties = [] } = usePropertiesQuery();
     const { data: contractsWithRel = [] } = useRentsWithRelationsQuery({ type: 'contract' });
+    const { data: rentOutContracts = [] } = useRentsWithRelationsQuery({ type: 'rent_out' });
 
     // Determine effective types for the type selector
     const effectiveTypes = allowedTypes && allowedTypes.length > 0
@@ -177,6 +178,9 @@ export default function RentModal({
                     (rent as any).rentOutDepositChequeNumber || (rent as any).rent_out_deposit_cheque_number || '',
                 rentOutDepositChequeImage:
                     (rent as any).rentOutDepositChequeImage || (rent as any).rent_out_deposit_cheque_image || '',
+                rentOutDepositChequePaymentDate: formatDate(
+                    (rent as any).rentOutDepositChequePaymentDate ?? (rent as any).rent_out_deposit_cheque_payment_date,
+                ),
                 rentOutDepositPaymentDate: formatDate(
                     (rent as any).rentOutDepositPaymentDate ?? (rent as any).rent_out_deposit_payment_date,
                 ),
@@ -300,6 +304,7 @@ export default function RentModal({
             rentOutDepositChequeBank: '',
             rentOutDepositChequeNumber: '',
             rentOutDepositChequeImage: '',
+            rentOutDepositChequePaymentDate: '',
             rentOutDepositPaymentDate: '',
             rentOutDepositBankInImage: '',
             rentOutDepositReceiveDate: '',
@@ -1151,6 +1156,12 @@ export default function RentModal({
                         (formData.rentOutDepositPaymentMethod === 'cheque' || formData.rentOutDepositPaymentMethod === 'fps') &&
                         formData.rentOutDepositChequeImage
                             ? formData.rentOutDepositChequeImage
+                            : null,
+                    rentOutDepositChequePaymentDate:
+                        formData.rentOutDepositPaymentMethod === 'cheque'
+                            ? formData.rentOutDepositChequePaymentDate
+                                ? new Date(formData.rentOutDepositChequePaymentDate)
+                                : null
                             : null,
                     rentOutDepositPaymentDate: rentOutDepositPaymentDateForSave,
                     rentOutDepositBankInImage:
@@ -2591,6 +2602,16 @@ export default function RentModal({
                                         />
                                     </div>
                                     <div className="space-y-2">
+                                        <label className={labelClass}>付款日期</label>
+                                        <input
+                                            type="date"
+                                            name="rentOutDepositChequePaymentDate"
+                                            value={formData.rentOutDepositChequePaymentDate ?? ''}
+                                            onChange={handleChange}
+                                            className={inputClass}
+                                        />
+                                    </div>
+                                    <div className="space-y-2">
                                         <label className={labelClass}>支票影像（選填）</label>
                                         <div className="flex flex-wrap items-center gap-3">
                                             <label className="px-4 py-2 rounded-xl border border-dashed border-zinc-300 dark:border-white/20 text-sm text-blue-600 dark:text-blue-400 cursor-pointer hover:bg-blue-50 dark:hover:bg-blue-500/10 transition-colors">
@@ -3029,6 +3050,7 @@ export default function RentModal({
                 <SubLandlordDetailModal
                     subLandlord={showSubLandlordDetail}
                     allProperties={allProperties}
+                    allRentOutContracts={rentOutContracts}
                     onClose={() => setShowSubLandlordDetail(null)}
                     onEdit={() => {
                         setEditSubLandlord(showSubLandlordDetail);
@@ -3057,11 +3079,13 @@ export default function RentModal({
 function SubLandlordDetailModal({
     subLandlord,
     allProperties,
+    allRentOutContracts,
     onClose,
     onEdit
 }: {
     subLandlord: SubLandlord;
     allProperties: Property[];
+    allRentOutContracts?: any[];
     onClose: () => void;
     onEdit: () => void;
 }) {
@@ -3094,23 +3118,20 @@ function SubLandlordDetailModal({
         });
     }, [subLandlord.tenancyNumber, allProperties]);
 
-    const formatDate = (date: any) => {
-        if (!date) return '—';
-        return new Date(date).toLocaleDateString('zh-HK');
-    };
+    const relatedRentOutContracts = useMemo(() => {
+        if (!allRentOutContracts || !subLandlord.id) return [];
 
-    const formatNumber = (num: any) => {
-        if (!num) return '—';
-        return new Intl.NumberFormat('zh-HK').format(num);
-    };
+        return allRentOutContracts.filter(rent => {
+            if (rent.rentOutSubLandlordId === subLandlord.id) return true;
 
-    const statusLabel =
-        subLandlord.status === 'listing' ? '放盤中' :
-        subLandlord.status === 'renting' ? '出租中' :
-        subLandlord.status === 'leasing_in' ? '租入中' :
-        subLandlord.status === 'completed' ? '已完租' : '—';
+            if (relatedProperties.length > 0) {
+                const relatedPropertyIds = new Set(relatedProperties.map(p => p.id));
+                if (rent.propertyId && relatedPropertyIds.has(rent.propertyId)) return true;
+            }
 
-    const isExpired = subLandlord.endDate ? new Date(subLandlord.endDate) < new Date() : false;
+            return false;
+        });
+    }, [allRentOutContracts, subLandlord.id, relatedProperties]);
 
     return (
         <>
@@ -3165,90 +3186,8 @@ function SubLandlordDetailModal({
                                 <p className="text-xs text-zinc-500 dark:text-white/50 mb-1">名稱</p>
                                 <p className="text-sm font-bold text-zinc-900 dark:text-white">{subLandlord.name}</p>
                             </div>
-                            <div className="p-3 bg-zinc-50 dark:bg-white/5 rounded-xl border border-zinc-100 dark:border-white/5">
-                                <p className="text-xs text-zinc-500 dark:text-white/50 mb-1">出租號碼</p>
-                                <p className="text-sm font-mono font-medium text-zinc-900 dark:text-white">{subLandlord.tenancyNumber || '—'}</p>
-                            </div>
-                            <div className="p-3 bg-zinc-50 dark:bg-white/5 rounded-xl border border-zinc-100 dark:border-white/5">
-                                <p className="text-xs text-zinc-500 dark:text-white/50 mb-1">狀態</p>
-                                <p className={`text-sm font-medium ${isExpired ? 'text-red-500' : 'text-zinc-900 dark:text-white'}`}>
-                                    {isExpired ? '已過期' : statusLabel}
-                                </p>
-                            </div>
-                            <div className="p-3 bg-zinc-50 dark:bg-white/5 rounded-xl border border-zinc-100 dark:border-white/5">
-                                <p className="text-xs text-zinc-500 dark:text-white/50 mb-1">出租人</p>
-                                <p className="text-sm font-medium text-zinc-900 dark:text-white">{subLandlord.lessor || '—'}</p>
-                            </div>
-                            <div className="p-3 bg-zinc-50 dark:bg-white/5 rounded-xl border border-zinc-100 dark:border-white/5">
-                                <p className="text-xs text-zinc-500 dark:text-white/50 mb-1">出租月租</p>
-                                <p className="text-sm font-bold text-emerald-600 dark:text-emerald-400">
-                                    {subLandlord.monthlyRental ? `$${formatNumber(subLandlord.monthlyRental)}` : '—'}
-                                </p>
-                            </div>
-                            <div className="p-3 bg-zinc-50 dark:bg-white/5 rounded-xl border border-zinc-100 dark:border-white/5">
-                                <p className="text-xs text-zinc-500 dark:text-white/50 mb-1">期數</p>
-                                <p className="text-sm font-medium text-zinc-900 dark:text-white">
-                                    {subLandlord.periods ? `${subLandlord.periods} 個月` : '—'}
-                                </p>
-                            </div>
                         </div>
                     </section>
-
-                    {/* 日期資料 */}
-                    <section>
-                        <h3 className="text-sm font-semibold text-purple-600 dark:text-purple-400 mb-3">日期資料</h3>
-                        <div className="bg-zinc-50 dark:bg-white/5 rounded-xl border border-zinc-100 dark:border-white/5 divide-y divide-zinc-100 dark:divide-white/5">
-                            <div className="flex items-center gap-3 px-4 py-3">
-                                <Calendar className="w-4 h-4 text-blue-500 shrink-0" />
-                                <span className="text-xs text-zinc-500 dark:text-white/50 w-20 shrink-0">開始日期</span>
-                                <span className="text-sm font-medium text-zinc-800 dark:text-white">{formatDate(subLandlord.startDate)}</span>
-                            </div>
-                            <div className="flex items-center gap-3 px-4 py-3">
-                                <Calendar className="w-4 h-4 text-blue-500 shrink-0" />
-                                <span className="text-xs text-zinc-500 dark:text-white/50 w-20 shrink-0">結束日期</span>
-                                <span className={`text-sm font-medium ${isExpired ? 'text-red-500' : 'text-zinc-800 dark:text-white'}`}>
-                                    {formatDate(subLandlord.endDate)}
-                                    {isExpired && <span className="ml-2 text-xs font-medium">(已過期)</span>}
-                                </span>
-                            </div>
-                            <div className="flex items-center gap-3 px-4 py-3">
-                                <Calendar className="w-4 h-4 text-amber-500 shrink-0" />
-                                <span className="text-xs text-zinc-500 dark:text-white/50 w-20 shrink-0">實際結束</span>
-                                <span className="text-sm font-medium text-zinc-800 dark:text-white">{formatDate(subLandlord.actualEndDate)}</span>
-                            </div>
-                        </div>
-                    </section>
-
-                    {/* 按金資料 */}
-                    {(subLandlord.depositReceived != null || subLandlord.depositReceiptNumber) && (
-                        <section>
-                            <h3 className="text-sm font-semibold text-purple-600 dark:text-purple-400 mb-3">按金資料</h3>
-                            <div className="bg-zinc-50 dark:bg-white/5 rounded-xl border border-zinc-100 dark:border-white/5 divide-y divide-zinc-100 dark:divide-white/5">
-                                <div className="flex items-center gap-3 px-4 py-3">
-                                    <span className="text-xs text-zinc-500 dark:text-white/50 w-20 shrink-0">按金</span>
-                                    <span className="text-sm font-medium text-zinc-800 dark:text-white">
-                                        {subLandlord.depositReceived != null ? `$${formatNumber(subLandlord.depositReceived)}` : '—'}
-                                    </span>
-                                </div>
-                                {subLandlord.depositReceiptNumber && (
-                                    <div className="flex items-center gap-3 px-4 py-3">
-                                        <span className="text-xs text-zinc-500 dark:text-white/50 w-20 shrink-0">收據號碼</span>
-                                        <span className="text-sm font-mono font-medium text-zinc-800 dark:text-white">{subLandlord.depositReceiptNumber}</span>
-                                    </div>
-                                )}
-                                <div className="flex items-center gap-3 px-4 py-3">
-                                    <Calendar className="w-4 h-4 text-emerald-500 shrink-0" />
-                                    <span className="text-xs text-zinc-500 dark:text-white/50 w-20 shrink-0">收取日期</span>
-                                    <span className="text-sm font-medium text-zinc-800 dark:text-white">{formatDate(subLandlord.depositReceiveDate)}</span>
-                                </div>
-                                <div className="flex items-center gap-3 px-4 py-3">
-                                    <Calendar className="w-4 h-4 text-amber-500 shrink-0" />
-                                    <span className="text-xs text-zinc-500 dark:text-white/50 w-20 shrink-0">退回日期</span>
-                                    <span className="text-sm font-medium text-zinc-800 dark:text-white">{formatDate(subLandlord.depositReturnDate)}</span>
-                                </div>
-                            </div>
-                        </section>
-                    )}
 
                     {/* 關聯物業 */}
                     <section>
@@ -3297,16 +3236,76 @@ function SubLandlordDetailModal({
                         )}
                     </section>
 
-                    {/* 描述 */}
-                    {subLandlord.description && (
-                        <section>
-                            <h3 className="text-sm font-semibold text-purple-600 dark:text-purple-400 mb-3">描述</h3>
-                            <div
-                                className="text-sm text-zinc-700 dark:text-white/80 prose dark:prose-invert max-w-none p-3 bg-zinc-50 dark:bg-white/5 rounded-xl border border-zinc-100 dark:border-white/5"
-                                dangerouslySetInnerHTML={{ __html: subLandlord.description }}
-                            />
-                        </section>
-                    )}
+                    {/* 出租合約 */}
+                    <section>
+                        <h3 className="text-sm font-semibold text-purple-600 dark:text-purple-400 mb-3">
+                            出租合約 ({relatedRentOutContracts.length})
+                        </h3>
+                        {relatedRentOutContracts.length === 0 ? (
+                            <div className="p-6 text-center bg-zinc-50 dark:bg-white/5 rounded-xl border-2 border-dashed border-zinc-200 dark:border-white/10">
+                                <FileText className="w-8 h-8 text-zinc-300 dark:text-white/10 mx-auto mb-2" />
+                                <p className="text-sm text-zinc-500 dark:text-white/40">暫無關聯出租合約</p>
+                            </div>
+                        ) : (
+                            <div className="space-y-3">
+                                {relatedRentOutContracts.map(rent => {
+                                    const rentProperty = rent.property as Property | null;
+                                    return (
+                                        <div
+                                            key={rent.id}
+                                            className="p-4 rounded-xl bg-zinc-50 dark:bg-white/5 border border-zinc-200 dark:border-white/10 transition-colors"
+                                        >
+                                            <div className="flex items-start justify-between gap-3">
+                                                <div className="flex-1 min-w-0">
+                                                    <div className="flex items-center gap-2 flex-wrap">
+                                                        <FileText className="w-4 h-4 text-purple-500 shrink-0" />
+                                                        <span className="text-sm font-bold text-zinc-900 dark:text-white">
+                                                            {rent.rentOutTenancyNumber || '—'}
+                                                        </span>
+                                                        <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                                                            rent.rentOutStatus === 'renting'
+                                                                ? 'bg-green-100 dark:bg-green-500/20 text-green-600 dark:text-green-400'
+                                                                : rent.rentOutStatus === 'completed'
+                                                                ? 'bg-zinc-100 dark:bg-white/10 text-zinc-500 dark:text-white/50'
+                                                                : 'bg-amber-100 dark:bg-amber-500/20 text-amber-600 dark:text-amber-400'
+                                                        }`}>
+                                                            {rent.rentOutStatus === 'listing' ? '放盤中' :
+                                                             rent.rentOutStatus === 'renting' ? '出租中' :
+                                                             rent.rentOutStatus === 'leasing_in' ? '租入中' :
+                                                             rent.rentOutStatus === 'completed' ? '已完租' : '—'}
+                                                        </span>
+                                                    </div>
+                                                    <div className="flex items-center gap-1.5 mt-1.5">
+                                                        <Building2 className="w-3.5 h-3.5 text-zinc-400 dark:text-white/40 shrink-0" />
+                                                        <span className="text-xs text-zinc-500 dark:text-white/50 truncate">
+                                                            {rentProperty?.name || '—'}
+                                                        </span>
+                                                        {rentProperty?.code && (
+                                                            <span className="text-xs text-zinc-400 dark:text-white/30 font-mono shrink-0">
+                                                                ({rentProperty.code})
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                    <div className="flex items-center gap-4 mt-2">
+                                                        {rent.rentOutMonthlyRental != null && (
+                                                            <span className="text-xs text-emerald-600 dark:text-emerald-400 font-medium">
+                                                                月租: ${new Intl.NumberFormat('zh-HK').format(rent.rentOutMonthlyRental)}
+                                                            </span>
+                                                        )}
+                                                        {rent.rentOutStartDate && (
+                                                            <span className="text-xs text-zinc-400 dark:text-white/30">
+                                                                {new Date(rent.rentOutStartDate).toLocaleDateString('zh-HK')} 起
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        )}
+                    </section>
                 </div>
 
                 {/* Footer */}

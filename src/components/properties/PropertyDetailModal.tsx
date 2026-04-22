@@ -186,7 +186,7 @@ export default function PropertyDetailModal({ propertyName, propertyId, onClose 
                         className={`grid ${rowGrid} gap-0 pb-3 border-b border-zinc-200 dark:border-white/10 text-xs font-bold text-zinc-900 dark:text-white`}
                     >
                         <div className="pr-4">{t('Number', '編號')}</div>
-                        <div className="px-4">{t('Property', '物業')}</div>
+                        <div className="px-4">{t('Property & Lot', '物業&地段')}</div>
                         {isRentingTable ? (
                             <>
                                 <div className="px-4">{t('Landlord', '業主')}</div>

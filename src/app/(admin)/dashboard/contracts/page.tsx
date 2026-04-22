@@ -8,6 +8,10 @@ import { FileText, Pencil, Trash2, Building2 } from 'lucide-react';
 import { useRentsWithRelationsQuery, useRents } from '@/hooks/useStorage';
 import type { Rent } from '@/lib/db';
 import { labelRentOutContractNatureZh } from '@/lib/rentPaymentDisplay';
+import {
+    normalizeRentPropertyLotSelection,
+    parseRentPropertyLotPartialFromRow,
+} from '@/lib/formatters';
 import { BentoCard } from '@/components/layout/BentoGrid';
 import RentModal from '@/components/properties/RentModal';
 import PropertyDetailModal from '@/components/properties/PropertyDetailModal';
@@ -329,8 +333,22 @@ export default function ContractsPage() {
                                                         : 'border-amber-200/50 dark:border-amber-500/10 hover:bg-amber-50/50 dark:hover:bg-amber-500/5'
                                                 }`}
                                             >
-                                                <td className="p-4 text-zinc-900 dark:text-white font-medium">
-                                                    {property?.name || '-'}
+                                                <td className="p-4">
+                                                    <div className="text-zinc-900 dark:text-white font-medium">
+                                                        {property?.name || '-'}
+                                                    </div>
+                                                    <div className="text-xs text-zinc-400 dark:text-white/40 mt-0.5 line-clamp-1">
+                                                        {(() => {
+                                                            const selected = normalizeRentPropertyLotSelection(contract.rentPropertyLot ?? (contract as any).rent_property_lot);
+                                                            const partial = parseRentPropertyLotPartialFromRow(contract.rentPropertyLotPartial ?? (contract as any).rent_property_lot_partial);
+                                                            if (!selected.length) return <span>—</span>;
+                                                            const lots = selected.map(lot => partial[lot] ? `${lot}（部分地方）` : lot);
+                                                            if (lots.length > 1) {
+                                                                return <span title={lots.join('、')}>{lots[0]}...</span>;
+                                                            }
+                                                            return <span>{lots[0]}</span>;
+                                                        })()}
+                                                    </div>
                                                 </td>
                                                 <td className="p-4">
                                                     <span
@@ -479,6 +497,18 @@ export default function ContractsPage() {
                                         <div className="flex items-start justify-between gap-2">
                                             <div>
                                                 <h3 className="font-bold text-zinc-900 dark:text-white">{property?.name || '-'}</h3>
+                                                <p className="text-xs text-zinc-400 dark:text-white/40 mt-0.5 line-clamp-1">
+                                                    {(() => {
+                                                        const selected = normalizeRentPropertyLotSelection(contract.rentPropertyLot ?? (contract as any).rent_property_lot);
+                                                        const partial = parseRentPropertyLotPartialFromRow(contract.rentPropertyLotPartial ?? (contract as any).rent_property_lot_partial);
+                                                        if (!selected.length) return '—';
+                                                        const lots = selected.map(lot => partial[lot] ? `${lot}（部分地方）` : lot);
+                                                        if (lots.length > 1) {
+                                                            return <span title={lots.join('、')}>{lots[0]}...</span>;
+                                                        }
+                                                        return lots[0];
+                                                    })()}
+                                                </p>
                                                 <p
                                                     className={`text-xs mt-0.5 ${
                                                         isLeaseInTab

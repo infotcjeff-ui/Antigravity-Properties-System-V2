@@ -307,7 +307,7 @@ export default function PropertyDetailsPage() {
         for (const r of pool) {
             if (r.rentOutSubLandlordId) {
                 const sl = subLandlords.find((s) => s.id === r.rentOutSubLandlordId);
-                if (sl) return { name: sl.name, subtitle: sl.tenancyNumber?.trim() || '' };
+                if (sl) return { name: sl.name, subtitle: '' };
             }
             if (r.rentOutSubLandlord?.trim()) {
                 return { name: r.rentOutSubLandlord.trim(), subtitle: '' };
@@ -722,7 +722,7 @@ export default function PropertyDetailsPage() {
                                             className={`grid ${historyRowGrid} gap-0 pb-3 border-b border-zinc-200 dark:border-white/10 text-xs font-bold text-zinc-900 dark:text-white`}
                                         >
                                             <div className="pr-4">{t('Number', '編號')}</div>
-                                            <div className="px-4">{t('Property', '物業')}</div>
+                                            <div className="px-4">{t('Property & Lot', '物業&地段')}</div>
                                             {isRentingTab ? (
                                                 <div className="px-4">{t('Proprietor', '業主')}</div>
                                             ) : (

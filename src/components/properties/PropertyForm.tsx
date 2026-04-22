@@ -843,7 +843,7 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                     <div className="font-bold">租借位置</div>
                     <div className="font-bold">租期</div>
                     <div className="font-bold">租金/月</div>
-                    <div className="font-bold">已收按金</div>
+                    <div className="font-bold">{isLeaseIn ? '已付按金' : '已收按金'}</div>
                     <div className="font-bold">操作</div>
                 </div>
                 {records.map((rent) => {
@@ -889,7 +889,9 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                             </div>
                             <div className="flex flex-col overflow-hidden min-w-0">
                                 <span className="font-semibold text-zinc-900 dark:text-white truncate" title={subLandlordName || undefined}>
-                                    {subLandlordName || '—'}
+                                    {isLeaseIn
+                                        ? (rent.rentOutSubLandlordId ? subLandlordName : '暫無')
+                                        : subLandlordName || '—'}
                                 </span>
                             </div>
                             <div className="flex flex-col overflow-hidden min-w-0">

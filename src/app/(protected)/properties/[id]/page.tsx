@@ -366,7 +366,7 @@ export default function PropertyDetailsPage() {
         for (const r of pool) {
             if (r.rentOutSubLandlordId) {
                 const sl = subLandlords.find((s) => s.id === r.rentOutSubLandlordId);
-                if (sl) return { name: sl.name, subtitle: sl.tenancyNumber?.trim() || '' };
+                if (sl) return { name: sl.name, subtitle: '' };
             }
             if (r.rentOutSubLandlord?.trim()) {
                 return { name: r.rentOutSubLandlord.trim(), subtitle: '' };
@@ -925,7 +925,7 @@ export default function PropertyDetailsPage() {
                                             className={`grid ${historyRowGrid} gap-0 pb-3 border-b border-zinc-200 dark:border-white/10 text-xs font-bold text-zinc-900 dark:text-white`}
                                         >
                                             <div className="pr-4">{t('Number', '編號')}</div>
-                                            <div className="px-4">{t('Property', '物業')}</div>
+                                            <div className="px-4">{t('Property & Lot', '物業&地段')}</div>
                                             {isRentingTab ? (
                                                 <div className="px-4">{t('Proprietor', '業主')}</div>
                                             ) : (
@@ -1020,12 +1020,6 @@ export default function PropertyDetailsPage() {
                                                                             <span className="font-bold">{property.name}</span>
                                                                             <span className="bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 px-1.5 py-0.5 rounded text-xs ml-auto">
                                                                                 {property.code}
-                                                                            </span>
-                                                                        </div>
-                                                                        <div className="text-xs text-zinc-500 dark:text-white/60">
-                                                                            {t('Lot Index', '地段')}:{' '}
-                                                                            <span className="text-zinc-900 dark:text-white">
-                                                                                {formatLotIndexPlainJoined(property.lotIndex) || '-'}
                                                                             </span>
                                                                         </div>
                                                                         <div className="text-xs text-zinc-500 dark:text-white/60">
@@ -1369,6 +1363,7 @@ export default function PropertyDetailsPage() {
                 <RentDetailsModal
                     rent={selectedRent}
                     property={property}
+                    currentTenants={currentTenants}
                     onClose={() => setSelectedRent(null)}
                 />
             )}

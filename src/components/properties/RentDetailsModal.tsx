@@ -3,7 +3,7 @@
 import { motion } from 'framer-motion';
 import { X, Building2, User } from 'lucide-react';
 import type { Rent, Property, Proprietor } from '@/lib/db';
-import { formatLotArea, proprietorCategoryLabelZh } from '@/lib/formatters';
+import { formatLotArea, proprietorCategoryLabelZh, normalizeRentPropertyLotSelection, parseRentPropertyLotPartialFromRow } from '@/lib/formatters';
 import {
     getRentOutCollectionDisplayPeriod,
     labelRentCollectionPaymentMethod,
@@ -16,6 +16,7 @@ import { Tooltip } from '@heroui/react';
 interface RentDetailsModalProps {
     rent: Rent;
     property?: Property;
+    currentTenants?: Array<{ id: string; name: string; code?: string; tenancyNumber?: string }>;
     onClose: () => void;
 }
 
@@ -40,7 +41,7 @@ function DetailRow({ label, value, tooltipContent }: { label: string; value: any
     );
 }
 
-export default function RentDetailsModal({ rent, property, onClose }: RentDetailsModalProps) {
+export default function RentDetailsModal({ rent, property, currentTenants = [], onClose }: RentDetailsModalProps) {
     const lang = useLanguage();
     const isZh = lang === 'zh-TW';
     const t = (en: string, zh: string) => isZh ? zh : en;
@@ -152,12 +153,6 @@ export default function RentDetailsModal({ rent, property, onClose }: RentDetail
                             <DetailRow label={t('Listing Price', '放盤價')} value={formatCurrency(rent.rentOutPricing)} />
                             <DetailRow label={t('Periods', '期數')} value={rent.rentOutPeriods} />
                             <DetailRow label={t('Total Amount', '總額')} value={formatCurrency(rent.rentOutTotalAmount)} />
-                            {rent.type !== 'contract' && (rent as any).rentCollectionPaymentMethod ? (
-                                <DetailRow
-                                    label={t('Payment Method', '付款方式')}
-                                    value={labelRentCollectionPaymentMethod((rent as any).rentCollectionPaymentMethod)}
-                                />
-                            ) : null}
                             <DetailRow
                                 label={t('Start Date', '開始日期')}
                                 value={formatDate(
@@ -208,15 +203,32 @@ export default function RentDetailsModal({ rent, property, onClose }: RentDetail
                             <DetailRow label={t('Deposit Receive Date', '按金收取日期')} value={formatDate(rent.rentOutDepositReceiveDate)} />
                             <DetailRow label={t('Deposit Return Date', '按金退回日期')} value={formatDate(rent.rentOutDepositReturnDate)} />
                             <DetailRow label={t('Deposit Return Amount', '按金退回金額')} value={formatCurrency(rent.rentOutDepositReturnAmount)} />
+                            {rent.type !== 'contract' && (rent as any).rentCollectionPaymentMethod ? (
+                                <DetailRow
+                                    label={t('Payment Method', '付款方式')}
+                                    value={labelRentCollectionPaymentMethod((rent as any).rentCollectionPaymentMethod)}
+                                />
+                            ) : null}
                             <DetailRow
                                 label={t('Payment Status', '付款狀態')}
                                 value={paymentStatus}
                             />
+                            {(rent as any).rentCollectionPaymentDate ? (
+                                <DetailRow
+                                    label={t('Payment Date', '付款日期')}
+                                    value={formatDate((rent as any).rentCollectionPaymentDate)}
+                                />
+                            ) : null}
 
                             {property && (
                                 <DetailRow
-                                    label={t('Property', '物業')}
-                                    value={property.name}
+                                    label={t('Property & Lot', '物業&地段')}
+                                    value={(function () {
+                                        const rawLot = (rent as any).rentPropertyLot ?? (rent as any).rent_property_lot;
+                                        const selectedLots = normalizeRentPropertyLotSelection(rawLot);
+                                        if (selectedLots.length > 0) return selectedLots.join('、');
+                                        return property.name;
+                                    })()}
                                     tooltipContent={
                                         <div className="flex flex-col gap-1.5 w-full text-sm">
                                             <div className="flex items-center gap-2 mb-1">
@@ -224,9 +236,32 @@ export default function RentDetailsModal({ rent, property, onClose }: RentDetail
                                                 <span className="font-bold">{property.name}</span>
                                                 <span className="bg-purple-100 dark:bg-purple-500/20 text-purple-700 dark:text-purple-300 px-1.5 py-0.5 rounded text-xs ml-auto">{property.code}</span>
                                             </div>
-                                            <div className="text-xs text-zinc-500 dark:text-white/60">
-                                                地段: <span className="text-zinc-900 dark:text-white">{property.lotIndex || '-'}</span>
-                                            </div>
+                                            {(function () {
+                                                const rawLot = (rent as any).rentPropertyLot ?? (rent as any).rent_property_lot;
+                                                const rawPartial = (rent as any).rentPropertyLotPartial ?? (rent as any).rent_property_lot_partial;
+                                                const selectedLots = normalizeRentPropertyLotSelection(rawLot);
+                                                const partialMap = parseRentPropertyLotPartialFromRow(rawPartial);
+                                                if (selectedLots.length === 0) {
+                                                    return (
+                                                        <>
+                                                            <div className="text-xs text-zinc-500 dark:text-white/60">
+                                                                地段: <span className="text-zinc-900 dark:text-white">{property.lotIndex || '-'}</span>
+                                                            </div>
+                                                            <div className="text-xs text-zinc-500 dark:text-white/60">
+                                                                面積: <span className="text-zinc-900 dark:text-white">{formatLotArea(property.lotArea)}</span>
+                                                            </div>
+                                                        </>
+                                                    );
+                                                }
+                                                return selectedLots.map((lot) => {
+                                                    const isPartial = partialMap[lot] === true;
+                                                    return (
+                                                        <div key={lot} className="text-xs text-zinc-500 dark:text-white/60">
+                                                            {isPartial ? `${lot}（部分地方）` : lot}
+                                                        </div>
+                                                    );
+                                                });
+                                            })()}
                                             <div className="text-xs text-zinc-500 dark:text-white/60">
                                                 面積: <span className="text-zinc-900 dark:text-white">{formatLotArea(property.lotArea)}</span>
                                             </div>
@@ -234,30 +269,82 @@ export default function RentDetailsModal({ rent, property, onClose }: RentDetail
                                     }
                                 />
                             )}
-                            {rent.tenant && (
+                            {rent.tenant || (rent as any).rentOutTenants?.length || (rent as any).rentOutTenantIds?.length ? (
                                 <DetailRow
-                                    label={t('Tenant', '承租人')}
-                                    value={rent.tenant.name}
+                                    label={t('Current Tenant', '現時租客')}
+                                    value={(function () {
+                                        const tenantIds = (rent as any).rentOutTenantIds;
+                                        const tenantNames = (rent as any).rentOutTenants;
+                                        if (Array.isArray(tenantIds) && tenantIds.length > 0) {
+                                            const found = currentTenants.find((ct) => tenantIds.includes(ct.id));
+                                            if (found) return found.name;
+                                        }
+                                        if (Array.isArray(tenantNames) && tenantNames.length > 0) {
+                                            return tenantNames.join('、');
+                                        }
+                                        return rent.tenant?.name;
+                                    })()}
                                     tooltipContent={
                                         <div className="flex flex-col gap-1.5 w-full text-sm">
-                                            <div className="flex items-center gap-2 mb-1">
-                                                <User className="w-4 h-4 text-blue-500" />
-                                                <span className="font-bold">{rent.tenant.name}</span>
-                                                <span className="bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-300 px-1.5 py-0.5 rounded text-xs ml-auto">{rent.tenant.code}</span>
-                                            </div>
-                                            <div className="text-xs text-zinc-500 dark:text-white/60">
-                                                英文名稱: <span className="text-zinc-900 dark:text-white">{rent.tenant.englishName || '-'}</span>
-                                            </div>
-                                            <div className="text-xs text-zinc-500 dark:text-white/60 flex items-center justify-between">
-                                                <span>類型: <span className="text-zinc-900 dark:text-white">{rent.tenant.type === 'company' ? '公司' : '個人'}</span></span>
-                                                <span className="bg-zinc-100 dark:bg-white/10 px-1.5 py-0.5 rounded text-xs text-zinc-600 dark:text-white/70">
-                                                    {proprietorCategoryLabelZh(rent.tenant.category, 'card')}
-                                                </span>
-                                            </div>
+                                            {(function () {
+                                                const tenantIds = (rent as any).rentOutTenantIds;
+                                                const tenantNames = (rent as any).rentOutTenants;
+                                                if (Array.isArray(tenantIds) && tenantIds.length > 0) {
+                                                    const found = currentTenants.find((ct) => tenantIds.includes(ct.id));
+                                                    if (found) {
+                                                        return (
+                                                            <div className="flex items-center gap-2 mb-1">
+                                                                <User className="w-4 h-4 text-blue-500" />
+                                                                <span className="font-bold">{found.name}</span>
+                                                                {found.code && (
+                                                                    <span className="bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-300 px-1.5 py-0.5 rounded text-xs ml-auto">{found.code}</span>
+                                                                )}
+                                                            </div>
+                                                        );
+                                                    }
+                                                }
+                                                if (rent.tenant) {
+                                                    return (
+                                                        <div className="flex items-center gap-2 mb-1">
+                                                            <User className="w-4 h-4 text-blue-500" />
+                                                            <span className="font-bold">{rent.tenant.name}</span>
+                                                            <span className="bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-300 px-1.5 py-0.5 rounded text-xs ml-auto">{rent.tenant.code}</span>
+                                                        </div>
+                                                    );
+                                                }
+                                                return null;
+                                            })()}
+                                            {(function () {
+                                                const tenantIds = (rent as any).rentOutTenantIds;
+                                                const found = Array.isArray(tenantIds) && tenantIds.length > 0
+                                                    ? currentTenants.find((ct) => tenantIds.includes(ct.id))
+                                                    : null;
+                                                if (found && found.tenancyNumber) {
+                                                    return (
+                                                        <div className="text-xs text-zinc-500 dark:text-white/60">
+                                                            租約號碼: <span className="text-zinc-900 dark:text-white">{found.tenancyNumber}</span>
+                                                        </div>
+                                                    );
+                                                }
+                                                return null;
+                                            })()}
+                                            {rent.tenant && (
+                                                <>
+                                                    <div className="text-xs text-zinc-500 dark:text-white/60">
+                                                        英文名稱: <span className="text-zinc-900 dark:text-white">{rent.tenant.englishName || '-'}</span>
+                                                    </div>
+                                                    <div className="text-xs text-zinc-500 dark:text-white/60 flex items-center justify-between">
+                                                        <span>類型: <span className="text-zinc-900 dark:text-white">{rent.tenant.type === 'company' ? '公司' : '個人'}</span></span>
+                                                        <span className="bg-zinc-100 dark:bg-white/10 px-1.5 py-0.5 rounded text-xs text-zinc-600 dark:text-white/70">
+                                                            {proprietorCategoryLabelZh(rent.tenant.category, 'card')}
+                                                        </span>
+                                                    </div>
+                                                </>
+                                            )}
                                         </div>
                                     }
                                 />
-                            )}
+                            ) : null}
                             {rent.rentOutDescription && (
                                 <div className="pt-3 mt-2 border-t border-zinc-100 dark:border-white/10">
                                     <p className="text-xs text-zinc-400 dark:text-white/40 mb-1">{t('Description', '描述')}</p>
@@ -278,8 +365,13 @@ export default function RentDetailsModal({ rent, property, onClose }: RentDetail
 
                             {property && (
                                 <DetailRow
-                                    label={t('Property', '物業')}
-                                    value={property.name}
+                                    label={t('Property & Lot', '物業&地段')}
+                                    value={(function () {
+                                        const rawLot = (rent as any).rentPropertyLot ?? (rent as any).rent_property_lot;
+                                        const selectedLots = normalizeRentPropertyLotSelection(rawLot);
+                                        if (selectedLots.length > 0) return selectedLots.join('、');
+                                        return property.name;
+                                    })()}
                                     tooltipContent={
                                         <div className="flex flex-col gap-1.5 w-full text-sm">
                                             <div className="flex items-center gap-2 mb-1">
@@ -287,9 +379,32 @@ export default function RentDetailsModal({ rent, property, onClose }: RentDetail
                                                 <span className="font-bold">{property.name}</span>
                                                 <span className="bg-purple-100 dark:bg-purple-500/20 text-purple-700 dark:text-purple-300 px-1.5 py-0.5 rounded text-xs ml-auto">{property.code}</span>
                                             </div>
-                                            <div className="text-xs text-zinc-500 dark:text-white/60">
-                                                地段: <span className="text-zinc-900 dark:text-white">{property.lotIndex || '-'}</span>
-                                            </div>
+                                            {(function () {
+                                                const rawLot = (rent as any).rentPropertyLot ?? (rent as any).rent_property_lot;
+                                                const rawPartial = (rent as any).rentPropertyLotPartial ?? (rent as any).rent_property_lot_partial;
+                                                const selectedLots = normalizeRentPropertyLotSelection(rawLot);
+                                                const partialMap = parseRentPropertyLotPartialFromRow(rawPartial);
+                                                if (selectedLots.length === 0) {
+                                                    return (
+                                                        <>
+                                                            <div className="text-xs text-zinc-500 dark:text-white/60">
+                                                                地段: <span className="text-zinc-900 dark:text-white">{property.lotIndex || '-'}</span>
+                                                            </div>
+                                                            <div className="text-xs text-zinc-500 dark:text-white/60">
+                                                                面積: <span className="text-zinc-900 dark:text-white">{formatLotArea(property.lotArea)}</span>
+                                                            </div>
+                                                        </>
+                                                    );
+                                                }
+                                                return selectedLots.map((lot) => {
+                                                    const isPartial = partialMap[lot] === true;
+                                                    return (
+                                                        <div key={lot} className="text-xs text-zinc-500 dark:text-white/60">
+                                                            {isPartial ? `${lot}（部分地方）` : lot}
+                                                        </div>
+                                                    );
+                                                });
+                                            })()}
                                             <div className="text-xs text-zinc-500 dark:text-white/60">
                                                 面積: <span className="text-zinc-900 dark:text-white">{formatLotArea(property.lotArea)}</span>
                                             </div>

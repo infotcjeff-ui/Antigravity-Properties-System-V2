@@ -270,7 +270,7 @@ export default function DashboardPage() {
                                 <table className="w-full min-w-[640px] text-left text-sm">
                                     <thead>
                                         <tr className="border-b border-zinc-200/80 bg-zinc-50/80 text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:border-white/10 dark:bg-white/[0.03] dark:text-white/45">
-                                            <th className="px-4 py-3">{t('Property', '物業')}</th>
+                                            <th className="px-4 py-3">{t('Property & Lot', '物業&地段')}</th>
                                             <th className="px-4 py-3">{t('Ref. no.', '編號')}</th>
                                             <th className="px-4 py-3">{t('Monthly / amount', '月租／金額')}</th>
                                             <th className="px-4 py-3">{t('Lease until', '租期至')}</th>
