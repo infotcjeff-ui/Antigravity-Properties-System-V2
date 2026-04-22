@@ -2,7 +2,7 @@
 
 import { motion } from 'framer-motion';
 import { X, Building2, User } from 'lucide-react';
-import type { Rent, Property, Proprietor } from '@/lib/db';
+import type { Rent, Property, Proprietor, CurrentTenant } from '@/lib/db';
 import { formatLotArea, proprietorCategoryLabelZh, normalizeRentPropertyLotSelection, parseRentPropertyLotPartialFromRow } from '@/lib/formatters';
 import {
     getRentOutCollectionDisplayPeriod,
@@ -16,7 +16,7 @@ import { Tooltip } from '@heroui/react';
 interface RentDetailsModalProps {
     rent: Rent;
     property?: Property;
-    currentTenants?: Array<{ id: string; name: string; code?: string; tenancyNumber?: string }>;
+    currentTenants?: Array<Omit<CurrentTenant, 'tenancyNumber'> & { tenancyNumber?: string }>;
     onClose: () => void;
 }
 
@@ -276,7 +276,7 @@ export default function RentDetailsModal({ rent, property, currentTenants = [], 
                                         const tenantIds = (rent as any).rentOutTenantIds;
                                         const tenantNames = (rent as any).rentOutTenants;
                                         if (Array.isArray(tenantIds) && tenantIds.length > 0) {
-                                            const found = currentTenants.find((ct) => tenantIds.includes(ct.id));
+                                            const found = currentTenants.find((ct) => tenantIds.includes(ct.id ?? ''));
                                             if (found) return found.name;
                                         }
                                         if (Array.isArray(tenantNames) && tenantNames.length > 0) {
@@ -290,7 +290,7 @@ export default function RentDetailsModal({ rent, property, currentTenants = [], 
                                                 const tenantIds = (rent as any).rentOutTenantIds;
                                                 const tenantNames = (rent as any).rentOutTenants;
                                                 if (Array.isArray(tenantIds) && tenantIds.length > 0) {
-                                                    const found = currentTenants.find((ct) => tenantIds.includes(ct.id));
+                                                    const found = currentTenants.find((ct) => tenantIds.includes(ct.id ?? ''));
                                                     if (found) {
                                                         return (
                                                             <div className="flex items-center gap-2 mb-1">
@@ -317,7 +317,7 @@ export default function RentDetailsModal({ rent, property, currentTenants = [], 
                                             {(function () {
                                                 const tenantIds = (rent as any).rentOutTenantIds;
                                                 const found = Array.isArray(tenantIds) && tenantIds.length > 0
-                                                    ? currentTenants.find((ct) => tenantIds.includes(ct.id))
+                                                    ? currentTenants.find((ct) => tenantIds.includes(ct.id ?? ''))
                                                     : null;
                                                 if (found && found.tenancyNumber) {
                                                     return (
