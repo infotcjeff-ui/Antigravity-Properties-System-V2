@@ -44,6 +44,8 @@ import {
 import { normalizePropertyLocation } from '@/lib/propertyLocation';
 import {
     compareRentOutForListNewestFirst,
+    compareRentByPeriodSmallestFirst,
+    compareContractByStartDateOldestFirst,
     getRentCollectionPayListStatus,
     getRentOutCollectionDisplayPeriod,
     getRentOutOrContractListNumber,
@@ -238,7 +240,7 @@ function RentListPagination({
                 type="button"
                 onClick={() => onPageChange(Math.max(1, page - 1))}
                 disabled={page <= 1}
-                className="px-3 py-1.5 rounded-lg border border-zinc-200 dark:border-white/15 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-zinc-50 dark:hover:bg-white/5"
+                className="px-3 py-1.5 rounded-lg border border-zinc-200 dark:border-white/15 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-zinc-50 dark:hover:bg-white/5 cursor-pointer"
             >
                 上一頁
             </button>
@@ -249,7 +251,7 @@ function RentListPagination({
                 type="button"
                 onClick={() => onPageChange(Math.min(totalPages, page + 1))}
                 disabled={page >= totalPages}
-                className="px-3 py-1.5 rounded-lg border border-zinc-200 dark:border-white/15 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-zinc-50 dark:hover:bg-white/5"
+                className="px-3 py-1.5 rounded-lg border border-zinc-200 dark:border-white/15 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-zinc-50 dark:hover:bg-white/5 cursor-pointer"
             >
                 下一頁
             </button>
@@ -429,15 +431,18 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
     }, [property?.id, allRents]);
 
     const rentOutRents = useMemo(
-        () => [...rents.filter((r) => r.type === 'rent_out')].sort(compareRentOutForListNewestFirst).reverse(),
+        () => [...rents.filter((r) => r.type === 'rent_out')].sort(compareRentOutForListNewestFirst),
         [rents],
     );
-    const rentingRents = useMemo(() => rents.filter(r => r.type === 'renting'), [rents]);
+    const rentingRents = useMemo(
+        () => [...rents.filter(r => r.type === 'renting')].sort(compareRentByPeriodSmallestFirst),
+        [rents],
+    );
     const contractRents = useMemo(() => {
         if (!property?.id) return [];
         return (allContractsWithRelations as RentWithRelations[])
             .filter((r) => r.propertyId === property.id)
-            .sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
+            .sort(compareContractByStartDateOldestFirst);
     }, [property?.id, allContractsWithRelations]);
     /** 與 dashboard/contracts 一致：leasing_in 為租賃合約，其餘為出租合約 */
     const leaseOutContractRents = useMemo(
@@ -477,6 +482,18 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
         if (years === 0) return `${months}個月`;
         if (months === 0) return `${years}年`;
         return `${years}年${months}個月`;
+    };
+
+    /** 租期顯示：DD/MM/YYYY 日月年格式，單行顯示 */
+    const formatLeasePeriod = (start: Date | null, end: Date | null, months: number): string => {
+        const pad = (n: number) => String(n).padStart(2, '0');
+        const fmt = (d: Date) => `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()}`;
+        const startStr = start ? fmt(start) : '—';
+        const endStr = end ? fmt(end) : '—';
+        const periodStr = formatMonthsToYearMonth(months);
+        return periodStr !== '—'
+            ? `${startStr} ~ ${endStr} (${periodStr})`
+            : `${startStr} ~ ${endStr}`;
     };
 
     const renderRentTable = (records: Rent[], partyMode: 'lessee' | 'landlord' | 'owner' = 'lessee') => {
@@ -715,21 +732,11 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                                     propertyLotIndex={formData.lotIndex || property?.lotIndex || ''}
                                 />
                             </div>
-                            <div className="flex flex-col">
+                            <div className="flex flex-col overflow-hidden min-w-0 justify-center">
                                 {startDate ? (
-                                    <>
-                                        <div className="text-zinc-800 dark:text-white/90 font-medium tabular-nums text-sm">
-                                            {startDate.toLocaleDateString('zh-TW')}
-                                        </div>
-                                        <div className="text-zinc-600 dark:text-white/60 flex items-center gap-1 tabular-nums text-xs">
-                                            <span>~</span> {endDate ? endDate.toLocaleDateString('zh-TW') : '-'}
-                                        </div>
-                                        <div className="mt-1 flex items-center gap-1">
-                                            <span className="text-xs px-2 py-0.5 bg-zinc-100 dark:bg-white/10 rounded font-semibold text-zinc-600 dark:text-white/60">
-                                                {formatMonthsToYearMonth(months)}
-                                            </span>
-                                        </div>
-                                    </>
+                                    <span className="text-zinc-800 dark:text-white/90 tabular-nums text-sm leading-snug">
+                                        {formatLeasePeriod(startDate, endDate, months)}
+                                    </span>
                                 ) : (
                                     <span className="text-zinc-500 dark:text-white/40 italic text-sm">未設定</span>
                                 )}
@@ -754,7 +761,7 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                                 <button
                                     type="button"
                                     onClick={() => setEditingRent(rent)}
-                                    className="p-2 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-500/20 rounded-lg transition-all"
+                                    className="p-2 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-500/20 rounded-lg transition-all cursor-pointer"
                                     title="更改租金記錄"
                                 >
                                     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -765,7 +772,7 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                                     type="button"
                                     disabled={unlinkingRentId === rent.id}
                                     onClick={() => handleUnlinkRent(rent.id!)}
-                                    className={`p-2 text-amber-600 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-500/20 rounded-lg transition-all ${unlinkingRentId === rent.id ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                    className={`p-2 text-amber-600 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-500/20 rounded-lg transition-all cursor-pointer ${unlinkingRentId === rent.id ? 'opacity-50 cursor-not-allowed' : ''}`}
                                     title="取消物業連結"
                                 >
                                     {unlinkingRentId === rent.id ? (
@@ -905,21 +912,11 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                                     propertyLotIndex={formData.lotIndex || property?.lotIndex || ''}
                                 />
                             </div>
-                            <div className="flex flex-col">
+                            <div className="flex flex-col overflow-hidden min-w-0 justify-center">
                                 {startDate ? (
-                                    <>
-                                        <div className="text-zinc-800 dark:text-white/90 font-medium tabular-nums text-sm">
-                                            {startDate.toLocaleDateString('zh-TW')}
-                                        </div>
-                                        <div className="text-zinc-600 dark:text-white/60 flex items-center gap-1 tabular-nums text-xs">
-                                            <span>~</span> {endDate ? endDate.toLocaleDateString('zh-TW') : '-'}
-                                        </div>
-                                        <div className="mt-1 flex items-center gap-1">
-                                            <span className="text-xs px-2 py-0.5 bg-zinc-100 dark:bg-white/10 rounded font-semibold text-zinc-600 dark:text-white/60">
-                                                {formatMonthsToYearMonth(months)}
-                                            </span>
-                                        </div>
-                                    </>
+                                    <span className="text-zinc-800 dark:text-white/90 tabular-nums text-sm leading-snug">
+                                        {formatLeasePeriod(startDate, endDate, months)}
+                                    </span>
                                 ) : (
                                     <span className="text-zinc-500 dark:text-white/40 italic text-sm">未設定</span>
                                 )}
@@ -940,7 +937,7 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                                 <button
                                     type="button"
                                     onClick={() => setEditingRent(rent as Rent)}
-                                    className="p-2 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-500/20 rounded-lg transition-all"
+                                    className="p-2 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-500/20 rounded-lg transition-all cursor-pointer"
                                     title="編輯合約記錄"
                                 >
                                     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -951,7 +948,7 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                                     type="button"
                                     disabled={unlinkingRentId === rent.id}
                                     onClick={() => handleUnlinkRent(rent.id!)}
-                                    className={`p-2 text-amber-600 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-500/20 rounded-lg transition-all ${unlinkingRentId === rent.id ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                    className={`p-2 text-amber-600 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-500/20 rounded-lg transition-all cursor-pointer ${unlinkingRentId === rent.id ? 'opacity-50 cursor-not-allowed' : ''}`}
                                     title="取消物業連結"
                                 >
                                     {unlinkingRentId === rent.id ? (

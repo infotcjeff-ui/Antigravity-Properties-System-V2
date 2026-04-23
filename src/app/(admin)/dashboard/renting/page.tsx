@@ -65,7 +65,11 @@ export default function RentingPage() {
     };
 
     const filteredRents = useMemo(() => {
-        return rents.filter(r => {
+        return [...rents].sort((a, b) => {
+            const dateA = new Date(a.rentCollectionDate || a.rentingStartDate || a.startDate || 0).getTime();
+            const dateB = new Date(b.rentCollectionDate || b.rentingStartDate || b.startDate || 0).getTime();
+            return dateA - dateB;
+        }).filter(r => {
             if (!matchesRentPaymentMethodFilter(r, filterPaymentMethod)) return false;
             if (filterRentingPayStatus && getRentCollectionPayListStatus(r) !== filterRentingPayStatus) return false;
             return true;

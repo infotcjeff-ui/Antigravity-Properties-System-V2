@@ -10,7 +10,7 @@ import PropertyForm from '@/components/properties/PropertyForm';
 import { Building2, Plus, Search, Pencil, Trash2, Eye, CheckSquare, Square, UserPlus, X } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import AnimatedSelect from '@/components/ui/AnimatedSelect';
-import { formatLotArea } from '@/lib/formatters';
+import { formatLotArea, formatLotIndexPlainJoined } from '@/lib/formatters';
 import { useLanguage } from '@/components/common/LanguageSwitcher';
 
 const statusColors: Record<string, string> = {
@@ -231,11 +231,12 @@ export default function ManagePropertiesPage() {
                                                 </button>
                                             </th>
                                         )}
-                                        <th className="px-4 py-3 text-left text-xs font-medium text-zinc-500 dark:text-white/40 uppercase tracking-wider">名稱</th>
                                         <th className="px-4 py-3 text-left text-xs font-medium text-zinc-500 dark:text-white/40 uppercase tracking-wider">編號</th>
+                                        <th className="px-4 py-3 text-left text-xs font-medium text-zinc-500 dark:text-white/40 uppercase tracking-wider">名稱</th>
+                                        <th className="px-4 py-3 text-left text-xs font-medium text-zinc-500 dark:text-white/40 uppercase tracking-wider">地段</th>
+                                        <th className="px-4 py-3 text-left text-xs font-medium text-zinc-500 dark:text-white/40 uppercase tracking-wider">地段面積</th>
                                         <th className="px-4 py-3 text-left text-xs font-medium text-zinc-500 dark:text-white/40 uppercase tracking-wider">類型</th>
                                         <th className="px-4 py-3 text-left text-xs font-medium text-zinc-500 dark:text-white/40 uppercase tracking-wider">狀態</th>
-                                        <th className="px-4 py-3 text-left text-xs font-medium text-zinc-500 dark:text-white/40 uppercase tracking-wider">地段面積</th>
                                         {isAdmin && (
                                             <th className="px-4 py-3 text-left text-xs font-medium text-zinc-500 dark:text-white/40 uppercase tracking-wider">上載者</th>
                                         )}
@@ -265,6 +266,7 @@ export default function ManagePropertiesPage() {
                                                     </button>
                                                 </td>
                                             )}
+                                            <td className="p-4 text-zinc-600 dark:text-white/70">{property.code}</td>
                                             <td className="p-4">
                                                 <div className="flex items-center gap-3">
                                                     {property.images?.[0] ? (
@@ -286,14 +288,20 @@ export default function ManagePropertiesPage() {
                                                     </div>
                                                 </div>
                                             </td>
-                                            <td className="p-4 text-zinc-600 dark:text-white/70">{property.code}</td>
+                                            <td className="p-4">
+                                                {(() => {
+                                                    const text = formatLotIndexPlainJoined(property.lotIndex);
+                                                    if (!text) return <span className="text-zinc-600 dark:text-white/70 text-sm">-</span>;
+                                                    return <span className="text-zinc-600 dark:text-white/70 text-sm">{text}</span>;
+                                                })()}
+                                            </td>
+                                            <td className="p-4 text-zinc-600 dark:text-white/70 text-sm">{formatLotArea(property.lotArea)}</td>
                                             <td className="p-4 text-zinc-600 dark:text-white/70">{typeLabels[property.type]}</td>
                                             <td className="p-4">
                                                 <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${statusColors[property.status]}`}>
                                                     {statusLabels[property.status]}
                                                 </span>
                                             </td>
-                                            <td className="p-4 text-zinc-600 dark:text-white/70 text-sm">{formatLotArea(property.lotArea)}</td>
                                             {isAdmin && (
                                                 <td className="p-4 text-zinc-600 dark:text-white/70 text-sm">
                                                     {property.createdBy ? (userMap[property.createdBy] || 'Unknown') : '-'}

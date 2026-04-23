@@ -262,3 +262,8 @@ html {
 .object-contain {
   object-fit: cover;
 }
+
+/* Backdrop blur overlay - no bottom margin */
+.backdrop-blur-sm {
+  margin-bottom: 0 !important;
+}

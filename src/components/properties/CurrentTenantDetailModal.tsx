@@ -14,13 +14,6 @@ interface CurrentTenantDetailModalProps {
     onEdit?: () => void;
 }
 
-const statusLabels: Record<string, string> = {
-    listing: '放盤中',
-    renting: '出租中',
-    leasing_in: '租入中',
-    completed: '已完租',
-};
-
 function DetailCard({ label, value }: { label: string; value: React.ReactNode }) {
     if (value == null || value === '' || value === '—') return null;
     return (
@@ -41,6 +34,13 @@ function InfoRow({ icon: Icon, label, value }: { icon: any; label: string; value
         </div>
     );
 }
+
+const statusLabels: Record<string, string> = {
+    listing: '放盤中',
+    renting: '出租中',
+    leasing_in: '租入中',
+    completed: '已完租',
+};
 
 function formatDate(date: any): string {
     if (!date) return '—';
@@ -80,8 +80,6 @@ export default function CurrentTenantDetailModal({
         return Array.from(map.values());
     }, [relatedRents]);
 
-    const statusLabel = statusLabels[currentTenant.status || ''] || '—';
-    const isExpired = currentTenant.endDate ? new Date(currentTenant.endDate) < new Date() : false;
     const partyTypeLabel =
         currentTenant.type === 'individual' ? '個人' : currentTenant.type === 'company' ? '公司' : '—';
 
@@ -92,7 +90,7 @@ export default function CurrentTenantDetailModal({
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
                 onClick={onClose}
-                className="fixed inset-0 min-h-screen bg-black/60 backdrop-blur-sm z-70"
+                className="fixed inset-0 min-h-screen bg-black/60 backdrop-blur-sm mb-0 z-70"
             />
             <motion.div
                 initial={{ opacity: 0, scale: 0.95, y: 20 }}
@@ -166,63 +164,6 @@ export default function CurrentTenantDetailModal({
                                     </p>
                                 </div>
                             )}
-                            {currentTenant.brNumber && (
-                                <div className="p-3 bg-zinc-50 dark:bg-white/5 rounded-xl border border-zinc-100 dark:border-white/5">
-                                    <p className="text-xs text-zinc-500 dark:text-white/50 mb-1">BR Number</p>
-                                    <p className="text-sm font-mono font-medium text-zinc-900 dark:text-white">{currentTenant.brNumber}</p>
-                                </div>
-                            )}
-                            <div className="p-3 bg-zinc-50 dark:bg-white/5 rounded-xl border border-zinc-100 dark:border-white/5">
-                                <p className="text-xs text-zinc-500 dark:text-white/50 mb-1">合約號碼</p>
-                                <p className="text-sm font-mono font-medium text-zinc-900 dark:text-white">{currentTenant.tenancyNumber || '—'}</p>
-                            </div>
-                            <div className="p-3 bg-zinc-50 dark:bg-white/5 rounded-xl border border-zinc-100 dark:border-white/5">
-                                <p className="text-xs text-zinc-500 dark:text-white/50 mb-1">狀態</p>
-                                <p className={`text-sm font-medium ${isExpired ? 'text-red-500' : 'text-zinc-900 dark:text-white'}`}>
-                                    {isExpired ? '已過期' : statusLabel}
-                                </p>
-                            </div>
-                            <div className="p-3 bg-zinc-50 dark:bg-white/5 rounded-xl border border-zinc-100 dark:border-white/5">
-                                <p className="text-xs text-zinc-500 dark:text-white/50 mb-1">出租人</p>
-                                <p className="text-sm font-medium text-zinc-900 dark:text-white">{currentTenant.lessor || '—'}</p>
-                            </div>
-                            <div className="p-3 bg-zinc-50 dark:bg-white/5 rounded-xl border border-zinc-100 dark:border-white/5">
-                                <p className="text-xs text-zinc-500 dark:text-white/50 mb-1">每月租金</p>
-                                <p className="text-sm font-bold text-emerald-600 dark:text-emerald-400">
-                                    {currentTenant.monthlyRental != null ? `$${formatNumber(currentTenant.monthlyRental)}` : '—'}
-                                </p>
-                            </div>
-                            <div className="p-3 bg-zinc-50 dark:bg-white/5 rounded-xl border border-zinc-100 dark:border-white/5">
-                                <p className="text-xs text-zinc-500 dark:text-white/50 mb-1">期數</p>
-                                <p className="text-sm font-medium text-zinc-900 dark:text-white">
-                                    {currentTenant.periods ? `${currentTenant.periods} 個月` : '—'}
-                                </p>
-                            </div>
-                        </div>
-                    </section>
-
-                    {/* 日期資料 */}
-                    <section>
-                        <h3 className="text-sm font-semibold text-purple-600 dark:text-purple-400 mb-3">日期資料</h3>
-                        <div className="bg-zinc-50 dark:bg-white/5 rounded-xl border border-zinc-100 dark:border-white/5 divide-y divide-zinc-100 dark:divide-white/5">
-                            <div className="flex items-center gap-3 px-4 py-3">
-                                <Calendar className="w-4 h-4 text-blue-500 shrink-0" />
-                                <span className="text-xs text-zinc-500 dark:text-white/50 w-20 shrink-0">開始日期</span>
-                                <span className="text-sm font-medium text-zinc-800 dark:text-white">{formatDate(currentTenant.startDate)}</span>
-                            </div>
-                            <div className="flex items-center gap-3 px-4 py-3">
-                                <Calendar className="w-4 h-4 text-blue-500 shrink-0" />
-                                <span className="text-xs text-zinc-500 dark:text-white/50 w-20 shrink-0">結束日期</span>
-                                <span className={`text-sm font-medium ${isExpired ? 'text-red-500' : 'text-zinc-800 dark:text-white'}`}>
-                                    {formatDate(currentTenant.endDate)}
-                                    {isExpired && <span className="ml-2 text-xs font-medium">(已過期)</span>}
-                                </span>
-                            </div>
-                            <div className="flex items-center gap-3 px-4 py-3">
-                                <Calendar className="w-4 h-4 text-amber-500 shrink-0" />
-                                <span className="text-xs text-zinc-500 dark:text-white/50 w-20 shrink-0">實際結束</span>
-                                <span className="text-sm font-medium text-zinc-800 dark:text-white">{formatDate(currentTenant.actualEndDate)}</span>
-                            </div>
                         </div>
                     </section>
 

@@ -4,7 +4,7 @@ import { useState, useMemo, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useQueryClient } from '@tanstack/react-query';
-import { FileText, Pencil, Trash2, Building2 } from 'lucide-react';
+import { FileText, Pencil, Trash2, Building2, Search, X, Calendar, Users, SlidersHorizontal } from 'lucide-react';
 import { useRentsWithRelationsQuery, useRents } from '@/hooks/useStorage';
 import type { Rent } from '@/lib/db';
 import { labelRentOutContractNatureZh } from '@/lib/rentPaymentDisplay';
@@ -41,26 +41,52 @@ export default function ContractsPage() {
         setDeletePortalReady(true);
     }, []);
 
+    /** 清除所有 filter 並重置頁碼 */
+    const clearAllFilters = () => {
+        setSearchQuery('');
+        setFilterTenant('');
+        setFilterStatus('');
+        setFilterDateStart('');
+        setFilterDateEnd('');
+        setListPage(1);
+    };
+
+    const handleTabChange = (tab: 'lease_out' | 'lease_in') => {
+        clearAllFilters();
+        setContractListTab(tab);
+    };
+
+    /** Filter states */
+    const [searchQuery, setSearchQuery] = useState('');
+    const [filterTenant, setFilterTenant] = useState(''); // 承租人篩選
+    const [filterDateStart, setFilterDateStart] = useState(''); // 租約日期 - 開始
+    const [filterDateEnd, setFilterDateEnd] = useState(''); // 租約日期 - 結束
+    const [filterStatus, setFilterStatus] = useState(''); // 狀態篩選
+    const [showFilters, setShowFilters] = useState(false); // 收合/展開 filter
+
+    const sortByStartDateOldestFirst = (arr: any[]) =>
+        [...arr].sort((a, b) => {
+            const startA = a.rentOutStartDate ? new Date(a.rentOutStartDate).getTime() : 0;
+            const startB = b.rentOutStartDate ? new Date(b.rentOutStartDate).getTime() : 0;
+            return startA - startB;
+        });
+
     const leaseOutContracts = useMemo(
         () =>
-            (contracts as any[]).filter((c) => (c.rentOutStatus || c.status) !== 'leasing_in'),
+            sortByStartDateOldestFirst(
+                (contracts as any[]).filter((c) => (c.rentOutStatus || c.status) !== 'leasing_in')
+            ),
         [contracts]
     );
     const leaseInContracts = useMemo(
         () =>
-            (contracts as any[]).filter((c) => (c.rentOutStatus || c.status) === 'leasing_in'),
+            sortByStartDateOldestFirst(
+                (contracts as any[]).filter((c) => (c.rentOutStatus || c.status) === 'leasing_in')
+            ),
         [contracts]
     );
     const activeContracts = contractListTab === 'lease_out' ? leaseOutContracts : leaseInContracts;
     const isLeaseInTab = contractListTab === 'lease_in';
-
-    const totalListPages = Math.max(1, Math.ceil((activeContracts as any[]).length / ADMIN_LIST_PAGE_SIZE));
-    const effectiveListPage = Math.min(listPage, totalListPages);
-    const pagedActiveContracts = useMemo(() => {
-        const arr = activeContracts as any[];
-        const start = (effectiveListPage - 1) * ADMIN_LIST_PAGE_SIZE;
-        return arr.slice(start, start + ADMIN_LIST_PAGE_SIZE);
-    }, [activeContracts, effectiveListPage]);
 
     /** 合約表單：業主存 tenant_id（join 為 tenant）、現時租客存 rent_out_tenant_ids（API 附 currentTenant） */
     const contractOwnerDisplayName = (c: any) =>
@@ -74,6 +100,69 @@ export default function ContractsPage() {
         if (Array.isArray(rt) && rt[0] != null && String(rt[0]).trim()) return String(rt[0]).trim();
         return '';
     };
+
+    /** 套用所有 Filter 條件 */
+    const filteredContracts = useMemo(() => {
+        let result = activeContracts as any[];
+
+        // 1. 搜尋過濾（合約號碼 + 物業名稱 + 承租人 + 業主）
+        if (searchQuery.trim()) {
+            const q = searchQuery.toLowerCase();
+            result = result.filter((c) => {
+                const lessee = contractLesseeDisplayName(c).toLowerCase();
+                const owner = contractOwnerDisplayName(c).toLowerCase();
+                const propertyName = (c.property?.name || '').toLowerCase();
+                const tenancyNumber = (c.rentOutTenancyNumber || '').toLowerCase();
+                return (
+                    lessee.includes(q) ||
+                    owner.includes(q) ||
+                    propertyName.includes(q) ||
+                    tenancyNumber.includes(q)
+                );
+            });
+        }
+
+        // 2. 承租人篩選
+        if (filterTenant) {
+            result = result.filter((c) => {
+                const lessee = contractLesseeDisplayName(c);
+                const owner = contractOwnerDisplayName(c);
+                return lessee === filterTenant || owner === filterTenant;
+            });
+        }
+
+        // 3. 租約日期範圍篩選
+        if (filterDateStart) {
+            const start = new Date(filterDateStart);
+            result = result.filter((c) => {
+                const contractStart = c.rentOutStartDate ? new Date(c.rentOutStartDate) : null;
+                return contractStart && contractStart >= start;
+            });
+        }
+        if (filterDateEnd) {
+            const end = new Date(filterDateEnd);
+            end.setHours(23, 59, 59, 999); // 包含結束日當天
+            result = result.filter((c) => {
+                const contractEnd = c.rentOutEndDate ? new Date(c.rentOutEndDate) : null;
+                return contractEnd && contractEnd <= end;
+            });
+        }
+
+        // 4. 狀態篩選
+        if (filterStatus) {
+            result = result.filter((c) => (c.rentOutStatus || c.status) === filterStatus);
+        }
+
+        return result;
+    }, [activeContracts, searchQuery, filterTenant, filterDateStart, filterDateEnd, filterStatus]);
+
+    const totalListPages = Math.max(1, Math.ceil((filteredContracts as any[]).length / ADMIN_LIST_PAGE_SIZE));
+    const effectiveListPage = Math.min(listPage, totalListPages);
+    const pagedActiveContracts = useMemo(() => {
+        const arr = filteredContracts as any[];
+        const start = (effectiveListPage - 1) * ADMIN_LIST_PAGE_SIZE;
+        return arr.slice(start, start + ADMIN_LIST_PAGE_SIZE);
+    }, [filteredContracts, effectiveListPage]);
 
     const formatContractDepositPaid = (c: any) => {
         const v = c.rentOutDepositReceived;
@@ -203,6 +292,161 @@ export default function ContractsPage() {
                 </BentoCard>
             </div>
 
+            {/* Filter Bar */}
+            <div className="glass-card overflow-hidden">
+                {/* Filter Toggle Bar */}
+                <div className="flex flex-wrap items-center gap-3 p-3 border-b border-zinc-100 dark:border-white/10">
+                    {/* 搜尋框 */}
+                    <div className="relative flex-1 min-w-[200px]">
+                        <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-400 dark:text-white/30">
+                            <Search className="w-4 h-4" />
+                        </div>
+                        <input
+                            type="text"
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            placeholder="搜尋合約..."
+                            className="w-full pl-10 pr-9 py-2.5 text-sm bg-zinc-100 dark:bg-white/5 border border-zinc-200 dark:border-white/10 rounded-xl text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-amber-500/30 transition-all"
+                        />
+                        {searchQuery && (
+                            <button
+                                type="button"
+                                onClick={() => setSearchQuery('')}
+                                className="absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded text-zinc-400 hover:text-zinc-600 dark:hover:text-white transition-colors"
+                            >
+                                <X className="w-3.5 h-3.5" />
+                            </button>
+                        )}
+                    </div>
+
+                    {/* Filter 按鈕 */}
+                    <button
+                        type="button"
+                        onClick={() => setShowFilters(!showFilters)}
+                        className={`flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all ${
+                            showFilters || filterTenant || filterStatus || filterDateStart || filterDateEnd
+                                ? 'bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-300 ring-1 ring-amber-300/40 dark:ring-amber-500/30'
+                                : 'bg-zinc-100 dark:bg-white/5 text-zinc-600 dark:text-white/60 hover:bg-zinc-200 dark:hover:bg-white/10'
+                        }`}
+                    >
+                        <SlidersHorizontal className="w-4 h-4" />
+                        <span>篩選</span>
+                        {(filterTenant || filterStatus || filterDateStart || filterDateEnd) && (
+                            <span className="w-5 h-5 flex items-center justify-center bg-amber-500 text-white rounded-full text-[10px] font-bold">
+                                {(!!filterTenant ? 1 : 0) + (!!filterStatus ? 1 : 0) + (!!filterDateStart ? 1 : 0) + (!!filterDateEnd ? 1 : 0)}
+                            </span>
+                        )}
+                    </button>
+
+                    {/* 快速清除全部 */}
+                    {(searchQuery || filterTenant || filterStatus || filterDateStart || filterDateEnd) && (
+                        <button
+                            type="button"
+                            onClick={() => clearAllFilters()}
+                            className="flex items-center gap-1 px-3 py-2 text-sm text-zinc-500 dark:text-white/50 hover:text-red-500 dark:hover:text-red-400 rounded-xl hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors"
+                        >
+                            <X className="w-3.5 h-3.5" />
+                            清除全部
+                        </button>
+                    )}
+                </div>
+
+                {/* 展開的 Filter 內容 */}
+                <AnimatePresence>
+                    {showFilters && (
+                        <motion.div
+                            initial={{ height: 0, opacity: 0 }}
+                            animate={{ height: 'auto', opacity: 1 }}
+                            exit={{ height: 0, opacity: 0 }}
+                            transition={{ duration: 0.2 }}
+                            className="overflow-hidden"
+                        >
+                            <div className="p-4 pt-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                                {/* 承租人 */}
+                                <div className="space-y-1.5">
+                                    <label className="flex items-center gap-1.5 text-sm font-medium text-zinc-500 dark:text-white/50 pl-0.5">
+                                        <Users className="w-4 h-4" />
+                                        承租人
+                                    </label>
+                                    <select
+                                        value={filterTenant}
+                                        onChange={(e) => setFilterTenant(e.target.value)}
+                                        className="w-full px-4 py-3 text-sm bg-zinc-50 dark:bg-white/5 border border-zinc-200 dark:border-white/10 rounded-xl text-zinc-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-amber-500/30 cursor-pointer"
+                                    >
+                                        <option value="">全部</option>
+                                        {(() => {
+                                            const tenantSet = new Set<string>();
+                                            const uniqueTenants: { name: string; code?: string }[] = [];
+                                            (activeContracts as any[]).forEach((c) => {
+                                                const name = contractLesseeDisplayName(c);
+                                                if (name && !tenantSet.has(name)) {
+                                                    tenantSet.add(name);
+                                                    uniqueTenants.push({ name, code: (c as any).tenant?.code || (c as any).proprietor?.code });
+                                                }
+                                            });
+                                            return uniqueTenants
+                                                .sort((a, b) => a.name.localeCompare(b.name, 'zh-HK'))
+                                                .map((t) => (
+                                                    <option key={t.name} value={t.name}>
+                                                        {t.code ? `[${t.code}] ${t.name}` : t.name}
+                                                    </option>
+                                                ));
+                                        })()}
+                                    </select>
+                                </div>
+
+                                {/* 租約日期 - 開始 */}
+                                <div className="space-y-1.5">
+                                    <label className="flex items-center gap-1.5 text-sm font-medium text-zinc-500 dark:text-white/50 pl-0.5">
+                                        <Calendar className="w-4 h-4" />
+                                        租約開始日期
+                                    </label>
+                                    <input
+                                        type="date"
+                                        value={filterDateStart}
+                                        onChange={(e) => setFilterDateStart(e.target.value)}
+                                        className="w-full px-4 py-3 text-sm bg-zinc-50 dark:bg-white/5 border border-zinc-200 dark:border-white/10 rounded-xl text-zinc-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-amber-500/30 cursor-pointer"
+                                    />
+                                </div>
+
+                                {/* 租約日期 - 結束 */}
+                                <div className="space-y-1.5">
+                                    <label className="flex items-center gap-1.5 text-sm font-medium text-zinc-500 dark:text-white/50 pl-0.5">
+                                        <Calendar className="w-4 h-4" />
+                                        租約結束日期
+                                    </label>
+                                    <input
+                                        type="date"
+                                        value={filterDateEnd}
+                                        onChange={(e) => setFilterDateEnd(e.target.value)}
+                                        className="w-full px-4 py-3 text-sm bg-zinc-50 dark:bg-white/5 border border-zinc-200 dark:border-white/10 rounded-xl text-zinc-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-amber-500/30 cursor-pointer"
+                                    />
+                                </div>
+
+                                {/* 狀態 */}
+                                <div className="space-y-1.5">
+                                    <label className="flex items-center gap-1.5 text-sm font-medium text-zinc-500 dark:text-white/50 pl-0.5">
+                                        <SlidersHorizontal className="w-4 h-4" />
+                                        狀態
+                                    </label>
+                                    <select
+                                        value={filterStatus}
+                                        onChange={(e) => setFilterStatus(e.target.value)}
+                                        className="w-full px-4 py-3 text-sm bg-zinc-50 dark:bg-white/5 border border-zinc-200 dark:border-white/10 rounded-xl text-zinc-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-amber-500/30 cursor-pointer"
+                                    >
+                                        <option value="">全部</option>
+                                        <option value="listing">放盤中</option>
+                                        <option value="renting">出租中</option>
+                                        <option value="leasing_in">租入中</option>
+                                        <option value="completed">已完租</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </motion.div>
+                    )}
+                </AnimatePresence>
+            </div>
+
             <div
                 className={`glass-card overflow-hidden transition-colors ${
                     isLeaseInTab
@@ -226,13 +470,13 @@ export default function ContractsPage() {
                     >
                         {contractListTab === 'lease_out' ? '出租合約記錄列表' : '租賃合約記錄列表'}
                         <span className="ml-2 text-base font-bold tabular-nums opacity-90">
-                            (總合約({activeContracts.length}))
+                            (總合約({filteredContracts.length}))
                         </span>
                     </h2>
                     <div className="flex gap-0.5 sm:gap-1 p-1 sm:p-1.5 rounded-xl sm:rounded-2xl bg-zinc-100/90 dark:bg-white/10 ring-1 ring-zinc-200/80 dark:ring-white/10 w-full sm:w-auto justify-stretch sm:justify-end">
                         <button
                             type="button"
-                            onClick={() => setContractListTab('lease_in')}
+                            onClick={() => handleTabChange('lease_in')}
                             className={`flex-1 sm:flex-none px-3 sm:px-4 py-2 rounded-lg sm:rounded-xl text-xs sm:text-sm font-semibold transition-all ${
                                 contractListTab === 'lease_in'
                                     ? 'bg-white dark:bg-violet-950/50 text-violet-900 dark:text-violet-100 shadow-md ring-2 ring-violet-400/50'
@@ -243,7 +487,7 @@ export default function ContractsPage() {
                         </button>
                         <button
                             type="button"
-                            onClick={() => setContractListTab('lease_out')}
+                            onClick={() => handleTabChange('lease_out')}
                             className={`flex-1 sm:flex-none px-3 sm:px-4 py-2 rounded-lg sm:rounded-xl text-xs sm:text-sm font-semibold transition-all ${
                                 contractListTab === 'lease_out'
                                     ? 'bg-white dark:bg-amber-950/40 text-amber-800 dark:text-amber-200 shadow-md ring-1 ring-amber-400/35'
@@ -260,7 +504,7 @@ export default function ContractsPage() {
                         <p className="text-lg">暫無合約記錄</p>
                         <p className="text-sm mt-1">點擊「新增合約記錄」開始建立</p>
                     </div>
-                ) : activeContracts.length === 0 ? (
+                ) : filteredContracts.length === 0 ? (
                     <div
                         className={`flex flex-col items-center justify-center py-20 ${
                             isLeaseInTab
@@ -268,11 +512,11 @@ export default function ContractsPage() {
                                 : 'text-amber-700/60 dark:text-amber-300/45'
                         }`}
                     >
-                        <FileText className={`w-16 h-16 mb-4 ${isLeaseInTab ? 'opacity-50 text-violet-500' : 'opacity-40 text-amber-500'}`} />
+                        <Search className={`w-16 h-16 mb-4 ${isLeaseInTab ? 'opacity-50 text-violet-500' : 'opacity-40 text-amber-500'}`} />
                         <p className="text-lg text-zinc-600 dark:text-white/55">
-                            {contractListTab === 'lease_out' ? '暫無出租合約記錄' : '暫無租賃合約記錄'}
+                            找不到符合條件的合約
                         </p>
-                        <p className="text-sm mt-1 text-zinc-500 dark:text-white/40">可切換另一分頁查看，或新增合約記錄</p>
+                        <p className="text-sm mt-1 text-zinc-500 dark:text-white/40">請調整篩選條件後再試</p>
                     </div>
                 ) : (
                     <>
@@ -603,7 +847,7 @@ export default function ContractsPage() {
                         <AdminListPagination
                             listPage={effectiveListPage}
                             totalPages={totalListPages}
-                            totalItems={(activeContracts as any[]).length}
+                            totalItems={(filteredContracts as any[]).length}
                             onPageChange={setListPage}
                             activeButtonClassName={
                                 isLeaseInTab

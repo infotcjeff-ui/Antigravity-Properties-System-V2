@@ -13,7 +13,8 @@ import {
 } from '@/lib/formatters';
 import type { CurrentTenant, Proprietor, Rent } from '@/lib/db';
 import {
-    compareRentOutForListNewestFirst,
+    compareRentByPeriodSmallestFirst,
+    compareContractByStartDateOldestFirst,
     getRentOutCollectionDisplayPeriod,
     getRentOutLesseeDisplayLabel,
     getRentOutOrContractListNumber,
@@ -324,16 +325,19 @@ export default function PropertyDetailsPage() {
 
     const allContractRents = rents.filter((r: Rent) => r.type === 'contract');
     const allRentOutRents = useMemo(
-        () => [...rents.filter((r: Rent) => r.type === 'rent_out')].sort(compareRentOutForListNewestFirst).reverse(),
+        () => [...rents.filter((r: Rent) => r.type === 'rent_out')].sort(compareRentByPeriodSmallestFirst),
         [rents],
     );
-    const allRentingRents = rents.filter((r: Rent) => r.type === 'renting');
+    const allRentingRents = useMemo(
+        () => [...rents.filter((r: Rent) => r.type === 'renting')].sort(compareRentByPeriodSmallestFirst),
+        [rents],
+    );
     const allLeaseInContractRents = useMemo(
-        () => allContractRents.filter((c: Rent) => (c.rentOutStatus || c.status) === 'leasing_in'),
+        () => [...allContractRents.filter((c: Rent) => (c.rentOutStatus || c.status) === 'leasing_in')].sort(compareRentByPeriodSmallestFirst),
         [allContractRents],
     );
     const allLeaseOutContractRents = useMemo(
-        () => allContractRents.filter((c: Rent) => (c.rentOutStatus || c.status) !== 'leasing_in'),
+        () => [...allContractRents.filter((c: Rent) => (c.rentOutStatus || c.status) !== 'leasing_in')].sort(compareContractByStartDateOldestFirst),
         [allContractRents],
     );
 
@@ -960,11 +964,13 @@ export default function PropertyDetailsPage() {
                                                           : rent.rentingEndDate || rent.endDate;
                                                 const formatEnDate = (d: any) =>
                                                     d
-                                                        ? new Date(d).toLocaleDateString('en-US', {
-                                                              month: 'short',
-                                                              day: 'numeric',
-                                                              year: 'numeric',
-                                                          })
+                                                        ? (() => {
+                                                              const date = new Date(d);
+                                                              const day = String(date.getDate()).padStart(2, '0');
+                                                              const month = String(date.getMonth() + 1).padStart(2, '0');
+                                                              const year = date.getFullYear();
+                                                              return `${day}/${month}/${year}`;
+                                                          })()
                                                         : '';
                                                 const periods = isRentOutOrContract ? rent.rentOutPeriods : rent.rentingPeriods;
                                                 const periodsDisplay =
@@ -1183,9 +1189,12 @@ export default function PropertyDetailsPage() {
                                                         )}
                                                         <div className="py-4 px-4 border-l border-dashed border-zinc-200 dark:border-white/10 flex flex-col justify-center min-w-0 overflow-hidden">
                                                             <div className="text-sm text-zinc-600 dark:text-white/70 leading-relaxed">
-                                                                <div>{formatEnDate(startDate)}{startDate && endDate ? ' ~' : ''}</div>
-                                                                {endDate && (
-                                                                    <div>~ {formatEnDate(endDate)}{periodsDisplay ? ` (${fmtYears(periodsDisplay)})` : ''}</div>
+                                                                <div>
+                                                                    {formatEnDate(startDate)}
+                                                                    {startDate && endDate ? ` ~ ${formatEnDate(endDate)}` : ''}
+                                                                </div>
+                                                                {periodsDisplay && (
+                                                                    <div>({fmtYears(periodsDisplay)})</div>
                                                                 )}
                                                             </div>
                                                         </div>
@@ -1206,7 +1215,7 @@ export default function PropertyDetailsPage() {
                                                 type="button"
                                                 onClick={() => setRentPage((p) => Math.max(1, p - 1))}
                                                 disabled={safePage <= 1}
-                                                className="px-3 py-1.5 rounded-lg border border-zinc-200 dark:border-white/15 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-zinc-50 dark:hover:bg-white/5"
+                                                className="px-3 py-1.5 rounded-lg border border-zinc-200 dark:border-white/15 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-zinc-50 dark:hover:bg-white/5 cursor-pointer"
                                             >
                                                 ‹
                                             </button>
@@ -1217,7 +1226,7 @@ export default function PropertyDetailsPage() {
                                                 type="button"
                                                 onClick={() => setRentPage((p) => Math.min(totalPages, p + 1))}
                                                 disabled={safePage >= totalPages}
-                                                className="px-3 py-1.5 rounded-lg border border-zinc-200 dark:border-white/15 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-zinc-50 dark:hover:bg-white/5"
+                                                className="px-3 py-1.5 rounded-lg border border-zinc-200 dark:border-white/15 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-zinc-50 dark:hover:bg-white/5 cursor-pointer"
                                             >
                                                 ›
                                             </button>

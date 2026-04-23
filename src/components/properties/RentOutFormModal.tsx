@@ -241,10 +241,6 @@ export default function RentOutFormModal({ mode, editItem, isAddPropertyData = f
             setError(mode === 'current_tenant' ? '請輸入租客名稱' : '請輸入名稱');
             return;
         }
-        if (mode === 'current_tenant' && !formData.code.trim()) {
-            setError('請輸入租客代碼');
-            return;
-        }
 
         const nameNorm = normalizeDuplicateName(formData.name);
         if (!isAddPropertyData) {
@@ -427,13 +423,12 @@ export default function RentOutFormModal({ mode, editItem, isAddPropertyData = f
                                 </div>
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     <div className="space-y-2">
-                                        <label className={labelClass}>租客代碼 *</label>
+                                        <label className={labelClass}>租客代碼</label>
                                         <input
                                             type="text"
                                             name="code"
                                             value={formData.code}
                                             onChange={handleChange}
-                                            required
                                             className={inputClass}
                                             placeholder="例如: A01"
                                         />

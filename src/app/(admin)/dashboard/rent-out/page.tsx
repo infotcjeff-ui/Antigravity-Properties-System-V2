@@ -88,7 +88,11 @@ export default function RentOutPage() {
     }, [rents]);
 
     const filteredRents = useMemo(() => {
-        return rents.filter((r) => {
+        return [...rents].sort((a, b) => {
+            const dateA = new Date(a.rentCollectionDate || a.rentOutStartDate || a.startDate || 0).getTime();
+            const dateB = new Date(b.rentCollectionDate || b.rentOutStartDate || b.startDate || 0).getTime();
+            return dateA - dateB;
+        }).filter((r) => {
             if (!matchesRentPaymentMethodFilter(r, filterPaymentMethod)) return false;
             if (filterRentOutPayStatus && getRentCollectionPayListStatus(r) !== filterRentOutPayStatus) return false;
             if (filterCurrentTenant && adminRentOutLesseeLabel(r) !== filterCurrentTenant) return false;
