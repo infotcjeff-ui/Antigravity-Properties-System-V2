@@ -91,7 +91,7 @@ export default function RentOutPage() {
         return [...rents].sort((a, b) => {
             const dateA = new Date(a.rentCollectionDate || a.rentOutStartDate || a.startDate || 0).getTime();
             const dateB = new Date(b.rentCollectionDate || b.rentOutStartDate || b.startDate || 0).getTime();
-            return dateA - dateB;
+            return dateB - dateA;
         }).filter((r) => {
             if (!matchesRentPaymentMethodFilter(r, filterPaymentMethod)) return false;
             if (filterRentOutPayStatus && getRentCollectionPayListStatus(r) !== filterRentOutPayStatus) return false;
@@ -171,13 +171,13 @@ export default function RentOutPage() {
                 <BentoCard>
                     <div className="flex items-center justify-between">
                         <div>
-                            <p className="text-zinc-500 dark:text-white/50 text-sm">{t('Active leases', '生效租約')}</p>
-                            <p className="text-2xl font-bold text-zinc-900 dark:text-white mt-1">
-                                {rents.filter(r => r.status === 'active').length}
+                            <p className="text-zinc-500 dark:text-white/50 text-sm">{t('Paid', '已繳付')}</p>
+                            <p className="text-2xl font-bold text-green-600 dark:text-green-400 mt-1">
+                                {rents.filter(r => getRentCollectionPayListStatus(r) === 'paid').length}
                             </p>
                         </div>
-                        <div className="p-3 rounded-xl bg-blue-50 dark:bg-blue-500/20">
-                            <svg className="w-6 h-6 text-blue-600 dark:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <div className="p-3 rounded-xl bg-green-50 dark:bg-green-500/20">
+                            <svg className="w-6 h-6 text-green-600 dark:text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                             </svg>
                         </div>
@@ -186,14 +186,14 @@ export default function RentOutPage() {
                 <BentoCard>
                     <div className="flex items-center justify-between">
                         <div>
-                            <p className="text-zinc-500 dark:text-white/50 text-sm">{t('Pending', '待處理')}</p>
-                            <p className="text-2xl font-bold text-zinc-900 dark:text-white mt-1">
-                                {rents.filter(r => r.status === 'pending').length}
+                            <p className="text-zinc-500 dark:text-white/50 text-sm">{t('Unpaid', '未繳付')}</p>
+                            <p className="text-2xl font-bold text-red-600 dark:text-red-400 mt-1">
+                                {rents.filter(r => getRentCollectionPayListStatus(r) === 'unpaid').length}
                             </p>
                         </div>
-                        <div className="p-3 rounded-xl bg-yellow-50 dark:bg-yellow-500/20">
-                            <svg className="w-6 h-6 text-yellow-600 dark:text-yellow-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        <div className="p-3 rounded-xl bg-red-50 dark:bg-red-500/20">
+                            <svg className="w-6 h-6 text-red-600 dark:text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                             </svg>
                         </div>
                     </div>
@@ -370,7 +370,7 @@ export default function RentOutPage() {
                                                         : <span className="text-zinc-300 dark:text-white/30">—</span>
                                                     }
                                                 </td>
-                                                <td className={`p-4 text-sm ${isExpired ? 'text-red-500 font-medium' : 'text-zinc-500 dark:text-white/50'}`}>
+                                                <td className={`p-4 text-sm ${payListStatus === 'paid' ? 'text-zinc-400 dark:text-white/40' : 'text-red-500 font-medium'}`}>
                                                     {formatDateRangeDMY(startDate, endDate)}
                                                 </td>
                                                 <td className="p-4 text-zinc-500 dark:text-white/50 text-sm max-w-32">
@@ -528,7 +528,7 @@ export default function RentOutPage() {
                                                     <Calendar className="w-3 h-3 text-blue-500" />
                                                     <p className="text-[10px] text-zinc-400 uppercase font-bold tracking-wider">租約期間</p>
                                                 </div>
-                                                <p className={`font-bold text-sm ${isExpired ? 'text-red-500' : 'text-zinc-900 dark:text-white'}`}>
+                                                <p className={`font-bold text-sm ${payListStatus === 'paid' ? 'text-zinc-400 dark:text-white/40' : 'text-red-500'}`}>
                                                     {formatDateRangeDMY(startDate, endDate)}
                                                 </p>
                                             </div>

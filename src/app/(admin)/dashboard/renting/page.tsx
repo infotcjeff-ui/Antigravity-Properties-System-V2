@@ -4,14 +4,13 @@ import { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useRentsWithRelationsQuery, useRents } from '@/hooks/useStorage';
 import { useQueryClient } from '@tanstack/react-query';
-import { Calendar, DollarSign, User, Building2, Pencil, Trash2, LayoutList } from 'lucide-react';
+import { User, Building2, Pencil, Trash2, LayoutList } from 'lucide-react';
 import type { Rent } from '@/lib/db';
 import {
     formatDateDMY,
     formatDateRangeDMY,
     getRentCollectionPayListStatus,
     hasRentCollectionPaidAmount,
-    isPeriodEndExpired,
     labelRentCollectionPaymentMethod,
     matchesRentPaymentMethodFilter,
     type RentCollectionPayListStatus,
@@ -64,11 +63,19 @@ export default function RentingPage() {
         }
     };
 
+    // Calculate total income for renting records
+    const totalIncomeRenting = rents
+        .filter(r => r.status === 'active' || r.status === 'completed' || r.rentOutStatus === 'renting')
+        .reduce((sum, r) => sum + ((r.rentCollectionAmount || r.amount || 0)), 0);
+
+    const paidCount = rents.filter(r => getRentCollectionPayListStatus(r) === 'paid').length;
+    const unpaidCount = rents.filter(r => getRentCollectionPayListStatus(r) === 'unpaid').length;
+
     const filteredRents = useMemo(() => {
         return [...rents].sort((a, b) => {
-            const dateA = new Date(a.rentCollectionDate || a.rentingStartDate || a.startDate || 0).getTime();
-            const dateB = new Date(b.rentCollectionDate || b.rentingStartDate || b.startDate || 0).getTime();
-            return dateA - dateB;
+            const dateA = new Date(a.rentingStartDate || a.startDate || 0).getTime();
+            const dateB = new Date(b.rentingStartDate || b.startDate || 0).getTime();
+            return dateB - dateA;
         }).filter(r => {
             if (!matchesRentPaymentMethodFilter(r, filterPaymentMethod)) return false;
             if (filterRentingPayStatus && getRentCollectionPayListStatus(r) !== filterRentingPayStatus) return false;
@@ -111,7 +118,22 @@ export default function RentingPage() {
             </div>
 
             {/* Stats */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <BentoCard>
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <p className="text-zinc-500 dark:text-white/50 text-sm">{t('Total income', '總收入')}</p>
+                            <p className="text-2xl font-bold text-green-600 dark:text-green-400 mt-1">
+                                HKD {totalIncomeRenting.toLocaleString()}
+                            </p>
+                        </div>
+                        <div className="p-3 rounded-xl bg-green-50 dark:bg-green-500/20">
+                            <svg className="w-6 h-6 text-green-600 dark:text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                        </div>
+                    </div>
+                </BentoCard>
                 <BentoCard>
                     <div className="flex items-center justify-between">
                         <div>
@@ -128,10 +150,8 @@ export default function RentingPage() {
                 <BentoCard>
                     <div className="flex items-center justify-between">
                         <div>
-                            <p className="text-zinc-500 dark:text-white/50 text-sm">已繳付（金額＋付款方式）</p>
-                            <p className="text-2xl font-bold text-zinc-900 dark:text-white mt-1">
-                                {rents.filter(r => getRentCollectionPayListStatus(r) === 'paid').length}
-                            </p>
+                            <p className="text-zinc-500 dark:text-white/50 text-sm">已繳付</p>
+                            <p className="text-2xl font-bold text-green-600 dark:text-green-400 mt-1">{paidCount}</p>
                         </div>
                         <div className="p-3 rounded-xl bg-green-50 dark:bg-green-500/20">
                             <svg className="w-6 h-6 text-green-600 dark:text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -144,13 +164,11 @@ export default function RentingPage() {
                     <div className="flex items-center justify-between">
                         <div>
                             <p className="text-zinc-500 dark:text-white/50 text-sm">未繳付</p>
-                            <p className="text-2xl font-bold text-zinc-900 dark:text-white mt-1">
-                                {rents.filter(r => getRentCollectionPayListStatus(r) === 'unpaid').length}
-                            </p>
+                            <p className="text-2xl font-bold text-red-600 dark:text-red-400 mt-1">{unpaidCount}</p>
                         </div>
-                        <div className="p-3 rounded-xl bg-yellow-50 dark:bg-yellow-500/20">
-                            <svg className="w-6 h-6 text-yellow-600 dark:text-yellow-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        <div className="p-3 rounded-xl bg-red-50 dark:bg-red-500/20">
+                            <svg className="w-6 h-6 text-red-600 dark:text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                             </svg>
                         </div>
                     </div>
@@ -169,7 +187,7 @@ export default function RentingPage() {
                 ) : (
                     <>
                         <div className="glass-card p-4 flex flex-col sm:flex-row flex-wrap gap-4 sm:items-end">
-                            <div className="flex-1 min-w-[160px]">
+                            <div className="flex-1 min-w-40">
                                 <label className="text-xs font-medium text-zinc-500 dark:text-white/50">付款方式</label>
                                 <select
                                     value={filterPaymentMethod}
@@ -184,7 +202,7 @@ export default function RentingPage() {
                                     <option value="bank_in">入數</option>
                                 </select>
                             </div>
-                            <div className="flex-1 min-w-[160px]">
+                            <div className="flex-1 min-w-40">
                                 <label className="text-xs font-medium text-zinc-500 dark:text-white/50">繳付狀態</label>
                                 <select
                                     value={filterRentingPayStatus}
@@ -235,7 +253,6 @@ export default function RentingPage() {
                                         const periodEnd = rent.endDate || rent.rentingEndDate;
                                         const payDone = hasRentCollectionPaidAmount(rent);
                                         const rowPayStatus = getRentCollectionPayListStatus(rent);
-                                        const isExpiredRow = isPeriodEndExpired(periodEnd);
                                         const payMethod = labelRentCollectionPaymentMethod(rent.rentCollectionPaymentMethod);
 
                                         return (
@@ -272,9 +289,9 @@ export default function RentingPage() {
                                                 </td>
                                                 <td
                                                     className={`p-4 text-sm font-medium ${
-                                                        isExpiredRow
-                                                            ? 'text-red-600 dark:text-red-400'
-                                                            : 'text-zinc-500 dark:text-white/50'
+                                                        rowPayStatus === 'paid'
+                                                            ? 'text-zinc-400 dark:text-white/40'
+                                                            : 'text-red-600 dark:text-red-400'
                                                     }`}
                                                 >
                                                     {formatDateRangeDMY(periodStart, periodEnd)}
@@ -313,21 +330,18 @@ export default function RentingPage() {
                         </div>
 
                         {/* Mobile Card View */}
-                        <div className="grid grid-cols-1 gap-4 md:hidden">
+                        <div className="flex flex-col gap-3 md:hidden">
                             {pagedRents.map((rent: any, index) => {
                                 const property = rent.property;
-                                const tenant = rent.tenant;
-                                const proprietor = rent.proprietor;
                                 const landlordDisplay =
                                     (rent.rentCollectionTenantName && String(rent.rentCollectionTenantName).trim()) ||
-                                    tenant?.name ||
+                                    rent.tenant?.name ||
                                     '—';
-                                const lesseeDisplay = (proprietor?.name && String(proprietor.name).trim()) || '—';
-                                const periodStart = rent.rentCollectionDate || rent.rentingStartDate || rent.startDate;
-                                const periodEnd = rent.endDate || rent.rentingEndDate;
+                                const lesseeDisplay = (rent.proprietor?.name && String(rent.proprietor.name).trim()) || '—';
+                                const periodStart = rent.rentingStartDate || rent.startDate;
+                                const periodEnd = rent.rentingEndDate || rent.endDate;
                                 const payDone = hasRentCollectionPaidAmount(rent);
                                 const rowPayStatus = getRentCollectionPayListStatus(rent);
-                                const isExpiredRow = isPeriodEndExpired(periodEnd);
                                 const payMethod = labelRentCollectionPaymentMethod(rent.rentCollectionPaymentMethod);
 
                                 return (
@@ -337,113 +351,57 @@ export default function RentingPage() {
                                         animate={{ opacity: 1, y: 0 }}
                                         transition={{ delay: index * 0.05 }}
                                         onClick={() => {
-                                            const pid = rent.propertyId || rent.property?.id;
+                                            const pid = rent.propertyId || property?.id;
                                             if (pid || property?.name) {
-                                                setPropertyDetailTarget({
-                                                    id: pid || undefined,
-                                                    name: property?.name || '物業',
-                                                });
+                                                setPropertyDetailTarget({ id: pid || undefined, name: property?.name || '物業' });
                                                 setShowPropertyModal(true);
                                             }
                                         }}
-                                        className="mobile-card p-4 space-y-4 relative overflow-hidden"
+                                        className="mobile-card px-4 py-3 flex items-center gap-3 relative overflow-hidden cursor-pointer hover:bg-zinc-50 dark:hover:bg-white/5 transition-colors"
                                     >
-                                        <div className="flex items-center justify-between">
-                                            <div className="flex items-center gap-3">
-                                                <div className="w-10 h-10 rounded-xl bg-purple-500/10 flex items-center justify-center text-purple-500">
-                                                    <Building2 className="w-5 h-5" />
-                                                </div>
-                                                <div>
-                                                    <h3 className="font-bold text-zinc-900 dark:text-white">{property?.name || 'Unknown Property'}</h3>
-                                                    <div className="flex flex-col gap-0.5 mt-0.5">
-                                                        <div className="flex items-center gap-1.5">
-                                                            <User className="w-3 h-3 text-zinc-400 shrink-0" />
-                                                            <p className="text-xs text-zinc-500 dark:text-white/50">
-                                                                <span className="text-zinc-400 dark:text-white/35 mr-1">業主</span>
-                                                                {landlordDisplay}
-                                                            </p>
-                                                        </div>
-                                                        <div className="flex items-center gap-1.5 pl-4">
-                                                            <p className="text-xs text-zinc-500 dark:text-white/50">
-                                                                <span className="text-zinc-400 dark:text-white/35 mr-1">承租人</span>
-                                                                {lesseeDisplay}
-                                                            </p>
-                                                        </div>
-                                                    </div>
-                                                </div>
+                                        <div className="w-9 h-9 rounded-lg bg-purple-500/10 flex items-center justify-center text-purple-500 shrink-0">
+                                            <Building2 className="w-4 h-4" />
+                                        </div>
+                                        <div className="flex-1 min-w-0">
+                                            <div className="flex items-center gap-2 mb-1.5">
+                                                <span className="font-semibold text-zinc-900 dark:text-white text-sm truncate">{property?.name || '—'}</span>
+                                                <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-bold shrink-0 ${rentingPayStatusBadgeClass[rowPayStatus]}`}>
+                                                    {rentingPayStatusLabel[rowPayStatus]}
+                                                </span>
                                             </div>
-                                            <span
-                                                className={`px-2 py-0.5 rounded-full text-[10px] font-bold tracking-wider border ${rentingPayStatusBadgeClass[rowPayStatus]}`}
+                                            <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px] text-zinc-500 dark:text-white/50">
+                                                <span className="flex items-center gap-1">
+                                                    <User className="w-3 h-3" />
+                                                    <span className="truncate max-w-20">{landlordDisplay}</span>
+                                                </span>
+                                                <span className="flex items-center gap-1">
+                                                    <span className="text-zinc-300 dark:text-white/20">承租</span>
+                                                    <span className="truncate max-w-20">{lesseeDisplay}</span>
+                                                </span>
+                                            </div>
+                                        </div>
+                                        <div className="text-right shrink-0">
+                                            <p className="font-semibold text-zinc-900 dark:text-white text-sm">
+                                                {payDone ? `${Number(rent.rentCollectionAmount).toLocaleString()}` : '—'}
+                                            </p>
+                                            <p className="text-[10px] text-zinc-400 dark:text-white/35">{payMethod}</p>
+                                            <p className={`text-[10px] font-medium tabular-nums ${rowPayStatus === 'paid' ? 'text-zinc-400 dark:text-white/40' : 'text-red-500 dark:text-red-400'}`}>
+                                                {formatDateRangeDMY(periodStart, periodEnd)}
+                                            </p>
+                                        </div>
+                                        <div className="flex items-center gap-1 shrink-0" onClick={e => e.stopPropagation()}>
+                                            <button
+                                                onClick={() => { setSelectedRent(rent); setShowModal(true); }}
+                                                className="p-1.5 rounded-lg text-zinc-400 dark:text-white/50 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-white/10 transition-all"
                                             >
-                                                {rentingPayStatusLabel[rowPayStatus]}
-                                            </span>
-                                        </div>
-
-                                        <div className="grid grid-cols-2 gap-4 py-3 border-y border-zinc-100 dark:border-white/5">
-                                            <div>
-                                                <div className="flex items-center gap-1.5 mb-1">
-                                                    <DollarSign className="w-3 h-3 text-emerald-500" />
-                                                    <p className="text-[10px] text-zinc-400 uppercase font-bold tracking-wider">繳付金額</p>
-                                                </div>
-                                                <p className="font-bold text-zinc-900 dark:text-white">
-                                                    {payDone
-                                                        ? `${rent.currency || 'HKD'} ${Number(rent.rentCollectionAmount).toLocaleString()}`
-                                                        : '—'}
-                                                </p>
-                                            </div>
-                                            <div>
-                                                <div className="flex items-center gap-1.5 mb-1">
-                                                    <Calendar className="w-3 h-3 text-blue-500" />
-                                                    <p className="text-[10px] text-zinc-400 uppercase font-bold tracking-wider">付款方式</p>
-                                                </div>
-                                                <p className="font-bold text-zinc-900 dark:text-white text-sm">
-                                                    {payMethod}
-                                                </p>
-                                            </div>
-                                            <div className="col-span-2">
-                                                <div className="flex items-center gap-1.5 mb-1">
-                                                    <Calendar className="w-3 h-3 text-blue-500" />
-                                                    <p className="text-[10px] text-zinc-400 uppercase font-bold tracking-wider">付款日期</p>
-                                                </div>
-                                                <p className="font-bold text-zinc-900 dark:text-white text-sm tabular-nums">
-                                                    {formatDateDMY(rent.rentCollectionPaymentDate) || '—'}
-                                                </p>
-                                            </div>
-                                            <div className="col-span-2">
-                                                <div className="flex items-center gap-1.5 mb-1">
-                                                    <Calendar className="w-3 h-3 text-blue-500" />
-                                                    <p className="text-[10px] text-zinc-400 uppercase font-bold tracking-wider">交租期間</p>
-                                                </div>
-                                                <p
-                                                    className={`font-bold text-sm ${
-                                                        isExpiredRow
-                                                            ? 'text-red-600 dark:text-red-400'
-                                                            : 'text-zinc-900 dark:text-white'
-                                                    }`}
-                                                >
-                                                    {formatDateRangeDMY(periodStart, periodEnd)}
-                                                </p>
-                                            </div>
-                                        </div>
-
-                                        <div className="flex items-center justify-end pt-1">
-                                            <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
-                                                <button
-                                                    onClick={() => {
-                                                        setSelectedRent(rent);
-                                                        setShowModal(true);
-                                                    }}
-                                                    className="p-2 rounded-lg bg-zinc-100 dark:bg-white/5 text-zinc-500 dark:text-white/50"
-                                                >
-                                                    <Pencil className="w-4 h-4" />
-                                                </button>
-                                                <button
-                                                    onClick={(e) => handleDelete(e, rent.id)}
-                                                    className="p-2 rounded-lg bg-red-50 dark:bg-red-500/10 text-red-500"
-                                                >
-                                                    <Trash2 className="w-4 h-4" />
-                                                </button>
-                                            </div>
+                                                <Pencil className="w-3.5 h-3.5" />
+                                            </button>
+                                            <button
+                                                onClick={e => handleDelete(e, rent.id)}
+                                                className="p-1.5 rounded-lg text-zinc-400 dark:text-white/50 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10 transition-all"
+                                            >
+                                                <Trash2 className="w-3.5 h-3.5" />
+                                            </button>
                                         </div>
                                     </motion.div>
                                 );

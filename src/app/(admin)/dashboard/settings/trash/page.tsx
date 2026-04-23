@@ -122,6 +122,20 @@ export default function TrashPage() {
 
     return (
         <div className="max-w-6xl mx-auto space-y-6">
+            {/* Warning Section */}
+            <div className="p-4 rounded-2xl bg-amber-500/5 border border-amber-500/20 text-amber-600 dark:text-amber-400 flex items-start gap-4">
+                <div className="w-10 h-10 rounded-xl bg-amber-500/10 flex items-center justify-center shrink-0">
+                    <AlertTriangle className="w-5 h-5 text-amber-500" />
+                </div>
+                <div>
+                    <h4 className="font-bold text-sm">關於垃圾桶功能</h4>
+                    <p className="text-xs mt-1 leading-relaxed opacity-80">
+                        刪除的項目將在此處保留。還原項目後，它們將重新出現在各自的主列表中。永久刪除將不可恢復。
+                        注意：如果您永久刪除一個物業，關聯到該物業的租務記錄可能也會受到影響。
+                    </p>
+                </div>
+            </div>
+
             {/* Header */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
@@ -298,20 +312,6 @@ export default function TrashPage() {
                         </table>
                     </div>
                 )}
-            </div>
-
-            {/* Warning Section */}
-            <div className="p-4 rounded-2xl bg-amber-500/5 border border-amber-500/20 text-amber-600 dark:text-amber-400 flex items-start gap-4">
-                <div className="w-10 h-10 rounded-xl bg-amber-500/10 flex items-center justify-center shrink-0">
-                    <AlertTriangle className="w-5 h-5 text-amber-500" />
-                </div>
-                <div>
-                    <h4 className="font-bold text-sm">關於垃圾桶功能</h4>
-                    <p className="text-xs mt-1 leading-relaxed opacity-80">
-                        刪除的項目將在此處保留。還原項目後，它們將重新出現在各自的主列表中。永久刪除將不可恢復。
-                        注意：如果您永久刪除一個物業，關聯到該物業的租務記錄可能也會受到影響。
-                    </p>
-                </div>
             </div>
         </div>
     );

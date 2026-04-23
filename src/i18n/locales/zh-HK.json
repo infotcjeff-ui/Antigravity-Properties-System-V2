@@ -54,6 +54,8 @@
     "geoMaps": "地圖",
     "planningPermission": "最新規劃許可申請",
     "proprietor": "業主",
+    "rentOutRecords": "收租記錄",
+    "rentingRecords": "交租記錄",
     "types": {
       "group_asset": "集團資產",
       "co_investment": "合作投資",

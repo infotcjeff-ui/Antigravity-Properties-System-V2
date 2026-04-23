@@ -62,7 +62,7 @@ export default function ContractsPage() {
     const [filterDateStart, setFilterDateStart] = useState(''); // 租約日期 - 開始
     const [filterDateEnd, setFilterDateEnd] = useState(''); // 租約日期 - 結束
     const [filterStatus, setFilterStatus] = useState(''); // 狀態篩選
-    const [showFilters, setShowFilters] = useState(false); // 收合/展開 filter
+    const [showFilters, setShowFilters] = useState(true); // 收合/展開 filter
 
     const sortByStartDateOldestFirst = (arr: any[]) =>
         [...arr].sort((a, b) => {
@@ -254,6 +254,7 @@ export default function ContractsPage() {
                 </motion.button>
             </div>
 
+            {/* 統計卡片順序：合約總數 → 租賃中 → 出租中 */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <BentoCard>
                     <div className="flex items-center justify-between">
@@ -269,6 +270,17 @@ export default function ContractsPage() {
                 <BentoCard>
                     <div className="flex items-center justify-between">
                         <div>
+                            <p className="text-zinc-500 dark:text-white/50 text-sm">租賃中</p>
+                            <p className="text-2xl font-bold text-zinc-900 dark:text-white mt-1">{leaseInContracts.length}</p>
+                        </div>
+                        <div className="p-3 rounded-xl bg-violet-50 dark:bg-violet-500/20">
+                            <FileText className="w-6 h-6 text-violet-600 dark:text-violet-400" />
+                        </div>
+                    </div>
+                </BentoCard>
+                <BentoCard>
+                    <div className="flex items-center justify-between">
+                        <div>
                             <p className="text-zinc-500 dark:text-white/50 text-sm">出租中</p>
                             <p className="text-2xl font-bold text-zinc-900 dark:text-white mt-1">
                                 {contracts.filter((c: any) => (c.rentOutStatus || c.status) === 'renting').length}
@@ -276,17 +288,6 @@ export default function ContractsPage() {
                         </div>
                         <div className="p-3 rounded-xl bg-green-50 dark:bg-green-500/20">
                             <Building2 className="w-6 h-6 text-green-600 dark:text-green-400" />
-                        </div>
-                    </div>
-                </BentoCard>
-                <BentoCard>
-                    <div className="flex items-center justify-between">
-                        <div>
-                            <p className="text-zinc-500 dark:text-white/50 text-sm">租賃中</p>
-                            <p className="text-2xl font-bold text-zinc-900 dark:text-white mt-1">{leaseInContracts.length}</p>
-                        </div>
-                        <div className="p-3 rounded-xl bg-violet-50 dark:bg-violet-500/20">
-                            <FileText className="w-6 h-6 text-violet-600 dark:text-violet-400" />
                         </div>
                     </div>
                 </BentoCard>
@@ -521,28 +522,28 @@ export default function ContractsPage() {
                 ) : (
                     <>
                         <div className="hidden md:block overflow-x-auto">
-                            <table className="w-full min-w-[1020px]">
+                            <table className="w-full min-w-[900px]">
                                 <thead>
                                     <tr
-                                        className={`text-left text-zinc-500 dark:text-white/50 text-sm border-b ${
+                                        className={`text-left text-zinc-500 dark:text-white/50 text-xs border-b ${
                                             isLeaseInTab
                                                 ? 'border-violet-200 dark:border-violet-500/25'
                                                 : 'border-amber-200 dark:border-amber-500/20'
                                         }`}
                                     >
-                                        <th className="p-4 font-medium">物業</th>
-                                        <th className="p-4 font-medium">
+                                        <th className="p-3 font-medium">物業</th>
+                                        <th className="p-3 font-medium">
                                             {contractListTab === 'lease_out' ? '出租合約號碼' : '租賃合約號碼'}
                                         </th>
-                                        <th className="p-4 font-medium">業主</th>
-                                        <th className="p-4 font-medium">承租人</th>
-                                        <th className="p-4 font-medium">月租</th>
-                                        <th className="p-4 font-medium">租約期間</th>
-                                        <th className="p-4 font-medium">{isLeaseInTab ? '已付按金' : '已收按金'}</th>
-                                        <th className="p-4 font-medium">租賃性質</th>
-                                        <th className="p-4 font-medium">合約描述</th>
-                                        <th className="p-4 font-medium">狀態</th>
-                                        <th className="p-4 font-medium">操作</th>
+                                        <th className="p-3 font-medium">業主</th>
+                                        <th className="p-3 font-medium">承租人</th>
+                                        <th className="p-3 font-medium">月租</th>
+                                        <th className="p-3 font-medium">租約期間 / 完結日</th>
+                                        <th className="p-3 font-medium">{isLeaseInTab ? '已付按金' : '已收按金'}</th>
+                                        <th className="p-3 font-medium">租賃性質</th>
+                                        <th className="p-3 font-medium">合約描述</th>
+                                        <th className="p-3 font-medium">狀態</th>
+                                        <th className="p-3 font-medium">操作</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -577,11 +578,11 @@ export default function ContractsPage() {
                                                         : 'border-amber-200/50 dark:border-amber-500/10 hover:bg-amber-50/50 dark:hover:bg-amber-500/5'
                                                 }`}
                                             >
-                                                <td className="p-4">
-                                                    <div className="text-zinc-900 dark:text-white font-medium">
+                                                <td className="p-3">
+                                                    <div className="text-zinc-900 dark:text-white text-xs font-medium max-w-32 truncate" title={property?.name || '-'}>
                                                         {property?.name || '-'}
                                                     </div>
-                                                    <div className="text-xs text-zinc-400 dark:text-white/40 mt-0.5 line-clamp-1">
+                                                    <div className="text-[10px] text-zinc-400 dark:text-white/40 mt-0.5 line-clamp-1 max-w-32">
                                                         {(() => {
                                                             const selected = normalizeRentPropertyLotSelection(contract.rentPropertyLot ?? (contract as any).rent_property_lot);
                                                             const partial = parseRentPropertyLotPartialFromRow(contract.rentPropertyLotPartial ?? (contract as any).rent_property_lot_partial);
@@ -594,9 +595,9 @@ export default function ContractsPage() {
                                                         })()}
                                                     </div>
                                                 </td>
-                                                <td className="p-4">
+                                                <td className="p-3">
                                                     <span
-                                                        className={`font-medium ${
+                                                        className={`font-medium text-xs ${
                                                             isLeaseInTab
                                                                 ? 'text-violet-700 dark:text-violet-300'
                                                                 : 'text-amber-600 dark:text-amber-400'
@@ -605,15 +606,19 @@ export default function ContractsPage() {
                                                         {contract.rentOutTenancyNumber || '-'}
                                                     </span>
                                                 </td>
-                                                <td className="p-4 text-zinc-600 dark:text-white/70">
-                                                    {ownerName || '-'}
+                                                <td className="p-3 text-zinc-600 dark:text-white/70 text-xs max-w-28">
+                                                    <div className="truncate" title={ownerName || '-'}>
+                                                        {ownerName || '-'}
+                                                    </div>
                                                 </td>
-                                                <td className="p-4 text-zinc-600 dark:text-white/70">
-                                                    {lesseeName || '-'}
+                                                <td className="p-3 text-zinc-600 dark:text-white/70 text-xs max-w-28">
+                                                    <div className="truncate" title={lesseeName || '-'}>
+                                                        {lesseeName || '-'}
+                                                    </div>
                                                 </td>
-                                                <td className="p-4">
+                                                <td className="p-3">
                                                     <span
-                                                        className={`font-medium ${
+                                                        className={`font-medium text-sm ${
                                                             isLeaseInTab
                                                                 ? 'text-violet-700 dark:text-violet-300'
                                                                 : 'text-amber-600 dark:text-amber-400'
@@ -622,9 +627,9 @@ export default function ContractsPage() {
                                                         {contract.currency || 'HKD'} {monthlyRent.toLocaleString()}
                                                     </span>
                                                 </td>
-                                                <td className="p-4 text-zinc-500 dark:text-white/50 text-sm leading-relaxed whitespace-nowrap">
-                                                    <div>{startDate ? new Date(startDate).toLocaleDateString() : '-'}</div>
-                                                    <div>
+                                                <td className="p-3 text-zinc-500 dark:text-white/50 text-xs leading-relaxed">
+                                                    <div className="whitespace-nowrap">{startDate ? new Date(startDate).toLocaleDateString() : '-'}</div>
+                                                    <div className="whitespace-nowrap">
                                                         ~ {endDate ? new Date(endDate).toLocaleDateString() : '-'}
                                                         {startDate && endDate
                                                             ? ` (${
@@ -639,14 +644,53 @@ export default function ContractsPage() {
                                                               })`
                                                             : ''}
                                                     </div>
+                                                    {endDate ? (
+                                                        (() => {
+                                                            const now = new Date();
+                                                            const end = new Date(endDate);
+                                                            const diff = Math.ceil((end.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+                                                            if (diff < 0) {
+                                                                return (
+                                                                    <div className="mt-0.5 text-zinc-400 dark:text-zinc-500 line-through text-[10px]">
+                                                                        已完結
+                                                                    </div>
+                                                                );
+                                                            }
+                                                            if (diff === 0) {
+                                                                return (
+                                                                    <div className="mt-0.5 text-red-600 dark:text-red-400 font-semibold animate-pulse text-[10px]">
+                                                                        今日完結
+                                                                    </div>
+                                                                );
+                                                            }
+                                                            const y = Math.floor(diff / 365);
+                                                            const m = Math.floor((diff % 365) / 30);
+                                                            const d = diff % 30;
+                                                            let parts = [];
+                                                            if (y > 0) parts.push(`${y} 年`);
+                                                            if (m > 0) parts.push(`${m} 個月`);
+                                                            if (d > 0 || parts.length === 0) parts.push(`${d} 日`);
+                                                            return (
+                                                                <div className={`mt-0.5 font-medium text-[10px] ${
+                                                                    diff <= 30
+                                                                        ? 'text-red-600 dark:text-red-400'
+                                                                        : diff <= 90
+                                                                        ? 'text-yellow-700 dark:text-yellow-400'
+                                                                        : 'text-green-700 dark:text-green-400'
+                                                                }`}>
+                                                                    剩 {parts.join(' ')}
+                                                                </div>
+                                                            );
+                                                        })()
+                                                    ) : null}
                                                 </td>
-                                                <td className="p-4 text-zinc-600 dark:text-white/70 text-sm">
+                                                <td className="p-3 text-zinc-600 dark:text-white/70 text-xs">
                                                     {formatContractDepositPaid(contract)}
                                                 </td>
-                                                <td className="p-4 text-zinc-600 dark:text-white/70 text-sm">
+                                                <td className="p-3 text-zinc-600 dark:text-white/70 text-xs">
                                                     {labelRentOutContractNatureZh(contract.rentOutContractNature)}
                                                 </td>
-                                                <td className="p-4 text-zinc-500 dark:text-white/50 text-sm max-w-30">
+                                                <td className="p-3 text-zinc-500 dark:text-white/50 text-xs max-w-24">
                                                     {(() => {
                                                         const raw = contract.rentOutDescription || '';
                                                         const plain = raw.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim();
@@ -661,7 +705,7 @@ export default function ContractsPage() {
                                                         );
                                                     })()}
                                                 </td>
-                                                <td className="p-4">
+                                                <td className="p-3">
                                                     <span
                                                         className={`px-2.5 py-1 rounded-full text-xs font-medium ${statusColors[status] || statusColors.listing}`}
                                                     >
@@ -676,7 +720,7 @@ export default function ContractsPage() {
                                                                 : '放盤中'}
                                                     </span>
                                                 </td>
-                                                <td className="p-4" onClick={(e) => e.stopPropagation()}>
+                                                <td className="p-3" onClick={(e) => e.stopPropagation()}>
                                                     <div className="flex items-center gap-2">
                                                         <button
                                                             type="button"
@@ -801,6 +845,50 @@ export default function ContractsPage() {
                                                       })`
                                                     : ''}
                                             </div>
+                                        </div>
+                                        <div className="text-xs text-zinc-500 dark:text-white/50">
+                                            租約完結日：
+                                            {endDate ? (
+                                                (() => {
+                                                    const now = new Date();
+                                                    const end = new Date(endDate);
+                                                    const diff = Math.ceil((end.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+                                                    if (diff < 0) {
+                                                        return (
+                                                            <span className="ml-1 text-zinc-400 dark:text-zinc-500 line-through">
+                                                                已完結
+                                                            </span>
+                                                        );
+                                                    }
+                                                    if (diff === 0) {
+                                                        return (
+                                                            <span className="ml-1 text-red-600 dark:text-red-400 font-semibold animate-pulse">
+                                                                今日完結
+                                                            </span>
+                                                        );
+                                                    }
+                                                    const y = Math.floor(diff / 365);
+                                                    const m = Math.floor((diff % 365) / 30);
+                                                    const d = diff % 30;
+                                                    let parts = [];
+                                                    if (y > 0) parts.push(`${y} 年`);
+                                                    if (m > 0) parts.push(`${m} 個月`);
+                                                    if (d > 0 || parts.length === 0) parts.push(`${d} 日`);
+                                                    return (
+                                                        <span className={`ml-1 font-medium ${
+                                                            diff <= 30
+                                                                ? 'text-red-600 dark:text-red-400'
+                                                                : diff <= 90
+                                                                ? 'text-yellow-700 dark:text-yellow-400'
+                                                                : 'text-green-700 dark:text-green-400'
+                                                        }`}>
+                                                            剩 {parts.join(' ')}
+                                                        </span>
+                                                    );
+                                                })()
+                                            ) : (
+                                                <span className="ml-1 text-zinc-300 dark:text-white/20">—</span>
+                                            )}
                                         </div>
                                         <p className="text-xs text-zinc-500 dark:text-white/50">
                                             {isLeaseInTab ? '已付按金' : '已收按金'}：<span className="text-zinc-800 dark:text-white/90">{formatContractDepositPaid(contract)}</span>

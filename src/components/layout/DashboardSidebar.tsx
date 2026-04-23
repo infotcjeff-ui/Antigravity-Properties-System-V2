@@ -17,6 +17,7 @@ import {
     Sun,
     Trash2,
     FileText,
+    Image as ImageIcon,
 } from 'lucide-react';
 import ThemeToggle from './ThemeToggle';
 import { useLanguage } from '@/components/common/LanguageSwitcher';
@@ -205,6 +206,18 @@ export default function DashboardSidebar({ userRole = 'client' }: DashboardSideb
                             工具
                         </p>
                         <ul className="space-y-1">
+                            <li>
+                                <Link
+                                    href="/dashboard/uploads"
+                                    className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${isActive('/dashboard/uploads')
+                                        ? 'bg-purple-500/20 text-purple-700 dark:text-white'
+                                        : 'text-zinc-600 dark:text-white/60 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-white/5'
+                                        }`}
+                                >
+                                    <ImageIcon className="w-5 h-5" />
+                                    <span className="font-medium">已上載</span>
+                                </Link>
+                            </li>
                             <li>
                                 <Link
                                     href="/dashboard/settings/trash"

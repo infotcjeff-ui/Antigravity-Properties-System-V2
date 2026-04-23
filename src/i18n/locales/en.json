@@ -54,6 +54,8 @@
         "geoMaps": "Geo Maps",
         "planningPermission": "Planning Permission",
         "proprietor": "Proprietor",
+        "rentOutRecords": "Rent Out Records",
+        "rentingRecords": "Renting Records",
         "types": {
             "group_asset": "Group Asset",
             "co_investment": "Co-investment",

@@ -13,8 +13,8 @@ import {
 } from '@/lib/formatters';
 import type { CurrentTenant, Proprietor, Rent } from '@/lib/db';
 import {
-    compareRentByPeriodSmallestFirst,
-    compareContractByStartDateOldestFirst,
+    compareRentByStartDateNewestFirst,
+    compareContractByStartDateNewestFirst,
     getRentOutCollectionDisplayPeriod,
     getRentOutLesseeDisplayLabel,
     getRentOutOrContractListNumber,
@@ -325,19 +325,19 @@ export default function PropertyDetailsPage() {
 
     const allContractRents = rents.filter((r: Rent) => r.type === 'contract');
     const allRentOutRents = useMemo(
-        () => [...rents.filter((r: Rent) => r.type === 'rent_out')].sort(compareRentByPeriodSmallestFirst),
+        () => [...rents.filter((r: Rent) => r.type === 'rent_out')].sort(compareRentByStartDateNewestFirst),
         [rents],
     );
     const allRentingRents = useMemo(
-        () => [...rents.filter((r: Rent) => r.type === 'renting')].sort(compareRentByPeriodSmallestFirst),
+        () => [...rents.filter((r: Rent) => r.type === 'renting')].sort(compareRentByStartDateNewestFirst),
         [rents],
     );
     const allLeaseInContractRents = useMemo(
-        () => [...allContractRents.filter((c: Rent) => (c.rentOutStatus || c.status) === 'leasing_in')].sort(compareRentByPeriodSmallestFirst),
+        () => [...allContractRents.filter((c: Rent) => (c.rentOutStatus || c.status) === 'leasing_in')].sort(compareRentByStartDateNewestFirst),
         [allContractRents],
     );
     const allLeaseOutContractRents = useMemo(
-        () => [...allContractRents.filter((c: Rent) => (c.rentOutStatus || c.status) !== 'leasing_in')].sort(compareContractByStartDateOldestFirst),
+        () => [...allContractRents.filter((c: Rent) => (c.rentOutStatus || c.status) !== 'leasing_in')].sort(compareContractByStartDateNewestFirst),
         [allContractRents],
     );
 

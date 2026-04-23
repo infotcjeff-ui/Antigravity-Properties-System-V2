@@ -2121,11 +2121,15 @@ export function useTrash() {
                 .update({ is_deleted: false, deleted_at: null })
                 .eq('id', id);
 
-            if (sbError) throw sbError;
+            if (sbError) {
+                console.error(`Failed to restore item ${id} from ${table}:`, sbError);
+                setError(`還原失敗: ${sbError.message || JSON.stringify(sbError)}`);
+                return false;
+            }
             return true;
-        } catch (err) {
-            console.error(`Failed to restore item ${id} from ${table}:`, err);
-            setError(`Failed to restore item`);
+        } catch (err: any) {
+            console.error(`Exception restoring item ${id} from ${table}:`, err);
+            setError(`還原失敗: ${err?.message || JSON.stringify(err)}`);
             return false;
         } finally {
             setLoading(false);
@@ -2136,16 +2140,30 @@ export function useTrash() {
         setLoading(true);
         setError(null);
         try {
+            // Step 1: Clear FK references before deleting
+            if (table === 'proprietors') {
+                await supabase.from('rents').update({ proprietor_id: null }).eq('proprietor_id', id);
+                await supabase.from('rents').update({ tenant_id: null }).eq('tenant_id', id);
+            }
+            if (table === 'properties') {
+                await supabase.from('rents').update({ property_id: null }).eq('property_id', id);
+            }
+
+            // Step 2: Delete the record
             const { error: sbError } = await supabase
                 .from(table)
                 .delete()
                 .eq('id', id);
 
-            if (sbError) throw sbError;
+            if (sbError) {
+                console.error(`Failed to permanently delete item ${id} from ${table}:`, sbError);
+                setError(`永久刪除失敗: ${sbError.message || JSON.stringify(sbError)}`);
+                return false;
+            }
             return true;
-        } catch (err) {
-            console.error(`Failed to permanently delete item ${id} from ${table}:`, err);
-            setError(`Failed to permanently delete item`);
+        } catch (err: any) {
+            console.error(`Exception permanently deleting item ${id} from ${table}:`, err);
+            setError(`永久刪除失敗: ${err?.message || JSON.stringify(err)}`);
             return false;
         } finally {
             setLoading(false);
@@ -2156,16 +2174,55 @@ export function useTrash() {
         setLoading(true);
         setError(null);
         try {
+            // Step 1: For proprietors, clear ALL FK references in rents before deleting
+            if (table === 'proprietors') {
+                const { data: deletedProprietors } = await supabase
+                    .from('proprietors')
+                    .select('id')
+                    .eq('is_deleted', true);
+
+                if (deletedProprietors && deletedProprietors.length > 0) {
+                    const ids = deletedProprietors.map((p: any) => p.id);
+                    // Clear proprietor_id FK
+                    await supabase.from('rents').update({ proprietor_id: null }).in('proprietor_id', ids);
+                    // Clear tenant_id FK (tenant also references proprietors)
+                    await supabase.from('rents').update({ tenant_id: null }).in('tenant_id', ids);
+                }
+            }
+
+            // Step 2: For properties, clear FK references in rents before deleting
+            if (table === 'properties') {
+                const { data: deletedProperties } = await supabase
+                    .from('properties')
+                    .select('id')
+                    .eq('is_deleted', true);
+
+                if (deletedProperties && deletedProperties.length > 0) {
+                    const { error: clearErr } = await supabase
+                        .from('rents')
+                        .update({ property_id: null })
+                        .in('property_id', deletedProperties.map((p: any) => p.id));
+                    if (clearErr) {
+                        console.error('Failed to clear property FK in rents:', clearErr);
+                    }
+                }
+            }
+
+            // Step 3: Delete the soft-deleted records
             const { error: sbError } = await supabase
                 .from(table)
                 .delete()
                 .eq('is_deleted', true);
 
-            if (sbError) throw sbError;
+            if (sbError) {
+                console.error(`Failed to empty trash for ${table}:`, sbError);
+                setError(`清空垃圾桶失敗: ${sbError.message || JSON.stringify(sbError)}`);
+                return false;
+            }
             return true;
-        } catch (err) {
-            console.error(`Failed to empty trash for ${table}:`, err);
-            setError(`Failed to empty trash`);
+        } catch (err: any) {
+            console.error(`Exception emptying trash for ${table}:`, err);
+            setError(`清空垃圾桶失敗: ${err?.message || JSON.stringify(err)}`);
             return false;
         } finally {
             setLoading(false);

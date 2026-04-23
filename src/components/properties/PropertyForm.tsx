@@ -46,6 +46,8 @@ import {
     compareRentOutForListNewestFirst,
     compareRentByPeriodSmallestFirst,
     compareContractByStartDateOldestFirst,
+    compareRentByStartDateNewestFirst,
+    coerceRentDateField,
     getRentCollectionPayListStatus,
     getRentOutCollectionDisplayPeriod,
     getRentOutOrContractListNumber,
@@ -431,13 +433,28 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
     }, [property?.id, allRents]);
 
     const rentOutRents = useMemo(
-        () => [...rents.filter((r) => r.type === 'rent_out')].sort(compareRentOutForListNewestFirst),
+        () => [...rents.filter((r) => r.type === 'rent_out')].sort(compareRentByStartDateNewestFirst),
         [rents],
     );
-    const rentingRents = useMemo(
-        () => [...rents.filter(r => r.type === 'renting')].sort(compareRentByPeriodSmallestFirst),
-        [rents],
-    );
+    const rentingRents = useMemo(() => {
+        const msOr = (d: Date | null | undefined, fallback: number) => {
+            if (d == null) return fallback;
+            const t = d.getTime();
+            return Number.isNaN(t) ? fallback : t;
+        };
+        return [...rents.filter((r) => r.type === 'renting')].sort((a, b) => {
+            const pa = a.rentingPeriods ?? null;
+            const pb = b.rentingPeriods ?? null;
+            const hasA = pa !== null;
+            const hasB = pb !== null;
+            if (hasA !== hasB) return hasA ? -1 : 1;
+            if (hasA && hasB && pa !== pb) return pa - pb;
+            const startA = msOr(coerceRentDateField(a.rentingStartDate) ?? coerceRentDateField(a.startDate), Number.POSITIVE_INFINITY);
+            const startB = msOr(coerceRentDateField(b.rentingStartDate) ?? coerceRentDateField(b.startDate), Number.POSITIVE_INFINITY);
+            if (startA !== startB) return startB - startA;
+            return new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime();
+        });
+    }, [rents]);
     const contractRents = useMemo(() => {
         if (!property?.id) return [];
         return (allContractsWithRelations as RentWithRelations[])
@@ -2063,7 +2080,7 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                                 <div>
                                     <h4 className="text-base font-bold text-emerald-700 dark:text-emerald-400 mb-4 flex items-center gap-2 px-1">
                                         <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]"></div>
-                                        收租記錄 (Rent Out Records)
+                                        收租記錄
                                     </h4>
                                     {renderRentTable(
                                         rentOutRents.slice(
@@ -2083,7 +2100,7 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                                 <div>
                                     <h4 className="text-base font-bold text-indigo-700 dark:text-indigo-400 mb-4 flex items-center gap-2 px-1">
                                         <div className="w-2.5 h-2.5 rounded-full bg-indigo-500 shadow-[0_0_8px_rgba(99,102,241,0.5)]"></div>
-                                        交租記錄 (Renting Records)
+                                        交租記錄
                                     </h4>
                                     {renderRentTable(
                                         rentingRents.slice(

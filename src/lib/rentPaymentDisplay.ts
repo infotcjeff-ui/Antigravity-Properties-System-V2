@@ -90,7 +90,7 @@ export function getRentOutCollectionDisplayPeriod(rent: {
     return { start, end };
 }
 
-function coerceRentDateField(v: Date | string | null | undefined): Date | null {
+export function coerceRentDateField(v: Date | string | null | undefined): Date | null {
     if (v == null || v === '') return null;
     const d = v instanceof Date ? v : new Date(v);
     return Number.isNaN(d.getTime()) ? null : d;
@@ -155,7 +155,7 @@ export function compareRentByPeriodSmallestFirst(a: Rent, b: Rent): number {
     };
     const getEffectiveStart = (r: Rent): number => {
         if (r.type === 'rent_out') return msOr(getRentOutCollectionListEffectiveStart(r), Number.POSITIVE_INFINITY);
-        return msOr(r.rentingStartDate || r.startDate, Number.POSITIVE_INFINITY);
+        return msOr(coerceRentDateField(r.rentingStartDate) ?? coerceRentDateField(r.startDate), Number.POSITIVE_INFINITY);
     };
     const pa = getPeriods(a);
     const pb = getPeriods(b);
@@ -174,6 +174,32 @@ export function compareContractByStartDateOldestFirst(a: Rent, b: Rent): number 
     const startB = b.rentOutStartDate ? new Date(b.rentOutStartDate).getTime() : Number.POSITIVE_INFINITY;
     if (startA !== startB) return startA - startB;
     return new Date(a.createdAt || 0).getTime() - new Date(b.createdAt || 0).getTime();
+}
+
+/** 租務記錄列表排序（收租/交租/租賃合約）：依租期開始日新→舊（最近開始的在前），無開始日排最後 */
+export function compareRentByStartDateNewestFirst(a: Rent, b: Rent): number {
+    const msOr = (d: Date | null | undefined, fallback: number) => {
+        if (d == null) return fallback;
+        const t = d.getTime();
+        return Number.isNaN(t) ? fallback : t;
+    };
+    const getEffectiveStart = (r: Rent): number => {
+        if (r.type === 'rent_out') return msOr(getRentOutCollectionListEffectiveStart(r), Number.POSITIVE_INFINITY);
+        if (r.type === 'contract') return msOr(coerceRentDateField(r.rentOutStartDate), Number.POSITIVE_INFINITY);
+        return msOr(coerceRentDateField(r.rentingStartDate) ?? coerceRentDateField(r.startDate), Number.POSITIVE_INFINITY);
+    };
+    const startA = getEffectiveStart(a);
+    const startB = getEffectiveStart(b);
+    if (startA !== startB) return startB - startA;
+    return new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime();
+}
+
+/** 合約列表排序（出租合約）：依租期開始日新→舊（最近開始的在前），無開始日排最後 */
+export function compareContractByStartDateNewestFirst(a: Rent, b: Rent): number {
+    const startA = a.rentOutStartDate ? new Date(a.rentOutStartDate).getTime() : Number.POSITIVE_INFINITY;
+    const startB = b.rentOutStartDate ? new Date(b.rentOutStartDate).getTime() : Number.POSITIVE_INFINITY;
+    if (startA !== startB) return startB - startA;
+    return new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime();
 }
 
 export function getRentOutLesseeDisplayLabel(rent: {

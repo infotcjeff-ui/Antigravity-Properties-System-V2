@@ -1777,32 +1777,6 @@ export default function RentModal({
                                     </select>
                                 </div>
                                 <div className="space-y-2">
-                                    <label className={labelClass}>免租期</label>
-                                    <div className="flex flex-col sm:flex-row gap-3 sm:items-end">
-                                        <div className="flex-1 space-y-1">
-                                            <span className="text-xs text-zinc-500 dark:text-white/50">開始</span>
-                                            <input
-                                                type="date"
-                                                name="rentFreePeriodStartDate"
-                                                value={(formData as any).rentFreePeriodStartDate}
-                                                onChange={handleChange}
-                                                className={inputClass}
-                                            />
-                                        </div>
-                                        <span className="hidden sm:inline text-zinc-400 dark:text-white/40 pb-3 shrink-0">至</span>
-                                        <div className="flex-1 space-y-1">
-                                            <span className="text-xs text-zinc-500 dark:text-white/50">結束</span>
-                                            <input
-                                                type="date"
-                                                name="rentFreePeriodEndDate"
-                                                value={(formData as any).rentFreePeriodEndDate}
-                                                onChange={handleChange}
-                                                className={inputClass}
-                                            />
-                                        </div>
-                                    </div>
-                                </div>
-                                <div className="space-y-2">
                                     <label className={labelClass}>收租日期（日／月／年 至 日／月／年）</label>
                                     <p className="text-xs text-zinc-500 dark:text-white/45 mb-2">請分別選擇開始與結束日期；列表將以 dd/mm/yyyy 顯示。</p>
                                     <div className="flex flex-col sm:flex-row gap-3 sm:items-end">
@@ -2122,32 +2096,6 @@ export default function RentModal({
                                         className={inputClass}
                                         placeholder={formData.tenantId ? '已自動填入業主名稱' : '與收據一致之名稱'}
                                     />
-                                </div>
-                                <div className="space-y-2">
-                                    <label className={labelClass}>免租期</label>
-                                    <div className="flex flex-col sm:flex-row gap-3 sm:items-end">
-                                        <div className="flex-1 space-y-1">
-                                            <span className="text-xs text-zinc-500 dark:text-white/50">開始</span>
-                                            <input
-                                                type="date"
-                                                name="rentFreePeriodStartDate"
-                                                value={(formData as any).rentFreePeriodStartDate}
-                                                onChange={handleChange}
-                                                className={inputClass}
-                                            />
-                                        </div>
-                                        <span className="hidden sm:inline text-zinc-400 dark:text-white/40 pb-3 shrink-0">至</span>
-                                        <div className="flex-1 space-y-1">
-                                            <span className="text-xs text-zinc-500 dark:text-white/50">結束</span>
-                                            <input
-                                                type="date"
-                                                name="rentFreePeriodEndDate"
-                                                value={(formData as any).rentFreePeriodEndDate}
-                                                onChange={handleChange}
-                                                className={inputClass}
-                                            />
-                                        </div>
-                                    </div>
                                 </div>
                                 <div className="space-y-2">
                                     <label className={labelClass}>交租日期（日／月／年 至 日／月／年）</label>
@@ -2473,33 +2421,6 @@ export default function RentModal({
                                 <div className="space-y-2">
                                     <label className={labelClass}>{contractSectionPrefix}合約結束日期</label>
                                     <input type="date" name="rentOutEndDate" value={formData.rentOutEndDate} onChange={handleChange} className={inputClass} />
-                                </div>
-                            </div>
-
-                            <div className="space-y-2">
-                                <label className={labelClass}>免租期</label>
-                                <div className="flex flex-col sm:flex-row gap-3 sm:items-end">
-                                    <div className="flex-1 space-y-1">
-                                        <span className="text-xs text-zinc-500 dark:text-white/50">開始</span>
-                                        <input
-                                            type="date"
-                                            name="rentFreePeriodStartDate"
-                                            value={(formData as any).rentFreePeriodStartDate}
-                                            onChange={handleChange}
-                                            className={inputClass}
-                                        />
-                                    </div>
-                                    <span className="hidden sm:inline text-zinc-400 dark:text-white/40 pb-3 shrink-0">至</span>
-                                    <div className="flex-1 space-y-1">
-                                        <span className="text-xs text-zinc-500 dark:text-white/50">結束</span>
-                                        <input
-                                            type="date"
-                                            name="rentFreePeriodEndDate"
-                                            value={(formData as any).rentFreePeriodEndDate}
-                                            onChange={handleChange}
-                                            className={inputClass}
-                                        />
-                                    </div>
                                 </div>
                             </div>
 
