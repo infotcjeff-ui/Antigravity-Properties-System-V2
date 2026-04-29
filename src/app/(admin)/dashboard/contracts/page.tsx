@@ -71,9 +71,16 @@ export default function ContractsPage() {
             return startA - startB;
         });
 
+    const sortByEndDateNearestFirst = (arr: any[]) =>
+        [...arr].sort((a, b) => {
+            const endA = a.rentOutEndDate ? new Date(a.rentOutEndDate).getTime() : Number.MAX_SAFE_INTEGER;
+            const endB = b.rentOutEndDate ? new Date(b.rentOutEndDate).getTime() : Number.MAX_SAFE_INTEGER;
+            return endA - endB;
+        });
+
     const leaseOutContracts = useMemo(
         () =>
-            sortByStartDateOldestFirst(
+            sortByEndDateNearestFirst(
                 (contracts as any[]).filter((c) => (c.rentOutStatus || c.status) !== 'leasing_in')
             ),
         [contracts]
@@ -247,7 +254,7 @@ export default function ContractsPage() {
                         setSelectedContract(null);
                         setShowModal(true);
                     }}
-                    className="px-4 py-2.5 bg-gradient-to-r from-amber-500 to-orange-500 rounded-xl text-white font-medium shadow-lg shadow-amber-500/20 flex items-center justify-center gap-2 w-full sm:w-auto"
+                    className="px-4 py-2.5 bg-linear-to-r from-amber-500 to-orange-500 rounded-xl text-white font-medium shadow-lg shadow-amber-500/20 flex items-center justify-center gap-2 w-full sm:w-auto"
                 >
                     <FileText className="w-5 h-5" />
                     新增合約記錄
@@ -298,7 +305,7 @@ export default function ContractsPage() {
                 {/* Filter Toggle Bar */}
                 <div className="flex flex-wrap items-center gap-3 p-3 border-b border-zinc-100 dark:border-white/10">
                     {/* 搜尋框 */}
-                    <div className="relative flex-1 min-w-[200px]">
+                        <div className="relative flex-1 min-w-50">
                         <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-400 dark:text-white/30">
                             <Search className="w-4 h-4" />
                         </div>
@@ -522,7 +529,7 @@ export default function ContractsPage() {
                 ) : (
                     <>
                         <div className="hidden md:block overflow-x-auto">
-                            <table className="w-full min-w-[900px]">
+                            <table className="w-full min-w-225">
                                 <thead>
                                     <tr
                                         className={`text-left text-zinc-500 dark:text-white/50 text-xs border-b ${
@@ -579,10 +586,10 @@ export default function ContractsPage() {
                                                 }`}
                                             >
                                                 <td className="p-3">
-                                                    <div className="text-zinc-900 dark:text-white text-xs font-medium max-w-32 truncate" title={property?.name || '-'}>
+                                                    <div className="text-zinc-900 dark:text-white text-sm font-medium max-w-32 truncate" title={property?.name || '-'}>
                                                         {property?.name || '-'}
                                                     </div>
-                                                    <div className="text-[10px] text-zinc-400 dark:text-white/40 mt-0.5 line-clamp-1 max-w-32">
+                                                    <div className="text-xs text-zinc-400 dark:text-white/40 mt-0.5 line-clamp-1 max-w-32">
                                                         {(() => {
                                                             const selected = normalizeRentPropertyLotSelection(contract.rentPropertyLot ?? (contract as any).rent_property_lot);
                                                             const partial = parseRentPropertyLotPartialFromRow(contract.rentPropertyLotPartial ?? (contract as any).rent_property_lot_partial);
@@ -597,7 +604,7 @@ export default function ContractsPage() {
                                                 </td>
                                                 <td className="p-3">
                                                     <span
-                                                        className={`font-medium text-xs ${
+                                                        className={`font-semibold text-sm ${
                                                             isLeaseInTab
                                                                 ? 'text-violet-700 dark:text-violet-300'
                                                                 : 'text-amber-600 dark:text-amber-400'
@@ -606,19 +613,19 @@ export default function ContractsPage() {
                                                         {contract.rentOutTenancyNumber || '-'}
                                                     </span>
                                                 </td>
-                                                <td className="p-3 text-zinc-600 dark:text-white/70 text-xs max-w-28">
+                                                <td className="p-3 text-zinc-600 dark:text-white/70 text-sm max-w-28">
                                                     <div className="truncate" title={ownerName || '-'}>
                                                         {ownerName || '-'}
                                                     </div>
                                                 </td>
-                                                <td className="p-3 text-zinc-600 dark:text-white/70 text-xs max-w-28">
+                                                <td className="p-3 text-zinc-600 dark:text-white/70 text-sm max-w-28">
                                                     <div className="truncate" title={lesseeName || '-'}>
                                                         {lesseeName || '-'}
                                                     </div>
                                                 </td>
                                                 <td className="p-3">
                                                     <span
-                                                        className={`font-medium text-sm ${
+                                                        className={`font-semibold text-base ${
                                                             isLeaseInTab
                                                                 ? 'text-violet-700 dark:text-violet-300'
                                                                 : 'text-amber-600 dark:text-amber-400'
@@ -627,7 +634,7 @@ export default function ContractsPage() {
                                                         {contract.currency || 'HKD'} {monthlyRent.toLocaleString()}
                                                     </span>
                                                 </td>
-                                                <td className="p-3 text-zinc-500 dark:text-white/50 text-xs leading-relaxed">
+                                                <td className="p-3 text-zinc-500 dark:text-white/50 text-sm leading-relaxed">
                                                     <div className="whitespace-nowrap">{startDate ? new Date(startDate).toLocaleDateString() : '-'}</div>
                                                     <div className="whitespace-nowrap">
                                                         ~ {endDate ? new Date(endDate).toLocaleDateString() : '-'}
@@ -651,14 +658,14 @@ export default function ContractsPage() {
                                                             const diff = Math.ceil((end.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
                                                             if (diff < 0) {
                                                                 return (
-                                                                    <div className="mt-0.5 text-zinc-400 dark:text-zinc-500 line-through text-[10px]">
+                                                                    <div className="mt-1 text-zinc-400 dark:text-zinc-500 line-through text-xs">
                                                                         已完結
                                                                     </div>
                                                                 );
                                                             }
                                                             if (diff === 0) {
                                                                 return (
-                                                                    <div className="mt-0.5 text-red-600 dark:text-red-400 font-semibold animate-pulse text-[10px]">
+                                                                    <div className="mt-1 text-red-600 dark:text-red-400 font-bold animate-pulse text-sm">
                                                                         今日完結
                                                                     </div>
                                                                 );
@@ -671,26 +678,26 @@ export default function ContractsPage() {
                                                             if (m > 0) parts.push(`${m} 個月`);
                                                             if (d > 0 || parts.length === 0) parts.push(`${d} 日`);
                                                             return (
-                                                                <div className={`mt-0.5 font-medium text-[10px] ${
+                                                                <span className={`mt-1 inline-block text-sm font-bold px-1.5 py-0.5 rounded-md ${
                                                                     diff <= 30
-                                                                        ? 'text-red-600 dark:text-red-400'
+                                                                        ? 'bg-red-100 dark:bg-red-500/20 text-red-600 dark:text-red-300'
                                                                         : diff <= 90
-                                                                        ? 'text-yellow-700 dark:text-yellow-400'
-                                                                        : 'text-green-700 dark:text-green-400'
+                                                                        ? 'bg-yellow-100 dark:bg-yellow-500/15 text-yellow-700 dark:text-yellow-300'
+                                                                        : 'bg-green-100 dark:bg-green-500/15 text-green-700 dark:text-green-300'
                                                                 }`}>
                                                                     剩 {parts.join(' ')}
-                                                                </div>
+                                                                </span>
                                                             );
                                                         })()
                                                     ) : null}
                                                 </td>
-                                                <td className="p-3 text-zinc-600 dark:text-white/70 text-xs">
+                                                <td className="p-3 text-zinc-600 dark:text-white/70 text-sm">
                                                     {formatContractDepositPaid(contract)}
                                                 </td>
-                                                <td className="p-3 text-zinc-600 dark:text-white/70 text-xs">
+                                                <td className="p-3 text-zinc-600 dark:text-white/70 text-sm">
                                                     {labelRentOutContractNatureZh(contract.rentOutContractNature)}
                                                 </td>
-                                                <td className="p-3 text-zinc-500 dark:text-white/50 text-xs max-w-24">
+                                                <td className="p-3 text-zinc-500 dark:text-white/50 text-sm max-w-24">
                                                     {(() => {
                                                         const raw = contract.rentOutDescription || '';
                                                         const plain = raw.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim();
@@ -813,14 +820,14 @@ export default function ContractsPage() {
                                                 </p>
                                             </div>
                                             <span
-                                                className={`px-2 py-0.5 rounded-full text-[10px] font-bold shrink-0 ${statusColors[status] || statusColors.listing}`}
+                                                className={`px-2.5 py-1 rounded-full text-xs font-bold shrink-0 ${statusColors[status] || statusColors.listing}`}
                                             >
                                                 {status === 'renting' ? '出租中' : status === 'listing' ? '放盤中' : status === 'leasing_in' ? '租入中' : status === 'completed' ? '已完租' : '其他'}
                                             </span>
                                         </div>
                                         <p className="text-sm text-zinc-600 dark:text-white/70">承租人：{lesseeName || '-'}</p>
                                         <p
-                                            className={`text-sm font-medium ${
+                                            className={`text-base font-semibold ${
                                                 isLeaseInTab
                                                     ? 'text-violet-700 dark:text-violet-300'
                                                     : 'text-amber-600 dark:text-amber-400'
@@ -828,7 +835,7 @@ export default function ContractsPage() {
                                         >
                                             {contract.currency || 'HKD'} {monthlyRent.toLocaleString()} / 月
                                         </p>
-                                        <div className="text-xs text-zinc-500 dark:text-white/50 leading-relaxed">
+                                        <div className="text-sm text-zinc-500 dark:text-white/50 leading-relaxed">
                                             <div>{startDate ? new Date(startDate).toLocaleDateString() : '-'}</div>
                                             <div>
                                                 ~ {endDate ? new Date(endDate).toLocaleDateString() : '-'}
@@ -846,8 +853,8 @@ export default function ContractsPage() {
                                                     : ''}
                                             </div>
                                         </div>
-                                        <div className="text-xs text-zinc-500 dark:text-white/50">
-                                            租約完結日：
+                                        <div className="text-sm text-zinc-500 dark:text-white/50">
+                                            <span className="text-zinc-700 dark:text-white/80 font-medium">完結日：</span>
                                             {endDate ? (
                                                 (() => {
                                                     const now = new Date();
@@ -855,14 +862,14 @@ export default function ContractsPage() {
                                                     const diff = Math.ceil((end.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
                                                     if (diff < 0) {
                                                         return (
-                                                            <span className="ml-1 text-zinc-400 dark:text-zinc-500 line-through">
+                                                            <span className="text-zinc-400 dark:text-zinc-500 line-through">
                                                                 已完結
                                                             </span>
                                                         );
                                                     }
                                                     if (diff === 0) {
                                                         return (
-                                                            <span className="ml-1 text-red-600 dark:text-red-400 font-semibold animate-pulse">
+                                                            <span className="text-red-600 dark:text-red-400 font-bold animate-pulse">
                                                                 今日完結
                                                             </span>
                                                         );
@@ -875,26 +882,26 @@ export default function ContractsPage() {
                                                     if (m > 0) parts.push(`${m} 個月`);
                                                     if (d > 0 || parts.length === 0) parts.push(`${d} 日`);
                                                     return (
-                                                        <span className={`ml-1 font-medium ${
+                                                        <span className={`inline-block text-sm font-bold px-1.5 py-0.5 rounded-md ${
                                                             diff <= 30
-                                                                ? 'text-red-600 dark:text-red-400'
+                                                                ? 'bg-red-100 dark:bg-red-500/20 text-red-600 dark:text-red-300'
                                                                 : diff <= 90
-                                                                ? 'text-yellow-700 dark:text-yellow-400'
-                                                                : 'text-green-700 dark:text-green-400'
+                                                                ? 'bg-yellow-100 dark:bg-yellow-500/15 text-yellow-700 dark:text-yellow-300'
+                                                                : 'bg-green-100 dark:bg-green-500/15 text-green-700 dark:text-green-300'
                                                         }`}>
                                                             剩 {parts.join(' ')}
                                                         </span>
                                                     );
                                                 })()
                                             ) : (
-                                                <span className="ml-1 text-zinc-300 dark:text-white/20">—</span>
+                                                <span className="text-zinc-300 dark:text-white/20">—</span>
                                             )}
                                         </div>
-                                        <p className="text-xs text-zinc-500 dark:text-white/50">
-                                            {isLeaseInTab ? '已付按金' : '已收按金'}：<span className="text-zinc-800 dark:text-white/90">{formatContractDepositPaid(contract)}</span>
+                                        <p className="text-sm text-zinc-500 dark:text-white/50">
+                                            <span className="text-zinc-700 dark:text-white/80 font-medium">{isLeaseInTab ? '已付按金' : '已收按金'}：</span><span className="text-zinc-800 dark:text-white/90">{formatContractDepositPaid(contract)}</span>
                                         </p>
-                                        <p className="text-xs text-zinc-500 dark:text-white/50">
-                                            租賃性質：<span className="text-zinc-800 dark:text-white/90">
+                                        <p className="text-sm text-zinc-500 dark:text-white/50">
+                                            <span className="text-zinc-700 dark:text-white/80 font-medium">租賃性質：</span><span className="text-zinc-800 dark:text-white/90">
                                                 {labelRentOutContractNatureZh(contract.rentOutContractNature)}
                                             </span>
                                         </p>
@@ -903,8 +910,8 @@ export default function ContractsPage() {
                                             const plain = raw.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim();
                                             if (!plain) return null;
                                             return (
-                                                <p className="text-xs text-zinc-500 dark:text-white/50 line-clamp-2">
-                                                    合約描述：<span className="text-zinc-700 dark:text-white/70">{plain}</span>
+                                                <p className="text-sm text-zinc-500 dark:text-white/50 line-clamp-2">
+                                                    <span className="text-zinc-700 dark:text-white/80 font-medium">合約描述：</span><span className="text-zinc-700 dark:text-white/70">{plain}</span>
                                                 </p>
                                             );
                                         })()}
