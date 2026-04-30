@@ -313,6 +313,8 @@ export default function DashboardPage() {
         }
     }, []);
 
+    const isInitialLoading = statsLoading && !stats;
+
     /* ---- 資料分類 ---- */
     const { paidRents, unpaidRents, leasingRows, terminatedRows } = useMemo(() => {
         const list = rents as Record<string, unknown>[];
@@ -335,18 +337,6 @@ export default function DashboardPage() {
     }, [rents]);
 
     const isAnyLoading = statsLoading || rentsLoading || contractLoading || propsLoading || propsrLoading;
-
-    if (statsLoading && !stats) {
-        return (
-            <div className="flex items-center justify-center min-h-[60vh]">
-                <motion.div
-                    animate={{ opacity: [0.3, 1, 0.3] }}
-                    transition={{ duration: 1.5, repeat: Infinity, ease: 'easeInOut' }}
-                    className="w-12 h-12 rounded-full bg-violet-500"
-                />
-            </div>
-        );
-    }
 
     /* ---- 租賃合約 / 出租合約 ---- */
     const totalProperties = stats?.totalProperties ?? 0;
@@ -381,6 +371,18 @@ export default function DashboardPage() {
                 return endA - endB;
             });
     }, [contractContract]);
+
+    if (isInitialLoading) {
+        return (
+            <div className="flex items-center justify-center min-h-[60vh]">
+                <motion.div
+                    animate={{ opacity: [0.3, 1, 0.3] }}
+                    transition={{ duration: 1.5, repeat: Infinity, ease: 'easeInOut' }}
+                    className="w-12 h-12 rounded-full bg-violet-500"
+                />
+            </div>
+        );
+    }
 
     return (
         <motion.div
