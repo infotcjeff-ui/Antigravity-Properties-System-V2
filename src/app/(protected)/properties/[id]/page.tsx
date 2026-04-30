@@ -974,7 +974,7 @@ export default function PropertyDetailsPage() {
                                                         : '';
                                                 const periods = isRentOutOrContract ? rent.rentOutPeriods : rent.rentingPeriods;
                                                 const periodsDisplay =
-                                                    rent.type === 'rent_out' && startDate && endDate
+                                                    (rent.type === 'rent_out' || rent.type === 'renting') && startDate && endDate
                                                         ? Math.max(
                                                               1,
                                                               Math.round(

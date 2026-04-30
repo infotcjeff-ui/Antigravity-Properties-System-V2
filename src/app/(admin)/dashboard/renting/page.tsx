@@ -4,7 +4,7 @@ import { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useRentsWithRelationsQuery, useRents } from '@/hooks/useStorage';
 import { useQueryClient } from '@tanstack/react-query';
-import { User, Building2, Pencil, Trash2, LayoutList } from 'lucide-react';
+import { User, Building2, Pencil, Trash2, LayoutList, X, Calendar } from 'lucide-react';
 import type { Rent } from '@/lib/db';
 import {
     formatDateDMY,
@@ -16,6 +16,10 @@ import {
     type RentCollectionPayListStatus,
     type RentPaymentMethodFilterValue,
 } from '@/lib/rentPaymentDisplay';
+import {
+    normalizeRentPropertyLotSelection,
+    parseRentPropertyLotPartialFromRow,
+} from '@/lib/formatters';
 import { BentoCard } from '@/components/layout/BentoGrid';
 import RentModal from '@/components/properties/RentModal';
 import PropertyDetailModal from '@/components/properties/PropertyDetailModal';
@@ -49,6 +53,10 @@ export default function RentingPage() {
     const [propertyDetailTarget, setPropertyDetailTarget] = useState<{ id?: string; name: string } | null>(null);
     const [filterPaymentMethod, setFilterPaymentMethod] = useState<RentPaymentMethodFilterValue>('');
     const [filterRentingPayStatus, setFilterRentingPayStatus] = useState<RentingPayStatusFilter>('');
+    const [filterOwner, setFilterOwner] = useState(''); // 業主篩選
+    const [filterLessee, setFilterLessee] = useState(''); // 承租人篩選
+    const [expenseDateStart, setExpenseDateStart] = useState(''); // 總支出日期篩選 - 開始
+    const [expenseDateEnd, setExpenseDateEnd] = useState(''); // 總支出日期篩選 - 結束
     const [listPage, setListPage] = useState(1);
     const { deleteRent } = useRents();
 
@@ -63,10 +71,48 @@ export default function RentingPage() {
         }
     };
 
-    // Calculate total income for renting records
-    const totalIncomeRenting = rents
-        .filter(r => r.status === 'active' || r.status === 'completed' || r.rentOutStatus === 'renting')
-        .reduce((sum, r) => sum + ((r.rentCollectionAmount || r.amount || 0)), 0);
+    // Calculate total expense with date filter
+    const totalExpense = useMemo(() => {
+        return rents
+            .filter(r => {
+                const active = r.status === 'active' || r.status === 'completed' || r.rentOutStatus === 'renting';
+                if (!active) return false;
+                const startDate = r.rentCollectionDate || r.rentingStartDate || r.startDate;
+                if (!startDate) return true;
+                const d = new Date(startDate);
+                if (expenseDateStart && d < new Date(expenseDateStart)) return false;
+                if (expenseDateEnd && d > new Date(expenseDateEnd + 'T23:59:59')) return false;
+                return true;
+            })
+            .reduce((sum, r) => sum + ((r.rentCollectionAmount || r.amount || 0)), 0);
+    }, [rents, expenseDateStart, expenseDateEnd]);
+
+    /** 業主名稱（租賃合約中：tenant 是承租人，proprietor 是業主） */
+    const landlordDisplayName = (r: any) =>
+        (r.proprietor?.name && String(r.proprietor.name).trim()) || '';
+    /** 承租人名稱 */
+    const lesseeDisplayName = (r: any) =>
+        (r.rentCollectionTenantName && String(r.rentCollectionTenantName).trim()) ||
+        (r.tenant?.name && String(r.tenant.name).trim()) ||
+        '';
+
+    const ownerFilterOptions = useMemo(() => {
+        const set = new Set<string>();
+        for (const r of rents) {
+            const name = landlordDisplayName(r);
+            if (name) set.add(name);
+        }
+        return [...set].sort((a, b) => a.localeCompare(b, 'zh-HK'));
+    }, [rents]);
+
+    const lesseeFilterOptions = useMemo(() => {
+        const set = new Set<string>();
+        for (const r of rents) {
+            const name = lesseeDisplayName(r);
+            if (name) set.add(name);
+        }
+        return [...set].sort((a, b) => a.localeCompare(b, 'zh-HK'));
+    }, [rents]);
 
     const paidCount = rents.filter(r => getRentCollectionPayListStatus(r) === 'paid').length;
     const unpaidCount = rents.filter(r => getRentCollectionPayListStatus(r) === 'unpaid').length;
@@ -79,9 +125,11 @@ export default function RentingPage() {
         }).filter(r => {
             if (!matchesRentPaymentMethodFilter(r, filterPaymentMethod)) return false;
             if (filterRentingPayStatus && getRentCollectionPayListStatus(r) !== filterRentingPayStatus) return false;
+            if (filterOwner && landlordDisplayName(r) !== filterOwner) return false;
+            if (filterLessee && lesseeDisplayName(r) !== filterLessee) return false;
             return true;
         });
-    }, [rents, filterPaymentMethod, filterRentingPayStatus]);
+    }, [rents, filterPaymentMethod, filterRentingPayStatus, filterOwner, filterLessee]);
 
     const totalListPages = Math.max(1, Math.ceil(filteredRents.length / ADMIN_LIST_PAGE_SIZE));
     const effectiveListPage = Math.min(listPage, totalListPages);
@@ -120,17 +168,52 @@ export default function RentingPage() {
             {/* Stats */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 <BentoCard>
-                    <div className="flex items-center justify-between">
-                        <div>
-                            <p className="text-zinc-500 dark:text-white/50 text-sm">{t('Total income', '總收入')}</p>
-                            <p className="text-2xl font-bold text-green-600 dark:text-green-400 mt-1">
-                                HKD {totalIncomeRenting.toLocaleString()}
-                            </p>
+                    <div className="flex flex-col gap-2">
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <p className="text-zinc-500 dark:text-white/50 text-sm">總支出</p>
+                                <p className="text-2xl font-bold text-[var(--color-green-600)] mt-1 tabular-nums">
+                                    HKD {totalExpense.toLocaleString()}
+                                </p>
+                                {(expenseDateStart || expenseDateEnd) && (
+                                    <p className="text-xs text-zinc-400 dark:text-white/50 mt-0.5">
+                                        {expenseDateStart ? new Date(expenseDateStart).toLocaleDateString('zh-HK', { year: 'numeric', month: '2-digit', day: '2-digit' }) : '…'} ~ {expenseDateEnd ? new Date(expenseDateEnd).toLocaleDateString('zh-HK', { year: 'numeric', month: '2-digit', day: '2-digit' }) : '…'}
+                                    </p>
+                                )}
+                            </div>
+                            <div className="p-3 rounded-xl bg-[var(--color-green-600)]/10 shrink-0">
+                                <svg className="w-6 h-6 text-[var(--color-green-600)]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
+                                </svg>
+                            </div>
                         </div>
-                        <div className="p-3 rounded-xl bg-green-50 dark:bg-green-500/20">
-                            <svg className="w-6 h-6 text-green-600 dark:text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                            </svg>
+                        <div className="flex items-center gap-1.5">
+                            <Calendar className="w-3 h-3 text-zinc-400 dark:text-white/30 shrink-0" />
+                            <input
+                                type="date"
+                                value={expenseDateStart}
+                                onChange={(e) => setExpenseDateStart(e.target.value)}
+                                max={expenseDateEnd || undefined}
+                                className="px-2 py-1 text-xs bg-zinc-50 dark:bg-white/5 border border-zinc-200 dark:border-white/10 rounded-lg text-zinc-600 dark:text-white/60 focus:outline-none focus:ring-1 focus:ring-red-500/30 cursor-pointer w-28"
+                            />
+                            <span className="text-zinc-400 dark:text-white/30 text-xs shrink-0">~</span>
+                            <input
+                                type="date"
+                                value={expenseDateEnd}
+                                onChange={(e) => setExpenseDateEnd(e.target.value)}
+                                min={expenseDateStart || undefined}
+                                className="px-2 py-1 text-xs bg-zinc-50 dark:bg-white/5 border border-zinc-200 dark:border-white/10 rounded-lg text-zinc-600 dark:text-white/60 focus:outline-none focus:ring-1 focus:ring-red-500/30 cursor-pointer w-28"
+                            />
+                            {(expenseDateStart || expenseDateEnd) && (
+                                <button
+                                    type="button"
+                                    onClick={() => { setExpenseDateStart(''); setExpenseDateEnd(''); }}
+                                    className="p-1 rounded text-zinc-400 hover:text-red-500 dark:hover:text-red-400 transition-colors"
+                                    title="清除日期篩選"
+                                >
+                                    <X className="w-3 h-3" />
+                                </button>
+                            )}
                         </div>
                     </div>
                 </BentoCard>
@@ -188,6 +271,32 @@ export default function RentingPage() {
                     <>
                         <div className="glass-card p-4 flex flex-col sm:flex-row flex-wrap gap-4 sm:items-end">
                             <div className="flex-1 min-w-40">
+                                <label className="text-xs font-medium text-zinc-500 dark:text-white/50">業主</label>
+                                <select
+                                    value={filterOwner}
+                                    onChange={e => setFilterOwner(e.target.value)}
+                                    className={filterSelectClass}
+                                >
+                                    <option value="">全部</option>
+                                    {ownerFilterOptions.map((name) => (
+                                        <option key={name} value={name}>{name}</option>
+                                    ))}
+                                </select>
+                            </div>
+                            <div className="flex-1 min-w-40">
+                                <label className="text-xs font-medium text-zinc-500 dark:text-white/50">承租人</label>
+                                <select
+                                    value={filterLessee}
+                                    onChange={e => setFilterLessee(e.target.value)}
+                                    className={filterSelectClass}
+                                >
+                                    <option value="">全部</option>
+                                    {lesseeFilterOptions.map((name) => (
+                                        <option key={name} value={name}>{name}</option>
+                                    ))}
+                                </select>
+                            </div>
+                            <div className="flex-1 min-w-40">
                                 <label className="text-xs font-medium text-zinc-500 dark:text-white/50">付款方式</label>
                                 <select
                                     value={filterPaymentMethod}
@@ -219,7 +328,7 @@ export default function RentingPage() {
                         {filteredRents.length === 0 ? (
                             <div className="glass-card flex flex-col items-center justify-center py-16 text-zinc-500 dark:text-white/45">
                                 <p className="text-lg font-medium">沒有符合篩選條件的記錄</p>
-                                <p className="text-sm mt-1">請調整「付款方式」或「狀態」篩選</p>
+                                <p className="text-sm mt-1">請調整上方篩選條件</p>
                             </div>
                         ) : (
                             <>
@@ -273,9 +382,31 @@ export default function RentingPage() {
                                                 }}
                                                 className="border-b border-zinc-100 dark:border-white/5 hover:bg-zinc-50 dark:hover:bg-white/5 transition-colors cursor-pointer"
                                             >
-                                                <td className="p-4 text-zinc-900 dark:text-white font-medium">{property?.name || '-'}</td>
-                                                <td className="p-4 text-zinc-600 dark:text-white/70">{landlordDisplay}</td>
-                                                <td className="p-4 text-zinc-600 dark:text-white/70 text-sm">{lesseeDisplay}</td>
+                                                <td className="p-4">
+                                                    <div className="text-zinc-900 dark:text-white font-medium">{property?.name || '-'}</div>
+                                                    <div className="text-xs text-zinc-400 dark:text-white/40 mt-0.5 line-clamp-1">
+                                                        {(() => {
+                                                            const selected = normalizeRentPropertyLotSelection(rent.rentPropertyLot ?? (rent as any).rent_property_lot);
+                                                            const partial = parseRentPropertyLotPartialFromRow(rent.rentPropertyLotPartial ?? (rent as any).rent_property_lot_partial);
+                                                            if (!selected.length) return <span className="text-zinc-300 dark:text-white/20">—</span>;
+                                                            const lots = selected.map(lot => partial[lot] ? `${lot}（部分地方）` : lot);
+                                                            if (lots.length > 1) {
+                                                                return <span className="truncate block" title={lots.join('、')}>{lots[0]}...</span>;
+                                                            }
+                                                            return <span className="truncate block">{lots[0]}</span>;
+                                                        })()}
+                                                    </div>
+                                                </td>
+                                                <td className="p-4 text-zinc-600 dark:text-white/70">
+                                                    <span className="truncate block max-w-28" title={landlordDisplay}>
+                                                        {landlordDisplay}
+                                                    </span>
+                                                </td>
+                                                <td className="p-4 text-zinc-600 dark:text-white/70 text-sm">
+                                                    <span className="truncate block max-w-28" title={lesseeDisplay}>
+                                                        {lesseeDisplay}
+                                                    </span>
+                                                </td>
                                                 <td className="p-4 text-zinc-900 dark:text-white font-medium">
                                                     {payDone
                                                         ? `${rent.currency || 'HKD'} ${Number(rent.rentCollectionAmount).toLocaleString()}`
@@ -369,14 +500,28 @@ export default function RentingPage() {
                                                     {rentingPayStatusLabel[rowPayStatus]}
                                                 </span>
                                             </div>
+                                            {(() => {
+                                                const selected = normalizeRentPropertyLotSelection(rent.rentPropertyLot ?? (rent as any).rent_property_lot);
+                                                const partial = parseRentPropertyLotPartialFromRow(rent.rentPropertyLotPartial ?? (rent as any).rent_property_lot_partial);
+                                                if (selected.length) {
+                                                    const lots = selected.map(lot => partial[lot] ? `${lot}（部分地方）` : lot);
+                                                    const display = lots.length > 1 ? `${lots[0]}...` : lots[0];
+                                                    return (
+                                                        <p className="text-[10px] text-zinc-400 dark:text-white/40 mb-1 line-clamp-1">
+                                                            {display}
+                                                        </p>
+                                                    );
+                                                }
+                                                return null;
+                                            })()}
                                             <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px] text-zinc-500 dark:text-white/50">
                                                 <span className="flex items-center gap-1">
                                                     <User className="w-3 h-3" />
-                                                    <span className="truncate max-w-20">{landlordDisplay}</span>
+                                                    <span className="truncate max-w-20" title={landlordDisplay}>{landlordDisplay}</span>
                                                 </span>
                                                 <span className="flex items-center gap-1">
                                                     <span className="text-zinc-300 dark:text-white/20">承租</span>
-                                                    <span className="truncate max-w-20">{lesseeDisplay}</span>
+                                                    <span className="truncate max-w-20" title={lesseeDisplay}>{lesseeDisplay}</span>
                                                 </span>
                                             </div>
                                         </div>

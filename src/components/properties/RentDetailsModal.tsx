@@ -60,6 +60,24 @@ export default function RentDetailsModal({ rent, property, currentTenants = [], 
             : date.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
     };
 
+    const calcMonths = (startDate: any, endDate: any) => {
+        if (!startDate || !endDate) return null;
+        const months = Math.max(
+            1,
+            Math.round(
+                (new Date(endDate).getTime() - new Date(startDate).getTime()) /
+                    (1000 * 60 * 60 * 24 * 30),
+            ),
+        );
+        return months;
+    };
+
+    const fmtPeriods = (periods: any, startDate: any, endDate: any) => {
+        if (periods != null && periods !== '') return periods;
+        const m = calcMonths(startDate, endDate);
+        return m != null ? `(${m}個月)` : null;
+    };
+
     const rentOutListPeriod = rent.type === 'rent_out' ? getRentOutCollectionDisplayPeriod(rent) : null;
     const endDateForExpiry =
         rent.type === 'renting'
@@ -357,7 +375,7 @@ export default function RentDetailsModal({ rent, property, currentTenants = [], 
                             <DetailRow label={t('Rent Number', '租約號碼')} value={rent.rentingNumber} />
                             <DetailRow label={t('Reference Number', '對方租約號碼')} value={rent.rentingReferenceNumber} />
                             <DetailRow label={t('Monthly Rent', '月租')} value={formatCurrency(rent.rentingMonthlyRental)} />
-                            <DetailRow label={t('Periods', '期數')} value={rent.rentingPeriods} />
+                            <DetailRow label={t('Periods', '期數')} value={fmtPeriods(rent.rentingPeriods, rent.rentingStartDate, rent.rentingEndDate)} />
                             <DetailRow label={t('Start Date', '開始日期')} value={formatDate(rent.rentingStartDate)} />
                             <DetailRow label={t('End Date', '結束日期')} value={formatDate(rent.rentingEndDate)} />
                             <DetailRow label={t('Deposit', '押金')} value={formatCurrency(rent.rentingDeposit)} />

@@ -2940,8 +2940,6 @@ export default function RentModal({
                 <RentOutFormModal
                     mode="sub_landlord"
                     editItem={editSubLandlord}
-                    isAddPropertyData={!!editSubLandlord && !!formData.propertyId}
-                    currentPropertyCode={formData.propertyId ? properties.find(p => p.id === formData.propertyId)?.code : undefined}
                     onClose={() => { setShowSubLandlordModal(false); setEditSubLandlord(null); }}
                     onSuccess={async (id) => {
                         await queryClient.invalidateQueries({ queryKey: ['sub_landlords'] });
@@ -2956,7 +2954,6 @@ export default function RentModal({
                 <RentOutFormModal
                     mode="current_tenant"
                     editItem={editCurrentTenant}
-                    currentPropertyCode={formData.propertyId ? properties.find(p => p.id === formData.propertyId)?.code : undefined}
                     onClose={() => { setShowCurrentTenantModal(false); setEditCurrentTenant(null); }}
                     onSuccess={async (id) => {
                         await queryClient.invalidateQueries({ queryKey: ['current_tenants'] });

@@ -20,6 +20,21 @@ const statusColors: Record<string, string> = {
     suspended: 'bg-red-500/20 text-red-400',
 };
 
+const landUseTypeLabels: Record<string, string> = {
+    agr: 'AGR 農業',
+    ca: 'CA 自然保育區',
+    os: 'OS 露天貯物',
+    v: 'V 鄉村式發展',
+    ou: 'OU 其他指定用途',
+    open_storage: '露天倉儲',
+    residential_a: '住宅(甲)',
+    open_space: '開放空間',
+    village_dev: '鄉村式發展',
+    conservation_area: '保育區',
+    residential_c: '住宅(丙類)',
+    recreation_use: '休憩用地',
+};
+
 const statusLabels: Record<string, string> = {
     holding: '持有中',
     renting: '出租中',
@@ -58,6 +73,7 @@ export default function ManagePropertiesPage() {
     const [searchQuery, setSearchQuery] = useState('');
     const [filterType, setFilterType] = useState('');
     const [filterStatus, setFilterStatus] = useState('');
+    const [filterLandUse, setFilterLandUse] = useState('');
     const [showForm, setShowForm] = useState(false);
     const [editingProperty, setEditingProperty] = useState<Property | null>(null);
     const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
@@ -87,8 +103,14 @@ export default function ManagePropertiesPage() {
             properties = properties.filter((p: Property) => p.status === filterStatus);
         }
 
+        if (filterLandUse) {
+            properties = properties.filter((p: Property) =>
+                p.landUse ? p.landUse.split(',').map(u => u.trim()).includes(filterLandUse) : false
+            );
+        }
+
         return properties;
-    }, [qProperties, searchQuery, filterType, filterStatus]);
+    }, [qProperties, searchQuery, filterType, filterStatus, filterLandUse]);
 
     const sortedProperties = useMemo(() => {
         return [...filteredProperties].sort((a, b) =>
@@ -193,6 +215,25 @@ export default function ManagePropertiesPage() {
                     <option value="sold">已售出</option>
                     <option value="suspended">已暫停</option>
                 </select>
+                <select
+                    value={filterLandUse}
+                    onChange={(e) => setFilterLandUse(e.target.value)}
+                    className="px-4 py-2.5 bg-zinc-100 dark:bg-white/5 border border-zinc-200 dark:border-white/10 rounded-xl text-zinc-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/30 transition-all cursor-pointer min-w-[160px]"
+                >
+                    <option value="">全部土地用途</option>
+                    <option value="agr">AGR 農業</option>
+                    <option value="ca">CA 自然保育區</option>
+                    <option value="os">OS 露天貯物</option>
+                    <option value="v">V 鄉村式發展</option>
+                    <option value="ou">OU 其他指定用途</option>
+                    <option value="open_storage">露天倉儲</option>
+                    <option value="residential_a">住宅(甲)</option>
+                    <option value="open_space">開放空間</option>
+                    <option value="village_dev">鄉村式發展</option>
+                    <option value="conservation_area">保育區</option>
+                    <option value="residential_c">住宅(丙類)</option>
+                    <option value="recreation_use">休憩用地</option>
+                </select>
             </div>
 
             {isLoading ? (
@@ -235,6 +276,7 @@ export default function ManagePropertiesPage() {
                                         <th className="px-4 py-3 text-left text-xs font-medium text-zinc-500 dark:text-white/40 uppercase tracking-wider">名稱</th>
                                         <th className="px-4 py-3 text-left text-xs font-medium text-zinc-500 dark:text-white/40 uppercase tracking-wider">地段</th>
                                         <th className="px-4 py-3 text-left text-xs font-medium text-zinc-500 dark:text-white/40 uppercase tracking-wider">地段面積</th>
+                                        <th className="px-4 py-3 text-left text-xs font-medium text-zinc-500 dark:text-white/40 uppercase tracking-wider">土地用途</th>
                                         <th className="px-4 py-3 text-left text-xs font-medium text-zinc-500 dark:text-white/40 uppercase tracking-wider">類型</th>
                                         <th className="px-4 py-3 text-left text-xs font-medium text-zinc-500 dark:text-white/40 uppercase tracking-wider">狀態</th>
                                         {isAdmin && (
@@ -296,6 +338,18 @@ export default function ManagePropertiesPage() {
                                                 })()}
                                             </td>
                                             <td className="p-4 text-zinc-600 dark:text-white/70 text-sm">{formatLotArea(property.lotArea)}</td>
+                                            <td className="p-4">
+                                                {property.landUse ? (
+                                                    <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-purple-100 dark:bg-purple-500/20 text-purple-700 dark:text-purple-300">
+                                                        {(() => {
+                                                            const parts = property.landUse.split(',').map(u => u.trim()).filter(Boolean);
+                                                            return parts.length > 0 ? (landUseTypeLabels[parts[parts.length - 1]] || parts[parts.length - 1]) : '-';
+                                                        })()}
+                                                    </span>
+                                                ) : (
+                                                    <span className="text-zinc-400 dark:text-white/30 text-sm">-</span>
+                                                )}
+                                            </td>
                                             <td className="p-4 text-zinc-600 dark:text-white/70">{typeLabels[property.type]}</td>
                                             <td className="p-4">
                                                 <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${statusColors[property.status]}`}>

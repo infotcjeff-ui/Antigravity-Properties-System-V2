@@ -15,7 +15,7 @@ export default function ProtectedLayout({
 }) {
     const pathname = usePathname();
     const [isAuthenticated, setIsAuthenticated] = useState(false);
-    const [isLoading, setIsLoading] = useState(true);
+    const [authChecked, setAuthChecked] = useState(false);
 
     useEffect(() => {
         // Check authentication from LocalStorage
@@ -32,7 +32,7 @@ export default function ProtectedLayout({
                 console.error('Auth check failed:', error);
                 setIsAuthenticated(false);
             } finally {
-                setIsLoading(false);
+                setAuthChecked(true);
             }
         };
 
@@ -41,7 +41,7 @@ export default function ProtectedLayout({
 
     // Global restrictions for unauthenticated guests
     useEffect(() => {
-        if (isLoading || isAuthenticated) return;
+        if (authChecked && isAuthenticated) return;
 
         const handleContextMenu = (e: MouseEvent) => {
             e.preventDefault();
@@ -69,7 +69,7 @@ export default function ProtectedLayout({
             window.removeEventListener('contextmenu', handleContextMenu);
             window.removeEventListener('keydown', handleKeyDown);
         };
-    }, [isLoading, isAuthenticated]);
+    }, [authChecked, isAuthenticated]);
 
     // Public routes that don't require authentication
     const publicRoutes = ['/'];
@@ -81,12 +81,12 @@ export default function ProtectedLayout({
 
     // If on a protected route and not authenticated, redirect to login
     useEffect(() => {
-        if (!isLoading && isProtectedRoute && !isAuthenticated) {
+        if (!authChecked && isProtectedRoute && !isAuthenticated) {
             window.location.href = '/login';
         }
-    }, [isLoading, isProtectedRoute, isAuthenticated]);
+    }, [authChecked, isProtectedRoute, isAuthenticated]);
 
-    if (isLoading) {
+    if (!authChecked) {
         return (
             <div className="min-h-screen flex items-center justify-center bg-[#0f0f1a]">
                 <motion.div

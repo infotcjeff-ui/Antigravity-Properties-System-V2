@@ -4,7 +4,7 @@ import { useState, useMemo, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useQueryClient } from '@tanstack/react-query';
-import { FileText, Pencil, Trash2, Building2, Search, X, Calendar, Users, SlidersHorizontal } from 'lucide-react';
+import { FileText, Pencil, Trash2, Building2, Search, X, Calendar, Users, SlidersHorizontal, DollarSign, ShieldCheck } from 'lucide-react';
 import { useRentsWithRelationsQuery, useRents } from '@/hooks/useStorage';
 import type { Rent } from '@/lib/db';
 import { labelRentOutContractNatureZh } from '@/lib/rentPaymentDisplay';
@@ -41,13 +41,18 @@ export default function ContractsPage() {
         setDeletePortalReady(true);
     }, []);
 
-    /** 清除所有 filter 並重置頁碼 */
+    /** 清除所有 filter 並重設頁碼 */
     const clearAllFilters = () => {
         setSearchQuery('');
+        setFilterOwner('');
+        setFilterSubLandlord('');
+        setFilterCurrentTenant('');
         setFilterTenant('');
         setFilterStatus('');
         setFilterDateStart('');
         setFilterDateEnd('');
+        setAmountDateStart('');
+        setAmountDateEnd('');
         setListPage(1);
     };
 
@@ -58,11 +63,51 @@ export default function ContractsPage() {
 
     /** Filter states */
     const [searchQuery, setSearchQuery] = useState('');
-    const [filterTenant, setFilterTenant] = useState(''); // 承租人篩選
+    const [filterOwner, setFilterOwner] = useState(''); // 業主篩選
+    const [filterSubLandlord, setFilterSubLandlord] = useState(''); // 二房東篩選
+    const [filterCurrentTenant, setFilterCurrentTenant] = useState(''); // 現時租客篩選
+    const [filterTenant, setFilterTenant] = useState(''); // 承租人篩選（租賃合約用）
     const [filterDateStart, setFilterDateStart] = useState(''); // 租約日期 - 開始
     const [filterDateEnd, setFilterDateEnd] = useState(''); // 租約日期 - 結束
     const [filterStatus, setFilterStatus] = useState(''); // 狀態篩選
+    /** 總金額 section 日期篩選 */
+    const [amountDateStart, setAmountDateStart] = useState('');
+    const [amountDateEnd, setAmountDateEnd] = useState('');
     const [showFilters, setShowFilters] = useState(true); // 收合/展開 filter
+
+    /** 足月計算制：計算兩個日期之間的完整月份數（考慮月末最後一天視為完整月份）
+     *  2026/1/1 ~ 2028/12/31 → 35 個月（Jan 2026 到 Dec 2028，12/31 是月末，計為完整月）
+     *  2026/1/1 ~ 2028/12/1  → 34 個月（12/1 不是月末，只算到 11 月底）
+     */
+    const calcFullMonths = (startDate: Date, endDate: Date): number => {
+        const start = new Date(startDate);
+        const end = new Date(endDate);
+        const startYear = start.getFullYear();
+        const startMonth = start.getMonth(); // 0-indexed
+        const endYear = end.getFullYear();
+        const endMonth = end.getMonth();
+
+        // 計算 start 到 end（含 both 的完整月數）
+        let months = (endYear - startYear) * 12 + (endMonth - startMonth);
+
+        // 檢查 end 是否為其月份的最後一天 → 多算一個月
+        const lastDayOfEndMonth = new Date(endYear, endMonth + 1, 0).getDate();
+        if (end.getDate() === lastDayOfEndMonth) {
+            months += 1;
+        }
+
+        return months;
+    };
+
+    /** 格式化租期顯示：月份數 → 年 + 剩餘月 */
+    const formatDuration = (months: number): string => {
+        if (months <= 0) return '0 個月';
+        const y = Math.floor(months / 12);
+        const r = months % 12;
+        if (y === 0) return `${r} 個月`;
+        if (r === 0) return `${y} 年`;
+        return `${y} 年 ${r} 個月`;
+    };
 
     const sortByStartDateOldestFirst = (arr: any[]) =>
         [...arr].sort((a, b) => {
@@ -100,6 +145,11 @@ export default function ContractsPage() {
         (c.tenant?.name && String(c.tenant.name).trim()) ||
         (c.proprietor?.name && String(c.proprietor.name).trim()) ||
         '';
+    /** 二房東顯示名稱 */
+    const contractSubLandlordDisplayName = (c: any) =>
+        (c.subLandlord?.name && String(c.subLandlord.name).trim()) ||
+        (c.rentOutSubLandlord && String(c.rentOutSubLandlord).trim()) ||
+        '';
     const contractLesseeDisplayName = (c: any) => {
         const fromCt = c.currentTenant?.name && String(c.currentTenant.name).trim();
         if (fromCt) return fromCt;
@@ -112,30 +162,45 @@ export default function ContractsPage() {
     const filteredContracts = useMemo(() => {
         let result = activeContracts as any[];
 
-        // 1. 搜尋過濾（合約號碼 + 物業名稱 + 承租人 + 業主）
+        // 1. 搜尋過濾（合約號碼 + 物業名稱 + 二房東 + 現時租客 + 業主）
         if (searchQuery.trim()) {
             const q = searchQuery.toLowerCase();
             result = result.filter((c) => {
                 const lessee = contractLesseeDisplayName(c).toLowerCase();
                 const owner = contractOwnerDisplayName(c).toLowerCase();
+                const subLandlord = contractSubLandlordDisplayName(c).toLowerCase();
                 const propertyName = (c.property?.name || '').toLowerCase();
                 const tenancyNumber = (c.rentOutTenancyNumber || '').toLowerCase();
                 return (
                     lessee.includes(q) ||
                     owner.includes(q) ||
+                    subLandlord.includes(q) ||
                     propertyName.includes(q) ||
                     tenancyNumber.includes(q)
                 );
             });
         }
 
-        // 2. 承租人篩選
-        if (filterTenant) {
-            result = result.filter((c) => {
-                const lessee = contractLesseeDisplayName(c);
-                const owner = contractOwnerDisplayName(c);
-                return lessee === filterTenant || owner === filterTenant;
-            });
+        // 2. 出租合約：按 業主 / 二房東 / 現時租客 篩選；租賃合約：按 業主 / 承租人 篩選
+        if (isLeaseInTab) {
+            // 租賃合約：業主、承租人各自獨立篩選
+            if (filterOwner) {
+                result = result.filter((c) => contractOwnerDisplayName(c) === filterOwner);
+            }
+            if (filterTenant) {
+                result = result.filter((c) => contractLesseeDisplayName(c) === filterTenant);
+            }
+        } else {
+            // 出租合約：按 業主 / 二房東 / 現時租客 分別篩選
+            if (filterOwner) {
+                result = result.filter((c) => contractOwnerDisplayName(c) === filterOwner);
+            }
+            if (filterSubLandlord) {
+                result = result.filter((c) => contractSubLandlordDisplayName(c) === filterSubLandlord);
+            }
+            if (filterCurrentTenant) {
+                result = result.filter((c) => contractLesseeDisplayName(c) === filterCurrentTenant);
+            }
         }
 
         // 3. 租約日期範圍篩選
@@ -161,7 +226,60 @@ export default function ContractsPage() {
         }
 
         return result;
-    }, [activeContracts, searchQuery, filterTenant, filterDateStart, filterDateEnd, filterStatus]);
+    }, [activeContracts, searchQuery, filterOwner, filterSubLandlord, filterCurrentTenant, filterTenant, filterDateStart, filterDateEnd, filterStatus, isLeaseInTab]);
+
+    /** 總金額 section：按日期範圍過濾合約（用租約開始日期），只計算當前 tab 的合約 */
+    const filteredByAmountDate = useMemo(() => {
+        let result = contracts as any[];
+        if (contractListTab === 'lease_in') {
+            result = result.filter((c) => (c.rentOutStatus || c.status) === 'leasing_in');
+        } else {
+            result = result.filter((c) => (c.rentOutStatus || c.status) !== 'leasing_in');
+        }
+        if (amountDateStart) {
+            const start = new Date(amountDateStart);
+            result = result.filter((c) => {
+                const contractStart = c.rentOutStartDate ? new Date(c.rentOutStartDate) : null;
+                return contractStart && contractStart >= start;
+            });
+        }
+        if (amountDateEnd) {
+            const end = new Date(amountDateEnd);
+            end.setHours(23, 59, 59, 999);
+            result = result.filter((c) => {
+                const contractStart = c.rentOutStartDate ? new Date(c.rentOutStartDate) : null;
+                return contractStart && contractStart <= end;
+            });
+        }
+        return result;
+    }, [contracts, contractListTab, amountDateStart, amountDateEnd]);
+
+    /** 總金額：月租 × 租期月份數（足月計算制），按 amountDate 過濾後 */
+    const totalMonthlyAmount = useMemo(() => {
+        return filteredByAmountDate.reduce((sum, c) => {
+            const monthly = Number(c.rentOutMonthlyRental) || 0;
+            if (!c.rentOutStartDate || !c.rentOutEndDate) return sum + monthly;
+            const months = calcFullMonths(new Date(c.rentOutStartDate), new Date(c.rentOutEndDate));
+            return sum + monthly * months;
+        }, 0);
+    }, [filteredByAmountDate]);
+
+    /** 按金：租賃合約顯示已付按金，出租合約顯示已收按金 */
+    const totalDeposit = useMemo(() => {
+        const paidDeposit = (filteredByAmountDate as any[]).reduce((sum, c) => {
+            if ((c.rentOutStatus || c.status) === 'leasing_in') {
+                return sum + (Number(c.rentOutDepositReceived) || 0);
+            }
+            return sum;
+        }, 0);
+        const receivedDeposit = (filteredByAmountDate as any[]).reduce((sum, c) => {
+            if ((c.rentOutStatus || c.status) !== 'leasing_in') {
+                return sum + (Number(c.rentOutDepositReceived) || 0);
+            }
+            return sum;
+        }, 0);
+        return { paid: paidDeposit, received: receivedDeposit };
+    }, [filteredByAmountDate]);
 
     const totalListPages = Math.max(1, Math.ceil((filteredContracts as any[]).length / ADMIN_LIST_PAGE_SIZE));
     const effectiveListPage = Math.min(listPage, totalListPages);
@@ -261,43 +379,107 @@ export default function ContractsPage() {
                 </motion.button>
             </div>
 
-            {/* 統計卡片順序：合約總數 → 租賃中 → 出租中 */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <BentoCard>
-                    <div className="flex items-center justify-between">
-                        <div>
-                            <p className="text-zinc-500 dark:text-white/50 text-sm">合約總數</p>
-                            <p className="text-2xl font-bold text-zinc-900 dark:text-white mt-1">{contracts.length}</p>
+            {/* 統計卡片：左側60%總金額 → 右側40% 2×2 grid */}
+            <div className="grid grid-cols-1 lg:grid-cols-20 gap-4 items-stretch">
+                {/* 左側：總金額（55%） */}
+                <div className="lg:col-span-11">
+                    <BentoCard className="h-full">
+                        <div className="space-y-3 h-full flex flex-col">
+                            <div className="flex items-center gap-2">
+                                <div className="p-2.5 rounded-xl bg-[var(--color-green-600)]/10">
+                                    <DollarSign className="w-5 h-5 text-[var(--color-green-600)]" />
+                                </div>
+                                <p className="text-base font-bold text-[var(--color-green-600)] dark:text-[var(--color-green-600)]">總金額</p>
+                            </div>
+                            <div className="flex flex-col gap-1.5">
+                                {/* 日期篩選（只影響金額合計） */}
+                                <div className="flex items-center gap-1 text-sm text-zinc-400 dark:text-white/40">
+                                    <Calendar className="w-3.5 h-3.5 shrink-0" />
+                                    <input
+                                        type="date"
+                                        value={amountDateStart}
+                                        onChange={(e) => setAmountDateStart(e.target.value)}
+                                        max={amountDateEnd || undefined}
+                                        className="px-2 py-1.5 text-sm bg-zinc-100 dark:bg-white/5 border border-zinc-200 dark:border-white/10 rounded-lg text-zinc-600 dark:text-white/60 focus:outline-none focus:ring-1 focus:ring-amber-500/30 cursor-pointer w-28"
+                                    />
+                                    <span>~</span>
+                                    <input
+                                        type="date"
+                                        value={amountDateEnd}
+                                        onChange={(e) => setAmountDateEnd(e.target.value)}
+                                        min={amountDateStart || undefined}
+                                        className="px-2 py-1.5 text-sm bg-zinc-100 dark:bg-white/5 border border-zinc-200 dark:border-white/10 rounded-lg text-zinc-600 dark:text-white/60 focus:outline-none focus:ring-1 focus:ring-amber-500/30 cursor-pointer w-28"
+                                    />
+                                </div>
+                                {/* 金額合計（日期篩選結果顯示在括號內） */}
+                                <div className="bg-[var(--color-green-600)]/10 rounded-xl p-3 border border-[var(--color-green-600)]/30">
+                                    <p className="text-sm text-[var(--color-green-600)] dark:text-[var(--color-green-600)]/80 font-medium">
+                                        {isLeaseInTab ? '租賃合計' : '出租合計'}
+                                        {amountDateStart || amountDateEnd ? (
+                                            <span className="ml-1 text-[var(--color-green-600)]/70 dark:text-[var(--color-green-600)]/60 font-normal">
+                                                ({amountDateStart ? new Date(amountDateStart).toLocaleDateString('zh-HK', { year: 'numeric', month: '2-digit', day: '2-digit' }) : '…'}{' '}~ {amountDateEnd ? new Date(amountDateEnd).toLocaleDateString('zh-HK', { year: 'numeric', month: '2-digit', day: '2-digit' }) : '…'})
+                                            </span>
+                                        ) : null}
+                                    </p>
+                                    <p className="text-2xl font-bold text-[var(--color-green-600)] dark:text-[var(--color-green-600)] mt-0.5 tabular-nums">
+                                        HKD {totalMonthlyAmount.toLocaleString()}
+                                    </p>
+                                </div>
+                            </div>
                         </div>
-                        <div className="p-3 rounded-xl bg-amber-50 dark:bg-amber-500/20">
-                            <FileText className="w-6 h-6 text-amber-600 dark:text-amber-400" />
+                    </BentoCard>
+                </div>
+                {/* 右側：2×2 grid（45%） — 上: 已付按金+合約總數, 下: 租賃中+出租中 */}
+                <div className="lg:col-span-9 grid grid-cols-1 sm:grid-cols-2 gap-4 items-stretch">
+                    <BentoCard className="h-full flex flex-col justify-center">
+                        <div className="flex items-center justify-between h-full">
+                            <div>
+                                <p className="text-zinc-500 dark:text-white/50 text-sm">{isLeaseInTab ? '已付按金' : '已收按金'}</p>
+                                <p className="text-2xl font-bold text-zinc-900 dark:text-white mt-1 tabular-nums">
+                                    HKD {isLeaseInTab ? totalDeposit.paid.toLocaleString() : totalDeposit.received.toLocaleString()}
+                                </p>
+                            </div>
+                            <div className="p-3 rounded-xl bg-emerald-50 dark:bg-emerald-500/20 shrink-0">
+                                <ShieldCheck className="w-6 h-6 text-emerald-600 dark:text-emerald-400" />
+                            </div>
                         </div>
-                    </div>
-                </BentoCard>
-                <BentoCard>
-                    <div className="flex items-center justify-between">
-                        <div>
-                            <p className="text-zinc-500 dark:text-white/50 text-sm">租賃中</p>
-                            <p className="text-2xl font-bold text-zinc-900 dark:text-white mt-1">{leaseInContracts.length}</p>
+                    </BentoCard>
+                    <BentoCard className="h-full flex flex-col justify-center">
+                        <div className="flex items-center justify-between h-full">
+                            <div>
+                                <p className="text-zinc-500 dark:text-white/50 text-sm">合約總數</p>
+                                <p className="text-2xl font-bold text-zinc-900 dark:text-white mt-1">{contracts.length}</p>
+                            </div>
+                            <div className="p-3 rounded-xl bg-amber-50 dark:bg-amber-500/20 shrink-0">
+                                <FileText className="w-6 h-6 text-amber-600 dark:text-amber-400" />
+                            </div>
                         </div>
-                        <div className="p-3 rounded-xl bg-violet-50 dark:bg-violet-500/20">
-                            <FileText className="w-6 h-6 text-violet-600 dark:text-violet-400" />
+                    </BentoCard>
+                    <BentoCard className="h-full flex flex-col justify-center">
+                        <div className="flex items-center justify-between h-full">
+                            <div>
+                                <p className="text-zinc-500 dark:text-white/50 text-sm">租賃中</p>
+                                <p className="text-2xl font-bold text-zinc-900 dark:text-white mt-1">{leaseInContracts.length}</p>
+                            </div>
+                            <div className="p-3 rounded-xl bg-violet-50 dark:bg-violet-500/20 shrink-0">
+                                <FileText className="w-6 h-6 text-violet-600 dark:text-violet-400" />
+                            </div>
                         </div>
-                    </div>
-                </BentoCard>
-                <BentoCard>
-                    <div className="flex items-center justify-between">
-                        <div>
-                            <p className="text-zinc-500 dark:text-white/50 text-sm">出租中</p>
-                            <p className="text-2xl font-bold text-zinc-900 dark:text-white mt-1">
-                                {contracts.filter((c: any) => (c.rentOutStatus || c.status) === 'renting').length}
-                            </p>
+                    </BentoCard>
+                    <BentoCard className="h-full flex flex-col justify-center">
+                        <div className="flex items-center justify-between h-full">
+                            <div>
+                                <p className="text-zinc-500 dark:text-white/50 text-sm">出租中</p>
+                                <p className="text-2xl font-bold text-zinc-900 dark:text-white mt-1">
+                                    {contracts.filter((c: any) => (c.rentOutStatus || c.status) === 'renting').length}
+                                </p>
+                            </div>
+                            <div className="p-3 rounded-xl bg-green-50 dark:bg-green-500/20 shrink-0">
+                                <Building2 className="w-6 h-6 text-green-600 dark:text-green-400" />
+                            </div>
                         </div>
-                        <div className="p-3 rounded-xl bg-green-50 dark:bg-green-500/20">
-                            <Building2 className="w-6 h-6 text-green-600 dark:text-green-400" />
-                        </div>
-                    </div>
-                </BentoCard>
+                    </BentoCard>
+                </div>
             </div>
 
             {/* Filter Bar */}
@@ -332,22 +514,22 @@ export default function ContractsPage() {
                         type="button"
                         onClick={() => setShowFilters(!showFilters)}
                         className={`flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all ${
-                            showFilters || filterTenant || filterStatus || filterDateStart || filterDateEnd
+                            showFilters || filterOwner || filterSubLandlord || filterCurrentTenant || filterTenant || filterStatus || filterDateStart || filterDateEnd || amountDateStart || amountDateEnd
                                 ? 'bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-300 ring-1 ring-amber-300/40 dark:ring-amber-500/30'
                                 : 'bg-zinc-100 dark:bg-white/5 text-zinc-600 dark:text-white/60 hover:bg-zinc-200 dark:hover:bg-white/10'
                         }`}
                     >
                         <SlidersHorizontal className="w-4 h-4" />
                         <span>篩選</span>
-                        {(filterTenant || filterStatus || filterDateStart || filterDateEnd) && (
+                        {(filterOwner || filterSubLandlord || filterCurrentTenant || filterTenant || filterStatus || filterDateStart || filterDateEnd) && (
                             <span className="w-5 h-5 flex items-center justify-center bg-amber-500 text-white rounded-full text-[10px] font-bold">
-                                {(!!filterTenant ? 1 : 0) + (!!filterStatus ? 1 : 0) + (!!filterDateStart ? 1 : 0) + (!!filterDateEnd ? 1 : 0)}
+                                {(!!filterOwner ? 1 : 0) + (!!filterSubLandlord ? 1 : 0) + (!!filterCurrentTenant ? 1 : 0) + (!!filterTenant ? 1 : 0) + (!!filterStatus ? 1 : 0) + ((!!filterDateStart || !!filterDateEnd) ? 1 : 0) + ((!!amountDateStart || !!amountDateEnd) ? 1 : 0)}
                             </span>
                         )}
                     </button>
 
                     {/* 快速清除全部 */}
-                    {(searchQuery || filterTenant || filterStatus || filterDateStart || filterDateEnd) && (
+                    {(searchQuery || filterOwner || filterSubLandlord || filterCurrentTenant || filterTenant || filterStatus || filterDateStart || filterDateEnd || amountDateStart || amountDateEnd) && (
                         <button
                             type="button"
                             onClick={() => clearAllFilters()}
@@ -369,86 +551,252 @@ export default function ContractsPage() {
                             transition={{ duration: 0.2 }}
                             className="overflow-hidden"
                         >
-                            <div className="p-4 pt-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                                {/* 承租人 */}
-                                <div className="space-y-1.5">
-                                    <label className="flex items-center gap-1.5 text-sm font-medium text-zinc-500 dark:text-white/50 pl-0.5">
-                                        <Users className="w-4 h-4" />
-                                        承租人
-                                    </label>
-                                    <select
-                                        value={filterTenant}
-                                        onChange={(e) => setFilterTenant(e.target.value)}
-                                        className="w-full px-4 py-3 text-sm bg-zinc-50 dark:bg-white/5 border border-zinc-200 dark:border-white/10 rounded-xl text-zinc-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-amber-500/30 cursor-pointer"
-                                    >
-                                        <option value="">全部</option>
-                                        {(() => {
-                                            const tenantSet = new Set<string>();
-                                            const uniqueTenants: { name: string; code?: string }[] = [];
-                                            (activeContracts as any[]).forEach((c) => {
-                                                const name = contractLesseeDisplayName(c);
-                                                if (name && !tenantSet.has(name)) {
-                                                    tenantSet.add(name);
-                                                    uniqueTenants.push({ name, code: (c as any).tenant?.code || (c as any).proprietor?.code });
-                                                }
-                                            });
-                                            return uniqueTenants
-                                                .sort((a, b) => a.name.localeCompare(b.name, 'zh-HK'))
-                                                .map((t) => (
-                                                    <option key={t.name} value={t.name}>
-                                                        {t.code ? `[${t.code}] ${t.name}` : t.name}
-                                                    </option>
-                                                ));
-                                        })()}
-                                    </select>
-                                </div>
-
-                                {/* 租約日期 - 開始 */}
-                                <div className="space-y-1.5">
-                                    <label className="flex items-center gap-1.5 text-sm font-medium text-zinc-500 dark:text-white/50 pl-0.5">
-                                        <Calendar className="w-4 h-4" />
-                                        租約開始日期
-                                    </label>
-                                    <input
-                                        type="date"
-                                        value={filterDateStart}
-                                        onChange={(e) => setFilterDateStart(e.target.value)}
-                                        className="w-full px-4 py-3 text-sm bg-zinc-50 dark:bg-white/5 border border-zinc-200 dark:border-white/10 rounded-xl text-zinc-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-amber-500/30 cursor-pointer"
-                                    />
-                                </div>
-
-                                {/* 租約日期 - 結束 */}
-                                <div className="space-y-1.5">
-                                    <label className="flex items-center gap-1.5 text-sm font-medium text-zinc-500 dark:text-white/50 pl-0.5">
-                                        <Calendar className="w-4 h-4" />
-                                        租約結束日期
-                                    </label>
-                                    <input
-                                        type="date"
-                                        value={filterDateEnd}
-                                        onChange={(e) => setFilterDateEnd(e.target.value)}
-                                        className="w-full px-4 py-3 text-sm bg-zinc-50 dark:bg-white/5 border border-zinc-200 dark:border-white/10 rounded-xl text-zinc-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-amber-500/30 cursor-pointer"
-                                    />
-                                </div>
-
-                                {/* 狀態 */}
-                                <div className="space-y-1.5">
-                                    <label className="flex items-center gap-1.5 text-sm font-medium text-zinc-500 dark:text-white/50 pl-0.5">
-                                        <SlidersHorizontal className="w-4 h-4" />
-                                        狀態
-                                    </label>
-                                    <select
-                                        value={filterStatus}
-                                        onChange={(e) => setFilterStatus(e.target.value)}
-                                        className="w-full px-4 py-3 text-sm bg-zinc-50 dark:bg-white/5 border border-zinc-200 dark:border-white/10 rounded-xl text-zinc-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-amber-500/30 cursor-pointer"
-                                    >
-                                        <option value="">全部</option>
-                                        <option value="listing">放盤中</option>
-                                        <option value="renting">出租中</option>
-                                        <option value="leasing_in">租入中</option>
-                                        <option value="completed">已完租</option>
-                                    </select>
-                                </div>
+                            <div className={`p-4 pt-4 grid grid-cols-1 sm:grid-cols-2 ${isLeaseInTab ? 'lg:grid-cols-3' : 'lg:grid-cols-4'} gap-4`}>
+                                {isLeaseInTab ? (
+                                    <>
+                                        <div className="space-y-1.5">
+                                            <label className="flex items-center gap-1.5 text-sm font-medium text-zinc-500 dark:text-white/50 pl-0.5">
+                                                <Users className="w-4 h-4" />
+                                                業主
+                                            </label>
+                                            <select
+                                                value={filterOwner}
+                                                onChange={(e) => setFilterOwner(e.target.value)}
+                                                className="w-full px-4 py-3 text-sm bg-zinc-50 dark:bg-white/5 border border-zinc-200 dark:border-white/10 rounded-xl text-zinc-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-amber-500/30 cursor-pointer"
+                                            >
+                                                <option value="">全部</option>
+                                                {(() => {
+                                                    const ownerSet = new Set<string>();
+                                                    const uniqueOwners: { name: string; code?: string }[] = [];
+                                                    (activeContracts as any[]).forEach((c) => {
+                                                        const name = contractOwnerDisplayName(c);
+                                                        if (name && !ownerSet.has(name)) {
+                                                            ownerSet.add(name);
+                                                            uniqueOwners.push({ name, code: (c as any).tenant?.code || (c as any).proprietor?.code });
+                                                        }
+                                                    });
+                                                    return uniqueOwners
+                                                        .sort((a, b) => a.name.localeCompare(b.name, 'zh-HK'))
+                                                        .map((t) => (
+                                                            <option key={t.name} value={t.name}>
+                                                                {t.code ? `[${t.code}] ${t.name}` : t.name}
+                                                            </option>
+                                                        ));
+                                                })()}
+                                            </select>
+                                        </div>
+                                        <div className="space-y-1.5">
+                                            <label className="flex items-center gap-1.5 text-sm font-medium text-zinc-500 dark:text-white/50 pl-0.5">
+                                                <Users className="w-4 h-4" />
+                                                承租人
+                                            </label>
+                                            <select
+                                                value={filterTenant}
+                                                onChange={(e) => setFilterTenant(e.target.value)}
+                                                className="w-full px-4 py-3 text-sm bg-zinc-50 dark:bg-white/5 border border-zinc-200 dark:border-white/10 rounded-xl text-zinc-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-amber-500/30 cursor-pointer"
+                                            >
+                                                <option value="">全部</option>
+                                                {(() => {
+                                                    const tenantSet = new Set<string>();
+                                                    const uniqueTenants: { name: string; code?: string }[] = [];
+                                                    (activeContracts as any[]).forEach((c) => {
+                                                        const name = contractLesseeDisplayName(c);
+                                                        if (name && !tenantSet.has(name)) {
+                                                            tenantSet.add(name);
+                                                            uniqueTenants.push({ name, code: (c as any).tenant?.code || (c as any).proprietor?.code });
+                                                        }
+                                                    });
+                                                    return uniqueTenants
+                                                        .sort((a, b) => a.name.localeCompare(b.name, 'zh-HK'))
+                                                        .map((t) => (
+                                                            <option key={t.name} value={t.name}>
+                                                                {t.code ? `[${t.code}] ${t.name}` : t.name}
+                                                            </option>
+                                                        ));
+                                                })()}
+                                            </select>
+                                        </div>
+                                        <div className="space-y-1.5">
+                                            <label className="flex items-center gap-1.5 text-sm font-medium text-zinc-500 dark:text-white/50 pl-0.5">
+                                                <SlidersHorizontal className="w-4 h-4" />
+                                                狀態
+                                            </label>
+                                            <select
+                                                value={filterStatus}
+                                                onChange={(e) => setFilterStatus(e.target.value)}
+                                                className="w-full px-4 py-3 text-sm bg-zinc-50 dark:bg-white/5 border border-zinc-200 dark:border-white/10 rounded-xl text-zinc-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-amber-500/30 cursor-pointer"
+                                            >
+                                                <option value="">全部</option>
+                                                <option value="listing">放盤中</option>
+                                                <option value="renting">出租中</option>
+                                                <option value="leasing_in">租入中</option>
+                                                <option value="completed">已完租</option>
+                                            </select>
+                                        </div>
+                                        {/* 租約日期範圍（自動填滿剩餘欄位） */}
+                                        <div className="space-y-1.5 sm:col-span-2 lg:col-span-3">
+                                            <label className="flex items-center gap-1.5 text-sm font-medium text-zinc-500 dark:text-white/50 pl-0.5">
+                                                <Calendar className="w-4 h-4" />
+                                                租約日期範圍
+                                            </label>
+                                            <div className="flex items-center gap-1.5">
+                                                <input
+                                                    type="date"
+                                                    value={filterDateStart}
+                                                    onChange={(e) => setFilterDateStart(e.target.value)}
+                                                    max={filterDateEnd || undefined}
+                                                    className="flex-1 min-w-0 px-3 py-2.5 text-sm bg-zinc-50 dark:bg-white/5 border border-zinc-200 dark:border-white/10 rounded-xl text-zinc-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-amber-500/30 cursor-pointer"
+                                                    placeholder="開始"
+                                                />
+                                                <span className="text-zinc-400 dark:text-white/30 text-xs shrink-0">~</span>
+                                                <input
+                                                    type="date"
+                                                    value={filterDateEnd}
+                                                    onChange={(e) => setFilterDateEnd(e.target.value)}
+                                                    min={filterDateStart || undefined}
+                                                    className="flex-1 min-w-0 px-3 py-2.5 text-sm bg-zinc-50 dark:bg-white/5 border border-zinc-200 dark:border-white/10 rounded-xl text-zinc-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-amber-500/30 cursor-pointer"
+                                                    placeholder="結束"
+                                                />
+                                            </div>
+                                        </div>
+                                    </>
+                                ) : (
+                                    /* 出租合約：業主 / 二房東 / 現時租客 / 狀態 / 日期範圍 */
+                                    <>
+                                        <div className="space-y-1.5">
+                                            <label className="flex items-center gap-1.5 text-sm font-medium text-zinc-500 dark:text-white/50 pl-0.5">
+                                                <Users className="w-4 h-4" />
+                                                業主
+                                            </label>
+                                            <select
+                                                value={filterOwner}
+                                                onChange={(e) => setFilterOwner(e.target.value)}
+                                                className="w-full px-4 py-3 text-sm bg-zinc-50 dark:bg-white/5 border border-zinc-200 dark:border-white/10 rounded-xl text-zinc-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-amber-500/30 cursor-pointer"
+                                            >
+                                                <option value="">全部</option>
+                                                {(() => {
+                                                    const ownerSet = new Set<string>();
+                                                    const uniqueOwners: { name: string; code?: string }[] = [];
+                                                    (activeContracts as any[]).forEach((c) => {
+                                                        const name = contractOwnerDisplayName(c);
+                                                        if (name && !ownerSet.has(name)) {
+                                                            ownerSet.add(name);
+                                                            uniqueOwners.push({ name, code: (c as any).tenant?.code || (c as any).proprietor?.code });
+                                                        }
+                                                    });
+                                                    return uniqueOwners
+                                                        .sort((a, b) => a.name.localeCompare(b.name, 'zh-HK'))
+                                                        .map((t) => (
+                                                            <option key={t.name} value={t.name}>
+                                                                {t.code ? `[${t.code}] ${t.name}` : t.name}
+                                                            </option>
+                                                        ));
+                                                })()}
+                                            </select>
+                                        </div>
+                                        <div className="space-y-1.5">
+                                            <label className="flex items-center gap-1.5 text-sm font-medium text-zinc-500 dark:text-white/50 pl-0.5">
+                                                <Building2 className="w-4 h-4" />
+                                                二房東
+                                            </label>
+                                            <select
+                                                value={filterSubLandlord}
+                                                onChange={(e) => setFilterSubLandlord(e.target.value)}
+                                                className="w-full px-4 py-3 text-sm bg-zinc-50 dark:bg-white/5 border border-zinc-200 dark:border-white/10 rounded-xl text-zinc-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-amber-500/30 cursor-pointer"
+                                            >
+                                                <option value="">全部</option>
+                                                {(() => {
+                                                    const slSet = new Set<string>();
+                                                    const uniqueSL: { name: string }[] = [];
+                                                    (activeContracts as any[]).forEach((c) => {
+                                                        const name = contractSubLandlordDisplayName(c);
+                                                        if (name && !slSet.has(name)) {
+                                                            slSet.add(name);
+                                                            uniqueSL.push({ name });
+                                                        }
+                                                    });
+                                                    return uniqueSL
+                                                        .sort((a, b) => a.name.localeCompare(b.name, 'zh-HK'))
+                                                        .map((t) => (
+                                                            <option key={t.name} value={t.name}>{t.name}</option>
+                                                        ));
+                                                })()}
+                                            </select>
+                                        </div>
+                                        <div className="space-y-1.5">
+                                            <label className="flex items-center gap-1.5 text-sm font-medium text-zinc-500 dark:text-white/50 pl-0.5">
+                                                <Users className="w-4 h-4" />
+                                                現時租客
+                                            </label>
+                                            <select
+                                                value={filterCurrentTenant}
+                                                onChange={(e) => setFilterCurrentTenant(e.target.value)}
+                                                className="w-full px-4 py-3 text-sm bg-zinc-50 dark:bg-white/5 border border-zinc-200 dark:border-white/10 rounded-xl text-zinc-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-amber-500/30 cursor-pointer"
+                                            >
+                                                <option value="">全部</option>
+                                                {(() => {
+                                                    const ctSet = new Set<string>();
+                                                    const uniqueCT: { name: string }[] = [];
+                                                    (activeContracts as any[]).forEach((c) => {
+                                                        const name = contractLesseeDisplayName(c);
+                                                        if (name && !ctSet.has(name)) {
+                                                            ctSet.add(name);
+                                                            uniqueCT.push({ name });
+                                                        }
+                                                    });
+                                                    return uniqueCT
+                                                        .sort((a, b) => a.name.localeCompare(b.name, 'zh-HK'))
+                                                        .map((t) => (
+                                                            <option key={t.name} value={t.name}>{t.name}</option>
+                                                        ));
+                                                })()}
+                                            </select>
+                                        </div>
+                                        <div className="space-y-1.5">
+                                            <label className="flex items-center gap-1.5 text-sm font-medium text-zinc-500 dark:text-white/50 pl-0.5">
+                                                <SlidersHorizontal className="w-4 h-4" />
+                                                狀態
+                                            </label>
+                                            <select
+                                                value={filterStatus}
+                                                onChange={(e) => setFilterStatus(e.target.value)}
+                                                className="w-full px-4 py-3 text-sm bg-zinc-50 dark:bg-white/5 border border-zinc-200 dark:border-white/10 rounded-xl text-zinc-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-amber-500/30 cursor-pointer"
+                                            >
+                                                <option value="">全部</option>
+                                                <option value="listing">放盤中</option>
+                                                <option value="renting">出租中</option>
+                                                <option value="leasing_in">租入中</option>
+                                                <option value="completed">已完租</option>
+                                            </select>
+                                        </div>
+                                        {/* 租約日期範圍（自動填滿剩餘欄位） */}
+                                        <div className="space-y-1.5 sm:col-span-2 lg:col-span-4">
+                                            <label className="flex items-center gap-1.5 text-sm font-medium text-zinc-500 dark:text-white/50 pl-0.5">
+                                                <Calendar className="w-4 h-4" />
+                                                租約日期範圍
+                                            </label>
+                                            <div className="flex items-center gap-1.5">
+                                                <input
+                                                    type="date"
+                                                    value={filterDateStart}
+                                                    onChange={(e) => setFilterDateStart(e.target.value)}
+                                                    max={filterDateEnd || undefined}
+                                                    className="flex-1 min-w-0 px-3 py-2.5 text-sm bg-zinc-50 dark:bg-white/5 border border-zinc-200 dark:border-white/10 rounded-xl text-zinc-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-amber-500/30 cursor-pointer"
+                                                    placeholder="開始"
+                                                />
+                                                <span className="text-zinc-400 dark:text-white/30 text-xs shrink-0">~</span>
+                                                <input
+                                                    type="date"
+                                                    value={filterDateEnd}
+                                                    onChange={(e) => setFilterDateEnd(e.target.value)}
+                                                    min={filterDateStart || undefined}
+                                                    className="flex-1 min-w-0 px-3 py-2.5 text-sm bg-zinc-50 dark:bg-white/5 border border-zinc-200 dark:border-white/10 rounded-xl text-zinc-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-amber-500/30 cursor-pointer"
+                                                    placeholder="結束"
+                                                />
+                                            </div>
+                                        </div>
+                                    </>
+                                )}
                             </div>
                         </motion.div>
                     )}
@@ -543,11 +891,18 @@ export default function ContractsPage() {
                                             {contractListTab === 'lease_out' ? '出租合約號碼' : '租賃合約號碼'}
                                         </th>
                                         <th className="p-3 font-medium">業主</th>
-                                        <th className="p-3 font-medium">承租人</th>
-                                        <th className="p-3 font-medium">月租</th>
+                                        {isLeaseInTab ? (
+                                            <th className="p-3 font-medium">承租人</th>
+                                        ) : (
+                                            <>
+                                                <th className="p-3 font-medium">二房東</th>
+                                                <th className="p-3 font-medium">現時租客</th>
+                                            </>
+                                        )}
+                                        <th className="p-3 font-medium">{isLeaseInTab ? '租賃金額' : '出租金額'}</th>
                                         <th className="p-3 font-medium">租約期間 / 完結日</th>
                                         <th className="p-3 font-medium">{isLeaseInTab ? '已付按金' : '已收按金'}</th>
-                                        <th className="p-3 font-medium">租賃性質</th>
+                                        <th className="p-3 font-medium">合約性質</th>
                                         <th className="p-3 font-medium">合約描述</th>
                                         <th className="p-3 font-medium">狀態</th>
                                         <th className="p-3 font-medium">操作</th>
@@ -561,6 +916,7 @@ export default function ContractsPage() {
                                         const monthlyRent = contract.rentOutMonthlyRental || 0;
                                         const status = contract.rentOutStatus || 'listing';
                                         const ownerName = contractOwnerDisplayName(contract);
+                                        const subLandlordName = contractSubLandlordDisplayName(contract);
                                         const lesseeName = contractLesseeDisplayName(contract);
 
                                         return (
@@ -593,12 +949,12 @@ export default function ContractsPage() {
                                                         {(() => {
                                                             const selected = normalizeRentPropertyLotSelection(contract.rentPropertyLot ?? (contract as any).rent_property_lot);
                                                             const partial = parseRentPropertyLotPartialFromRow(contract.rentPropertyLotPartial ?? (contract as any).rent_property_lot_partial);
-                                                            if (!selected.length) return <span>—</span>;
+                                                            if (!selected.length) return <span className="truncate block">—</span>;
                                                             const lots = selected.map(lot => partial[lot] ? `${lot}（部分地方）` : lot);
                                                             if (lots.length > 1) {
-                                                                return <span title={lots.join('、')}>{lots[0]}...</span>;
+                                                                return <span className="truncate block" title={lots.join('、')}>{lots[0]}...</span>;
                                                             }
-                                                            return <span>{lots[0]}</span>;
+                                                            return <span className="truncate block">{lots[0]}</span>;
                                                         })()}
                                                     </div>
                                                 </td>
@@ -618,11 +974,22 @@ export default function ContractsPage() {
                                                         {ownerName || '-'}
                                                     </div>
                                                 </td>
-                                                <td className="p-3 text-zinc-600 dark:text-white/70 text-sm max-w-28">
-                                                    <div className="truncate" title={lesseeName || '-'}>
-                                                        {lesseeName || '-'}
-                                                    </div>
-                                                </td>
+                                                {isLeaseInTab ? (
+                                                    <td className="p-3 text-zinc-600 dark:text-white/70 text-sm max-w-28">
+                                                        <div className="truncate" title={lesseeName || '-'}>
+                                                            {lesseeName || '-'}
+                                                        </div>
+                                                    </td>
+                                                ) : (
+                                                    <>
+                                                        <td className="p-3 text-zinc-600 dark:text-white/70 text-sm max-w-28">
+                                                            <div className="truncate" title={subLandlordName || '-'}>{subLandlordName || <span className="text-zinc-300 dark:text-white/20">—</span>}</div>
+                                                        </td>
+                                                        <td className="p-3 text-zinc-600 dark:text-white/70 text-sm max-w-28">
+                                                            <div className="truncate" title={lesseeName || '-'}>{lesseeName || <span className="text-zinc-300 dark:text-white/20">—</span>}</div>
+                                                        </td>
+                                                    </>
+                                                )}
                                                 <td className="p-3">
                                                     <span
                                                         className={`font-semibold text-base ${
@@ -641,12 +1008,8 @@ export default function ContractsPage() {
                                                         {startDate && endDate
                                                             ? ` (${
                                                                   (() => {
-                                                                      const m = Math.round((new Date(endDate).getTime() - new Date(startDate).getTime()) / (1000 * 60 * 60 * 24 * 30));
-                                                                      const y = Math.floor(m / 12);
-                                                                      const r = m % 12;
-                                                                      if (y === 0) return `${r} 個月`;
-                                                                      if (r === 0) return `${y} 年`;
-                                                                      return `${y} 年 ${r} 個月`;
+                                                                      const m = calcFullMonths(new Date(startDate), new Date(endDate));
+                                                                      return formatDuration(m);
                                                                   })()
                                                               })`
                                                             : ''}
@@ -765,6 +1128,7 @@ export default function ContractsPage() {
                                 const monthlyRent = contract.rentOutMonthlyRental || 0;
                                 const status = contract.rentOutStatus || 'listing';
                                 const ownerName = contractOwnerDisplayName(contract);
+                                const subLandlordName = contractSubLandlordDisplayName(contract);
                                 const lesseeName = contractLesseeDisplayName(contract);
 
                                 return (
@@ -796,12 +1160,12 @@ export default function ContractsPage() {
                                                     {(() => {
                                                         const selected = normalizeRentPropertyLotSelection(contract.rentPropertyLot ?? (contract as any).rent_property_lot);
                                                         const partial = parseRentPropertyLotPartialFromRow(contract.rentPropertyLotPartial ?? (contract as any).rent_property_lot_partial);
-                                                        if (!selected.length) return '—';
+                                                        if (!selected.length) return <span className="truncate block">—</span>;
                                                         const lots = selected.map(lot => partial[lot] ? `${lot}（部分地方）` : lot);
                                                         if (lots.length > 1) {
-                                                            return <span title={lots.join('、')}>{lots[0]}...</span>;
+                                                            return <span className="truncate block" title={lots.join('、')}>{lots[0]}...</span>;
                                                         }
-                                                        return lots[0];
+                                                        return <span className="truncate block">{lots[0]}</span>;
                                                     })()}
                                                 </p>
                                                 <p
@@ -815,9 +1179,28 @@ export default function ContractsPage() {
                                                     {contract.rentOutTenancyNumber || '—'}
                                                 </p>
                                                 <p className="text-xs text-zinc-500 dark:text-white/50 mt-2">業主</p>
-                                                <p className="text-sm font-medium text-zinc-800 dark:text-white/90">
+                                                <p className="text-sm font-medium text-zinc-800 dark:text-white/90 truncate" title={ownerName || '—'}>
                                                     {ownerName || '—'}
                                                 </p>
+                                                {isLeaseInTab ? (
+                                                    <>
+                                                        <p className="text-xs text-zinc-500 dark:text-white/50 mt-2">承租人</p>
+                                                        <p className="text-sm font-medium text-zinc-800 dark:text-white/90 truncate" title={lesseeName || '—'}>
+                                                            {lesseeName || '—'}
+                                                        </p>
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <p className="text-xs text-zinc-500 dark:text-white/50 mt-2">二房東</p>
+                                                        <p className="text-sm font-medium text-zinc-800 dark:text-white/90 truncate" title={subLandlordName || '—'}>
+                                                            {subLandlordName || <span className="text-zinc-300 dark:text-white/20">—</span>}
+                                                        </p>
+                                                        <p className="text-xs text-zinc-500 dark:text-white/50 mt-2">現時租客</p>
+                                                        <p className="text-sm font-medium text-zinc-800 dark:text-white/90 truncate" title={lesseeName || '—'}>
+                                                            {lesseeName || <span className="text-zinc-300 dark:text-white/20">—</span>}
+                                                        </p>
+                                                    </>
+                                                )}
                                             </div>
                                             <span
                                                 className={`px-2.5 py-1 rounded-full text-xs font-bold shrink-0 ${statusColors[status] || statusColors.listing}`}
@@ -825,7 +1208,6 @@ export default function ContractsPage() {
                                                 {status === 'renting' ? '出租中' : status === 'listing' ? '放盤中' : status === 'leasing_in' ? '租入中' : status === 'completed' ? '已完租' : '其他'}
                                             </span>
                                         </div>
-                                        <p className="text-sm text-zinc-600 dark:text-white/70">承租人：{lesseeName || '-'}</p>
                                         <p
                                             className={`text-base font-semibold ${
                                                 isLeaseInTab
@@ -842,12 +1224,8 @@ export default function ContractsPage() {
                                                 {startDate && endDate
                                                     ? ` (${
                                                           (() => {
-                                                              const m = Math.round((new Date(endDate).getTime() - new Date(startDate).getTime()) / (1000 * 60 * 60 * 24 * 30));
-                                                              const y = Math.floor(m / 12);
-                                                              const r = m % 12;
-                                                              if (y === 0) return `${r} 個月`;
-                                                              if (r === 0) return `${y} 年`;
-                                                              return `${y} 年 ${r} 個月`;
+                                                              const m = calcFullMonths(new Date(startDate), new Date(endDate));
+                                                              return formatDuration(m);
                                                           })()
                                                       })`
                                                     : ''}
@@ -901,7 +1279,7 @@ export default function ContractsPage() {
                                             <span className="text-zinc-700 dark:text-white/80 font-medium">{isLeaseInTab ? '已付按金' : '已收按金'}：</span><span className="text-zinc-800 dark:text-white/90">{formatContractDepositPaid(contract)}</span>
                                         </p>
                                         <p className="text-sm text-zinc-500 dark:text-white/50">
-                                            <span className="text-zinc-700 dark:text-white/80 font-medium">租賃性質：</span><span className="text-zinc-800 dark:text-white/90">
+                                            <span className="text-zinc-700 dark:text-white/80 font-medium">合約性質：</span><span className="text-zinc-800 dark:text-white/90">
                                                 {labelRentOutContractNatureZh(contract.rentOutContractNature)}
                                             </span>
                                         </p>

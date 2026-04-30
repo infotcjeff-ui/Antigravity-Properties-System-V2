@@ -179,10 +179,12 @@ export interface Rent {
   subLandlord?: { id: string; name: string };
 }
 
-/** 二房東 (Sub-landlord) - admin-managed, mirrors rent_out contract fields */
+/** 二房東 (Sub-landlord) - admin-managed */
 export interface SubLandlord {
   id?: string;
   name: string;
+  code?: string;
+  brNumber?: string;
   tenancyNumber?: string;
   pricing?: number;
   monthlyRental?: number;

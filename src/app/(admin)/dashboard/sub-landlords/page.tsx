@@ -20,7 +20,7 @@ export default function SubLandlordsPage() {
     const filtered = useMemo(() => {
         if (!searchQuery) return items || [];
         const q = searchQuery.toLowerCase();
-        return (items || []).filter(x => (x.name || '').toLowerCase().includes(q) || (x.tenancyNumber || '').toLowerCase().includes(q));
+        return (items || []).filter(x => (x.name || '').toLowerCase().includes(q));
     }, [items, searchQuery]);
 
     const handleDelete = async (id: string) => {
@@ -111,7 +111,6 @@ export default function SubLandlordsPage() {
                             <div className="flex items-start justify-between">
                                 <div>
                                     <h3 className="font-bold text-zinc-900 dark:text-white">{item.name}</h3>
-                                    <p className="text-sm text-zinc-500 dark:text-white/50">{item.tenancyNumber || '—'}</p>
                                     {item.monthlyRental != null && (
                                         <p className="text-xs text-purple-500 dark:text-purple-400 mt-1">月租: {item.monthlyRental.toLocaleString()}</p>
                                     )}

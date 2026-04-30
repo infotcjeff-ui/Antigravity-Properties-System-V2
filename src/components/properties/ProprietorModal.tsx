@@ -499,28 +499,12 @@ export default function ProprietorModal({ onClose, onSuccess, mode = 'proprietor
                         </>
                     )}
 
-                    {/* Actions（詳情版面已含底部關閉，不重複顯示） */}
+                    {/* Actions */}
                     {!isDetailLayoutMode && (
                     <div className="flex items-center justify-end gap-3 pt-4 border-t border-zinc-100 dark:border-white/5">
                         <button
                             type="button"
-                            onClick={() => {
-                                if (initialData && isEditing) {
-                                    setIsEditing(false);
-                                    // Reset form data if needed
-                                    setFormData({
-                                        name: initialData.name,
-                                        code: initialData.code,
-                                        type: initialData.type as any,
-                                        category: initialData.category as any,
-                                        englishName: initialData.englishName || '',
-                                        shortName: initialData.shortName || '',
-                                        brNumber: initialData.brNumber ?? (initialData as any).description ?? '',
-                                    });
-                                } else {
-                                    onClose();
-                                }
-                            }}
+                            onClick={onClose}
                             className="px-4 py-2 rounded-xl text-zinc-500 dark:text-white/70 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-white/10 transition-all"
                         >
                             取消
