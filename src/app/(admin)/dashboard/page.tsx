@@ -297,7 +297,7 @@ export default function DashboardPage() {
     const { data: proprietors = [], isLoading: propsrLoading } = useProprietorsQuery();
 
     const [userRole, setUserRole] = useState<string>('client');
-    const [contractTab, setContractTab] = useState<ContractTab>('active');
+    const [contractTab, setContractTab] = useState<ContractTab>('contract');
     const [rentOutTab, setRentOutTab] = useState<RentOutTab>('paid');
     const [rentingTab, setRentingTab] = useState<LeaseTab>('leasing');
 
