@@ -678,7 +678,7 @@ export const fetchDashboardStats = async (user?: any) => {
         let rentsDataQuery = supabase
             .from('rents')
             .select(
-                'type, status, renting_end_date, rent_out_end_date, rent_out_status, renting_monthly_rental, rent_out_monthly_rental, amount, renting_periods, rent_out_periods, rent_collection_date, rent_collection_amount, rent_collection_payment_date, rent_collection_payment_method, start_date, end_date, rent_out_start_date, renting_start_date, renting_end_date',
+                'type, status, renting_end_date, rent_out_end_date, rent_out_status, renting_monthly_rental, rent_out_monthly_rental, amount, renting_periods, rent_out_periods, rent_collection_date, rent_collection_amount, rent_collection_payment_date, rent_collection_payment_method, start_date, end_date, rent_out_start_date, renting_start_date, renting_end_date, rent_out_start_date',
             );
 
         let holdingQuery = supabase.from('properties').select('*', { count: 'exact', head: true }).eq('status', 'holding');
@@ -750,6 +750,22 @@ export const fetchDashboardStats = async (user?: any) => {
             .filter((r) => dateInCalendarMonth(rentMonthTransactionAnchor(r as Record<string, unknown>), now))
             .reduce((sum, r) => sum + Number((r as any).rentCollectionAmount ?? 0), 0);
 
+        // ===== 合約統計：期內 / 期滿 =====
+        const contractRows = rents.filter((r) => r.type === 'contract' || r.type === 'rent_out');
+        const todayStr = now.toISOString().split('T')[0];
+
+        const contractActiveCount = contractRows.filter((r) => {
+            const end = (r as any).rentOutEndDate ?? (r as any).endDate ?? null;
+            if (!end) return true; // 無結束日視為期內
+            return String(end) >= todayStr;
+        }).length;
+
+        const contractExpiredCount = contractRows.filter((r) => {
+            const end = (r as any).rentOutEndDate ?? (r as any).endDate ?? null;
+            if (!end) return false;
+            return String(end) < todayStr;
+        }).length;
+
         return {
             totalProperties: totalProperties || 0,
             totalProprietors: totalProprietors || 0,
@@ -761,6 +777,10 @@ export const fetchDashboardStats = async (user?: any) => {
                 renting: rentingCount || 0,
                 sold: soldCount || 0,
                 suspended: suspendedCount || 0
+            },
+            contractBreakdown: {
+                active: contractActiveCount,
+                expired: contractExpiredCount
             }
         };
     } catch (err: any) {
@@ -780,6 +800,10 @@ export const fetchDashboardStats = async (user?: any) => {
                 renting: 0,
                 sold: 0,
                 suspended: 0
+            },
+            contractBreakdown: {
+                active: 0,
+                expired: 0
             }
         };
     }

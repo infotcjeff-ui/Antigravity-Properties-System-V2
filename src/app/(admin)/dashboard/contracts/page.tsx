@@ -379,58 +379,10 @@ export default function ContractsPage() {
                 </motion.button>
             </div>
 
-            {/* 統計卡片：左側60%總金額 → 右側40% 2×2 grid */}
-            <div className="grid grid-cols-1 lg:grid-cols-20 gap-4 items-stretch">
-                {/* 左側：總金額（55%） */}
-                <div className="lg:col-span-11">
-                    <BentoCard className="h-full">
-                        <div className="space-y-3 h-full flex flex-col">
-                            <div className="flex items-center gap-2">
-                                <div className="p-2.5 rounded-xl bg-[var(--color-green-600)]/10">
-                                    <DollarSign className="w-5 h-5 text-[var(--color-green-600)]" />
-                                </div>
-                                <p className="text-base font-bold text-[var(--color-green-600)] dark:text-[var(--color-green-600)]">總金額</p>
-                            </div>
-                            <div className="flex flex-col gap-1.5">
-                                {/* 日期篩選（只影響金額合計） */}
-                                <div className="flex items-center gap-1 text-sm text-zinc-400 dark:text-white/40">
-                                    <Calendar className="w-3.5 h-3.5 shrink-0" />
-                                    <input
-                                        type="date"
-                                        value={amountDateStart}
-                                        onChange={(e) => setAmountDateStart(e.target.value)}
-                                        max={amountDateEnd || undefined}
-                                        className="px-2 py-1.5 text-sm bg-zinc-100 dark:bg-white/5 border border-zinc-200 dark:border-white/10 rounded-lg text-zinc-600 dark:text-white/60 focus:outline-none focus:ring-1 focus:ring-amber-500/30 cursor-pointer w-28"
-                                    />
-                                    <span>~</span>
-                                    <input
-                                        type="date"
-                                        value={amountDateEnd}
-                                        onChange={(e) => setAmountDateEnd(e.target.value)}
-                                        min={amountDateStart || undefined}
-                                        className="px-2 py-1.5 text-sm bg-zinc-100 dark:bg-white/5 border border-zinc-200 dark:border-white/10 rounded-lg text-zinc-600 dark:text-white/60 focus:outline-none focus:ring-1 focus:ring-amber-500/30 cursor-pointer w-28"
-                                    />
-                                </div>
-                                {/* 金額合計（日期篩選結果顯示在括號內） */}
-                                <div className="bg-[var(--color-green-600)]/10 rounded-xl p-3 border border-[var(--color-green-600)]/30">
-                                    <p className="text-sm text-[var(--color-green-600)] dark:text-[var(--color-green-600)]/80 font-medium">
-                                        {isLeaseInTab ? '租賃合計' : '出租合計'}
-                                        {amountDateStart || amountDateEnd ? (
-                                            <span className="ml-1 text-[var(--color-green-600)]/70 dark:text-[var(--color-green-600)]/60 font-normal">
-                                                ({amountDateStart ? new Date(amountDateStart).toLocaleDateString('zh-HK', { year: 'numeric', month: '2-digit', day: '2-digit' }) : '…'}{' '}~ {amountDateEnd ? new Date(amountDateEnd).toLocaleDateString('zh-HK', { year: 'numeric', month: '2-digit', day: '2-digit' }) : '…'})
-                                            </span>
-                                        ) : null}
-                                    </p>
-                                    <p className="text-2xl font-bold text-[var(--color-green-600)] dark:text-[var(--color-green-600)] mt-0.5 tabular-nums">
-                                        HKD {totalMonthlyAmount.toLocaleString()}
-                                    </p>
-                                </div>
-                            </div>
-                        </div>
-                    </BentoCard>
-                </div>
-                {/* 右側：2×2 grid（45%） — 上: 已付按金+合約總數, 下: 租賃中+出租中 */}
-                <div className="lg:col-span-9 grid grid-cols-1 sm:grid-cols-2 gap-4 items-stretch">
+            {/* 統計卡片：2×2 → 第一行2格 full width，第二行3格 full width */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-stretch">
+                {/* 第一行：已付按金 + 合約總數（各6/12，full width） */}
+                <div className="lg:col-span-6 grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <BentoCard className="h-full flex flex-col justify-center">
                         <div className="flex items-center justify-between h-full">
                             <div>
@@ -455,6 +407,9 @@ export default function ContractsPage() {
                             </div>
                         </div>
                     </BentoCard>
+                </div>
+                {/* 第二行：租賃中 + 出租中 + 總金額（各4/12，full width） */}
+                <div className="lg:col-span-6 grid grid-cols-1 sm:grid-cols-3 gap-4">
                     <BentoCard className="h-full flex flex-col justify-center">
                         <div className="flex items-center justify-between h-full">
                             <div>
@@ -476,6 +431,45 @@ export default function ContractsPage() {
                             </div>
                             <div className="p-3 rounded-xl bg-green-50 dark:bg-green-500/20 shrink-0">
                                 <Building2 className="w-6 h-6 text-green-600 dark:text-green-400" />
+                            </div>
+                        </div>
+                    </BentoCard>
+                    {/* 總金額（第三個位置，內容整合到同一行） */}
+                    <BentoCard className="h-full">
+                        <div className="space-y-2 h-full flex flex-col">
+                            <div className="flex items-center gap-2">
+                                <div className="p-2 rounded-xl bg-[var(--color-green-600)]/10">
+                                    <DollarSign className="w-4 h-4 text-[var(--color-green-600)]" />
+                                </div>
+                                <p className="text-sm font-bold text-[var(--color-green-600)] dark:text-[var(--color-green-600)]">總金額</p>
+                            </div>
+                            <div className="flex flex-col gap-1">
+                                <div className="flex items-center gap-1 text-xs text-zinc-400 dark:text-white/40">
+                                    <Calendar className="w-3 h-3 shrink-0" />
+                                    <input
+                                        type="date"
+                                        value={amountDateStart}
+                                        onChange={(e) => setAmountDateStart(e.target.value)}
+                                        max={amountDateEnd || undefined}
+                                        className="px-1.5 py-1 text-xs bg-zinc-100 dark:bg-white/5 border border-zinc-200 dark:border-white/10 rounded-lg text-zinc-600 dark:text-white/60 focus:outline-none focus:ring-1 focus:ring-amber-500/30 cursor-pointer w-24"
+                                    />
+                                    <span>~</span>
+                                    <input
+                                        type="date"
+                                        value={amountDateEnd}
+                                        onChange={(e) => setAmountDateEnd(e.target.value)}
+                                        min={amountDateStart || undefined}
+                                        className="px-1.5 py-1 text-xs bg-zinc-100 dark:bg-white/5 border border-zinc-200 dark:border-white/10 rounded-lg text-zinc-600 dark:text-white/60 focus:outline-none focus:ring-1 focus:ring-amber-500/30 cursor-pointer w-24"
+                                    />
+                                </div>
+                                <div className="bg-[var(--color-green-600)]/10 rounded-xl p-2 border border-[var(--color-green-600)]/30">
+                                    <p className="text-xs text-[var(--color-green-600)] dark:text-[var(--color-green-600)]/80 font-medium">
+                                        {isLeaseInTab ? '租賃合計' : '出租合計'}
+                                    </p>
+                                    <p className="text-lg font-bold text-[var(--color-green-600)] dark:text-[var(--color-green-600)] mt-0.5 tabular-nums">
+                                        HKD {totalMonthlyAmount.toLocaleString()}
+                                    </p>
+                                </div>
                             </div>
                         </div>
                     </BentoCard>
