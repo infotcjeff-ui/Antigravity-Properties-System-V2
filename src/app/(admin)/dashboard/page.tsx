@@ -107,10 +107,6 @@ function getPropertyLabel(r: Record<string, unknown>): string {
     return String(prop?.name || prop?.code || '—').trim() || '—';
 }
 
-function getPropertyId(r: Record<string, unknown>): string | undefined {
-    return (r.property as { id?: string } | undefined)?.id;
-}
-
 /* ---------- Section Header ---------- */
 interface SectionHeaderProps {
     icon: React.ReactNode;
@@ -202,7 +198,7 @@ interface ListRowProps {
 
 function ListRow({ cells, badge, href, hrefLabel }: ListRowProps) {
     const content = (
-        <div className="flex items-center gap-3 py-3 px-4 rounded-xl hover:bg-zinc-50 dark:hover:bg-white/[0.04] transition-colors group">
+        <div className="flex items-center gap-3 py-3 px-4 rounded-xl hover:bg-violet-50/70 dark:hover:bg-violet-500/10 hover:shadow-sm hover:shadow-violet-200/60 dark:hover:shadow-violet-900/30 transition-all duration-150 group cursor-pointer">
             <div className="min-w-0 flex-1">
                 <p className="text-sm font-medium text-zinc-800 dark:text-white/90 truncate">{cells[0]?.label}</p>
                 {cells[0]?.sub && (
@@ -549,7 +545,7 @@ export default function DashboardPage() {
                         <button
                             onClick={() => setContractTab('contract')}
                             className={cn(
-                                'flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors',
+                                'flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors cursor-pointer',
                                 contractTab === 'contract'
                                     ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300'
                                     : 'text-zinc-400 hover:bg-zinc-100 dark:hover:bg-white/5'
@@ -561,7 +557,7 @@ export default function DashboardPage() {
                         <button
                             onClick={() => setContractTab('rent_out')}
                             className={cn(
-                                'flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors',
+                                'flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors cursor-pointer',
                                 contractTab === 'rent_out'
                                     ? 'bg-rose-100 text-rose-700 dark:bg-rose-500/15 dark:text-rose-300'
                                     : 'text-zinc-400 hover:bg-zinc-100 dark:hover:bg-white/5'
@@ -588,12 +584,11 @@ export default function DashboardPage() {
                             <div className="px-2 pb-3 space-y-0.5">
                                 {(contractTab === 'contract' ? contractContractFiltered : contractRentOutFiltered).slice(0, 5).map((r: any) => {
                                     const propLabel = getPropertyLabel(r);
-                                    const propId = getPropertyId(r);
                                     const end = getEndDate(r);
                                     return (
                                         <ListRow
                                             key={String(r.id)}
-                                            href={propId ? `/dashboard/properties/${propId}` : undefined}
+                                            href="/dashboard/contracts"
                                             cells={[
                                                 { label: propLabel },
                                                 { label: getRefNo(r), sub: '' },
@@ -638,7 +633,7 @@ export default function DashboardPage() {
                         <button
                             onClick={() => setRentOutTab('paid')}
                             className={cn(
-                                'flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors',
+                                'flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors cursor-pointer',
                                 rentOutTab === 'paid'
                                     ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300'
                                     : 'text-zinc-400 hover:bg-zinc-100 dark:hover:bg-white/5'
@@ -650,7 +645,7 @@ export default function DashboardPage() {
                         <button
                             onClick={() => setRentOutTab('unpaid')}
                             className={cn(
-                                'flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors',
+                                'flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors cursor-pointer',
                                 rentOutTab === 'unpaid'
                                     ? 'bg-rose-100 text-rose-700 dark:bg-rose-500/15 dark:text-rose-300'
                                     : 'text-zinc-400 hover:bg-zinc-100 dark:hover:bg-white/5'
@@ -678,12 +673,11 @@ export default function DashboardPage() {
                                 ) : (
                                     (rentOutTab === 'paid' ? paidRents : unpaidRents).slice(0, 5).map((r: any) => {
                                         const propLabel = getPropertyLabel(r);
-                                        const propId = getPropertyId(r);
                                         const end = getEndDate(r);
                                         return (
                                             <ListRow
                                                 key={String(r.id)}
-                                                href={propId ? `/dashboard/properties/${propId}` : undefined}
+                                                href="/dashboard/rent-out"
                                                 cells={[
                                                     { label: propLabel },
                                                     { label: getRefNo(r) },
@@ -729,7 +723,7 @@ export default function DashboardPage() {
                         <button
                             onClick={() => setRentingTab('leasing')}
                             className={cn(
-                                'flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors',
+                                'flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors cursor-pointer',
                                 rentingTab === 'leasing'
                                     ? 'bg-blue-100 text-blue-700 dark:bg-blue-500/15 dark:text-blue-300'
                                     : 'text-zinc-400 hover:bg-zinc-100 dark:hover:bg-white/5'
@@ -741,7 +735,7 @@ export default function DashboardPage() {
                         <button
                             onClick={() => setRentingTab('terminated')}
                             className={cn(
-                                'flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors',
+                                'flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors cursor-pointer',
                                 rentingTab === 'terminated'
                                     ? 'bg-zinc-200 text-zinc-600 dark:bg-white/10 dark:text-white/60'
                                     : 'text-zinc-400 hover:bg-zinc-100 dark:hover:bg-white/5'
@@ -768,11 +762,10 @@ export default function DashboardPage() {
                                 ) : (
                                     (rentingTab === 'leasing' ? leasingRows : terminatedRows).slice(0, 5).map((r: any) => {
                                         const propLabel = getPropertyLabel(r);
-                                        const propId = getPropertyId(r);
                                         return (
                                             <ListRow
                                                 key={String(r.id)}
-                                                href={propId ? `/dashboard/properties/${propId}` : undefined}
+                                                href="/dashboard/renting"
                                                 cells={[
                                                     { label: propLabel },
                                                     { label: getRefNo(r) },
