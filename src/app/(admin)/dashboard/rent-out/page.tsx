@@ -115,7 +115,9 @@ export default function RentOutPage() {
     const contractNatureFilterOptions = useMemo(() => {
         const set = new Set<string>();
         for (const r of rents) {
-            if (r.rentOutContractNature) set.add(r.rentOutContractNature);
+            const raw = r as any;
+            const v = raw.rentCollectionContractNature ?? raw.rent_collection_contract_nature ?? r.rentOutContractNature;
+            if (v) set.add(String(v).trim());
         }
         return [...set].sort((a, b) => a.localeCompare(b, 'zh-HK'));
     }, [rents]);
@@ -130,7 +132,11 @@ export default function RentOutPage() {
             if (filterRentOutPayStatus && getRentCollectionPayListStatus(r) !== filterRentOutPayStatus) return false;
             if (filterCurrentTenant && adminRentOutLesseeLabel(r) !== filterCurrentTenant) return false;
             if (filterOwner && adminRentOutOwnerLabel(r) !== filterOwner) return false;
-            if (filterContractNature && r.rentOutContractNature !== filterContractNature) return false;
+            if (filterContractNature && (() => {
+                const raw = r as any;
+                const v = raw.rentCollectionContractNature ?? raw.rent_collection_contract_nature ?? r.rentOutContractNature;
+                return v !== filterContractNature;
+            })()) return false;
             const startDate = r.rentCollectionDate || r.rentOutStartDate || r.startDate;
             const endDate = r.endDate || r.rentOutEndDate;
             if (!rentOutPeriodOverlapsDateFilter(startDate, endDate, filterLeaseFrom, filterLeaseTo)) return false;
