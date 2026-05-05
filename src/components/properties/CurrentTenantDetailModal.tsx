@@ -51,22 +51,20 @@ export default function CurrentTenantDetailModal({
     // 只在 modal 首次開啟時初始化 collapsedGroups，之後由用戶操作控制
     const hasInitializedRef = useRef(false);
 
-    const { data: allRentOutRents = [], isLoading: loadingRentOut } = useRentsWithRelationsQuery({ type: 'rent_out' });
+    // 只顯示合約類型（contract）的記錄，不顯示租賃（rent_out）和交租（renting）的 listing
     const { data: allContractRents = [], isLoading: loadingContract } = useRentsWithRelationsQuery({ type: 'contract' });
-    const { data: allRentingRents = [], isLoading: loadingRenting } = useRentsWithRelationsQuery({ type: 'renting' });
 
     const relatedRents = useMemo(() => {
-        const combined = [...allRentOutRents, ...allContractRents, ...allRentingRents];
-        return combined.filter((r: any) => {
-            const ids = r.rentOutTenantIds || r.rentingTenantIds || [];
+        return allContractRents.filter((r: any) => {
+            const ids = r.rentOutTenantIds || [];
             return ids.includes(currentTenant.id);
         });
-    }, [allRentOutRents, allContractRents, allRentingRents, currentTenant.id]);
+    }, [allContractRents, currentTenant.id]);
 
     const groupedContracts = useMemo(() => {
         const groups = new Map<string, typeof relatedRents>();
         relatedRents.forEach(rent => {
-            const key = rent.rentOutTenancyNumber || rent.rentingTenancyNumber || '__none__';
+            const key = rent.rentOutTenancyNumber || '__none__';
             if (!groups.has(key)) groups.set(key, []);
             groups.get(key)!.push(rent);
         });
@@ -103,7 +101,7 @@ export default function CurrentTenantDetailModal({
         });
     };
 
-    const isLoading = loadingRentOut || loadingContract || loadingRenting;
+    const isLoading = loadingContract;
     const partyTypeLabel =
         currentTenant.type === 'individual' ? '個人' : currentTenant.type === 'company' ? '公司' : '—';
 
@@ -233,12 +231,11 @@ export default function CurrentTenantDetailModal({
                                                         <div className="divide-y divide-zinc-100 dark:divide-white/5">
                                                             {group.contracts.map(rent => {
                                                                 const rentProperty = rent.property as Property | null;
-                                                                const rentType = rent.type || 'rent_out';
-                                                                const tenancyNum = rent.rentOutTenancyNumber || rent.rentingTenancyNumber;
-                                                                const monthlyRental = rent.rentOutMonthlyRental ?? rent.rentingMonthlyRental;
-                                                                const startDate = rent.rentOutStartDate || rent.rentingStartDate;
-                                                                const endDate = rent.rentOutEndDate || rent.rentingEndDate;
-                                                                const contractStatus = rent.rentOutStatus || rent.rentingStatus || 'listing';
+                                                                const tenancyNum = rent.rentOutTenancyNumber;
+                                                                const monthlyRental = rent.rentOutMonthlyRental;
+                                                                const startDate = rent.rentOutStartDate;
+                                                                const endDate = rent.rentOutEndDate;
+                                                                const contractStatus = rent.rentOutStatus || 'listing';
                                                                 const statusLabel = statusLabels[contractStatus] || contractStatus;
                                                                 return (
                                                                     <div
@@ -252,14 +249,8 @@ export default function CurrentTenantDetailModal({
                                                                     >
                                                                         <div className="flex items-center gap-3">
                                                                             <div className="flex-1 min-w-0">
-                                                                                <div className="flex items-center gap-2 flex-wrap mb-1">
-                                                                                    {rentType === 'rent_out' ? (
-                                                                                        <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-purple-100 dark:bg-purple-500/20 text-purple-600 dark:text-purple-300 font-medium">出租</span>
-                                                                                    ) : rentType === 'contract' ? (
-                                                                                        <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-blue-100 dark:bg-blue-500/20 text-blue-600 dark:text-blue-300 font-medium">合約</span>
-                                                                                    ) : (
-                                                                                        <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-cyan-100 dark:bg-cyan-500/20 text-cyan-600 dark:text-cyan-300 font-medium">交租</span>
-                                                                                    )}
+                                                                <div className="flex items-center gap-2 flex-wrap mb-1">
+                                                                    <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-blue-100 dark:bg-blue-500/20 text-blue-600 dark:text-blue-300 font-medium">合約</span>
                                                                                     {rentProperty && (
                                                                                         <div className="flex items-center gap-1 text-zinc-500 dark:text-white/40">
                                                                                             <MapPin className="w-3 h-3 shrink-0" />

@@ -379,105 +379,64 @@ export default function ContractsPage() {
                 </motion.button>
             </div>
 
-            {/* 統計區域：左側 Hero 總金額卡片 + 右側指標 */}
-            <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 items-stretch">
-                {/* 左側 Hero 總金額卡片（60% = 3/5） */}
-                <div className="lg:col-span-3">
-                    <div className="relative h-full rounded-2xl overflow-hidden bg-linear-to-br from-emerald-600 via-emerald-500 to-teal-400 shadow-xl shadow-emerald-500/20">
-                        {/* 裝飾性背景 */}
-                        <div className="absolute inset-0 opacity-20">
-                            <div className="absolute -top-20 -right-20 w-80 h-80 rounded-full bg-white/20 blur-3xl" />
-                            <div className="absolute -bottom-10 -left-10 w-60 h-60 rounded-full bg-teal-300/30 blur-3xl" />
+            {/* 統計區域：同一行 5 個卡片（首卡佔 35%，其餘各佔 16.25%） */}
+            <div className="flex flex-row gap-4 items-stretch">
+                {/* 卡片 1：Hero 總金額（35%） */}
+                <div className="w-[35%]">
+                    <div className={`relative h-full rounded-2xl overflow-hidden shadow-xl ${
+                        isLeaseInTab
+                            ? 'bg-linear-to-br from-violet-200 via-violet-100 to-purple-100 shadow-violet-200/50'
+                            : 'bg-linear-to-br from-amber-100 via-amber-50 to-orange-100 shadow-amber-200/50'
+                    }`}>
+                        <div className="absolute inset-0 opacity-60">
+                            <div className="absolute -top-20 -right-20 w-80 h-80 rounded-full bg-white/50 blur-3xl" />
+                            <div className="absolute -bottom-10 -left-10 w-60 h-60 rounded-full bg-white/60 blur-3xl" />
                         </div>
-                        {/* 幾何裝飾線 */}
                         <div className="absolute top-4 right-4 w-px h-20 bg-white/20 rotate-45" />
                         <div className="absolute bottom-6 right-8 w-24 h-px bg-white/20 rotate-45" />
 
-                        <div className="relative z-10 p-6 lg:p-8 h-full flex flex-col">
-                            {/* 頂部：標題 + 日期篩選浮動欄 */}
-                            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
-                                <div className="flex items-center gap-3">
-                                    <div className="p-2.5 rounded-xl bg-white/15 backdrop-blur-md border border-white/20 shadow-inner">
-                                        <DollarSign className="w-5 h-5 text-white" />
-                                    </div>
-                                    <div>
-                                        <p className="text-emerald-100 text-sm font-semibold tracking-wide">{isLeaseInTab ? '租賃合計' : '出租合計'}</p>
-                                        <p className="text-white/60 text-xs mt-0.5">合約總租金</p>
-                                    </div>
+                        <div className="relative z-10 p-5 h-full flex flex-col">
+                            <div className="flex items-center gap-2 mb-3">
+                                <div className={`p-2 rounded-lg shadow-inner ${
+                                    isLeaseInTab ? 'bg-violet-500/15' : 'bg-amber-500/15'
+                                }`}>
+                                    <DollarSign className={`w-4 h-4 ${isLeaseInTab ? 'text-violet-600' : 'text-amber-600'}`} />
                                 </div>
-
-                                {/* 日期篩選浮動膠囊 */}
-                                <div className="flex items-center gap-2 bg-white/10 backdrop-blur-md border border-white/20 rounded-xl px-3 py-1.5">
-                                    <Calendar className="w-3.5 h-3.5 text-emerald-100/80 shrink-0" />
-                                    <input
-                                        type="date"
-                                        value={amountDateStart}
-                                        onChange={(e) => setAmountDateStart(e.target.value)}
-                                        max={amountDateEnd || undefined}
-                                        className="bg-transparent text-xs text-emerald-100 placeholder-white/50 focus:outline-none cursor-pointer w-24 scheme-dark"
-                                    />
-                                    <span className="text-white/40 text-xs shrink-0">—</span>
-                                    <input
-                                        type="date"
-                                        value={amountDateEnd}
-                                        onChange={(e) => setAmountDateEnd(e.target.value)}
-                                        min={amountDateStart || undefined}
-                                        className="bg-transparent text-xs text-emerald-100 placeholder-white/50 focus:outline-none cursor-pointer w-24 scheme-dark"
-                                    />
-                                    {(amountDateStart || amountDateEnd) && (
-                                        <button
-                                            onClick={() => { setAmountDateStart(''); setAmountDateEnd(''); }}
-                                            className="ml-1 p-0.5 rounded-lg text-white/60 hover:text-white hover:bg-white/10 transition-all"
-                                        >
-                                            <X className="w-3.5 h-3.5" />
-                                        </button>
-                                    )}
-                                </div>
-                            </div>
-
-                            {/* 主數字 */}
-                            <div className="flex-1 flex items-center">
                                 <div>
-                                    <p className="text-5xl lg:text-6xl font-black text-white tabular-nums leading-none tracking-tight drop-shadow-lg">
-                                        {totalMonthlyAmount.toLocaleString()}
-                                    </p>
-                                    <p className="text-emerald-100/80 text-sm font-medium mt-2 tracking-wider">HKD <span className="text-emerald-100/60 text-xs">/ 總合約租金</span></p>
+                                    <p className={`text-sm font-semibold tracking-wide ${isLeaseInTab ? 'text-violet-700' : 'text-amber-700'}`}>{isLeaseInTab ? '租賃合計' : '出租合計'}</p>
+                                    <p className={`text-xs mt-0.5 ${isLeaseInTab ? 'text-violet-500/70' : 'text-amber-600/70'}`}>合約總租金</p>
                                 </div>
                             </div>
 
-                            {/* 底部：按金摘要 + 趨勢線裝飾 */}
-                            <div className="flex items-center justify-between mt-4 pt-4 border-t border-white/15">
-                                <div className="flex items-center gap-4">
-                                    <div className="flex items-center gap-1.5">
-                                        <div className="w-1.5 h-1.5 rounded-full bg-emerald-200" />
-                                        <p className="text-emerald-100/70 text-xs font-medium">{isLeaseInTab ? '已付按金' : '已收按金'}</p>
-                                        <p className="text-white text-sm font-bold tabular-nums ml-1">
-                                            {isLeaseInTab ? totalDeposit.paid.toLocaleString() : totalDeposit.received.toLocaleString()}
-                                        </p>
-                                    </div>
-                                    <div className="w-px h-4 bg-white/20" />
-                                    <div className="flex items-center gap-1.5">
-                                        <div className="w-1.5 h-1.5 rounded-full bg-teal-200" />
-                                        <p className="text-emerald-100/70 text-xs font-medium">合約數</p>
-                                        <p className="text-white text-sm font-bold tabular-nums ml-1">{contracts.length}</p>
-                                    </div>
-                                </div>
-                                {/* 迷你趨勢線 SVG */}
-                                <svg className="w-16 h-8 opacity-40" viewBox="0 0 64 32" fill="none">
-                                    <path d="M0 28 L12 22 L20 26 L32 16 L44 20 L56 8 L64 4" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                                    <path d="M0 28 L12 22 L20 26 L32 16 L44 20 L56 8 L64 4 L64 32 L0 32Z" fill="white" opacity="0.15" />
-                                </svg>
+                            <div className="flex-1 flex items-center">
+                                <p className={`text-4xl font-black tabular-nums leading-none tracking-tight drop-shadow-lg ${isLeaseInTab ? 'text-violet-800' : 'text-amber-800'}`}>
+                                    ${totalMonthlyAmount.toLocaleString()}
+                                </p>
+                            </div>
+
+                            {/* 日期篩選 */}
+                            <div className={`flex items-center gap-1 mt-3 backdrop-blur-md border rounded-lg px-3 py-2 ${
+                                isLeaseInTab ? 'bg-violet-500/10 border-violet-300/30' : 'bg-amber-500/10 border-amber-300/30'
+                            }`}>
+                                <Calendar className={`w-4 h-4 shrink-0 ${isLeaseInTab ? 'text-violet-500/80' : 'text-amber-500/80'}`} />
+                                <input type="date" value={amountDateStart} onChange={(e) => setAmountDateStart(e.target.value)} max={amountDateEnd || undefined} className={`bg-transparent text-xs focus:outline-none cursor-pointer w-24 scheme-dark ${isLeaseInTab ? 'text-violet-700 placeholder-violet-400/50' : 'text-amber-700 placeholder-amber-500/50'}`} />
+                                <span className={`text-xs shrink-0 ${isLeaseInTab ? 'text-violet-400/60' : 'text-amber-500/60'}`}>—</span>
+                                <input type="date" value={amountDateEnd} onChange={(e) => setAmountDateEnd(e.target.value)} min={amountDateStart || undefined} className={`bg-transparent text-xs focus:outline-none cursor-pointer w-24 scheme-dark ${isLeaseInTab ? 'text-violet-700 placeholder-violet-400/50' : 'text-amber-700 placeholder-amber-500/50'}`} />
+                                {(amountDateStart || amountDateEnd) && (
+                                    <button onClick={() => { setAmountDateStart(''); setAmountDateEnd(''); }} className={`p-0.5 rounded transition-all ${isLeaseInTab ? 'text-violet-400/70 hover:text-violet-700 hover:bg-violet-500/10' : 'text-amber-500/70 hover:text-amber-700 hover:bg-amber-500/10'}`}>
+                                        <X className="w-3.5 h-3.5" />
+                                    </button>
+                                )}
                             </div>
                         </div>
                     </div>
                 </div>
 
-                {/* 右側 2×2 指標卡（40% = 2/5） */}
-                <div className="lg:col-span-2 grid grid-cols-2 gap-4">
-                    {/* 出租中 */}
-                    <div className="relative rounded-2xl overflow-hidden bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-white/10 shadow-lg shadow-green-500/8 group hover:shadow-xl hover:-translate-y-0.5 transition-all duration-300">
+                {/* 卡片 2：出租中 */}
+                <div className="w-[16.25%]">
+                    <div className="relative h-full rounded-2xl overflow-hidden bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-white/10 shadow-lg shadow-green-500/8 group hover:shadow-xl hover:-translate-y-0.5 transition-all duration-300">
                         <div className="absolute inset-0 bg-linear-to-br from-green-50 to-transparent dark:from-green-950/30 dark:to-transparent opacity-80" />
-                        <div className="relative z-10 p-5 flex flex-col justify-between h-full">
+                        <div className="relative z-10 p-5 h-full flex flex-col justify-between">
                             <div className="flex items-start justify-between">
                                 <div className="p-2.5 rounded-xl bg-linear-to-br from-green-500 to-emerald-600 shadow-lg shadow-green-500/25 group-hover:rotate-3 transition-transform duration-300">
                                     <Building2 className="w-5 h-5 text-white" />
@@ -492,11 +451,13 @@ export default function ContractsPage() {
                             </div>
                         </div>
                     </div>
+                </div>
 
-                    {/* 租賃中 */}
-                    <div className="relative rounded-2xl overflow-hidden bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-white/10 shadow-lg shadow-violet-500/8 group hover:shadow-xl hover:-translate-y-0.5 transition-all duration-300">
+                {/* 卡片 3：租賃中 */}
+                <div className="w-[16.25%]">
+                    <div className="relative h-full rounded-2xl overflow-hidden bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-white/10 shadow-lg shadow-violet-500/8 group hover:shadow-xl hover:-translate-y-0.5 transition-all duration-300">
                         <div className="absolute inset-0 bg-linear-to-br from-violet-50 to-transparent dark:from-violet-950/30 dark:to-transparent opacity-80" />
-                        <div className="relative z-10 p-5 flex flex-col justify-between h-full">
+                        <div className="relative z-10 p-5 h-full flex flex-col justify-between">
                             <div className="flex items-start justify-between">
                                 <div className="p-2.5 rounded-xl bg-linear-to-br from-violet-500 to-purple-600 shadow-lg shadow-violet-500/25 group-hover:-rotate-3 transition-transform duration-300">
                                     <FileText className="w-5 h-5 text-white" />
@@ -509,11 +470,13 @@ export default function ContractsPage() {
                             </div>
                         </div>
                     </div>
+                </div>
 
-                    {/* 按金 */}
-                    <div className="relative rounded-2xl overflow-hidden bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-white/10 shadow-lg shadow-amber-500/8 group hover:shadow-xl hover:-translate-y-0.5 transition-all duration-300">
+                {/* 卡片 4：按金 */}
+                <div className="w-[16.25%]">
+                    <div className="relative h-full rounded-2xl overflow-hidden bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-white/10 shadow-lg shadow-amber-500/8 group hover:shadow-xl hover:-translate-y-0.5 transition-all duration-300">
                         <div className="absolute inset-0 bg-linear-to-br from-amber-50 to-transparent dark:from-amber-950/30 dark:to-transparent opacity-80" />
-                        <div className="relative z-10 p-5 flex flex-col justify-between h-full">
+                        <div className="relative z-10 p-5 h-full flex flex-col justify-between">
                             <div className="flex items-start justify-between">
                                 <div className="p-2.5 rounded-xl bg-linear-to-br from-amber-500 to-orange-500 shadow-lg shadow-amber-500/25 group-hover:rotate-6 transition-transform duration-300">
                                     <ShieldCheck className="w-5 h-5 text-white" />
@@ -528,11 +491,13 @@ export default function ContractsPage() {
                             </div>
                         </div>
                     </div>
+                </div>
 
-                    {/* 合約總數 */}
-                    <div className="relative rounded-2xl overflow-hidden bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-white/10 shadow-lg shadow-zinc-200/50 dark:shadow-white/5 group hover:shadow-xl hover:-translate-y-0.5 transition-all duration-300">
+                {/* 卡片 5：合約總數 */}
+                <div className="w-[16.25%]">
+                    <div className="relative h-full rounded-2xl overflow-hidden bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-white/10 shadow-lg shadow-zinc-200/50 dark:shadow-white/5 group hover:shadow-xl hover:-translate-y-0.5 transition-all duration-300">
                         <div className="absolute inset-0 bg-linear-to-br from-zinc-50 to-transparent dark:from-zinc-800/40 dark:to-transparent opacity-80" />
-                        <div className="relative z-10 p-5 flex flex-col justify-between h-full">
+                        <div className="relative z-10 p-5 h-full flex flex-col justify-between">
                             <div className="flex items-start justify-between">
                                 <div className="p-2.5 rounded-xl bg-linear-to-br from-zinc-600 to-zinc-700 shadow-lg shadow-zinc-500/20 group-hover:-rotate-3 transition-transform duration-300">
                                     <FileText className="w-5 h-5 text-white" />
