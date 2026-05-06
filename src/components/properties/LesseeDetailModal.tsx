@@ -353,10 +353,15 @@ export default function LesseeDetailModal({
                                                                                 )}
                                                                                 <div className="flex items-center gap-4 mt-2 flex-wrap">
                                                                                     {monthlyRent > 0 && (
-                                                                                        <span className="text-sm text-blue-600 dark:text-blue-400 font-bold">
-                                                                                            ${formatNumber(monthlyRent)}/月
+                                                                                    <div className="flex items-center gap-1">
+                                                                                        <span className="text-[20px] font-bold text-blue-600 dark:text-blue-400">
+                                                                                            ${formatNumber(monthlyRent)}
                                                                                         </span>
-                                                                                    )}
+                                                                                        <span className="text-[14px] text-zinc-400 dark:text-white/40 font-light">
+                                                                                            /月
+                                                                                        </span>
+                                                                                    </div>
+                                                                                )}
                                                                                     {startDate && (
                                                                                         <span className="flex items-center gap-1 text-sm text-zinc-400 dark:text-white/30">
                                                                                             <Calendar className="w-3 h-3 shrink-0" />
