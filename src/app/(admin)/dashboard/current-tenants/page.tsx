@@ -17,6 +17,7 @@ export default function CurrentTenantsPage() {
     const [showModal, setShowModal] = useState(false);
     const [editItem, setEditItem] = useState<CurrentTenant | null>(null);
     const [detailItem, setDetailItem] = useState<CurrentTenant | null>(null);
+    const [editingFromDetail, setEditingFromDetail] = useState(false); // 追蹤是否從詳情進入編輯
     const [searchQuery, setSearchQuery] = useState('');
 
     const filtered = useMemo(() => {
@@ -43,9 +44,10 @@ export default function CurrentTenantsPage() {
         setShowModal(true);
     };
 
-    const handleOpenEdit = (item: CurrentTenant) => {
-        setDetailItem(null);
+    const handleOpenEdit = (item: CurrentTenant, fromDetail = false) => {
         setEditItem(item);
+        setDetailItem(fromDetail ? item : null);
+        setEditingFromDetail(fromDetail);
         setShowModal(true);
     };
 
@@ -145,6 +147,15 @@ export default function CurrentTenantsPage() {
                         mode="current_tenant"
                         editItem={editItem}
                         onClose={() => { setShowModal(false); setEditItem(null); }}
+                        onCancel={() => {
+                            setShowModal(false);
+                            setEditItem(null);
+                            setEditingFromDetail(false);
+                            // 從詳情進入編輯時，取消回到詳情 popup
+                            if (editingFromDetail && editItem) {
+                                setDetailItem(editItem);
+                            }
+                        }}
                         onSuccess={handleSuccess}
                     />
                 )}
@@ -152,15 +163,13 @@ export default function CurrentTenantsPage() {
 
             <AnimatePresence>
                 {detailItem && (
-                    <CurrentTenantDetailModal
-                        currentTenant={detailItem}
-                        onClose={() => setDetailItem(null)}
-                        onEdit={() => {
-                            setEditItem(detailItem);
-                            setDetailItem(null);
-                            setShowModal(true);
-                        }}
-                    />
+                <CurrentTenantDetailModal
+                    currentTenant={detailItem}
+                    onClose={() => setDetailItem(null)}
+                    onEdit={() => {
+                        handleOpenEdit(detailItem, true);
+                    }}
+                />
                 )}
             </AnimatePresence>
         </div>

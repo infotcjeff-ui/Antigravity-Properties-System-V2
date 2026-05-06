@@ -336,7 +336,7 @@ export const fetchRents = async (user?: any): Promise<Rent[]> => {
 export const fetchRentsWithRelations = async (user?: any, options?: { type?: 'renting' | 'rent_out' | 'contract' }): Promise<any[]> => {
     try {
         // EXCLUDE heavy fields from property join
-        const propFields = 'id, name, code, address, type, status, land_use, lot_index, lot_area, location, google_drive_plan_url, has_planning_permission, proprietor_id, tenant_id, created_by, created_at, updated_at, images';
+        const propFields = 'id, name, code, address, type, status, land_use, lot_index, lot_area, location, google_drive_plan_url, has_planning_permission, proprietor_id, proprietor_ids, tenant_id, created_by, created_at, updated_at, images';
         let query = supabase.from('rents').select(`*, property:properties(${propFields}), proprietor:proprietors!proprietor_id(*), tenant:proprietors!tenant_id(*)`);
 
         if (options?.type) {

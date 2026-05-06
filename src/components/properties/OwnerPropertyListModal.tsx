@@ -3,7 +3,7 @@
 import { useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
-import { X, Building2, ExternalLink, ChevronRight, ChevronLeft, MapPin, Hash } from 'lucide-react';
+import { X, Building2, ChevronRight, ChevronLeft, MapPin, Hash } from 'lucide-react';
 import type { Proprietor, Property } from '@/lib/db';
 import { formatLotIndexPlainJoined } from '@/lib/formatters';
 
@@ -156,7 +156,7 @@ export default function OwnerPropertyListModal({
                                 <div className="py-16 text-center">
                                     <Building2 className="w-12 h-12 text-zinc-200 dark:text-white/10 mx-auto mb-3" />
                                     <p className="text-zinc-500 dark:text-white/40 font-medium">暫無關聯物業</p>
-                                    <p className="text-zinc-400 dark:text-white/25 text-xs mt-1">此業主尚未關聯任何物業</p>
+                                    <p className="text-zinc-400 dark:text-white/25 text-sm mt-1">此業主尚未關聯任何物業</p>
                                 </div>
                             ) : (
                                 <>
@@ -188,31 +188,17 @@ export default function OwnerPropertyListModal({
                                                         {property.address && (
                                                             <div className="flex items-center gap-1.5 text-zinc-500 dark:text-white/40 mb-1">
                                                                 <MapPin className="w-3.5 h-3.5 shrink-0" />
-                                                                <span className="text-xs truncate">{property.address}</span>
+                                                                <span className="text-sm text-zinc-600 dark:text-white/60 truncate">{property.address}</span>
                                                             </div>
                                                         )}
                                                         {property.lotIndex && (
                                                             <div className="flex items-center gap-1.5 text-zinc-400 dark:text-white/30">
                                                                 <Hash className="w-3 h-3 shrink-0" />
-                                                                <span className="text-xs font-mono">{formatLotIndexPlainJoined(property.lotIndex)}</span>
+                                                                <span className="text-sm font-mono text-zinc-600 dark:text-white/60">{formatLotIndexPlainJoined(property.lotIndex)}</span>
                                                             </div>
                                                         )}
                                                     </div>
-                                                    <div className="flex items-center gap-2 shrink-0 mt-1">
-                                                        {property.address && (
-                                                            <a
-                                                                href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(property.address)}`}
-                                                                target="_blank"
-                                                                rel="noopener noreferrer"
-                                                                onClick={(e) => e.stopPropagation()}
-                                                                className="p-1.5 rounded-lg hover:bg-purple-100 dark:hover:bg-purple-500/20 text-zinc-400 dark:text-white/30 hover:text-purple-500 dark:hover:text-purple-400 transition-colors"
-                                                                title="在 Google Maps 開啟"
-                                                            >
-                                                                <ExternalLink className="w-4 h-4" />
-                                                            </a>
-                                                        )}
-                                                        <ChevronRight className="w-4 h-4 text-zinc-300 dark:text-white/20 group-hover:text-purple-400 dark:group-hover:text-purple-400 transition-colors" />
-                                                    </div>
+                                                    <ChevronRight className="w-4 h-4 text-zinc-300 dark:text-white/20 group-hover:text-purple-400 dark:group-hover:text-purple-400 transition-colors shrink-0 mt-1" />
                                                 </div>
                                             </div>
                                         ))}
@@ -247,49 +233,51 @@ export default function OwnerPropertyListModal({
 
                     {activeTab === 'basic' && (
                         <div className="p-5">
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div className="grid grid-cols-2 gap-4">
                                 <div className="p-4 bg-zinc-50 dark:bg-white/5 rounded-xl border border-zinc-100 dark:border-white/5">
-                                    <p className="text-xs text-zinc-500 dark:text-white/40 mb-1">名稱</p>
-                                    <p className="text-sm font-bold text-zinc-900 dark:text-white">{proprietor.name}</p>
+                                    <p className="text-sm text-zinc-500 dark:text-white/40 mb-1">名稱</p>
+                                    <p className="text-base font-bold text-zinc-900 dark:text-white">{proprietor.name}</p>
                                 </div>
-                                {proprietor.englishName && (
-                                    <div className="p-4 bg-zinc-50 dark:bg-white/5 rounded-xl border border-zinc-100 dark:border-white/5">
-                                        <p className="text-xs text-zinc-500 dark:text-white/40 mb-1">英文名稱</p>
-                                        <p className="text-sm font-medium text-zinc-700 dark:text-white/70">{proprietor.englishName}</p>
-                                    </div>
-                                )}
+                                <div className="p-4 bg-zinc-50 dark:bg-white/5 rounded-xl border border-zinc-100 dark:border-white/5">
+                                    <p className="text-sm text-zinc-500 dark:text-white/40 mb-1">代碼</p>
+                                    <p className="text-base font-medium text-zinc-900 dark:text-white">
+                                        {proprietor.code || '—'}
+                                    </p>
+                                </div>
                                 {proprietor.shortName && (
                                     <div className="p-4 bg-zinc-50 dark:bg-white/5 rounded-xl border border-zinc-100 dark:border-white/5">
-                                        <p className="text-xs text-zinc-500 dark:text-white/40 mb-1">簡稱</p>
-                                        <p className="text-sm font-medium text-zinc-700 dark:text-white/70">{proprietor.shortName}</p>
+                                        <p className="text-sm text-zinc-500 dark:text-white/40 mb-1">簡稱</p>
+                                        <p className="text-base font-medium text-zinc-900 dark:text-white">{proprietor.shortName}</p>
+                                    </div>
+                                )}
+                                {proprietor.englishName && (
+                                    <div className="p-4 bg-zinc-50 dark:bg-white/5 rounded-xl border border-zinc-100 dark:border-white/5">
+                                        <p className="text-sm text-zinc-500 dark:text-white/40 mb-1">英文名稱</p>
+                                        <p className="text-base font-medium text-zinc-900 dark:text-white">{proprietor.englishName}</p>
                                     </div>
                                 )}
                                 <div className="p-4 bg-zinc-50 dark:bg-white/5 rounded-xl border border-zinc-100 dark:border-white/5">
-                                    <p className="text-xs text-zinc-500 dark:text-white/40 mb-1">代碼</p>
-                                    <p className="text-sm font-mono font-bold text-zinc-900 dark:text-white">{proprietor.code}</p>
-                                </div>
-                                <div className="p-4 bg-zinc-50 dark:bg-white/5 rounded-xl border border-zinc-100 dark:border-white/5">
-                                    <p className="text-xs text-zinc-500 dark:text-white/40 mb-1">性質</p>
-                                    <p className="text-sm font-medium text-zinc-700 dark:text-white/70">
+                                    <p className="text-sm text-zinc-500 dark:text-white/40 mb-1">性質</p>
+                                    <p className="text-base font-medium text-zinc-900 dark:text-white">
                                         {proprietor.type === 'company' ? '公司' : '個人'}
                                     </p>
                                 </div>
-                                {proprietor.brNumber && (
-                                    <div className="p-4 bg-zinc-50 dark:bg-white/5 rounded-xl border border-zinc-100 dark:border-white/5 sm:col-span-2">
-                                        <p className="text-xs text-zinc-500 dark:text-white/40 mb-1">商業登記號碼</p>
-                                        <p className="text-sm font-mono font-medium text-zinc-700 dark:text-white/70">{proprietor.brNumber}</p>
-                                    </div>
-                                )}
-                                <div className="p-4 bg-zinc-50 dark:bg-white/5 rounded-xl border border-zinc-100 dark:border-white/5 sm:col-span-2">
-                                    <p className="text-xs text-zinc-500 dark:text-white/40 mb-1">擁有類別</p>
-                                    <p className="text-sm font-medium text-zinc-700 dark:text-white/70 capitalize">
+                                <div className="p-4 bg-zinc-50 dark:bg-white/5 rounded-xl border border-zinc-100 dark:border-white/5">
+                                    <p className="text-sm text-zinc-500 dark:text-white/40 mb-1">類別</p>
+                                    <p className="text-base font-medium text-zinc-900 dark:text-white capitalize">
                                         {proprietor.category.replace(/_/g, ' ')}
                                     </p>
                                 </div>
+                                {proprietor.brNumber && (
+                                    <div className="p-4 bg-zinc-50 dark:bg-white/5 rounded-xl border border-zinc-100 dark:border-white/5">
+                                        <p className="text-sm text-zinc-500 dark:text-white/40 mb-1">商業登記號碼</p>
+                                        <p className="text-base font-medium text-zinc-900 dark:text-white">{proprietor.brNumber}</p>
+                                    </div>
+                                )}
                                 {proprietor.createdAt && (
-                                    <div className="p-4 bg-zinc-50 dark:bg-white/5 rounded-xl border border-zinc-100 dark:border-white/5 sm:col-span-2">
-                                        <p className="text-xs text-zinc-500 dark:text-white/40 mb-1">建立日期</p>
-                                        <p className="text-sm font-medium text-zinc-700 dark:text-white/70">
+                                    <div className="p-4 bg-zinc-50 dark:bg-white/5 rounded-xl border border-zinc-100 dark:border-white/5">
+                                        <p className="text-sm text-zinc-500 dark:text-white/40 mb-1">建立日期</p>
+                                        <p className="text-base font-medium text-zinc-900 dark:text-white">
                                             {new Date(proprietor.createdAt).toLocaleDateString('zh-HK', {
                                                 year: 'numeric',
                                                 month: 'long',

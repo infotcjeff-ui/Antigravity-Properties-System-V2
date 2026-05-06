@@ -55,6 +55,8 @@ interface RentOutFormModalProps {
     editItem?: SubLandlord | CurrentTenant | null;
     onClose: () => void;
     onSuccess: (id: string) => void;
+    /** 取消時回到詳情模式（僅用於現時租客從詳情進入編輯時） */
+    onCancel?: () => void;
 }
 
 const formatDate = (d: any) => {
@@ -63,7 +65,7 @@ const formatDate = (d: any) => {
     return x.toISOString().split('T')[0];
 };
 
-export default function RentOutFormModal({ mode, editItem, onClose, onSuccess }: RentOutFormModalProps) {
+export default function RentOutFormModal({ mode, editItem, onClose, onSuccess, onCancel }: RentOutFormModalProps) {
     const { addSubLandlord, updateSubLandlord } = useSubLandlords();
     const { addCurrentTenant, updateCurrentTenant } = useCurrentTenants();
     const [saving, setSaving] = useState(false);
@@ -361,7 +363,17 @@ export default function RentOutFormModal({ mode, editItem, onClose, onSuccess }:
                         )}
                     </div>
                     <div className="flex items-center justify-end gap-3 p-5 border-t border-zinc-100 dark:border-white/5 shrink-0">
-                        <button type="button" onClick={onClose} className="px-4 py-2 rounded-xl text-zinc-500 dark:text-white/70 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-white/10 transition-all">
+                        <button
+                            type="button"
+                            onClick={() => {
+                                if (editItem && onCancel) {
+                                    onCancel();
+                                } else {
+                                    onClose();
+                                }
+                            }}
+                            className="px-4 py-2 rounded-xl text-zinc-500 dark:text-white/70 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-white/10 transition-all"
+                        >
                             取消
                         </button>
                         <motion.button

@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useProprietorsQuery, useProprietors, useSubLandlordsQuery, useSubLandlords, useCurrentTenantsQuery, useCurrentTenants, usePropertiesQuery, useRentsWithRelationsQuery } from '@/hooks/useStorage';
 import { useQueryClient } from '@tanstack/react-query';
-import { Users, ChevronRight, ChevronUp, Building2, Plus, Pencil, Trash2, X, ExternalLink, FileText, MapPin } from 'lucide-react';
+import { Users, ChevronRight, ChevronUp, ChevronLeft, Building2, Plus, Pencil, Trash2, X, FileText, MapPin, Hash, Calendar } from 'lucide-react';
 import type { Proprietor, SubLandlord, CurrentTenant, Property } from '@/lib/db';
 import { BentoCard } from '@/components/layout/BentoGrid';
 import ProprietorModal from '@/components/properties/ProprietorModal';
@@ -13,7 +13,8 @@ import OwnerPropertyListModal from '@/components/properties/OwnerPropertyListMod
 import LesseeDetailModal from '@/components/properties/LesseeDetailModal';
 import RentOutFormModal from '@/components/properties/RentOutFormModal';
 import CurrentTenantDetailModal from '@/components/properties/CurrentTenantDetailModal';
-import { dedupeRecordsByDisplayName, proprietorCategoryLabelZh, proprietorCategoryBadgeClassName } from '@/lib/formatters';
+import { dedupeRecordsByDisplayName, proprietorCategoryLabelZh, proprietorCategoryBadgeClassName, formatLotIndexPlainJoined, formatRentHistoryLotCellText } from '@/lib/formatters';
+import { getRentOutLesseeDisplayLabel } from '@/lib/rentPaymentDisplay';
 
 type ProprietorManageTab = 'owners' | 'lessees' | 'sub_landlords' | 'current_tenants';
 
@@ -52,6 +53,7 @@ export default function TenantsPage() {
     const [showSubLandlordModal, setShowSubLandlordModal] = useState(false);
     const [editSubLandlord, setEditSubLandlord] = useState<SubLandlord | null>(null);
     const [showSubLandlordDetail, setShowSubLandlordDetail] = useState<SubLandlord | null>(null);
+    const [editingFromDetailSubLandlord, setEditingFromDetailSubLandlord] = useState<SubLandlord | null>(null);
     
     // For property count calculation
     const { data: allProperties } = usePropertiesQuery();
@@ -161,6 +163,10 @@ export default function TenantsPage() {
     const handleSubLandlordSuccess = () => {
         setShowSubLandlordModal(false);
         setEditSubLandlord(null);
+        if (editingFromDetailSubLandlord) {
+            setShowSubLandlordDetail(editingFromDetailSubLandlord);
+            setEditingFromDetailSubLandlord(null);
+        }
         queryClient.invalidateQueries({ queryKey: ['sub_landlords'] });
     };
 
@@ -598,13 +604,40 @@ export default function TenantsPage() {
                             setProprietorModalMode('tenant');
                         }}
                         onSuccess={handleTenantSuccess}
+                        onCancel={() => {
+                            setShowTenantModal(false);
+                            setTenantEditMode(false);
+                            if (selectedTenant) {
+                                if (selectedTenant.code?.startsWith('T')) {
+                                    setShowLesseeDetail(selectedTenant);
+                                } else {
+                                    setShowOwnerDetail(selectedTenant);
+                                }
+                            }
+                            setSelectedTenant(null);
+                        }}
                     />
                 )}
                 {showSubLandlordModal && (
                     <RentOutFormModal
                         mode="sub_landlord"
                         editItem={editSubLandlord}
-                        onClose={() => { setShowSubLandlordModal(false); setEditSubLandlord(null); }}
+                        onClose={() => {
+                            setShowSubLandlordModal(false);
+                            setEditSubLandlord(null);
+                            if (editingFromDetailSubLandlord) {
+                                setShowSubLandlordDetail(editingFromDetailSubLandlord);
+                                setEditingFromDetailSubLandlord(null);
+                            }
+                        }}
+                        onCancel={() => {
+                            setShowSubLandlordModal(false);
+                            setEditSubLandlord(null);
+                            if (editingFromDetailSubLandlord) {
+                                setShowSubLandlordDetail(editingFromDetailSubLandlord);
+                                setEditingFromDetailSubLandlord(null);
+                            }
+                        }}
                         onSuccess={handleSubLandlordSuccess}
                     />
                 )}
@@ -613,6 +646,14 @@ export default function TenantsPage() {
                         mode="current_tenant"
                         editItem={editCurrentTenant}
                         onClose={() => { setShowCurrentTenantModal(false); setEditCurrentTenant(null); }}
+                        onCancel={() => {
+                            setShowCurrentTenantModal(false);
+                            setEditCurrentTenant(null);
+                            // 從詳情進入編輯時，取消回到詳情 popup
+                            if (detailCurrentTenant) {
+                                setDetailCurrentTenant(detailCurrentTenant);
+                            }
+                        }}
                         onSuccess={handleCurrentTenantSuccess}
                     />
                 )}
@@ -633,6 +674,7 @@ export default function TenantsPage() {
                         allRentOutContracts={allRentOutContracts || []}
                         onClose={() => setShowSubLandlordDetail(null)}
                         onEdit={() => {
+                            setEditingFromDetailSubLandlord(showSubLandlordDetail);
                             setEditSubLandlord(showSubLandlordDetail);
                             setShowSubLandlordDetail(null);
                             setShowSubLandlordModal(true);
@@ -819,43 +861,44 @@ function SubLandlordDetailModal({
                                 <div className="py-16 text-center">
                                     <FileText className="w-12 h-12 text-zinc-200 dark:text-white/10 mx-auto mb-3" />
                                     <p className="text-zinc-500 dark:text-white/40 font-medium">暫無關聯合約</p>
-                                    <p className="text-zinc-400 dark:text-white/25 text-xs mt-1">此二房東尚未關聯任何合約記錄</p>
+                                    <p className="text-zinc-400 dark:text-white/25 text-sm mt-1">此二房東尚未關聯任何合約記錄</p>
                                 </div>
                             ) : (
                                 <>
-                                    <div className="space-y-2">
+                                    <div className="space-y-3">
                                         {paginatedGroups.map(group => {
                                             const isCollapsed = collapsedGroups.has(group.tenancyNumber);
-                                            const firstProperty = group.firstContract?.property as Property | null;
+                                            const firstContract = group.firstContract;
+                                            const firstProperty = firstContract?.property as Property | null;
                                             return (
                                                 <div key={group.tenancyNumber} className="rounded-xl border border-zinc-200 dark:border-white/10 overflow-hidden">
                                                     {/* Group Header */}
                                                     <div
-                                                        className="flex items-center gap-3 px-4 py-3 bg-zinc-50 dark:bg-white/5 cursor-pointer hover:bg-zinc-100 dark:hover:bg-white/10 transition-colors group"
+                                                        className="flex items-center gap-3 px-5 py-4 bg-zinc-50 dark:bg-white/5 cursor-pointer hover:bg-zinc-100 dark:hover:bg-white/10 transition-colors group"
                                                         onClick={() => toggleGroup(group.tenancyNumber)}
                                                     >
-                                                        <div className="flex items-center gap-2 flex-1 min-w-0">
-                                                            <FileText className="w-4 h-4 text-blue-500 shrink-0" />
-                                                            <span className="text-sm font-bold text-zinc-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+                                                        <div className="flex items-center gap-2.5 flex-1 min-w-0">
+                                                            <FileText className="w-5 h-5 text-blue-500 shrink-0" />
+                                                            <span className="text-base font-bold text-zinc-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
                                                                 {group.tenancyNumber === '__none__' ? '—' : group.tenancyNumber}
                                                             </span>
                                                             {group.totalCount > 1 && (
-                                                                <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-blue-100 dark:bg-blue-500/20 text-blue-600 dark:text-blue-300 font-medium shrink-0">
+                                                                <span className="text-xs px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-500/20 text-blue-600 dark:text-blue-300 font-semibold shrink-0">
                                                                     {group.totalCount}個
                                                                 </span>
                                                             )}
                                                         </div>
                                                         <div className="flex items-center gap-3">
                                                             {firstProperty && (
-                                                                <div className="flex items-center gap-1 text-zinc-400 dark:text-white/40">
-                                                                    <MapPin className="w-3 h-3 shrink-0" />
-                                                                    <span className="text-[10px] truncate max-w-24">{firstProperty.name || '—'}</span>
+                                                                <div className="flex items-center gap-1 text-zinc-500 dark:text-white/50">
+                                                                    <MapPin className="w-4 h-4 shrink-0" />
+                                                                    <span className="text-sm truncate max-w-32">{firstProperty.name || '—'}</span>
                                                                 </div>
                                                             )}
                                                             {isCollapsed ? (
-                                                                <ChevronRight className="w-4 h-4 text-zinc-400 dark:text-white/30 shrink-0" />
+                                                                <ChevronRight className="w-5 h-5 text-zinc-400 dark:text-white/30 shrink-0" />
                                                             ) : (
-                                                                <ChevronUp className="w-4 h-4 text-zinc-400 dark:text-white/30 shrink-0" />
+                                                                <ChevronUp className="w-5 h-5 text-zinc-400 dark:text-white/30 shrink-0" />
                                                             )}
                                                         </div>
                                                     </div>
@@ -867,7 +910,7 @@ function SubLandlordDetailModal({
                                                                 return (
                                                                     <div
                                                                         key={rent.id}
-                                                                        className="px-4 py-3 pl-10 hover:bg-zinc-50 dark:hover:bg-white/5 cursor-pointer group/item transition-colors"
+                                                                        className="px-5 py-4 pl-14 hover:bg-zinc-50 dark:hover:bg-white/5 cursor-pointer group/item transition-colors"
                                                                         onClick={() => {
                                                                             if (rentProperty?.id) {
                                                                                 router.push(`/properties/${rentProperty.id}`);
@@ -875,45 +918,76 @@ function SubLandlordDetailModal({
                                                                             }
                                                                         }}
                                                                     >
-                                                                        <div className="flex items-center gap-3">
-                                                                            <div className="flex-1 min-w-0">
+                                                                        <div className="flex items-start justify-between gap-4">
+                                                                            <div className="flex-1 min-w-0 space-y-2">
+                                                                                {/* 物業名稱 */}
                                                                                 {rentProperty && (
-                                                                                    <div className="flex items-center gap-1.5 text-zinc-500 dark:text-white/40 mb-1">
-                                                                                        <MapPin className="w-3 h-3 shrink-0" />
-                                                                                        <span className="text-xs truncate">{rentProperty.name || '—'}</span>
-                                                                                        <span className="text-[10px] text-zinc-400 dark:text-white/25 font-mono shrink-0">
-                                                                                            ({rentProperty.code})
+                                                                                    <div className="flex items-center gap-2">
+                                                                                        <Building2 className="w-4 h-4 text-blue-500 shrink-0" />
+                                                                                        <span className="text-sm font-bold text-zinc-900 dark:text-white truncate">{rentProperty.name || '—'}</span>
+                                                                                        <span className="text-xs px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-500/20 text-blue-600 dark:text-blue-300 font-mono font-medium shrink-0">
+                                                                                            {rentProperty.code}
                                                                                         </span>
                                                                                     </div>
                                                                                 )}
-                                                                                <div className="flex items-center gap-4 flex-wrap">
-                                                                                    {rent.rentOutMonthlyRental != null && (
-                                                                                        <span className="text-xs text-emerald-600 dark:text-emerald-400 font-medium">
-                                                                                            ${new Intl.NumberFormat('zh-HK').format(rent.rentOutMonthlyRental)}/月
-                                                                                        </span>
-                                                                                    )}
-                                                                                    {rent.rentOutStartDate && (
-                                                                                        <span className="text-[10px] text-zinc-400 dark:text-white/30">
-                                                                                            {new Date(rent.rentOutStartDate).toLocaleDateString('zh-HK')}
-                                                                                            {rent.rentOutEndDate && ` — ${new Date(rent.rentOutEndDate).toLocaleDateString('zh-HK')}`}
-                                                                                        </span>
-                                                                                    )}
-                                                                                </div>
-                                                                            </div>
-                                                                            <div className="flex items-center gap-2 shrink-0">
+                                                                                {/* 租客名稱（現時租客） */}
+                                                                                {(() => {
+                                                                                    const lesseeName = getRentOutLesseeDisplayLabel(rent);
+                                                                                    return lesseeName ? (
+                                                                                        <div className="flex items-center gap-2">
+                                                                                            <Users className="w-4 h-4 text-purple-500 shrink-0" />
+                                                                                            <span className="text-sm text-zinc-700 dark:text-white/80 truncate">{lesseeName}</span>
+                                                                                            <span className="text-xs text-zinc-400 dark:text-white/40 shrink-0">（現時租客）</span>
+                                                                                        </div>
+                                                                                    ) : null;
+                                                                                })()}
+                                                                                {/* 地址 */}
                                                                                 {rentProperty?.address && (
-                                                                                    <a
-                                                                                        href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(rentProperty.address)}`}
-                                                                                        target="_blank"
-                                                                                        rel="noopener noreferrer"
-                                                                                        onClick={e => e.stopPropagation()}
-                                                                                        className="p-1 rounded hover:bg-blue-100 dark:hover:bg-blue-500/20 text-zinc-400 dark:text-white/30 hover:text-blue-500 dark:hover:text-blue-400 transition-colors opacity-0 group-hover/item:opacity-100"
-                                                                                        title="在 Google Maps 開啟"
-                                                                                    >
-                                                                                        <ExternalLink className="w-3.5 h-3.5" />
-                                                                                    </a>
+                                                                                    <div className="flex items-start gap-2">
+                                                                                        <MapPin className="w-4 h-4 text-zinc-400 dark:text-white/40 shrink-0 mt-0.5" />
+                                                                                        <span className="text-sm text-zinc-600 dark:text-white/60">{rentProperty.address}</span>
+                                                                                    </div>
                                                                                 )}
-                                                                                <ChevronRight className="w-4 h-4 text-zinc-300 dark:text-white/20" />
+                                                                                {/* 地段：優先顯示該合約所選地段，否則顯示物业全部地段 */}
+                                                                                {rentProperty?.lotIndex && (
+                                                                                    <div className="flex items-center gap-2">
+                                                                                        <Hash className="w-4 h-4 text-zinc-400 dark:text-white/40 shrink-0" />
+                                                                                        <span className="text-sm font-mono text-zinc-600 dark:text-white/60">
+                                                                                            {formatRentHistoryLotCellText(rentProperty.lotIndex, rent)}
+                                                                                        </span>
+                                                                                    </div>
+                                                                                )}
+                                                                                {/* 租期 + 出租金額（同一行） */}
+                                                                                {(rent.rentOutStartDate || rent.startDate || rent.rentOutEndDate || rent.endDate || rent.rentOutMonthlyRental != null || rent.amount != null) && (
+                                                                                    <div className="flex items-center gap-2">
+                                                                                        <Calendar className="w-4 h-4 text-zinc-400 dark:text-white/40 shrink-0" />
+                                                                                        <span className="text-sm text-zinc-600 dark:text-white/60">
+                                                                                            {rent.rentOutStartDate
+                                                                                                ? new Date(rent.rentOutStartDate).toLocaleDateString('zh-HK')
+                                                                                                : rent.startDate
+                                                                                                ? new Date(rent.startDate).toLocaleDateString('zh-HK')
+                                                                                                : '—'}
+                                                                                            {rent.rentOutEndDate
+                                                                                                ? ` — ${new Date(rent.rentOutEndDate).toLocaleDateString('zh-HK')}`
+                                                                                                : rent.endDate
+                                                                                                ? ` — ${new Date(rent.endDate).toLocaleDateString('zh-HK')}`
+                                                                                                : ''}
+                                                                                            {rent.rentOutPeriods != null && (
+                                                                                                <span className="ml-2 text-xs text-blue-500 dark:text-blue-400 font-medium">
+                                                                                                    （{rent.rentOutPeriods}期）
+                                                                                                </span>
+                                                                                            )}
+                                                                                        </span>
+                                                                                        {(rent.rentOutMonthlyRental != null || rent.amount != null) && (
+                                                                                            <span className="ml-auto flex items-baseline gap-0.5 shrink-0">
+                                                                                                <span className="text-[20px] font-bold" style={{ color: 'var(--color-emerald-600)' }}>
+                                                                                                    ${new Intl.NumberFormat('zh-HK').format(rent.rentOutMonthlyRental ?? rent.amount ?? 0)}
+                                                                                                </span>
+                                                                                                <span className="text-[14px] font-light" style={{ color: 'var(--color-zinc-400)' }}>/月</span>
+                                                                                            </span>
+                                                                                        )}
+                                                                                    </div>
+                                                                                )}
                                                                             </div>
                                                                         </div>
                                                                     </div>
@@ -926,23 +1000,25 @@ function SubLandlordDetailModal({
                                         })}
                                     </div>
                                     {totalPages > 1 && (
-                                        <div className="flex items-center justify-center gap-2 mt-4 pt-4 border-t border-zinc-100 dark:border-white/5">
+                                        <div className="flex items-center justify-center gap-3 pt-4 mt-2 text-sm text-zinc-500 dark:text-white/50 border-t border-zinc-100 dark:border-white/5">
                                             <button
-                                                onClick={() => setContractsPage(p => Math.max(1, p - 1))}
-                                                disabled={contractsPage === 1}
-                                                className="px-3 py-1.5 rounded-lg text-xs font-medium text-zinc-500 dark:text-white/50 hover:bg-zinc-100 dark:hover:bg-white/10 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                                                type="button"
+                                                onClick={() => setContractsPage((p) => Math.max(1, p - 1))}
+                                                disabled={contractsPage <= 1}
+                                                className="p-1.5 rounded-lg border border-zinc-200 dark:border-white/15 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-zinc-50 dark:hover:bg-white/5 cursor-pointer transition-colors"
                                             >
-                                                上一頁
+                                                <ChevronLeft className="w-4 h-4 text-zinc-600 dark:text-white" />
                                             </button>
-                                            <span className="text-xs text-zinc-400 dark:text-white/40 font-mono">
+                                            <span className="font-medium min-w-[3rem] text-center">
                                                 {contractsPage} / {totalPages}
                                             </span>
                                             <button
-                                                onClick={() => setContractsPage(p => Math.min(totalPages, p + 1))}
-                                                disabled={contractsPage === totalPages}
-                                                className="px-3 py-1.5 rounded-lg text-xs font-medium text-zinc-500 dark:text-white/50 hover:bg-zinc-100 dark:hover:bg-white/10 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                                                type="button"
+                                                onClick={() => setContractsPage((p) => Math.min(totalPages, p + 1))}
+                                                disabled={contractsPage >= totalPages}
+                                                className="p-1.5 rounded-lg border border-zinc-200 dark:border-white/15 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-zinc-50 dark:hover:bg-white/5 cursor-pointer transition-colors"
                                             >
-                                                下一頁
+                                                <ChevronRight className="w-4 h-4 text-zinc-600 dark:text-white" />
                                             </button>
                                         </div>
                                     )}
@@ -953,23 +1029,35 @@ function SubLandlordDetailModal({
 
                     {activeTab === 'basic' && (
                         <div className="p-5">
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div className="grid grid-cols-2 gap-4">
                                 <div className="p-4 bg-zinc-50 dark:bg-white/5 rounded-xl border border-zinc-100 dark:border-white/5">
-                                    <p className="text-xs text-zinc-500 dark:text-white/40 mb-1">名稱</p>
-                                    <p className="text-sm font-bold text-zinc-900 dark:text-white">{initialSubLandlord.name}</p>
+                                    <p className="text-sm text-zinc-500 dark:text-white/40 mb-1">名稱</p>
+                                    <p className="text-base font-bold text-zinc-900 dark:text-white">{initialSubLandlord.name}</p>
                                 </div>
-                                {initialSubLandlord.createdAt && (
-                                    <div className="p-4 bg-zinc-50 dark:bg-white/5 rounded-xl border border-zinc-100 dark:border-white/5 sm:col-span-2">
-                                        <p className="text-xs text-zinc-500 dark:text-white/40 mb-1">建立日期</p>
-                                        <p className="text-sm font-medium text-zinc-900 dark:text-white">
-                                            {new Date(initialSubLandlord.createdAt).toLocaleDateString('zh-HK', {
+                                <div className="p-4 bg-zinc-50 dark:bg-white/5 rounded-xl border border-zinc-100 dark:border-white/5">
+                                    <p className="text-sm text-zinc-500 dark:text-white/40 mb-1">二房東編號</p>
+                                    <p className="text-base font-medium text-zinc-900 dark:text-white">
+                                        {initialSubLandlord.code || '暫無'}
+                                    </p>
+                                </div>
+                                <div className="p-4 bg-zinc-50 dark:bg-white/5 rounded-xl border border-zinc-100 dark:border-white/5">
+                                    <p className="text-sm text-zinc-500 dark:text-white/40 mb-1">商業登記號碼</p>
+                                    <p className="text-base font-medium text-zinc-900 dark:text-white">
+                                        {initialSubLandlord.brNumber || '暫無'}
+                                    </p>
+                                </div>
+                                <div className="p-4 bg-zinc-50 dark:bg-white/5 rounded-xl border border-zinc-100 dark:border-white/5">
+                                    <p className="text-sm text-zinc-500 dark:text-white/40 mb-1">建立日期</p>
+                                    <p className="text-base font-medium text-zinc-900 dark:text-white">
+                                        {initialSubLandlord.createdAt
+                                            ? new Date(initialSubLandlord.createdAt).toLocaleDateString('zh-HK', {
                                                 year: 'numeric',
                                                 month: 'long',
                                                 day: 'numeric',
-                                            })}
-                                        </p>
-                                    </div>
-                                )}
+                                            })
+                                            : '暫無'}
+                                    </p>
+                                </div>
                             </div>
                         </div>
                     )}

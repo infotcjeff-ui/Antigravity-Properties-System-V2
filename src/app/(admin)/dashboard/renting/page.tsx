@@ -172,7 +172,7 @@ export default function RentingPage() {
                         <div className="flex items-center justify-between">
                             <div>
                                 <p className="text-zinc-500 dark:text-white/50 text-sm">總支出</p>
-                                <p className="text-2xl font-bold text-[var(--color-green-600)] mt-1 tabular-nums">
+                                <p className="text-2xl font-bold text-indigo-600 dark:text-indigo-400 mt-1 tabular-nums">
                                     HKD {totalExpense.toLocaleString()}
                                 </p>
                                 {(expenseDateStart || expenseDateEnd) && (
@@ -181,8 +181,8 @@ export default function RentingPage() {
                                     </p>
                                 )}
                             </div>
-                            <div className="p-3 rounded-xl bg-[var(--color-green-600)]/10 shrink-0">
-                                <svg className="w-6 h-6 text-[var(--color-green-600)]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <div className="p-3 rounded-xl bg-indigo-50 dark:bg-indigo-500/20 shrink-0">
+                                <svg className="w-6 h-6 text-indigo-600 dark:text-indigo-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
                                 </svg>
                             </div>
@@ -407,7 +407,7 @@ export default function RentingPage() {
                                                         {lesseeDisplay}
                                                     </span>
                                                 </td>
-                                                <td className="p-4 text-zinc-900 dark:text-white font-medium">
+                                                <td className="p-4 text-indigo-600 dark:text-indigo-400 font-medium tabular-nums">
                                                     {payDone
                                                         ? `${rent.currency || 'HKD'} ${Number(rent.rentCollectionAmount).toLocaleString()}`
                                                         : '—'}

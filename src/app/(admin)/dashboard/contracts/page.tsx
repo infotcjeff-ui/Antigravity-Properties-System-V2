@@ -15,7 +15,7 @@ import {
 import { BentoCard } from '@/components/layout/BentoGrid';
 import RentModal from '@/components/properties/RentModal';
 import PropertyDetailModal from '@/components/properties/PropertyDetailModal';
-import { AdminListPagination, ADMIN_LIST_PAGE_SIZE } from '@/components/admin/AdminListPagination';
+import { AdminListPagination } from '@/components/admin/AdminListPagination';
 
 export default function ContractsPage() {
     const queryClient = useQueryClient();
@@ -281,12 +281,13 @@ export default function ContractsPage() {
         return { paid: paidDeposit, received: receivedDeposit };
     }, [filteredByAmountDate]);
 
-    const totalListPages = Math.max(1, Math.ceil((filteredContracts as any[]).length / ADMIN_LIST_PAGE_SIZE));
+    const LIST_PAGE_SIZE = 5;
+    const totalListPages = Math.max(1, Math.ceil((filteredContracts as any[]).length / LIST_PAGE_SIZE));
     const effectiveListPage = Math.min(listPage, totalListPages);
     const pagedActiveContracts = useMemo(() => {
         const arr = filteredContracts as any[];
-        const start = (effectiveListPage - 1) * ADMIN_LIST_PAGE_SIZE;
-        return arr.slice(start, start + ADMIN_LIST_PAGE_SIZE);
+        const start = (effectiveListPage - 1) * LIST_PAGE_SIZE;
+        return arr.slice(start, start + LIST_PAGE_SIZE);
     }, [filteredContracts, effectiveListPage]);
 
     const formatContractDepositPaid = (c: any) => {
@@ -379,32 +380,40 @@ export default function ContractsPage() {
                 </motion.button>
             </div>
 
-            {/* 統計區域：同一行 5 個卡片（首卡佔 35%，其餘各佔 16.25%） */}
+            {/* 統計區域：同一行 4 個卡片（首卡佔 40%，其餘各佔 20%） */}
             <div className="flex flex-row gap-4 items-stretch">
-                {/* 卡片 1：Hero 總金額（35%） */}
-                <div className="w-[35%]">
-                    <div className={`relative h-full rounded-2xl overflow-hidden shadow-xl ${
+                {/* 卡片 1：Hero 總金額（40%） */}
+                <div className="w-[40%]">
+                    <div className={`relative h-full rounded-2xl overflow-hidden bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-white/10 transition-all duration-300 group hover:-translate-y-0.5 ${
                         isLeaseInTab
-                            ? 'bg-linear-to-br from-violet-200 via-violet-100 to-purple-100 shadow-violet-200/50'
-                            : 'bg-linear-to-br from-amber-100 via-amber-50 to-orange-100 shadow-amber-200/50'
+                            ? 'shadow-lg shadow-violet-500/8 hover:shadow-xl hover:shadow-violet-500/12'
+                            : 'shadow-lg shadow-amber-500/8 hover:shadow-xl hover:shadow-amber-500/12'
                     }`}>
-                        <div className="absolute inset-0 opacity-60">
-                            <div className="absolute -top-20 -right-20 w-80 h-80 rounded-full bg-white/50 blur-3xl" />
-                            <div className="absolute -bottom-10 -left-10 w-60 h-60 rounded-full bg-white/60 blur-3xl" />
-                        </div>
-                        <div className="absolute top-4 right-4 w-px h-20 bg-white/20 rotate-45" />
-                        <div className="absolute bottom-6 right-8 w-24 h-px bg-white/20 rotate-45" />
+                        <div className="absolute top-0 left-0 right-0 h-1.5 ${
+                            isLeaseInTab ? 'bg-gradient-to-r from-violet-400 to-purple-500' : 'bg-gradient-to-r from-amber-400 to-orange-500'
+                        }" />
 
                         <div className="relative z-10 p-5 h-full flex flex-col">
-                            <div className="flex items-center gap-2 mb-3">
-                                <div className={`p-2 rounded-lg shadow-inner ${
-                                    isLeaseInTab ? 'bg-violet-500/15' : 'bg-amber-500/15'
-                                }`}>
-                                    <DollarSign className={`w-4 h-4 ${isLeaseInTab ? 'text-violet-600' : 'text-amber-600'}`} />
+                            <div className="flex items-center justify-between mb-3">
+                                <div className="flex items-center gap-2">
+                                    <div className={`p-2 rounded-lg shadow-inner ${
+                                        isLeaseInTab ? 'bg-violet-500/15' : 'bg-amber-500/15'
+                                    }`}>
+                                        <DollarSign className={`w-4 h-4 ${isLeaseInTab ? 'text-violet-600' : 'text-amber-600'}`} />
+                                    </div>
+                                    <div>
+                                        <p className={`text-sm font-semibold tracking-wide ${isLeaseInTab ? 'text-violet-700' : 'text-amber-700'}`}>{isLeaseInTab ? '租賃合計' : '出租合計'}</p>
+                                        <p className={`text-xs mt-0.5 ${isLeaseInTab ? 'text-violet-500/70' : 'text-amber-600/70'}`}>合約總租金</p>
+                                    </div>
                                 </div>
-                                <div>
-                                    <p className={`text-sm font-semibold tracking-wide ${isLeaseInTab ? 'text-violet-700' : 'text-amber-700'}`}>{isLeaseInTab ? '租賃合計' : '出租合計'}</p>
-                                    <p className={`text-xs mt-0.5 ${isLeaseInTab ? 'text-violet-500/70' : 'text-amber-600/70'}`}>合約總租金</p>
+                                {/* 按金：compact badge 在 header */}
+                                <div className="flex items-center gap-1.5">
+                                    <p className={`text-sm ${isLeaseInTab ? 'text-violet-500/70' : 'text-amber-600/70'}`}>
+                                        {isLeaseInTab ? '已付按金' : '已收按金'}
+                                    </p>
+                                    <p className={`text-base font-black tabular-nums ${isLeaseInTab ? 'text-violet-700' : 'text-amber-700'}`}>
+                                        ${isLeaseInTab ? totalDeposit.paid.toLocaleString() : totalDeposit.received.toLocaleString()}
+                                    </p>
                                 </div>
                             </div>
 
@@ -418,10 +427,10 @@ export default function ContractsPage() {
                             <div className={`flex items-center gap-1 mt-3 backdrop-blur-md border rounded-lg px-3 py-2 ${
                                 isLeaseInTab ? 'bg-violet-500/10 border-violet-300/30' : 'bg-amber-500/10 border-amber-300/30'
                             }`}>
-                                <Calendar className={`w-4 h-4 shrink-0 ${isLeaseInTab ? 'text-violet-500/80' : 'text-amber-500/80'}`} />
-                                <input type="date" value={amountDateStart} onChange={(e) => setAmountDateStart(e.target.value)} max={amountDateEnd || undefined} className={`bg-transparent text-xs focus:outline-none cursor-pointer w-24 scheme-dark ${isLeaseInTab ? 'text-violet-700 placeholder-violet-400/50' : 'text-amber-700 placeholder-amber-500/50'}`} />
+                                <Calendar className={`w-4 h-4 shrink-0 ${isLeaseInTab ? 'text-violet-700' : 'text-amber-700'}`} />
+                                <input type="date" value={amountDateStart} onChange={(e) => setAmountDateStart(e.target.value)} max={amountDateEnd || undefined} className={`bg-transparent text-xs focus:outline-none cursor-pointer w-24 ${isLeaseInTab ? 'text-violet-700 dark:text-violet-300' : 'text-amber-700 dark:text-amber-300'}`} />
                                 <span className={`text-xs shrink-0 ${isLeaseInTab ? 'text-violet-400/60' : 'text-amber-500/60'}`}>—</span>
-                                <input type="date" value={amountDateEnd} onChange={(e) => setAmountDateEnd(e.target.value)} min={amountDateStart || undefined} className={`bg-transparent text-xs focus:outline-none cursor-pointer w-24 scheme-dark ${isLeaseInTab ? 'text-violet-700 placeholder-violet-400/50' : 'text-amber-700 placeholder-amber-500/50'}`} />
+                                <input type="date" value={amountDateEnd} onChange={(e) => setAmountDateEnd(e.target.value)} min={amountDateStart || undefined} className={`bg-transparent text-xs focus:outline-none cursor-pointer w-24 ${isLeaseInTab ? 'text-violet-700 dark:text-violet-300' : 'text-amber-700 dark:text-amber-300'}`} />
                                 {(amountDateStart || amountDateEnd) && (
                                     <button onClick={() => { setAmountDateStart(''); setAmountDateEnd(''); }} className={`p-0.5 rounded transition-all ${isLeaseInTab ? 'text-violet-400/70 hover:text-violet-700 hover:bg-violet-500/10' : 'text-amber-500/70 hover:text-amber-700 hover:bg-amber-500/10'}`}>
                                         <X className="w-3.5 h-3.5" />
@@ -432,29 +441,27 @@ export default function ContractsPage() {
                     </div>
                 </div>
 
-                {/* 卡片 2：出租中 */}
-                <div className="w-[16.25%]">
-                    <div className="relative h-full rounded-2xl overflow-hidden bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-white/10 shadow-lg shadow-green-500/8 group hover:shadow-xl hover:-translate-y-0.5 transition-all duration-300">
-                        <div className="absolute inset-0 bg-linear-to-br from-green-50 to-transparent dark:from-green-950/30 dark:to-transparent opacity-80" />
+                {/* 卡片 2：合約總數 */}
+                <div className="w-[20%]">
+                    <div className="relative h-full rounded-2xl overflow-hidden bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-white/10 shadow-lg shadow-zinc-200/50 dark:shadow-white/5 group hover:shadow-xl hover:-translate-y-0.5 transition-all duration-300">
+                        <div className="absolute inset-0 bg-linear-to-br from-zinc-50 to-transparent dark:from-zinc-800/40 dark:to-transparent opacity-80" />
                         <div className="relative z-10 p-5 h-full flex flex-col justify-between">
                             <div className="flex items-start justify-between">
-                                <div className="p-2.5 rounded-xl bg-linear-to-br from-green-500 to-emerald-600 shadow-lg shadow-green-500/25 group-hover:rotate-3 transition-transform duration-300">
-                                    <Building2 className="w-5 h-5 text-white" />
+                                <div className="p-2.5 rounded-xl bg-linear-to-br from-zinc-600 to-zinc-700 shadow-lg shadow-zinc-500/20 group-hover:-rotate-3 transition-transform duration-300">
+                                    <FileText className="w-5 h-5 text-white" />
                                 </div>
                             </div>
                             <div className="mt-4">
-                                <p className="text-zinc-400 dark:text-white/40 text-xs font-semibold uppercase tracking-widest mb-1">出租中</p>
-                                <p className="text-3xl font-black text-zinc-900 dark:text-white tabular-nums">
-                                    {contracts.filter((c: any) => (c.rentOutStatus || c.status) === 'renting').length}
-                                </p>
-                                <p className="text-zinc-400 dark:text-white/30 text-xs mt-1">個活躍合約</p>
+                                <p className="text-zinc-400 dark:text-white/40 text-xs font-semibold uppercase tracking-widest mb-1">合約總數</p>
+                                <p className="text-3xl font-black text-zinc-900 dark:text-white tabular-nums">{contracts.length}</p>
+                                <p className="text-zinc-400 dark:text-white/30 text-xs mt-1">全部記錄</p>
                             </div>
                         </div>
                     </div>
                 </div>
 
                 {/* 卡片 3：租賃中 */}
-                <div className="w-[16.25%]">
+                <div className="w-[20%]">
                     <div className="relative h-full rounded-2xl overflow-hidden bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-white/10 shadow-lg shadow-violet-500/8 group hover:shadow-xl hover:-translate-y-0.5 transition-all duration-300">
                         <div className="absolute inset-0 bg-linear-to-br from-violet-50 to-transparent dark:from-violet-950/30 dark:to-transparent opacity-80" />
                         <div className="relative z-10 p-5 h-full flex flex-col justify-between">
@@ -472,41 +479,22 @@ export default function ContractsPage() {
                     </div>
                 </div>
 
-                {/* 卡片 4：按金 */}
-                <div className="w-[16.25%]">
-                    <div className="relative h-full rounded-2xl overflow-hidden bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-white/10 shadow-lg shadow-amber-500/8 group hover:shadow-xl hover:-translate-y-0.5 transition-all duration-300">
-                        <div className="absolute inset-0 bg-linear-to-br from-amber-50 to-transparent dark:from-amber-950/30 dark:to-transparent opacity-80" />
+                {/* 卡片 4：出租中 */}
+                <div className="w-[20%]">
+                    <div className="relative h-full rounded-2xl overflow-hidden bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-white/10 shadow-lg shadow-green-500/8 group hover:shadow-xl hover:-translate-y-0.5 transition-all duration-300">
+                        <div className="absolute inset-0 bg-linear-to-br from-green-50 to-transparent dark:from-green-950/30 dark:to-transparent opacity-80" />
                         <div className="relative z-10 p-5 h-full flex flex-col justify-between">
                             <div className="flex items-start justify-between">
-                                <div className="p-2.5 rounded-xl bg-linear-to-br from-amber-500 to-orange-500 shadow-lg shadow-amber-500/25 group-hover:rotate-6 transition-transform duration-300">
-                                    <ShieldCheck className="w-5 h-5 text-white" />
+                                <div className="p-2.5 rounded-xl bg-linear-to-br from-green-500 to-emerald-600 shadow-lg shadow-green-500/25 group-hover:rotate-3 transition-transform duration-300">
+                                    <Building2 className="w-5 h-5 text-white" />
                                 </div>
                             </div>
                             <div className="mt-4">
-                                <p className="text-zinc-400 dark:text-white/40 text-xs font-semibold uppercase tracking-widest mb-1">{isLeaseInTab ? '已付按金' : '已收按金'}</p>
-                                <p className="text-2xl font-black text-zinc-900 dark:text-white tabular-nums leading-tight">
-                                    {isLeaseInTab ? totalDeposit.paid.toLocaleString() : totalDeposit.received.toLocaleString()}
+                                <p className="text-zinc-400 dark:text-white/40 text-xs font-semibold uppercase tracking-widest mb-1">出租中</p>
+                                <p className="text-3xl font-black text-zinc-900 dark:text-white tabular-nums">
+                                    {contracts.filter((c: any) => (c.rentOutStatus || c.status) === 'renting').length}
                                 </p>
-                                <p className="text-zinc-400 dark:text-white/30 text-xs mt-1">HKD</p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                {/* 卡片 5：合約總數 */}
-                <div className="w-[16.25%]">
-                    <div className="relative h-full rounded-2xl overflow-hidden bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-white/10 shadow-lg shadow-zinc-200/50 dark:shadow-white/5 group hover:shadow-xl hover:-translate-y-0.5 transition-all duration-300">
-                        <div className="absolute inset-0 bg-linear-to-br from-zinc-50 to-transparent dark:from-zinc-800/40 dark:to-transparent opacity-80" />
-                        <div className="relative z-10 p-5 h-full flex flex-col justify-between">
-                            <div className="flex items-start justify-between">
-                                <div className="p-2.5 rounded-xl bg-linear-to-br from-zinc-600 to-zinc-700 shadow-lg shadow-zinc-500/20 group-hover:-rotate-3 transition-transform duration-300">
-                                    <FileText className="w-5 h-5 text-white" />
-                                </div>
-                            </div>
-                            <div className="mt-4">
-                                <p className="text-zinc-400 dark:text-white/40 text-xs font-semibold uppercase tracking-widest mb-1">合約總數</p>
-                                <p className="text-3xl font-black text-zinc-900 dark:text-white tabular-nums">{contracts.length}</p>
-                                <p className="text-zinc-400 dark:text-white/30 text-xs mt-1">全部記錄</p>
+                                <p className="text-zinc-400 dark:text-white/30 text-xs mt-1">個活躍合約</p>
                             </div>
                         </div>
                     </div>
@@ -582,7 +570,7 @@ export default function ContractsPage() {
                             transition={{ duration: 0.2 }}
                             className="overflow-hidden"
                         >
-                            <div className={`p-4 pt-4 grid grid-cols-1 sm:grid-cols-2 ${isLeaseInTab ? 'lg:grid-cols-3' : 'lg:grid-cols-4'} gap-4`}>
+                            <div className={`p-4 pt-4 grid grid-cols-2 gap-4 ${isLeaseInTab ? 'sm:grid-cols-4 lg:grid-cols-4' : 'sm:grid-cols-5 lg:grid-cols-5'} `}>
                                 {isLeaseInTab ? (
                                     <>
                                         <div className="space-y-1.5">
@@ -664,8 +652,8 @@ export default function ContractsPage() {
                                                 <option value="completed">已完租</option>
                                             </select>
                                         </div>
-                                        {/* 租約日期範圍（自動填滿剩餘欄位） */}
-                                        <div className="space-y-1.5 sm:col-span-2 lg:col-span-3">
+                                        {/* 租約日期範圍 */}
+                                        <div className="space-y-1.5 col-span-1">
                                             <label className="flex items-center gap-1.5 text-sm font-medium text-zinc-500 dark:text-white/50 pl-0.5">
                                                 <Calendar className="w-4 h-4" />
                                                 租約日期範圍
@@ -801,7 +789,7 @@ export default function ContractsPage() {
                                             </select>
                                         </div>
                                         {/* 租約日期範圍（自動填滿剩餘欄位） */}
-                                        <div className="space-y-1.5 sm:col-span-2 lg:col-span-4">
+                                        <div className="space-y-1.5 col-span-1 sm:col-span-1 lg:col-span-1">
                                             <label className="flex items-center gap-1.5 text-sm font-medium text-zinc-500 dark:text-white/50 pl-0.5">
                                                 <Calendar className="w-4 h-4" />
                                                 租約日期範圍

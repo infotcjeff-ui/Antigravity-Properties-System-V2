@@ -2,10 +2,11 @@
 
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
-import { X, Building2, MapPin, Calendar, DollarSign, ExternalLink, Users, FileText, ChevronRight, ChevronUp } from 'lucide-react';
-import type { CurrentTenant, Property, Rent } from '@/lib/db';
+import { X, Building2, MapPin, Users, FileText, ChevronRight, ChevronUp, Hash, ChevronLeft, Calendar } from 'lucide-react';
+import type { CurrentTenant, Property } from '@/lib/db';
 import { useRentsWithRelationsQuery } from '@/hooks/useStorage';
-import { proprietorCategoryLabelZh } from '@/lib/formatters';
+import { proprietorCategoryLabelZh, formatLotIndexPlainJoined, formatRentHistoryLotCellText } from '@/lib/formatters';
+import { getRentOutLesseeDisplayLabel } from '@/lib/rentPaymentDisplay';
 
 type CurrentTenantDetailTab = 'basic' | 'contracts';
 
@@ -20,11 +21,6 @@ interface CurrentTenantDetailModalProps {
     currentTenant: CurrentTenant;
     onClose: () => void;
     onEdit?: () => void;
-}
-
-function formatDate(date: any): string {
-    if (!date) return '—';
-    return new Date(date).toLocaleDateString('zh-HK');
 }
 
 function formatNumber(num: any): string {
@@ -178,18 +174,18 @@ export default function CurrentTenantDetailModal({
                             {isLoading ? (
                                 <div className="space-y-3">
                                     {[1, 2].map(i => (
-                                        <div key={i} className="h-20 rounded-xl bg-zinc-100 dark:bg-white/5 animate-pulse" />
+                                        <div key={i} className="h-24 rounded-xl bg-zinc-100 dark:bg-white/5 animate-pulse" />
                                     ))}
                                 </div>
                             ) : relatedRents.length === 0 ? (
                                 <div className="py-16 text-center">
                                     <FileText className="w-12 h-12 text-zinc-200 dark:text-white/10 mx-auto mb-3" />
                                     <p className="text-zinc-500 dark:text-white/40 font-medium">暫無關聯合約</p>
-                                    <p className="text-zinc-400 dark:text-white/25 text-xs mt-1">此現時租客尚未關聯任何合約記錄</p>
+                                    <p className="text-zinc-400 dark:text-white/25 text-sm mt-1">此現時租客尚未關聯任何合約記錄</p>
                                 </div>
                             ) : (
                                 <>
-                                    <div className="space-y-2">
+                                    <div className="space-y-3">
                                         {paginatedGroups.map(group => {
                                             const isCollapsed = collapsedGroups.has(group.tenancyNumber);
                                             const firstContract = group.firstContract as any;
@@ -198,31 +194,31 @@ export default function CurrentTenantDetailModal({
                                                 <div key={group.tenancyNumber} className="rounded-xl border border-zinc-200 dark:border-white/10 overflow-hidden">
                                                     {/* Group Header */}
                                                     <div
-                                                        className="flex items-center gap-3 px-4 py-3 bg-zinc-50 dark:bg-white/5 cursor-pointer hover:bg-zinc-100 dark:hover:bg-white/10 transition-colors group"
+                                                        className="flex items-center gap-3 px-5 py-4 bg-zinc-50 dark:bg-white/5 cursor-pointer hover:bg-zinc-100 dark:hover:bg-white/10 transition-colors group"
                                                         onClick={() => toggleGroup(group.tenancyNumber)}
                                                     >
-                                                        <div className="flex items-center gap-2 flex-1 min-w-0">
-                                                            <FileText className="w-4 h-4 text-purple-500 shrink-0" />
-                                                            <span className="text-sm font-bold text-zinc-900 dark:text-white group-hover:text-purple-600 dark:group-hover:text-purple-400 transition-colors">
+                                                        <div className="flex items-center gap-2.5 flex-1 min-w-0">
+                                                            <FileText className="w-5 h-5 text-purple-500 shrink-0" />
+                                                            <span className="text-base font-bold text-zinc-900 dark:text-white group-hover:text-purple-600 dark:group-hover:text-purple-400 transition-colors">
                                                                 {group.tenancyNumber === '__none__' ? '—' : group.tenancyNumber}
                                                             </span>
                                                             {group.totalCount > 1 && (
-                                                                <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-purple-100 dark:bg-purple-500/20 text-purple-600 dark:text-purple-300 font-medium shrink-0">
+                                                                <span className="text-xs px-2 py-0.5 rounded-full bg-purple-100 dark:bg-purple-500/20 text-purple-600 dark:text-purple-300 font-semibold shrink-0">
                                                                     {group.totalCount}個
                                                                 </span>
                                                             )}
                                                         </div>
                                                         <div className="flex items-center gap-3">
                                                             {firstProperty && (
-                                                                <div className="flex items-center gap-1 text-zinc-400 dark:text-white/40">
-                                                                    <MapPin className="w-3 h-3 shrink-0" />
-                                                                    <span className="text-[10px] truncate max-w-24">{firstProperty.name || '—'}</span>
+                                                                <div className="flex items-center gap-1 text-zinc-500 dark:text-white/50">
+                                                                    <MapPin className="w-4 h-4 shrink-0" />
+                                                                    <span className="text-sm truncate max-w-32">{firstProperty.name || '—'}</span>
                                                                 </div>
                                                             )}
                                                             {isCollapsed ? (
-                                                                <ChevronRight className="w-4 h-4 text-zinc-400 dark:text-white/30 shrink-0" />
+                                                                <ChevronRight className="w-5 h-5 text-zinc-400 dark:text-white/30 shrink-0" />
                                                             ) : (
-                                                                <ChevronUp className="w-4 h-4 text-zinc-400 dark:text-white/30 shrink-0" />
+                                                                <ChevronUp className="w-5 h-5 text-zinc-400 dark:text-white/30 shrink-0" />
                                                             )}
                                                         </div>
                                                     </div>
@@ -231,75 +227,97 @@ export default function CurrentTenantDetailModal({
                                                         <div className="divide-y divide-zinc-100 dark:divide-white/5">
                                                             {group.contracts.map(rent => {
                                                                 const rentProperty = rent.property as Property | null;
-                                                                const tenancyNum = rent.rentOutTenancyNumber;
-                                                                const monthlyRental = rent.rentOutMonthlyRental;
-                                                                const startDate = rent.rentOutStartDate;
-                                                                const endDate = rent.rentOutEndDate;
                                                                 const contractStatus = rent.rentOutStatus || 'listing';
                                                                 const statusLabel = statusLabels[contractStatus] || contractStatus;
                                                                 return (
                                                                     <div
                                                                         key={rent.id}
-                                                                        className="px-4 py-3 pl-10 hover:bg-zinc-50 dark:hover:bg-white/5 cursor-pointer group/item transition-colors"
+                                                                        className="px-5 py-4 pl-14 hover:bg-zinc-50 dark:hover:bg-white/5 cursor-pointer group/item transition-colors"
                                                                         onClick={() => {
                                                                             if (rentProperty?.id) {
                                                                                 window.location.href = `/properties/${rentProperty.id}`;
                                                                             }
                                                                         }}
                                                                     >
-                                                                        <div className="flex items-center gap-3">
-                                                                            <div className="flex-1 min-w-0">
-                                                                <div className="flex items-center gap-2 flex-wrap mb-1">
-                                                                    <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-blue-100 dark:bg-blue-500/20 text-blue-600 dark:text-blue-300 font-medium">合約</span>
-                                                                                    {rentProperty && (
-                                                                                        <div className="flex items-center gap-1 text-zinc-500 dark:text-white/40">
-                                                                                            <MapPin className="w-3 h-3 shrink-0" />
-                                                                                            <span className="text-xs truncate">{rentProperty.name || '—'}</span>
-                                                                                            <span className="text-[10px] text-zinc-400 dark:text-white/25 font-mono shrink-0">
-                                                                                                ({rentProperty.code})
+                                                                        <div className="flex items-start justify-between gap-4">
+                                                                            <div className="flex-1 min-w-0 space-y-2">
+                                                                                {/* 物業名稱 */}
+                                                                                {rentProperty && (
+                                                                                    <div className="flex items-center gap-2">
+                                                                                        <Building2 className="w-4 h-4 text-purple-500 shrink-0" />
+                                                                                        <span className="text-sm font-bold text-zinc-900 dark:text-white truncate">{rentProperty.name || '—'}</span>
+                                                                                        <span className="text-xs px-2 py-0.5 rounded-full bg-purple-100 dark:bg-purple-500/20 text-purple-600 dark:text-purple-300 font-mono font-medium shrink-0">
+                                                                                            {rentProperty.code}
+                                                                                        </span>
+                                                                                        <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                                                                                            contractStatus === 'renting'
+                                                                                                ? 'bg-green-100 dark:bg-green-500/20 text-green-600 dark:text-green-400'
+                                                                                                : contractStatus === 'listing'
+                                                                                                ? 'bg-amber-100 dark:bg-amber-500/20 text-amber-600 dark:text-amber-400'
+                                                                                                : contractStatus === 'leasing_in'
+                                                                                                ? 'bg-cyan-100 dark:bg-cyan-500/20 text-cyan-600 dark:text-cyan-400'
+                                                                                                : 'bg-zinc-100 dark:bg-white/10 text-zinc-500 dark:text-white/50'
+                                                                                        }`}>
+                                                                                            {statusLabel}
+                                                                                        </span>
+                                                                                    </div>
+                                                                                )}
+                                                                                {/* 租客名稱 */}
+                                                                                {(() => {
+                                                                                    const lesseeName = getRentOutLesseeDisplayLabel(rent);
+                                                                                    return lesseeName ? (
+                                                                                        <div className="flex items-center gap-2">
+                                                                                            <Users className="w-4 h-4 text-purple-500 shrink-0" />
+                                                                                            <span className="text-sm text-zinc-700 dark:text-white/80 truncate">{lesseeName}</span>
+                                                                                        </div>
+                                                                                    ) : null;
+                                                                                })()}
+                                                                                {/* 地址 */}
+                                                                                {rentProperty?.address && (
+                                                                                    <div className="flex items-start gap-2">
+                                                                                        <MapPin className="w-4 h-4 text-zinc-400 dark:text-white/40 shrink-0 mt-0.5" />
+                                                                                        <span className="text-sm text-zinc-600 dark:text-white/60">{rentProperty.address}</span>
+                                                                                    </div>
+                                                                                )}
+                                                                                {/* 地段：優先顯示該合約所選地段，否則顯示物业全部地段 */}
+                                                                                {rentProperty?.lotIndex && (
+                                                                                    <div className="flex items-center gap-2">
+                                                                                        <Hash className="w-4 h-4 text-zinc-400 dark:text-white/40 shrink-0" />
+                                                                                        <span className="text-sm text-zinc-600 dark:text-white/60">
+                                                                                            {formatRentHistoryLotCellText(rentProperty.lotIndex, rent)}
+                                                                                        </span>
+                                                                                    </div>
+                                                                                )}
+                                                                                {/* 租期 + 租金同行，右側顯示租金 */}
+                                                                                {(rent.rentOutStartDate || rent.startDate || rent.rentOutEndDate || rent.endDate || rent.rentOutMonthlyRental != null) && (
+                                                                                    <div className="flex items-center justify-between gap-3">
+                                                                                        <div className="flex items-center gap-2">
+                                                                                            <Calendar className="w-4 h-4 text-zinc-400 dark:text-white/40 shrink-0" />
+                                                                                            <span className="text-sm text-zinc-600 dark:text-white/60">
+                                                                                                {rent.rentOutStartDate
+                                                                                                    ? new Date(rent.rentOutStartDate).toLocaleDateString('zh-HK')
+                                                                                                    : rent.startDate
+                                                                                                    ? new Date(rent.startDate).toLocaleDateString('zh-HK')
+                                                                                                    : '—'}
+                                                                                                {rent.rentOutEndDate
+                                                                                                    ? ` — ${new Date(rent.rentOutEndDate).toLocaleDateString('zh-HK')}`
+                                                                                                    : rent.endDate
+                                                                                                    ? ` — ${new Date(rent.endDate).toLocaleDateString('zh-HK')}`
+                                                                                                    : ''}
                                                                                             </span>
                                                                                         </div>
-                                                                                    )}
-                                                                                    <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${
-                                                                                        contractStatus === 'renting'
-                                                                                            ? 'bg-green-100 dark:bg-green-500/20 text-green-600 dark:text-green-400'
-                                                                                            : contractStatus === 'listing'
-                                                                                            ? 'bg-amber-100 dark:bg-amber-500/20 text-amber-600 dark:text-amber-400'
-                                                                                            : contractStatus === 'leasing_in'
-                                                                                            ? 'bg-cyan-100 dark:bg-cyan-500/20 text-cyan-600 dark:text-cyan-400'
-                                                                                            : 'bg-zinc-100 dark:bg-white/10 text-zinc-500 dark:text-white/50'
-                                                                                    }`}>
-                                                                                        {statusLabel}
-                                                                                    </span>
-                                                                                </div>
-                                                                                <div className="flex items-center gap-4 flex-wrap">
-                                                                                    {monthlyRental != null && (
-                                                                                        <span className="text-xs text-emerald-600 dark:text-emerald-400 font-medium">
-                                                                                            ${new Intl.NumberFormat('zh-HK').format(monthlyRental)}/月
-                                                                                        </span>
-                                                                                    )}
-                                                                                    {startDate && (
-                                                                                        <span className="text-[10px] text-zinc-400 dark:text-white/30">
-                                                                                            {formatDate(startDate)}
-                                                                                            {endDate && ` — ${formatDate(endDate)}`}
-                                                                                        </span>
-                                                                                    )}
-                                                                                </div>
-                                                                            </div>
-                                                                            <div className="flex items-center gap-2 shrink-0">
-                                                                                {rentProperty?.address && (
-                                                                                    <a
-                                                                                        href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(rentProperty.address)}`}
-                                                                                        target="_blank"
-                                                                                        rel="noopener noreferrer"
-                                                                                        onClick={e => e.stopPropagation()}
-                                                                                        className="p-1 rounded hover:bg-purple-100 dark:hover:bg-purple-500/20 text-zinc-400 dark:text-white/30 hover:text-purple-500 dark:hover:text-purple-400 transition-colors opacity-0 group-hover/item:opacity-100"
-                                                                                        title="在 Google Maps 開啟"
-                                                                                    >
-                                                                                        <ExternalLink className="w-3.5 h-3.5" />
-                                                                                    </a>
+                                                                                        {rent.rentOutMonthlyRental != null && (
+                                                                                            <div className="flex items-baseline gap-1 shrink-0">
+                                                                                                <span className="text-[20px] font-bold" style={{ color: 'var(--color-emerald-600)' }}>
+                                                                                                    ${new Intl.NumberFormat('zh-HK').format(rent.rentOutMonthlyRental)}
+                                                                                                </span>
+                                                                                                <span className="text-sm" style={{ color: 'var(--color-zinc-400)', fontWeight: 400 }}>
+                                                                                                    /月
+                                                                                                </span>
+                                                                                            </div>
+                                                                                        )}
+                                                                                    </div>
                                                                                 )}
-                                                                                <ChevronRight className="w-4 h-4 text-zinc-300 dark:text-white/20" />
                                                                             </div>
                                                                         </div>
                                                                     </div>
@@ -312,23 +330,23 @@ export default function CurrentTenantDetailModal({
                                         })}
                                     </div>
                                     {totalPages > 1 && (
-                                        <div className="flex items-center justify-center gap-2 mt-4 pt-4 border-t border-zinc-100 dark:border-white/5">
+                                        <div className="flex items-center justify-center gap-3 pt-4 mt-2 text-sm text-zinc-500 dark:text-white/50 border-t border-zinc-100 dark:border-white/5">
                                             <button
                                                 onClick={() => setContractsPage(p => Math.max(1, p - 1))}
-                                                disabled={contractsPage === 1}
-                                                className="px-3 py-1.5 rounded-lg text-xs font-medium text-zinc-500 dark:text-white/50 hover:bg-zinc-100 dark:hover:bg-white/10 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                                                disabled={contractsPage <= 1}
+                                                className="p-1.5 rounded-lg border border-zinc-200 dark:border-white/15 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-zinc-50 dark:hover:bg-white/5 cursor-pointer transition-colors"
                                             >
-                                                上一頁
+                                                <ChevronLeft className="w-4 h-4 text-zinc-600 dark:text-white" />
                                             </button>
-                                            <span className="text-xs text-zinc-400 dark:text-white/40 font-mono">
+                                            <span className="font-medium min-w-12 text-center">
                                                 {contractsPage} / {totalPages}
                                             </span>
                                             <button
                                                 onClick={() => setContractsPage(p => Math.min(totalPages, p + 1))}
-                                                disabled={contractsPage === totalPages}
-                                                className="px-3 py-1.5 rounded-lg text-xs font-medium text-zinc-500 dark:text-white/50 hover:bg-zinc-100 dark:hover:bg-white/10 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                                                disabled={contractsPage >= totalPages}
+                                                className="p-1.5 rounded-lg border border-zinc-200 dark:border-white/15 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-zinc-50 dark:hover:bg-white/5 cursor-pointer transition-colors"
                                             >
-                                                下一頁
+                                                <ChevronRight className="w-4 h-4 text-zinc-600 dark:text-white" />
                                             </button>
                                         </div>
                                     )}
@@ -338,105 +356,69 @@ export default function CurrentTenantDetailModal({
                     )}
 
                     {activeTab === 'basic' && (
-                        <div className="p-5 space-y-6">
-                            {/* 基本資料 */}
-                            <section>
-                                <h3 className="text-sm font-semibold text-purple-600 dark:text-purple-400 mb-3">基本資料</h3>
-                                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                                    <div className="p-3 bg-zinc-50 dark:bg-white/5 rounded-xl border border-zinc-100 dark:border-white/5">
-                                        <p className="text-xs text-zinc-500 dark:text-white/50 mb-1">名稱</p>
-                                        <p className="text-sm font-bold text-zinc-900 dark:text-white wrap-break-word">{currentTenant.name}</p>
-                                    </div>
-                                    {currentTenant.code && (
-                                        <div className="p-3 bg-zinc-50 dark:bg-white/5 rounded-xl border border-zinc-100 dark:border-white/5">
-                                            <p className="text-xs text-zinc-500 dark:text-white/50 mb-1">現時租客編號</p>
-                                            <p className="text-sm font-mono font-medium text-zinc-900 dark:text-white">{currentTenant.code}</p>
-                                        </div>
-                                    )}
-                                    {currentTenant.englishName && (
-                                        <div className="p-3 bg-zinc-50 dark:bg-white/5 rounded-xl border border-zinc-100 dark:border-white/5 md:col-span-2">
-                                            <p className="text-xs text-zinc-500 dark:text-white/50 mb-1">公司／英文名稱</p>
-                                            <p className="text-sm font-medium text-zinc-900 dark:text-white wrap-break-word">{currentTenant.englishName}</p>
-                                        </div>
-                                    )}
-                                    {currentTenant.type && (
-                                        <div className="p-3 bg-zinc-50 dark:bg-white/5 rounded-xl border border-zinc-100 dark:border-white/5">
-                                            <p className="text-xs text-zinc-500 dark:text-white/50 mb-1">性質</p>
-                                            <span className="inline-flex px-2.5 py-1 rounded-full text-xs font-semibold bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20">
-                                                {partyTypeLabel}
-                                            </span>
-                                        </div>
-                                    )}
-                                    {currentTenant.category && (
-                                        <div className="p-3 bg-zinc-50 dark:bg-white/5 rounded-xl border border-zinc-100 dark:border-white/5">
-                                            <p className="text-xs text-zinc-500 dark:text-white/50 mb-1">類別</p>
-                                            <span className="inline-flex px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
-                                                {proprietorCategoryLabelZh(currentTenant.category, 'modal')}
-                                            </span>
-                                        </div>
-                                    )}
+                        <div className="p-5">
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="p-4 bg-zinc-50 dark:bg-white/5 rounded-xl border border-zinc-100 dark:border-white/5">
+                                    <p className="text-sm text-zinc-500 dark:text-white/40 mb-1">名稱</p>
+                                    <p className="text-base font-bold text-zinc-900 dark:text-white wrap-break-word">{currentTenant.name}</p>
                                 </div>
-                            </section>
-
-                            {/* 按金資料 */}
-                            {(currentTenant.depositReceived != null || currentTenant.depositReceiptNumber) && (
-                                <section>
-                                    <h3 className="text-sm font-semibold text-purple-600 dark:text-purple-400 mb-3">按金資料</h3>
-                                    <div className="bg-zinc-50 dark:bg-white/5 rounded-xl border border-zinc-100 dark:border-white/5 divide-y divide-zinc-100 dark:divide-white/5">
-                                        <div className="flex items-center gap-3 px-4 py-3">
-                                            <DollarSign className="w-4 h-4 text-emerald-500 shrink-0" />
-                                            <span className="text-xs text-zinc-500 dark:text-white/50 w-20 shrink-0">按金</span>
-                                            <span className="text-sm font-medium text-zinc-800 dark:text-white">
+                                <div className="p-4 bg-zinc-50 dark:bg-white/5 rounded-xl border border-zinc-100 dark:border-white/5">
+                                    <p className="text-sm text-zinc-500 dark:text-white/40 mb-1">現時租客編號</p>
+                                    <p className="text-base font-medium text-zinc-900 dark:text-white">
+                                        {currentTenant.code || '—'}
+                                    </p>
+                                </div>
+                                {currentTenant.englishName && (
+                                    <div className="p-4 bg-zinc-50 dark:bg-white/5 rounded-xl border border-zinc-100 dark:border-white/5 col-span-2">
+                                        <p className="text-sm text-zinc-500 dark:text-white/40 mb-1">公司／英文名稱</p>
+                                        <p className="text-base font-medium text-zinc-900 dark:text-white wrap-break-word">{currentTenant.englishName}</p>
+                                    </div>
+                                )}
+                                <div className="p-4 bg-zinc-50 dark:bg-white/5 rounded-xl border border-zinc-100 dark:border-white/5">
+                                    <p className="text-sm text-zinc-500 dark:text-white/40 mb-1">性質</p>
+                                    <span className="inline-flex px-2.5 py-1 rounded-full text-xs font-semibold bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20">
+                                        {partyTypeLabel}
+                                    </span>
+                                </div>
+                                {currentTenant.category && (
+                                    <div className="p-4 bg-zinc-50 dark:bg-white/5 rounded-xl border border-zinc-100 dark:border-white/5">
+                                        <p className="text-sm text-zinc-500 dark:text-white/40 mb-1">類別</p>
+                                        <span className="inline-flex px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                                            {proprietorCategoryLabelZh(currentTenant.category, 'modal')}
+                                        </span>
+                                    </div>
+                                )}
+                                {(currentTenant.depositReceived != null || currentTenant.depositReceiptNumber) && (
+                                    <>
+                                        <div className="p-4 bg-zinc-50 dark:bg-white/5 rounded-xl border border-zinc-100 dark:border-white/5">
+                                            <p className="text-sm text-zinc-500 dark:text-white/40 mb-1">按金</p>
+                                            <p className="text-base font-medium text-zinc-900 dark:text-white">
                                                 {currentTenant.depositReceived != null ? `$${formatNumber(currentTenant.depositReceived)}` : '—'}
-                                            </span>
+                                            </p>
                                         </div>
                                         {currentTenant.depositReceiptNumber && (
-                                            <div className="flex items-center gap-3 px-4 py-3">
-                                                <span className="text-xs text-zinc-500 dark:text-white/50 w-20 shrink-0 ml-7">收據號碼</span>
-                                                <span className="text-sm font-mono font-medium text-zinc-800 dark:text-white">{currentTenant.depositReceiptNumber}</span>
+                                            <div className="p-4 bg-zinc-50 dark:bg-white/5 rounded-xl border border-zinc-100 dark:border-white/5">
+                                                <p className="text-sm text-zinc-500 dark:text-white/40 mb-1">按金收據號碼</p>
+                                                <p className="text-base font-mono font-medium text-zinc-900 dark:text-white">{currentTenant.depositReceiptNumber}</p>
                                             </div>
                                         )}
-                                        <div className="flex items-center gap-3 px-4 py-3">
-                                            <Calendar className="w-4 h-4 text-emerald-500 shrink-0" />
-                                            <span className="text-xs text-zinc-500 dark:text-white/50 w-20 shrink-0">收取日期</span>
-                                            <span className="text-sm font-medium text-zinc-800 dark:text-white">{formatDate(currentTenant.depositReceiveDate)}</span>
-                                        </div>
-                                        <div className="flex items-center gap-3 px-4 py-3">
-                                            <Calendar className="w-4 h-4 text-amber-500 shrink-0" />
-                                            <span className="text-xs text-zinc-500 dark:text-white/50 w-20 shrink-0">退回日期</span>
-                                            <span className="text-sm font-medium text-zinc-800 dark:text-white">{formatDate(currentTenant.depositReturnDate)}</span>
-                                        </div>
-                                        {currentTenant.depositReturnAmount != null && (
-                                            <div className="flex items-center gap-3 px-4 py-3">
-                                                <DollarSign className="w-4 h-4 text-amber-500 shrink-0" />
-                                                <span className="text-xs text-zinc-500 dark:text-white/50 w-20 shrink-0">退回金額</span>
-                                                <span className="text-sm font-medium text-zinc-800 dark:text-white">${formatNumber(currentTenant.depositReturnAmount)}</span>
-                                            </div>
-                                        )}
+                                    </>
+                                )}
+                                {currentTenant.addressDetail && (
+                                    <div className="p-4 bg-zinc-50 dark:bg-white/5 rounded-xl border border-zinc-100 dark:border-white/5 col-span-2">
+                                        <p className="text-sm text-zinc-500 dark:text-white/40 mb-1">地址</p>
+                                        <p className="text-base text-zinc-900 dark:text-white">{currentTenant.addressDetail}</p>
                                     </div>
-                                </section>
-                            )}
-
-                            {/* 地址資料 */}
-                            {currentTenant.addressDetail && (
-                                <section>
-                                    <h3 className="text-sm font-semibold text-purple-600 dark:text-purple-400 mb-3">地址資料</h3>
-                                    <div className="flex items-start gap-2 p-3 bg-zinc-50 dark:bg-white/5 rounded-xl border border-zinc-100 dark:border-white/5">
-                                        <MapPin className="w-4 h-4 text-purple-500 mt-0.5 shrink-0" />
-                                        <span className="text-sm text-zinc-800 dark:text-white">{currentTenant.addressDetail}</span>
-                                    </div>
-                                </section>
-                            )}
-
-                            {/* 描述 */}
+                                )}
+                            </div>
                             {currentTenant.description && (
-                                <section>
-                                    <h3 className="text-sm font-semibold text-purple-600 dark:text-purple-400 mb-3">描述</h3>
+                                <div className="mt-4">
+                                    <p className="text-sm text-zinc-500 dark:text-white/40 mb-1">描述</p>
                                     <div
                                         className="text-sm text-zinc-700 dark:text-white/80 prose dark:prose-invert max-w-none p-3 bg-zinc-50 dark:bg-white/5 rounded-xl border border-zinc-100 dark:border-white/5"
                                         dangerouslySetInnerHTML={{ __html: currentTenant.description }}
                                     />
-                                </section>
+                                </div>
                             )}
                         </div>
                     )}

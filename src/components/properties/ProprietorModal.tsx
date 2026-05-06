@@ -21,9 +21,11 @@ interface ProprietorModalProps {
     initialData?: Proprietor | null;
     propertyCode?: string; // 當前物業編號，用於產生業主代碼
     initialEditing?: boolean; // 控制初始是否為編輯模式
+    /** 取消時回到詳情模式（而非關閉整個 popup） */
+    onCancel?: () => void;
 }
 
-export default function ProprietorModal({ onClose, onSuccess, mode = 'proprietor', initialData, propertyCode, initialEditing }: ProprietorModalProps) {
+export default function ProprietorModal({ onClose, onSuccess, mode = 'proprietor', initialData, propertyCode, initialEditing, onCancel }: ProprietorModalProps) {
     const { getProprietors, addProprietor, updateProprietor, loading } = useProprietors();
     const [saving, setSaving] = useState(false);
     const [isEditing, setIsEditing] = useState(initialEditing !== undefined ? initialEditing : !initialData);
@@ -504,7 +506,13 @@ export default function ProprietorModal({ onClose, onSuccess, mode = 'proprietor
                     <div className="flex items-center justify-end gap-3 pt-4 border-t border-zinc-100 dark:border-white/5">
                         <button
                             type="button"
-                            onClick={onClose}
+                            onClick={() => {
+                                if (initialData && onCancel) {
+                                    onCancel();
+                                } else {
+                                    onClose();
+                                }
+                            }}
                             className="px-4 py-2 rounded-xl text-zinc-500 dark:text-white/70 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-white/10 transition-all"
                         >
                             取消
