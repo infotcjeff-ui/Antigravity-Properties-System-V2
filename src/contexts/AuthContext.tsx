@@ -11,6 +11,7 @@ export interface User {
     username: string;
     displayName?: string;
     role: UserRole;
+    avatar?: string;
 }
 
 interface AuthContextType {
@@ -82,6 +83,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 username: data.username,
                 displayName: data.display_name,
                 role: data.role as UserRole,
+                avatar: data.avatar || undefined,
             };
 
             setUser(userData);
@@ -128,7 +130,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         try {
             const { data, error } = await supabase
                 .from('app_users')
-                .select('id, username, role, display_name')
+                .select('id, username, role, display_name, avatar')
                 .order('username', { ascending: true });
 
             if (error) throw error;
@@ -136,7 +138,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 id: u.id,
                 username: u.username,
                 role: u.role as UserRole,
-                displayName: u.display_name
+                displayName: u.display_name,
+                avatar: u.avatar || undefined,
             }));
             return { success: true, users };
         } catch (err: any) {

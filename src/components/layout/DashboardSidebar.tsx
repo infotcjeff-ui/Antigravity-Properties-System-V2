@@ -132,7 +132,7 @@ export default function DashboardSidebar({ userRole = 'client' }: DashboardSideb
                     <div>
                         <h1 className="font-bold text-zinc-900 dark:text-white text-lg">{t('Backend', '後台')}</h1>
                         <p className="text-zinc-500 dark:text-white/40 text-xs font-medium">
-                            {t('Management console', '管理控制台')}
+                            {t('Manage properties', '管理物業')}
                         </p>
                     </div>
                 </div>
@@ -143,7 +143,7 @@ export default function DashboardSidebar({ userRole = 'client' }: DashboardSideb
                     className="mt-4 flex items-center gap-2 px-3 py-2 rounded-lg text-zinc-500 dark:text-white/60 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-white/5 transition-all"
                 >
                     <ArrowLeft className="w-4 h-4" />
-                    <span className="text-sm">返回應用</span>
+                    <span className="text-sm">返回主頁</span>
                 </Link>
             </div>
 

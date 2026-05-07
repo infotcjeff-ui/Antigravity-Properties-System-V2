@@ -4,10 +4,11 @@ import { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, Bell, Check, Trash2, LayoutDashboard, LogIn, LogOut, Database, Cloud, Menu, X, Building2, Users, ArrowUpFromLine, ArrowDownToLine, Network, Settings, FileText } from 'lucide-react';
+import { Search, Bell, Check, Trash2, LayoutDashboard, LogIn, LogOut, Database, Cloud, Menu, X, Building2, Users, ArrowUpFromLine, ArrowDownToLine, Network, Settings, FileText, User } from 'lucide-react';
 import { useNotifications } from '@/contexts/NotificationContext';
 import ThemeToggle from './ThemeToggle';
 import { useLanguage } from '@/components/common/LanguageSwitcher';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface TopBarProps {
     onSearch?: (query: string) => void;
@@ -19,11 +20,13 @@ interface TopBarProps {
 export default function TopBar({ onSearch, placeholder = '搜尋...', isAuthenticated = false, isAdmin = false }: TopBarProps) {
     const router = useRouter();
     const lang = useLanguage();
+    const { user } = useAuth();
     const isZh = lang === 'zh-TW';
     const t = (en: string, zh: string) => (isZh ? zh : en);
     const [searchValue, setSearchValue] = useState('');
     const [showNotifications, setShowNotifications] = useState(false);
     const [showMobileMenu, setShowMobileMenu] = useState(false);
+    const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
     const notificationRef = useRef<HTMLDivElement>(null);
 
     // Only use notifications if authenticated
@@ -135,7 +138,7 @@ export default function TopBar({ onSearch, placeholder = '搜尋...', isAuthenti
                                     className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-purple-600 to-blue-600 rounded-xl text-white font-medium shadow-lg shadow-purple-500/20 hover:shadow-purple-500/30 transition-shadow"
                                 >
                                     <LayoutDashboard className="w-4 h-4" />
-                                    <span className="text-sm">{isAdmin ? "返回前端" : "後台管理"}</span>
+                                    <span className="text-sm">{isAdmin ? "返回主頁" : "物業管理"}</span>
                                 </motion.button>
                             </Link>
 
@@ -143,8 +146,8 @@ export default function TopBar({ onSearch, placeholder = '搜尋...', isAuthenti
                             <motion.button
                                 whileHover={{ scale: 1.05 }}
                                 whileTap={{ scale: 0.95 }}
-                                onClick={handleLogout}
-                                className="p-2.5 rounded-xl bg-zinc-100 dark:bg-white/5 border border-zinc-200 dark:border-white/10 text-zinc-600 dark:text-white/70 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 transition-all"
+                                onClick={() => setShowLogoutConfirm(true)}
+                                className="p-2.5 rounded-xl bg-zinc-100 dark:bg-white/5 border border-zinc-200 dark:border-white/10 text-zinc-600 dark:text-white/70 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 transition-all cursor-pointer"
                                 title="登出"
                             >
                                 <LogOut className="w-5 h-5" />
@@ -160,7 +163,7 @@ export default function TopBar({ onSearch, placeholder = '搜尋...', isAuthenti
                                     className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-purple-600 to-blue-600 rounded-xl text-white font-medium shadow-lg shadow-purple-500/20 hover:shadow-purple-500/30 transition-shadow"
                                 >
                                     <LayoutDashboard className="w-4 h-4" />
-                                    <span className="text-sm">{isAdmin ? "返回前端" : "後台管理"}</span>
+                                    <span className="text-sm">{isAdmin ? "返回主頁" : "物業管理"}</span>
                                 </motion.button>
                             </Link>
 
@@ -168,8 +171,8 @@ export default function TopBar({ onSearch, placeholder = '搜尋...', isAuthenti
                             <motion.button
                                 whileHover={{ scale: 1.05 }}
                                 whileTap={{ scale: 0.95 }}
-                                onClick={handleLogout}
-                                className="p-2.5 rounded-xl bg-zinc-100 dark:bg-white/5 border border-zinc-200 dark:border-white/10 text-zinc-600 dark:text-white/70 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 transition-all"
+                                onClick={() => setShowLogoutConfirm(true)}
+                                className="p-2.5 rounded-xl bg-zinc-100 dark:bg-white/5 border border-zinc-200 dark:border-white/10 text-zinc-600 dark:text-white/70 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 transition-all cursor-pointer"
                                 title="登出"
                             >
                                 <LogOut className="w-5 h-5" />
@@ -259,13 +262,65 @@ export default function TopBar({ onSearch, placeholder = '搜尋...', isAuthenti
                                 <ThemeToggle className="w-full justify-start px-4 h-11" showLabel />
                                 {isAuthenticated && (
                                     <button
-                                        onClick={handleLogout}
-                                        className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10 transition-all font-medium"
+                                        onClick={() => setShowLogoutConfirm(true)}
+                                        className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10 transition-all font-medium cursor-pointer"
                                     >
                                         <LogOut className="w-5 h-5" />
                                         登出系統
                                     </button>
                                 )}
+                            </div>
+                        </motion.div>
+                    </>
+                )}
+            </AnimatePresence>
+
+            {/* 登出確認對話框 */}
+            <AnimatePresence>
+                {showLogoutConfirm && (
+                    <>
+                        <motion.div
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            onClick={() => setShowLogoutConfirm(false)}
+                            className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[100]"
+                        />
+                        <motion.div
+                            initial={{ opacity: 0, scale: 0.92, y: 10 }}
+                            animate={{ opacity: 1, scale: 1, y: 0 }}
+                            exit={{ opacity: 0, scale: 0.92, y: 10 }}
+                            transition={{ type: 'spring', stiffness: 400, damping: 30 }}
+                            className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[min(420px,calc(100vw-32px))] z-[101] bg-white dark:bg-zinc-900 rounded-2xl shadow-2xl border border-zinc-200 dark:border-white/10 overflow-hidden"
+                        >
+                            <div className="p-6 text-center">
+                                <div className="w-16 h-16 rounded-full bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center mx-auto mb-4">
+                                    {user?.avatar ? (
+                                        // eslint-disable-next-line @next/next/no-img-element
+                                        <img src={user.avatar} alt={user.displayName || user.username} className="w-full h-full rounded-full object-cover" />
+                                    ) : (
+                                        <User className="w-7 h-7 text-zinc-600 dark:text-zinc-400" />
+                                    )}
+                                </div>
+                                <h2 className="text-lg font-bold text-zinc-900 dark:text-white">登出確認</h2>
+                                <p className="text-sm text-zinc-500 dark:text-white/50 mt-1">{user?.displayName || user?.username}，確定要登出系統嗎？</p>
+                            </div>
+                            <div className="flex border-t border-zinc-100 dark:border-white/5">
+                                <button
+                                    onClick={() => setShowLogoutConfirm(false)}
+                                    className="flex-1 px-6 py-4 text-sm font-medium text-zinc-600 dark:text-white/70 hover:bg-zinc-50 dark:hover:bg-white/5 transition-colors cursor-pointer"
+                                >
+                                    取消
+                                </button>
+                                <button
+                                    onClick={() => {
+                                        setShowLogoutConfirm(false);
+                                        handleLogout();
+                                    }}
+                                    className="flex-1 px-6 py-4 text-sm font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors border-l border-zinc-100 dark:border-white/5 cursor-pointer"
+                                >
+                                    確定登出
+                                </button>
                             </div>
                         </motion.div>
                     </>

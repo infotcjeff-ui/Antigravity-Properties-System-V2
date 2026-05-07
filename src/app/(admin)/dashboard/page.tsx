@@ -10,6 +10,7 @@ import {
     useProprietorsQuery,
 } from '@/hooks/useStorage';
 import { useLanguage } from '@/components/common/LanguageSwitcher';
+import { useAuth } from '@/contexts/AuthContext';
 import {
     Building2,
     Users,
@@ -307,6 +308,8 @@ export default function DashboardPage() {
     const lang = useLanguage();
     const isZh = lang === 'zh-TW';
     const t = (en: string, zh: string) => (isZh ? zh : en);
+    const { user } = useAuth();
+    const userDisplayName = user?.displayName || user?.username || '';
 
     const { data: stats, isLoading: statsLoading } = useDashboardStatsQuery();
     const { data: rents = [], isLoading: rentsLoading } = useRentsWithRelationsQuery({ enabled: true });
@@ -426,9 +429,7 @@ export default function DashboardPage() {
                             {userRole === 'admin' ? t('Overview', '總覽') : t('My Overview', '我的總覽')}
                         </h1>
                         <p className="mt-1 text-sm text-zinc-500 dark:text-white/45">
-                            {userRole === 'admin'
-                                ? t('Real-time system snapshot and key metrics.', '即時掌握營運數據與物業概況。')
-                                : t('Your properties and leasing at a glance.', '您的物業與租賃概覽。')}
+                            {userDisplayName}{userDisplayName ? '，' : ''}歡迎回來。以下是目前的的物業概況。
                         </p>
                     </div>
                 </div>

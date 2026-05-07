@@ -16,7 +16,8 @@ type ViewMode = 'grid' | 'map';
 export default function PropertiesPage() {
     const queryClient = useQueryClient();
     const { data: qProperties, isLoading: qLoading } = usePropertiesQuery({ bypassIsolation: true });
-    const { isAuthenticated } = useAuth();
+    const { isAuthenticated, user } = useAuth();
+    const userDisplayName = user?.displayName || user?.username || '';
     const [viewMode, setViewMode] = useState<ViewMode>('grid');
     const [searchQuery, setSearchQuery] = useState('');
     const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -77,8 +78,8 @@ export default function PropertiesPage() {
             {/* Page header */}
             <div className="flex items-center justify-between">
                 <div>
-                    <h1 className="text-2xl font-bold text-zinc-900 dark:text-white">物業管理</h1>
-                    <p className="text-zinc-500 dark:text-white/50 mt-1">瀏覽並管理您的物業資產</p>
+                    <h1 className="text-2xl font-bold text-zinc-900 dark:text-white">物業</h1>
+                    <p className="text-zinc-500 dark:text-white/50 mt-1">{userDisplayName}{userDisplayName ? '，' : ''}歡迎回來。隨時查看您的物業資訊。</p>
                 </div>
                 {isAuthenticated && (
                     <motion.button
