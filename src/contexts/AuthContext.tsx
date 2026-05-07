@@ -122,7 +122,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             return { success: true };
         } catch (err: any) {
             console.error('Register error:', err);
-            return { success: false, error: err.message || '創建用戶失敗' };
+            const errorMessage = err?.message || err?.details || err?.hint || JSON.stringify(err) || '創建用戶失敗';
+            return { success: false, error: errorMessage };
         }
     }, []);
 
@@ -144,7 +145,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             return { success: true, users };
         } catch (err: any) {
             console.error('Fetch users error:', err);
-            return { success: false, error: err.message || '獲取用戶失敗' };
+            const errorMessage = err?.message || err?.details || err?.hint || JSON.stringify(err) || '獲取用戶失敗';
+            return { success: false, error: errorMessage };
         }
     }, []);
 
@@ -168,7 +170,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             return { success: true };
         } catch (err: any) {
             console.error('Update user error:', err);
-            return { success: false, error: err.message || '更新用戶失敗' };
+            const errorMessage = err?.message || err?.details || err?.hint || JSON.stringify(err) || '更新用戶失敗';
+            return { success: false, error: errorMessage };
         }
     }, []);
 

@@ -103,7 +103,7 @@ export default function TopBar({ onSearch, placeholder = '搜尋...', isAuthenti
                         {showMobileMenu ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
                     </button>
                     {isAdmin && (
-                        <div className="font-bold text-zinc-900 dark:text-white text-sm">{t('Backend', '後台')}</div>
+                        <div className="font-bold text-xl text-zinc-900 dark:text-white">{t('Backend', '後台')}</div>
                     )}
                 </div>
 
@@ -138,7 +138,7 @@ export default function TopBar({ onSearch, placeholder = '搜尋...', isAuthenti
                                     className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-purple-600 to-blue-600 rounded-xl text-white font-medium shadow-lg shadow-purple-500/20 hover:shadow-purple-500/30 transition-shadow"
                                 >
                                     <LayoutDashboard className="w-4 h-4" />
-                                    <span className="text-sm">{isAdmin ? "返回主頁" : "物業管理"}</span>
+                                    <span className="text-base">{isAdmin ? "返回主頁" : "物業管理"}</span>
                                 </motion.button>
                             </Link>
 
@@ -163,7 +163,7 @@ export default function TopBar({ onSearch, placeholder = '搜尋...', isAuthenti
                                     className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-purple-600 to-blue-600 rounded-xl text-white font-medium shadow-lg shadow-purple-500/20 hover:shadow-purple-500/30 transition-shadow"
                                 >
                                     <LayoutDashboard className="w-4 h-4" />
-                                    <span className="text-sm">{isAdmin ? "返回主頁" : "物業管理"}</span>
+                                    <span className="text-base">{isAdmin ? "返回主頁" : "物業管理"}</span>
                                 </motion.button>
                             </Link>
 
@@ -187,7 +187,7 @@ export default function TopBar({ onSearch, placeholder = '搜尋...', isAuthenti
                                 className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-purple-600 to-blue-600 rounded-xl text-white font-medium shadow-lg shadow-purple-500/20 hover:shadow-purple-500/30 transition-shadow"
                             >
                                 <LogIn className="w-4 h-4" />
-                                <span className="text-sm">登入</span>
+                                <span className="text-base">登入</span>
                             </motion.button>
                         </Link>
                     )}
@@ -217,7 +217,7 @@ export default function TopBar({ onSearch, placeholder = '搜尋...', isAuthenti
                                     <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 to-blue-600 flex items-center justify-center text-white font-bold">
                                         {isAdmin ? 'B' : 'P'}
                                     </div>
-                                    <span className="font-bold text-zinc-900 dark:text-white">
+                                    <span className="font-bold text-xl text-zinc-900 dark:text-white">
                                         {isAdmin ? t('Backend', '後台') : 'PMS'}
                                     </span>
                                 </div>

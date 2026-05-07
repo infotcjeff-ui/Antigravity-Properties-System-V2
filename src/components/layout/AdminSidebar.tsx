@@ -119,8 +119,8 @@ export default function AdminSidebar() {
                         </svg>
                     </div>
                     <div>
-                        <h1 className="font-bold text-white text-lg">PMS</h1>
-                        <p className="text-white/40 text-xs">物業管理系統</p>
+                        <h1 className="font-bold text-white text-2xl">PMS</h1>
+                        <p className="text-white/40 text-sm">物業管理系統</p>
                     </div>
                 </Link>
             </div>
@@ -141,7 +141,7 @@ export default function AdminSidebar() {
                                     >
                                         <div className="flex items-center gap-3">
                                             {item.icon}
-                                            <span className="font-medium">{item.labelZh}</span>
+                                            <span className="font-medium text-base">{item.labelZh}</span>
                                         </div>
                                         <motion.svg
                                             animate={{ rotate: expandedItems.includes(item.label) ? 180 : 0 }}
@@ -170,7 +170,7 @@ export default function AdminSidebar() {
                                                             }`}
                                                     >
                                                         <div className={`w-1.5 h-1.5 rounded-full ${isActive(item.href) ? 'bg-purple-500' : 'bg-white/30'}`} />
-                                                        <span className="text-sm">{t('All properties', '全部物業')}</span>
+                                                        <span className="text-base">{t('All properties', '全部物業')}</span>
                                                     </Link>
                                                 </li>
                                                 {item.children.map((child) => (
@@ -183,7 +183,7 @@ export default function AdminSidebar() {
                                                                 }`}
                                                         >
                                                             <div className={`w-1.5 h-1.5 rounded-full ${isActive(child.href) ? 'bg-purple-500' : 'bg-white/30'}`} />
-                                                            <span className="text-sm">{child.labelZh}</span>
+                                                            <span className="text-base">{child.labelZh}</span>
                                                         </Link>
                                                     </li>
                                                 ))}
@@ -200,7 +200,7 @@ export default function AdminSidebar() {
                                         }`}
                                 >
                                     {item.icon}
-                                    <span className="font-medium">{item.labelZh}</span>
+                                    <span className="font-medium text-base">{item.labelZh}</span>
                                 </Link>
                             )}
                         </li>
@@ -216,8 +216,8 @@ export default function AdminSidebar() {
                             {user?.username?.charAt(0).toUpperCase()}
                         </div>
                         <div>
-                            <p className="text-white text-sm font-medium">{user?.username}</p>
-                            <p className="text-white/40 text-xs capitalize">{user?.role}</p>
+                            <p className="text-white text-base font-medium">{user?.username}</p>
+                            <p className="text-white/40 text-sm capitalize">{user?.role}</p>
                         </div>
                     </div>
                     <button

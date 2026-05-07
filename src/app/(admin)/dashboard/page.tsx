@@ -6,8 +6,8 @@ import { motion } from 'framer-motion';
 import {
     useDashboardStatsQuery,
     useRentsWithRelationsQuery,
-    usePropertiesQuery,
     useProprietorsQuery,
+    usePropertiesQuery,
 } from '@/hooks/useStorage';
 import { useLanguage } from '@/components/common/LanguageSwitcher';
 import { useAuth } from '@/contexts/AuthContext';
@@ -18,15 +18,8 @@ import {
     ArrowUpCircle,
     ArrowDownCircle,
     ChevronRight,
-    Clock,
     CheckCircle2,
     XCircle,
-    TrendingUp,
-    Home,
-    CircleDot,
-    Ban,
-    Package,
-    RefreshCw,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { getRentOutCollectionDisplayPeriod } from '@/lib/rentPaymentDisplay';
@@ -141,7 +134,7 @@ function SectionHeader({ icon, title, count, accentColor, href }: SectionHeaderP
                     {icon}
                 </div>
                 <div>
-                    <h2 className="text-base font-semibold text-zinc-900 dark:text-white tracking-tight">{title}</h2>
+                    <h2 className="text-lg font-semibold text-zinc-900 dark:text-white tracking-tight">{title}</h2>
                     <p className="text-sm text-zinc-400 dark:text-white/40">{count} 筆</p>
                 </div>
             </div>
@@ -212,16 +205,16 @@ interface ListRowProps {
 }
 
 const HOVER_COLORS = {
-    violet: 'hover:bg-violet-50/70 dark:hover:bg-violet-500/10 hover:shadow-sm hover:shadow-violet-200/60 dark:hover:shadow-violet-900/30',
-    blue: 'hover:bg-blue-50/70 dark:hover:bg-blue-500/10 hover:shadow-sm hover:shadow-blue-200/60 dark:hover:shadow-blue-900/30',
-    amber: 'hover:bg-amber-50/70 dark:hover:bg-amber-500/10 hover:shadow-sm hover:shadow-amber-200/60 dark:hover:shadow-amber-900/30',
-    emerald: 'hover:bg-emerald-50/70 dark:hover:bg-emerald-500/10 hover:shadow-sm hover:shadow-emerald-200/60 dark:hover:shadow-emerald-900/30',
-    rose: 'hover:bg-rose-50/70 dark:hover:bg-rose-500/10 hover:shadow-sm hover:shadow-rose-200/60 dark:hover:shadow-rose-900/30',
+    violet: 'hover:bg-violet-50/70 dark:hover:bg-violet-500/10',
+    blue: 'hover:bg-blue-50/70 dark:hover:bg-blue-500/10',
+    amber: 'hover:bg-amber-50/70 dark:hover:bg-amber-500/10',
+    emerald: 'hover:bg-emerald-50/70 dark:hover:bg-emerald-500/10',
+    rose: 'hover:bg-rose-50/70 dark:hover:bg-rose-500/10',
 } as const;
 
 function ListRow({ cells, badge, href, hrefLabel, hoverColor = 'violet' }: ListRowProps) {
-    const content = (
-        <div className={cn('flex items-center gap-3 py-3 px-4 rounded-xl transition-all duration-150 group cursor-pointer', HOVER_COLORS[hoverColor])}>
+    const innerContent = (
+        <div className="flex items-center gap-3 py-3">
             <div className="min-w-0 flex-1">
                 <p className="text-sm font-medium text-zinc-800 dark:text-white/90 truncate">
                     {cells[0]?.label}
@@ -245,14 +238,18 @@ function ListRow({ cells, badge, href, hrefLabel, hoverColor = 'violet' }: ListR
         </div>
     );
 
+    const wrapperClass = cn('px-5', HOVER_COLORS[hoverColor]);
+
     if (href) {
         return (
-            <Link href={href} className="block rounded-xl focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500/40">
-                {content}
-            </Link>
+            <div className={wrapperClass}>
+                <Link href={href} className="block focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500/40">
+                    {innerContent}
+                </Link>
+            </div>
         );
     }
-    return <div className="rounded-xl">{content}</div>;
+    return <div className={wrapperClass}>{innerContent}</div>;
 }
 
 /* ---------- Section Card ---------- */
@@ -287,9 +284,9 @@ function EmptyState({ message }: { message: string }) {
 }
 
 /* ---------- Loading Skeleton ---------- */
-function SkeletonRows({ rows = 3 }: { rows?: number }) {
+function SkeletonRows({ rows = 3, px = 'px-4' }: { rows?: number; px?: string }) {
     return (
-        <div className="space-y-2 px-4 py-4">
+        <div className={cn('space-y-2 py-4', px)}>
             {Array.from({ length: rows }).map((_, i) => (
                 <div key={i} className="flex items-center gap-3 py-3">
                     <div className="h-4 w-24 rounded-lg bg-zinc-100 dark:bg-white/5 animate-pulse" />
@@ -314,8 +311,8 @@ export default function DashboardPage() {
     const { data: stats, isLoading: statsLoading } = useDashboardStatsQuery();
     const { data: rents = [], isLoading: rentsLoading } = useRentsWithRelationsQuery({ enabled: true });
     const { data: contractContract = [], isLoading: contractLoading } = useRentsWithRelationsQuery({ type: 'contract' });
-    const { data: properties = [], isLoading: propsLoading } = usePropertiesQuery();
-    const { data: proprietors = [], isLoading: propsrLoading } = useProprietorsQuery();
+    const { data: allProprietors = [], isLoading: propsrLoading } = useProprietorsQuery({ bypassIsolation: true });
+    const { data: allProperties = [], isLoading: propsLoading } = usePropertiesQuery({ bypassIsolation: true });
 
     const [userRole, setUserRole] = useState<string>('client');
     const [contractTab, setContractTab] = useState<ContractTab>('contract');
@@ -357,7 +354,7 @@ export default function DashboardPage() {
         return { paidRents, unpaidRents, leasingRows, terminatedRows };
     }, [rents]);
 
-    const isAnyLoading = statsLoading || rentsLoading || contractLoading || propsLoading || propsrLoading;
+    const isAnyLoading = statsLoading || rentsLoading || contractLoading || propsrLoading || propsLoading;
 
     /* ---- 租賃合約 / 出租合約 ---- */
     const totalProperties = stats?.totalProperties ?? 0;
@@ -451,18 +448,14 @@ export default function DashboardPage() {
                     </div>
 
                     {/* 物業列表 */}
-                    <div className="px-4 py-2">
-                        <span className="text-xs font-semibold uppercase tracking-wider text-zinc-400 dark:text-white/30">
-                            {t('Properties', '物業')}
-                        </span>
-                    </div>
-                    {propsLoading ? (
-                        <SkeletonRows rows={3} />
-                    ) : properties.length === 0 ? (
-                        <EmptyState message={t('No properties yet', '暫無物業')} />
-                    ) : (
-                        <div className="px-2 pb-3 space-y-0.5">
-                                {properties.slice(0, 5).map((p: any) => (
+                    <div className="border-t border-zinc-100 dark:border-white/[0.06]">
+                        {propsLoading ? (
+                            <SkeletonRows rows={3} />
+                        ) : allProperties.length === 0 ? (
+                            <EmptyState message={t('No properties yet', '暫無物業')} />
+                        ) : (
+                            <div className="pb-3 space-y-0.5">
+                                {allProperties.slice(0, 5).map((p: any) => (
                                     <ListRow
                                         key={p.id}
                                         href={`/dashboard/properties/${p.id}`}
@@ -471,31 +464,30 @@ export default function DashboardPage() {
                                         ]}
                                         badge={
                                             <Badge
-                                                label={
-                                                    p.status === 'holding' ? t('Holding', '持有') :
+                                                label={p.status === 'holding' ? t('Holding', '持有中') :
                                                     p.status === 'renting' ? t('Renting', '出租中') :
-                                                    p.status === 'sold' ? t('Sold', '已售') :
-                                                    p.status === 'suspended' ? t('Suspended', '暫停') : '—'
-                                                }
+                                                    p.status === 'suspended' ? t('Suspended', '已暫停') :
+                                                    p.status === 'sold' ? t('Sold', '已售出') : '—'}
                                                 variant={
-                                                    p.status === 'holding' ? 'blue' :
-                                                    p.status === 'renting' ? 'green' :
-                                                    p.status === 'sold' ? 'amber' : 'zinc'
+                                                    p.status === 'holding' ? 'green' :
+                                                    p.status === 'renting' ? 'blue' :
+                                                    p.status === 'suspended' ? 'red' :
+                                                    p.status === 'sold' ? 'zinc' : 'zinc'
                                                 }
-                                                dot
                                             />
                                         }
                                         hoverColor="violet"
                                     />
                                 ))}
-                        </div>
-                    )}
+                            </div>
+                        )}
                         {/* 查看全部 */}
                         <div className="flex justify-center pb-3">
                             <Link href="/dashboard/properties" className="text-xs text-violet-500 hover:text-violet-600 dark:hover:text-violet-400 transition-colors">
                                 {t('View all', '查看全部')}
                             </Link>
                         </div>
+                    </div>
                 </SectionCard>
 
                 {/* ---- 2. 業主 ---- */}
@@ -504,40 +496,39 @@ export default function DashboardPage() {
                         <SectionHeader
                             icon={<Users className="w-5 h-5 text-white" />}
                             title={t('Proprietors', '業主')}
-                            count={totalProprietors}
+                            count={allProprietors.filter((p: any) => !p.code?.startsWith('T')).length}
                             accentColor="bg-gradient-to-br from-blue-500 to-cyan-600"
                             href="/dashboard/proprietors"
                         />
                     </div>
 
+                    {/* 業主列表 */}
                     <div className="border-t border-zinc-100 dark:border-white/[0.06]">
-                        <div className="px-4 py-2">
-                            <span className="text-xs font-semibold uppercase tracking-wider text-zinc-400 dark:text-white/30">
-                                {t('Proprietors', '業主')}
-                            </span>
-                        </div>
                         {propsrLoading ? (
                             <SkeletonRows rows={3} />
-                        ) : proprietors.length === 0 ? (
+                        ) : allProprietors.filter((p: any) => !p.code?.startsWith('T')).length === 0 ? (
                             <EmptyState message={t('No proprietors yet', '暫無業主')} />
                         ) : (
-                            <div className="px-2 pb-3 space-y-0.5">
-                                {proprietors.slice(0, 5).map((p: any) => (
-                                    <ListRow
-                                        key={p.id}
-                                        href={`/dashboard/proprietors?id=${p.id}`}
-                                        cells={[
-                                            { label: p.name || '—', sub: p.code },
-                                        ]}
-                                        badge={
-                                            <Badge
-                                                label={p.type === 'company' ? t('Company', '公司') : t('Individual', '個人')}
-                                                variant="zinc"
-                                            />
-                                        }
-                                        hoverColor="blue"
-                                    />
-                                ))}
+                            <div className="pb-3 space-y-0.5">
+                                {allProprietors
+                                    .filter((p: any) => !p.code?.startsWith('T'))
+                                    .slice(0, 5)
+                                    .map((p: any) => (
+                                        <ListRow
+                                            key={p.id}
+                                            href={`/dashboard/proprietors?id=${p.id}`}
+                                            cells={[
+                                                { label: p.name || '—', sub: p.code },
+                                            ]}
+                                            badge={
+                                                <Badge
+                                                    label={p.type === 'company' ? t('Company', '公司') : t('Individual', '個人')}
+                                                    variant="zinc"
+                                                />
+                                            }
+                                            hoverColor="blue"
+                                        />
+                                    ))}
                             </div>
                         )}
                         {/* 查看全部 */}
@@ -595,7 +586,7 @@ export default function DashboardPage() {
 
                     {/* 合約列表 */}
                     <div>
-                        <div className="px-4 py-2 grid grid-cols-5 gap-2 text-xs font-semibold uppercase tracking-wider text-zinc-400 dark:text-white/30">
+                        <div className="px-[20px] py-2 grid grid-cols-5 gap-2 text-xs font-semibold uppercase tracking-wider text-zinc-400 dark:text-white/30">
                             <span>{t('Property', '物業')}</span>
                             <span className="text-left">
                                 {t('Contract No.', '合約號碼')}
@@ -609,22 +600,22 @@ export default function DashboardPage() {
                             <span className="text-left">{t('Status', '狀態')}</span>
                         </div>
                         {rentsLoading || contractLoading ? (
-                            <SkeletonRows rows={3} />
+                            <SkeletonRows rows={3} px="px-[20px]" />
                         ) : (contractTab === 'contract' ? contractContractFiltered : contractRentOutFiltered).length === 0 ? (
                             <EmptyState message={t('No contracts yet', '暫無合約')} />
                         ) : (
-                            <div className="px-2 pb-3 space-y-0.5">
+                            <div className="pb-3 space-y-0.5">
                                 {(contractTab === 'contract' ? contractContractFiltered : contractRentOutFiltered).slice(0, 5).map((r: any) => {
                                     const propLabel = getPropertyLabel(r);
                                     const refNo = getRefNo(r);
                                     const period = getContractPeriod(r);
                                     const status = r.rentOutStatus || r.status;
                                     return (
-                                        <Link
-                                            key={String(r.id)}
-                                            href="/dashboard/contracts"
-                                            className="grid grid-cols-5 gap-2 py-3 px-4 rounded-xl hover:bg-amber-50/70 dark:hover:bg-amber-500/10 hover:shadow-sm hover:shadow-amber-200/60 dark:hover:shadow-amber-900/30 transition-all duration-150 group cursor-pointer"
-                                        >
+                                        <div key={String(r.id)} className="px-5 hover:bg-amber-50/70 dark:hover:bg-amber-500/10">
+                                            <Link
+                                                href="/dashboard/contracts"
+                                                className="grid grid-cols-5 gap-2 py-3 transition-all duration-150 group cursor-pointer"
+                                            >
                                             <span className="text-sm font-medium text-zinc-800 dark:text-white/90 truncate">{propLabel}</span>
                                             <span className="text-xs text-zinc-700 dark:text-white/70 truncate" title={refNo}>{refNo}</span>
                                             <span className="text-xs text-zinc-700 dark:text-white/70 truncate" title={getContractAmount(r)}>{getContractAmount(r)}</span>
@@ -647,7 +638,8 @@ export default function DashboardPage() {
                                                 />
                                                 <ChevronRight className="w-4 h-4 text-zinc-400 group-hover:translate-x-0.5 transition-transform shrink-0" />
                                             </div>
-                                        </Link>
+                                            </Link>
+                                        </div>
                                     );
                                 })}
                             </div>
@@ -703,7 +695,7 @@ export default function DashboardPage() {
 
                     {/* 收租列表 */}
                     <div>
-                        <div className="px-4 py-2 grid grid-cols-5 gap-2 text-xs font-semibold uppercase tracking-wider text-zinc-400 dark:text-white/30">
+                        <div className="px-[20px] py-2 grid grid-cols-5 gap-2 text-xs font-semibold uppercase tracking-wider text-zinc-400 dark:text-white/30">
                             <span>{t('Property', '物業')}</span>
                             <span className="text-left">{t('Ref. No.', '編號')}</span>
                             <span className="text-left">{t('Current Tenant', '現時租客')}</span>
@@ -711,22 +703,22 @@ export default function DashboardPage() {
                             <span className="text-left">{t('Status', '狀態')}</span>
                         </div>
                         {rentsLoading ? (
-                            <SkeletonRows rows={3} />
+                            <SkeletonRows rows={3} px="px-[20px]" />
                         ) : (rentOutTab === 'paid' ? paidRents : unpaidRents).length === 0 ? (
                             <EmptyState message={t('No records', '暫無記錄')} />
                         ) : (
-                            <div className="px-2 pb-3 space-y-0.5">
+                            <div className="pb-3 space-y-0.5">
                                 {(rentOutTab === 'paid' ? paidRents : unpaidRents).slice(0, 5).map((r: any) => {
                                     const propLabel = getPropertyLabel(r);
                                     const refNo = getRefNo(r);
                                     const currentTenantName = r.currentTenant?.name || r.tenant?.name || '—';
                                     const paymentDate = r.rentCollectionPaymentDate ? formatDate(r.rentCollectionPaymentDate) : '—';
                                     return (
-                                        <Link
-                                            key={String(r.id)}
-                                            href="/dashboard/rent-out"
-                                            className="grid grid-cols-5 gap-2 py-3 px-4 rounded-xl hover:bg-emerald-50/70 dark:hover:bg-emerald-500/10 hover:shadow-sm hover:shadow-emerald-200/60 dark:hover:shadow-emerald-900/30 transition-all duration-150 group cursor-pointer"
-                                        >
+                                        <div key={String(r.id)} className="px-5 hover:bg-emerald-50/70 dark:hover:bg-emerald-500/10">
+                                            <Link
+                                                href="/dashboard/rent-out"
+                                                className="grid grid-cols-5 gap-2 py-3 transition-all duration-150 group cursor-pointer"
+                                            >
                                             <span className="text-sm font-medium text-zinc-800 dark:text-white/90 truncate">{propLabel}</span>
                                             <span className="text-xs text-zinc-700 dark:text-white/70 truncate" title={refNo}>{refNo}</span>
                                             <span className="text-xs text-zinc-700 dark:text-white/70 truncate" title={currentTenantName}>{currentTenantName}</span>
@@ -739,7 +731,8 @@ export default function DashboardPage() {
                                                 />
                                                 <ChevronRight className="w-4 h-4 text-zinc-400 group-hover:translate-x-0.5 transition-transform shrink-0" />
                                             </div>
-                                        </Link>
+                                            </Link>
+                                        </div>
                                     );
                                 })}
                             </div>
@@ -765,37 +758,37 @@ export default function DashboardPage() {
                         />
                     </div>
 
-                    {/* Tab: 租賃中 / 已終止 */}
+                    {/* Tab: 已繳付 / 未繳付 */}
                     <div className="px-5 py-3 flex gap-2 border-b border-zinc-100 dark:border-white/[0.06]">
                         <button
                             onClick={() => setRentingTab('leasing')}
                             className={cn(
                                 'flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors cursor-pointer',
                                 rentingTab === 'leasing'
-                                    ? 'bg-blue-100 text-blue-700 dark:bg-blue-500/15 dark:text-blue-300'
+                                    ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300'
                                     : 'text-zinc-400 hover:bg-zinc-100 dark:hover:bg-white/5'
                             )}
                         >
-                            <RefreshCw className="w-3.5 h-3.5" />
-                            {t('Active', '租賃中')} <span className="tabular-nums opacity-60">({leasingRows.length})</span>
+                            <CheckCircle2 className="w-3.5 h-3.5" />
+                            {t('Paid', '已繳付')} <span className="tabular-nums opacity-60">({leasingRows.length})</span>
                         </button>
                         <button
                             onClick={() => setRentingTab('terminated')}
                             className={cn(
                                 'flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors cursor-pointer',
                                 rentingTab === 'terminated'
-                                    ? 'bg-zinc-200 text-zinc-600 dark:bg-white/10 dark:text-white/60'
+                                    ? 'bg-rose-100 text-rose-700 dark:bg-rose-500/15 dark:text-rose-300'
                                     : 'text-zinc-400 hover:bg-zinc-100 dark:hover:bg-white/5'
                             )}
                         >
-                            <Ban className="w-3.5 h-3.5" />
-                            {t('Terminated', '已終止')} <span className="tabular-nums opacity-60">({terminatedRows.length})</span>
+                            <XCircle className="w-3.5 h-3.5" />
+                            {t('Unpaid', '未繳付')} <span className="tabular-nums opacity-60">({terminatedRows.length})</span>
                         </button>
                     </div>
 
                     {/* 交租列表 */}
                     <div>
-                        <div className="px-4 py-2 grid grid-cols-5 gap-2 text-xs font-semibold uppercase tracking-wider text-zinc-400 dark:text-white/30">
+                        <div className="px-[20px] py-2 grid grid-cols-5 gap-2 text-xs font-semibold uppercase tracking-wider text-zinc-400 dark:text-white/30">
                             <span>{t('Property', '物業')}</span>
                             <span className="text-left">{t('Owner', '業主')}</span>
                             <span className="text-left">{t('Tenant', '承租人')}</span>
@@ -803,35 +796,36 @@ export default function DashboardPage() {
                             <span className="text-left">{t('Status', '狀態')}</span>
                         </div>
                         {rentsLoading ? (
-                            <SkeletonRows rows={3} />
+                            <SkeletonRows rows={3} px="px-[20px]" />
                         ) : (rentingTab === 'leasing' ? leasingRows : terminatedRows).length === 0 ? (
                             <EmptyState message={t('No records', '暫無記錄')} />
                         ) : (
-                            <div className="px-2 pb-3 space-y-0.5">
+                            <div className="pb-3 space-y-0.5">
                                 {(rentingTab === 'leasing' ? leasingRows : terminatedRows).slice(0, 5).map((r: any) => {
                                     const propLabel = getPropertyLabel(r);
                                     const ownerName = r.proprietor?.name || '—';
                                     const tenantName = r.rentCollectionTenantName || r.tenant?.name || '—';
                                     const paymentDate = r.rentCollectionPaymentDate ? formatDate(r.rentCollectionPaymentDate) : '—';
                                     return (
-                                        <Link
-                                            key={String(r.id)}
-                                            href="/dashboard/renting"
-                                            className="grid grid-cols-5 gap-2 py-3 px-4 rounded-xl hover:bg-rose-50/70 dark:hover:bg-rose-500/10 hover:shadow-sm hover:shadow-rose-200/60 dark:hover:shadow-rose-900/30 transition-all duration-150 group cursor-pointer"
-                                        >
+                                        <div key={String(r.id)} className="px-5 hover:bg-rose-50/70 dark:hover:bg-rose-500/10">
+                                            <Link
+                                                href="/dashboard/renting"
+                                                className="grid grid-cols-5 gap-2 py-3 transition-all duration-150 group cursor-pointer"
+                                            >
                                             <span className="text-sm font-medium text-zinc-800 dark:text-white/90 truncate">{propLabel}</span>
                                             <span className="text-xs text-zinc-700 dark:text-white/70 truncate" title={ownerName}>{ownerName}</span>
                                             <span className="text-xs text-zinc-700 dark:text-white/70 truncate" title={tenantName}>{tenantName}</span>
                                             <span className="text-xs text-zinc-500 dark:text-white/50 truncate" title={paymentDate}>{paymentDate}</span>
                                             <div className="flex items-center gap-2 shrink-0 whitespace-nowrap">
                                                 <Badge
-                                                    label={rentingTab === 'leasing' ? t('Active', '租賃中') : t('Ended', '已終止')}
-                                                    variant={rentingTab === 'leasing' ? 'blue' : 'zinc'}
+                                                    label={rentingTab === 'leasing' ? t('Paid', '已繳付') : t('Unpaid', '未繳付')}
+                                                    variant={rentingTab === 'leasing' ? 'green' : 'red'}
                                                     dot
                                                 />
                                                 <ChevronRight className="w-4 h-4 text-zinc-400 group-hover:translate-x-0.5 transition-transform shrink-0" />
                                             </div>
-                                        </Link>
+                                            </Link>
+                                        </div>
                                     );
                                 })}
                             </div>

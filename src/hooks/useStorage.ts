@@ -264,11 +264,11 @@ export const fetchProperty = async (id: string): Promise<Property | undefined> =
     }
 };
 
-export const fetchProprietors = async (user?: any): Promise<Proprietor[]> => {
+export const fetchProprietors = async (user?: any, options?: { bypassIsolation?: boolean }): Promise<Proprietor[]> => {
     try {
         let query = supabase.from('proprietors').select('*');
 
-        if (user && user.role !== 'admin') {
+        if (user && user.role !== 'admin' && !options?.bypassIsolation) {
             query = query.eq('created_by', user.id);
         }
 
@@ -688,7 +688,6 @@ export const fetchDashboardStats = async (user?: any) => {
 
         if (user && user.role !== 'admin') {
             propertiesQuery = propertiesQuery.eq('created_by', user.id);
-            proprietorsQuery = proprietorsQuery.eq('created_by', user.id);
             rentsQuery = rentsQuery.eq('created_by', user.id);
             rentsDataQuery = rentsDataQuery.eq('created_by', user.id);
 
@@ -1138,11 +1137,11 @@ export function useProprietors() {
     };
 }
 
-export function useProprietorsQuery() {
+export function useProprietorsQuery(options?: { bypassIsolation?: boolean }) {
     const { user } = useAuth();
     return useQuery({
-        queryKey: ['proprietors', user?.id],
-        queryFn: () => fetchProprietors(user),
+        queryKey: ['proprietors', user?.id, options?.bypassIsolation],
+        queryFn: () => fetchProprietors(user, options),
         staleTime: 5 * 60 * 1000, // 5 minutes
     });
 }

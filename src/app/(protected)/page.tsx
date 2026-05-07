@@ -78,7 +78,7 @@ export default function PropertiesPage() {
             {/* Page header */}
             <div className="flex items-center justify-between">
                 <div>
-                    <h1 className="text-2xl font-bold text-zinc-900 dark:text-white">物業</h1>
+                    <h1 className="text-3xl font-bold text-zinc-900 dark:text-white">物業</h1>
                     <p className="text-zinc-500 dark:text-white/50 mt-1">{userDisplayName}{userDisplayName ? '，' : ''}歡迎回來。隨時查看您的物業資訊。</p>
                 </div>
                 {isAuthenticated && (

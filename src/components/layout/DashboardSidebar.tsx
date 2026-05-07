@@ -131,7 +131,7 @@ export default function DashboardSidebar({ userRole = 'client' }: DashboardSideb
                     </div>
                     <div>
                         <h1 className="font-bold text-zinc-900 dark:text-white text-lg">{t('Backend', '後台')}</h1>
-                        <p className="text-zinc-500 dark:text-white/40 text-xs font-medium">
+                        <p className="text-zinc-500 dark:text-white/40 text-sm font-medium">
                             {t('Manage properties', '管理物業')}
                         </p>
                     </div>
@@ -143,13 +143,13 @@ export default function DashboardSidebar({ userRole = 'client' }: DashboardSideb
                     className="mt-4 flex items-center gap-2 px-3 py-2 rounded-lg text-zinc-500 dark:text-white/60 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-white/5 transition-all"
                 >
                     <ArrowLeft className="w-4 h-4" />
-                    <span className="text-sm">返回主頁</span>
+                    <span className="text-base">返回主頁</span>
                 </Link>
             </div>
 
             {/* Navigation */}
             <nav className="flex-1 p-4 overflow-y-auto">
-                <p className="px-4 text-xs text-zinc-400 dark:text-white/40 uppercase tracking-wider mb-3">
+                    <p className="px-4 text-sm text-zinc-400 dark:text-white/40 uppercase tracking-wider mb-3">
                     管理
                 </p>
                 <ul className="space-y-1">
@@ -163,7 +163,7 @@ export default function DashboardSidebar({ userRole = 'client' }: DashboardSideb
                                     }`}
                             >
                                 {item.icon}
-                                <span className="font-medium">{item.labelZh}</span>
+                                <span className="font-medium text-base">{item.labelZh}</span>
                             </Link>
                         </li>
                     ))}
@@ -172,7 +172,7 @@ export default function DashboardSidebar({ userRole = 'client' }: DashboardSideb
                 {/* Settings Section */}
                 {userRole === 'admin' && (
                     <>
-                        <p className="px-4 text-xs text-zinc-400 dark:text-white/40 uppercase tracking-wider mb-3 mt-6 font-medium">
+                        <p className="px-4 text-sm text-zinc-400 dark:text-white/40 uppercase tracking-wider mb-3 mt-6 font-medium">
                             設定
                         </p>
                         <ul className="space-y-1">
@@ -185,7 +185,7 @@ export default function DashboardSidebar({ userRole = 'client' }: DashboardSideb
                                         }`}
                                 >
                                     <Users className="w-5 h-5" />
-                                    <span className="font-medium">帳號管理</span>
+                                    <span className="font-medium text-base">帳號管理</span>
                                 </Link>
                             </li>
                             <li>
@@ -197,12 +197,12 @@ export default function DashboardSidebar({ userRole = 'client' }: DashboardSideb
                                         }`}
                                 >
                                     <Settings className="w-5 h-5" />
-                                    <span className="font-medium">系統設定</span>
+                                    <span className="font-medium text-base">系統設定</span>
                                 </Link>
                             </li>
                         </ul>
 
-                        <p className="px-4 text-xs text-zinc-400 dark:text-white/40 uppercase tracking-wider mb-3 mt-6 font-medium">
+                        <p className="px-4 text-sm text-zinc-400 dark:text-white/40 uppercase tracking-wider mb-3 mt-6 font-medium">
                             工具
                         </p>
                         <ul className="space-y-1">
@@ -215,7 +215,7 @@ export default function DashboardSidebar({ userRole = 'client' }: DashboardSideb
                                         }`}
                                 >
                                     <ImageIcon className="w-5 h-5" />
-                                    <span className="font-medium">已上載</span>
+                                    <span className="font-medium text-base">已上載</span>
                                 </Link>
                             </li>
                             <li>
@@ -227,7 +227,7 @@ export default function DashboardSidebar({ userRole = 'client' }: DashboardSideb
                                         }`}
                                 >
                                     <Trash2 className="w-5 h-5" />
-                                    <span className="font-medium">垃圾桶</span>
+                                    <span className="font-medium text-base">垃圾桶</span>
                                 </Link>
                             </li>
                         </ul>
@@ -245,8 +245,8 @@ export default function DashboardSidebar({ userRole = 'client' }: DashboardSideb
                             {user.username?.charAt(0).toUpperCase()}
                         </div>
                         <div>
-                            <p className="text-zinc-900 dark:text-white text-sm font-medium">{user.username}</p>
-                            <p className="text-zinc-500 dark:text-white/40 text-xs">
+                            <p className="text-zinc-900 dark:text-white text-base font-medium">{user.username}</p>
+                            <p className="text-zinc-500 dark:text-white/40 text-sm">
                                 {user.role === 'admin'
                                     ? `🔐 ${t('Admin', '管理員')}`
                                     : `👤 ${t('Client', '客戶')}`}

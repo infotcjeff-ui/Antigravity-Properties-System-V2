@@ -101,8 +101,8 @@ export default function Sidebar({ isAuthenticated = false }: SidebarProps) {
                         <Building2 className="w-5 h-5 text-white" />
                     </div>
                     <div>
-                        <h1 className="font-bold text-zinc-900 dark:text-white text-lg">PMS</h1>
-                        <p className="text-zinc-500 dark:text-white/40 text-xs">物業管理系統</p>
+                        <h1 className="font-bold text-zinc-900 dark:text-white text-2xl">PMS</h1>
+                        <p className="text-zinc-500 dark:text-white/40 text-sm">物業管理系統</p>
                     </div>
                 </Link>
             </div>
@@ -123,7 +123,7 @@ export default function Sidebar({ isAuthenticated = false }: SidebarProps) {
                                     >
                                         <div className="flex items-center gap-3">
                                             {item.icon}
-                                            <span className="font-medium">{item.label}</span>
+                                            <span className="font-medium text-base">{item.label}</span>
                                         </div>
                                         <motion.div
                                             animate={{ rotate: expandedItems.includes(item.label) ? 180 : 0 }}
@@ -149,7 +149,7 @@ export default function Sidebar({ isAuthenticated = false }: SidebarProps) {
                                                                 }`}
                                                         >
                                                             <div className={`w-1.5 h-1.5 rounded-full ${isActive(child.href) ? 'bg-purple-500' : 'bg-zinc-400 dark:bg-white/30'}`} />
-                                                            <span className="text-sm">{child.label}</span>
+                                                            <span className="text-base">{child.label}</span>
                                                         </Link>
                                                     </li>
                                                 ))}
@@ -178,12 +178,12 @@ export default function Sidebar({ isAuthenticated = false }: SidebarProps) {
                     <div className="mt-6 p-4 rounded-xl bg-purple-500/10 border border-purple-500/20 space-y-3">
                         <ThemeToggle className="w-full justify-start px-4 h-11" showLabel />
                         <div>
-                            <p className="text-zinc-600 dark:text-white/70 text-sm">
+                            <p className="text-zinc-600 dark:text-white/70 text-base">
                                 🔒 登入以查看所有功能
                             </p>
                             <Link
                                 href="/login"
-                                className="mt-2 inline-block text-purple-400 text-sm hover:text-purple-300 transition-colors"
+                                className="mt-2 inline-block text-purple-400 text-base hover:text-purple-300 transition-colors"
                             >
                                 登入 →
                             </Link>
@@ -203,8 +203,8 @@ export default function Sidebar({ isAuthenticated = false }: SidebarProps) {
                                 {user.username?.charAt(0).toUpperCase()}
                             </div>
                             <div>
-                                <p className="text-zinc-900 dark:text-white text-sm font-medium">{user.username}</p>
-                                <p className="text-zinc-500 dark:text-white/40 text-xs capitalize">{user.role}</p>
+                                <p className="text-zinc-900 dark:text-white text-base font-medium">{user.username}</p>
+                                <p className="text-zinc-500 dark:text-white/40 text-sm capitalize">{user.role}</p>
                             </div>
                         </div>
                         <button

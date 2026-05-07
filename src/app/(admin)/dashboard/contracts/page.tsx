@@ -264,6 +264,30 @@ export default function ContractsPage() {
         }, 0);
     }, [filteredByAmountDate]);
 
+    /** 計算到目前為止的月份數 */
+    const calcMonthsToNow = (startDate: Date): number => {
+        const start = new Date(startDate);
+        const now = new Date();
+        const startYear = start.getFullYear();
+        const startMonth = start.getMonth();
+        const nowYear = now.getFullYear();
+        const nowMonth = now.getMonth();
+        let months = (nowYear - startYear) * 12 + (nowMonth - startMonth);
+        const lastDayOfStartMonth = new Date(startYear, startMonth + 1, 0).getDate();
+        if (start.getDate() >= lastDayOfStartMonth) months += 1;
+        return Math.max(0, months);
+    };
+
+    /** 已收到金額：合約開始日至目前的月份數 × 月租（租賃/出租均適用） */
+    const totalReceivedAmount = useMemo(() => {
+        return filteredByAmountDate.reduce((sum, c) => {
+            const monthly = Number(c.rentOutMonthlyRental) || 0;
+            if (!c.rentOutStartDate) return sum;
+            const months = calcMonthsToNow(new Date(c.rentOutStartDate));
+            return sum + monthly * months;
+        }, 0);
+    }, [filteredByAmountDate]);
+
     /** 按金：租賃合約顯示已付按金，出租合約顯示已收按金 */
     const totalDeposit = useMemo(() => {
         const paidDeposit = (filteredByAmountDate as any[]).reduce((sum, c) => {
@@ -403,7 +427,7 @@ export default function ContractsPage() {
                                     </div>
                                     <div>
                                         <p className={`text-sm font-semibold tracking-wide ${isLeaseInTab ? 'text-violet-700' : 'text-amber-700'}`}>{isLeaseInTab ? '租賃合計' : '出租合計'}</p>
-                                        <p className={`text-xs mt-0.5 ${isLeaseInTab ? 'text-violet-500/70' : 'text-amber-600/70'}`}>合約總租金</p>
+                                        <p className={`text-xs mt-0.5 ${isLeaseInTab ? 'text-violet-500/70' : 'text-amber-600/70'}`}>已收 / 合計</p>
                                     </div>
                                 </div>
                                 {/* 按金：compact badge 在 header */}
@@ -417,10 +441,21 @@ export default function ContractsPage() {
                                 </div>
                             </div>
 
-                            <div className="flex-1 flex items-center">
-                                <p className={`text-4xl font-black tabular-nums leading-none tracking-tight drop-shadow-lg ${isLeaseInTab ? 'text-violet-800' : 'text-amber-800'}`}>
-                                    ${totalMonthlyAmount.toLocaleString()}
-                                </p>
+                            <div className="flex-1 flex flex-col justify-center gap-1">
+                                <div className="flex items-baseline gap-2">
+                                    <span className={`text-2xl font-black tabular-nums leading-none drop-shadow-lg ${isLeaseInTab ? 'text-violet-600' : 'text-amber-600'}`}>
+                                        $
+                                    </span>
+                                    <span className={`text-4xl font-black tabular-nums leading-none tracking-tight drop-shadow-lg ${isLeaseInTab ? 'text-violet-800' : 'text-amber-800'}`}>
+                                        {totalReceivedAmount.toLocaleString()}
+                                    </span>
+                                    <span className={`text-sm font-medium ${isLeaseInTab ? 'text-violet-500/70' : 'text-amber-600/70'}`}>
+                                        /
+                                    </span>
+                                    <span className={`text-xl font-bold tabular-nums leading-none ${isLeaseInTab ? 'text-violet-500' : 'text-amber-500'}`}>
+                                        ${totalMonthlyAmount.toLocaleString()}
+                                    </span>
+                                </div>
                             </div>
 
                             {/* 日期篩選 */}

@@ -14,7 +14,6 @@ import LesseeDetailModal from '@/components/properties/LesseeDetailModal';
 import RentOutFormModal from '@/components/properties/RentOutFormModal';
 import CurrentTenantDetailModal from '@/components/properties/CurrentTenantDetailModal';
 import { dedupeRecordsByDisplayName, proprietorCategoryLabelZh, proprietorCategoryBadgeClassName, formatLotIndexPlainJoined, formatRentHistoryLotCellText } from '@/lib/formatters';
-import { getRentOutLesseeDisplayLabel } from '@/lib/rentPaymentDisplay';
 
 type ProprietorManageTab = 'owners' | 'lessees' | 'sub_landlords' | 'current_tenants';
 
@@ -60,6 +59,9 @@ export default function TenantsPage() {
 
     // Rent-out contracts (出租合約) for sub-landlord detail
     const { data: allRentOutContracts } = useRentsWithRelationsQuery({ type: 'rent_out' });
+
+    // Contract records (租賃合約/出租合約記錄) for sub-landlord detail
+    const { data: allContracts } = useRentsWithRelationsQuery({ type: 'contract' });
 
     // Current tenants (現時租客)
     const { data: currentTenants, isLoading: currentTenantsLoading } = useCurrentTenantsQuery();
@@ -672,6 +674,7 @@ export default function TenantsPage() {
                     <SubLandlordDetailModal
                         subLandlord={showSubLandlordDetail}
                         allRentOutContracts={allRentOutContracts || []}
+                        allContracts={allContracts || []}
                         onClose={() => setShowSubLandlordDetail(null)}
                         onEdit={() => {
                             setEditingFromDetailSubLandlord(showSubLandlordDetail);
@@ -714,6 +717,7 @@ export default function TenantsPage() {
 interface SubLandlordDetailModalProps {
     subLandlord: SubLandlord;
     allRentOutContracts: any[];
+    allContracts: any[];
     onClose: () => void;
     onEdit: () => void;
 }
@@ -730,6 +734,7 @@ const SUBLANDLORD_TAB_LABEL: Record<SubLandlordDetailTab, string> = {
 function SubLandlordDetailModal({
     subLandlord: initialSubLandlord,
     allRentOutContracts,
+    allContracts,
     onClose,
     onEdit,
 }: SubLandlordDetailModalProps) {
@@ -739,17 +744,55 @@ function SubLandlordDetailModal({
     const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
     const hasInitializedRef = useRef(false);
 
-    // 過濾關聯的出租合約（直接關聯）
+    // 過濾關聯的出租合約（直接關聯 + tenancyNumber 匹配）
     const relatedRentOutContracts = useMemo(() => {
         if (!allRentOutContracts || !initialSubLandlord.id) return [];
-        return allRentOutContracts.filter(rent => rent.rentOutSubLandlordId === initialSubLandlord.id);
-    }, [allRentOutContracts, initialSubLandlord.id]);
+        const slTenancy = initialSubLandlord.tenancyNumber || '';
+        const slParts = slTenancy.split(',').map(p => p.trim()).filter(Boolean);
+        return allRentOutContracts.filter(rent => {
+            if (rent.rentOutSubLandlordId === initialSubLandlord.id) return true;
+            const propCode = (rent.property as Property | null)?.code || '';
+            if (!propCode || slParts.length === 0) return false;
+            return slParts.some(p => {
+                const pc = propCode;
+                return pc === p || pc === p.split('-')[0] || pc.startsWith(p.split('-')[0] + '-') || p.startsWith(pc.split('-')[0] + '-') || pc.split('-')[0] === p.split('-')[0];
+            });
+        });
+    }, [allRentOutContracts, initialSubLandlord.id, initialSubLandlord.tenancyNumber]);
 
-    // 按 tenancyNumber 分組（重複合約折疊在一起）
+    // 過濾關聯的租賃合約（type=contract, status!==leasing_in）
+    // 匹配方式：1) rentOutSubLandlordId 直接關聯  2) tenancyNumber 匹配
+    const relatedContracts = useMemo(() => {
+        if (!allContracts || !initialSubLandlord.id) return [];
+        return allContracts.filter(c => {
+            // 先排除 leasing_in 狀態
+            const contractStatus = c.rentOutStatus || c.status;
+            if (contractStatus === 'leasing_in') return false;
+            // 方式1: 直接 ID 匹配
+            if (c.rentOutSubLandlordId === initialSubLandlord.id) return true;
+            // 方式2: tenancyNumber 匹配（多條件前綴匹配）
+            const slTenancy = initialSubLandlord.tenancyNumber || '';
+            const slParts = slTenancy.split(',').map(p => p.trim()).filter(Boolean);
+            if (slParts.length === 0) return false;
+            const tenancyNum = (c.rentOutTenancyNumber || '').trim();
+            if (!tenancyNum) return false;
+            return slParts.some(p => {
+                const normalized = tenancyNum.toLowerCase();
+                const part = p.toLowerCase();
+                return normalized === part ||
+                    normalized === part.split('-')[0] ||
+                    normalized.startsWith(part.split('-')[0] + '-') ||
+                    part.startsWith(normalized.split('-')[0] + '-') ||
+                    normalized.split('-')[0] === part.split('-')[0];
+            });
+        });
+    }, [allContracts, initialSubLandlord.id, initialSubLandlord.tenancyNumber]);
+
+    // 合併合約記錄，按 tenancyNumber 分組（只顯示 contract 記錄）
     const groupedContracts = useMemo(() => {
-        const groups = new Map<string, typeof relatedRentOutContracts>();
-        relatedRentOutContracts.forEach(rent => {
-            const key = rent.rentOutTenancyNumber || '__none__';
+        const groups = new Map<string, typeof relatedContracts>();
+        relatedContracts.forEach(rent => {
+            const key = (rent.rentOutTenancyNumber || rent.tenancyNumber || '__none__').trim();
             if (!groups.has(key)) groups.set(key, []);
             groups.get(key)!.push(rent);
         });
@@ -759,9 +802,9 @@ function SubLandlordDetailModal({
             totalCount: contracts.length,
             firstContract: contracts[0],
         }));
-    }, [relatedRentOutContracts]);
+    }, [relatedContracts]);
 
-    // 只在 modal 首次開啟且資料載入完成後初始化收起狀態
+    const totalContractsCount = relatedContracts.length;
     useEffect(() => {
         if (groupedContracts.length > 0 && !hasInitializedRef.current) {
             hasInitializedRef.current = true;
@@ -847,7 +890,7 @@ function SubLandlordDetailModal({
                         >
                             {SUBLANDLORD_TAB_LABEL[tab]}
                             {tab === 'contracts' && (
-                                <span className="ml-1.5 text-xs font-mono opacity-70">({relatedRentOutContracts.length})</span>
+                                <span className="ml-1.5 text-xs font-mono opacity-70">({totalContractsCount})</span>
                             )}
                         </button>
                     ))}
@@ -857,7 +900,7 @@ function SubLandlordDetailModal({
                 <div className="flex-1 overflow-y-auto">
                     {activeTab === 'contracts' && (
                         <div className="p-5">
-                            {relatedRentOutContracts.length === 0 ? (
+                            {totalContractsCount === 0 ? (
                                 <div className="py-16 text-center">
                                     <FileText className="w-12 h-12 text-zinc-200 dark:text-white/10 mx-auto mb-3" />
                                     <p className="text-zinc-500 dark:text-white/40 font-medium">暫無關聯合約</p>
@@ -879,7 +922,7 @@ function SubLandlordDetailModal({
                                                     >
                                                         <div className="flex items-center gap-2.5 flex-1 min-w-0">
                                                             <FileText className="w-5 h-5 text-blue-500 shrink-0" />
-                                                            <span className="text-base font-bold text-zinc-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+                                                            <span className="text-[16px] font-bold text-zinc-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
                                                                 {group.tenancyNumber === '__none__' ? '—' : group.tenancyNumber}
                                                             </span>
                                                             {group.totalCount > 1 && (
@@ -889,6 +932,22 @@ function SubLandlordDetailModal({
                                                             )}
                                                         </div>
                                                         <div className="flex items-center gap-3">
+                                                            {/* 合約各方 - contract 記錄 */}
+                                                            {firstContract?.contractParties && (
+                                                                <div className="flex items-center gap-1 text-purple-600 dark:text-purple-400">
+                                                                    <Users className="w-4 h-4 shrink-0" />
+                                                                    <span className="text-sm font-medium truncate max-w-32">{firstContract.contractParties}</span>
+                                                                </div>
+                                                            )}
+                                                            {/* 現時租客（收合時也顯示） */}
+                                                            {(firstContract?.currentTenant?.name || firstContract?.rentOutTenants?.[0]) && (
+                                                                <div className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400">
+                                                                    <Users className="w-4 h-4 shrink-0" />
+                                                                    <span className="text-sm font-medium truncate max-w-32">
+                                                                        {firstContract.currentTenant?.name || firstContract.rentOutTenants?.[0]}
+                                                                    </span>
+                                                                </div>
+                                                            )}
                                                             {firstProperty && (
                                                                 <div className="flex items-center gap-1 text-zinc-500 dark:text-white/50">
                                                                     <MapPin className="w-4 h-4 shrink-0" />
@@ -918,77 +977,66 @@ function SubLandlordDetailModal({
                                                                             }
                                                                         }}
                                                                     >
-                                                                        <div className="flex items-start justify-between gap-4">
-                                                                            <div className="flex-1 min-w-0 space-y-2">
-                                                                                {/* 物業名稱 */}
-                                                                                {rentProperty && (
-                                                                                    <div className="flex items-center gap-2">
-                                                                                        <Building2 className="w-4 h-4 text-blue-500 shrink-0" />
-                                                                                        <span className="text-sm font-bold text-zinc-900 dark:text-white truncate">{rentProperty.name || '—'}</span>
-                                                                                        <span className="text-xs px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-500/20 text-blue-600 dark:text-blue-300 font-mono font-medium shrink-0">
-                                                                                            {rentProperty.code}
-                                                                                        </span>
-                                                                                    </div>
-                                                                                )}
-                                                                                {/* 租客名稱（現時租客） */}
-                                                                                {(() => {
-                                                                                    const lesseeName = getRentOutLesseeDisplayLabel(rent);
-                                                                                    return lesseeName ? (
-                                                                                        <div className="flex items-center gap-2">
-                                                                                            <Users className="w-4 h-4 text-purple-500 shrink-0" />
-                                                                                            <span className="text-sm text-zinc-700 dark:text-white/80 truncate">{lesseeName}</span>
-                                                                                            <span className="text-xs text-zinc-400 dark:text-white/40 shrink-0">（現時租客）</span>
-                                                                                        </div>
-                                                                                    ) : null;
-                                                                                })()}
-                                                                                {/* 地址 */}
-                                                                                {rentProperty?.address && (
-                                                                                    <div className="flex items-start gap-2">
-                                                                                        <MapPin className="w-4 h-4 text-zinc-400 dark:text-white/40 shrink-0 mt-0.5" />
-                                                                                        <span className="text-sm text-zinc-600 dark:text-white/60">{rentProperty.address}</span>
-                                                                                    </div>
-                                                                                )}
-                                                                                {/* 地段：優先顯示該合約所選地段，否則顯示物业全部地段 */}
-                                                                                {rentProperty?.lotIndex && (
-                                                                                    <div className="flex items-center gap-2">
-                                                                                        <Hash className="w-4 h-4 text-zinc-400 dark:text-white/40 shrink-0" />
-                                                                                        <span className="text-sm font-mono text-zinc-600 dark:text-white/60">
-                                                                                            {formatRentHistoryLotCellText(rentProperty.lotIndex, rent)}
-                                                                                        </span>
-                                                                                    </div>
-                                                                                )}
-                                                                                {/* 租期 + 出租金額（同一行） */}
-                                                                                {(rent.rentOutStartDate || rent.startDate || rent.rentOutEndDate || rent.endDate || rent.rentOutMonthlyRental != null || rent.amount != null) && (
-                                                                                    <div className="flex items-center gap-2">
+                                                                        <div className="space-y-2">
+                                                                            {/* 1. 物業名稱 & 編號 */}
+                                                                            {rentProperty && (
+                                                                                <div className="flex items-center gap-2">
+                                                                                    <Building2 className="w-4 h-4 text-blue-500 shrink-0" />
+                                                                                    <span className="text-sm font-bold text-zinc-900 dark:text-white truncate">{rentProperty.name || '—'}</span>
+                                                                                    <span className="text-xs px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-500/20 text-blue-600 dark:text-blue-300 font-mono font-medium shrink-0">
+                                                                                        {rentProperty.code}
+                                                                                    </span>
+                                                                                </div>
+                                                                            )}
+                                                                            {/* 2. 現時租客 */}
+                                                                            {(rent.currentTenant?.name || rent.rentOutTenants?.[0]) && (
+                                                                                <div className="flex items-center gap-2">
+                                                                                    <Users className="w-4 h-4 text-emerald-500 shrink-0" />
+                                                                                    <span className="text-sm font-medium text-zinc-700 dark:text-white/70 truncate">
+                                                                                        {rent.currentTenant?.name || rent.rentOutTenants?.[0]}
+                                                                                    </span>
+                                                                                </div>
+                                                                            )}
+                                                                            {/* 3. 地址 */}
+                                                                            {rentProperty?.address && (
+                                                                                <div className="flex items-start gap-2">
+                                                                                    <MapPin className="w-4 h-4 text-zinc-400 dark:text-white/40 shrink-0 mt-0.5" />
+                                                                                    <span className="text-[14px] text-zinc-600 dark:text-white/60 font-normal">{rentProperty.address}</span>
+                                                                                </div>
+                                                                            )}
+                                                                            {/* 4. 地段 */}
+                                                                            {rentProperty?.lotIndex && (
+                                                                                <div className="flex items-center gap-2">
+                                                                                    <Hash className="w-4 h-4 text-zinc-400 dark:text-white/40 shrink-0" />
+                                                                                    <span className="text-sm font-mono text-zinc-600 dark:text-white/60">
+                                                                                        {formatRentHistoryLotCellText(rentProperty.lotIndex, rent)}
+                                                                                    </span>
+                                                                                </div>
+                                                                            )}
+                                                                            {/* 5. 租期 + 出租金額（同一行，金額靠右） */}
+                                                                            {(rent.rentOutStartDate || rent.rentOutEndDate) && (
+                                                                                <div className="flex items-center justify-between gap-3">
+                                                                                    <div className="flex items-center gap-2 min-w-0">
                                                                                         <Calendar className="w-4 h-4 text-zinc-400 dark:text-white/40 shrink-0" />
                                                                                         <span className="text-sm text-zinc-600 dark:text-white/60">
                                                                                             {rent.rentOutStartDate
                                                                                                 ? new Date(rent.rentOutStartDate).toLocaleDateString('zh-HK')
-                                                                                                : rent.startDate
-                                                                                                ? new Date(rent.startDate).toLocaleDateString('zh-HK')
                                                                                                 : '—'}
                                                                                             {rent.rentOutEndDate
                                                                                                 ? ` — ${new Date(rent.rentOutEndDate).toLocaleDateString('zh-HK')}`
-                                                                                                : rent.endDate
-                                                                                                ? ` — ${new Date(rent.endDate).toLocaleDateString('zh-HK')}`
                                                                                                 : ''}
-                                                                                            {rent.rentOutPeriods != null && (
-                                                                                                <span className="ml-2 text-xs text-blue-500 dark:text-blue-400 font-medium">
-                                                                                                    （{rent.rentOutPeriods}期）
-                                                                                                </span>
-                                                                                            )}
                                                                                         </span>
-                                                                                        {(rent.rentOutMonthlyRental != null || rent.amount != null) && (
-                                                                                            <span className="ml-auto flex items-baseline gap-0.5 shrink-0">
-                                                                                                <span className="text-[20px] font-bold" style={{ color: 'var(--color-emerald-600)' }}>
-                                                                                                    ${new Intl.NumberFormat('zh-HK').format(rent.rentOutMonthlyRental ?? rent.amount ?? 0)}
-                                                                                                </span>
-                                                                                                <span className="text-[14px] font-light" style={{ color: 'var(--color-zinc-400)' }}>/月</span>
-                                                                                            </span>
-                                                                                        )}
                                                                                     </div>
-                                                                                )}
-                                                                            </div>
+                                                                                    {rent.rentOutMonthlyRental != null && rent.rentOutMonthlyRental > 0 && (
+                                                                                        <div className="flex items-center gap-1 shrink-0">
+                                                                                            <span className="text-[20px] font-bold text-blue-600 dark:text-blue-400 leading-none">
+                                                                                                ${rent.rentOutMonthlyRental.toLocaleString()}
+                                                                                            </span>
+                                                                                            <span className="text-[14px] text-zinc-400 dark:text-white/40 font-light">/月</span>
+                                                                                        </div>
+                                                                                    )}
+                                                                                </div>
+                                                                            )}
                                                                         </div>
                                                                     </div>
                                                                 );

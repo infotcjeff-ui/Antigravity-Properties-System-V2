@@ -90,18 +90,16 @@ export default function LesseeDetailModal({
     const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
     const hasInitializedRef = useRef(false);
 
-    // 獲取所有合約記錄
+    // 只顯示合約記錄（contract），不顯示出租合約（rent_out）的 listing
     const { data: allContractRents = [], isLoading: loadingContract } = useRentsWithRelationsQuery({ type: 'contract' });
-    const { data: allRentOutRents = [], isLoading: loadingRentOut } = useRentsWithRelationsQuery({ type: 'rent_out' });
 
-    // 找出所有與此承租人關聯的合約（同時支援 tenantId 精確匹配和名稱匹配）
+    // 找出所有與此承租人關聯的合約記錄
     const relatedContracts = useMemo(() => {
         if (!lessee.id && !lessee.name) return [];
-        const all = [...allContractRents, ...allRentOutRents];
         const seen = new Set<string>();
         const lesseeName = lessee.name.trim().toLowerCase();
 
-        return all.filter((r: any) => {
+        return allContractRents.filter((r: any) => {
             if (r.id && seen.has(r.id)) return false;
 
             // 優先精確匹配 tenantId
@@ -129,7 +127,7 @@ export default function LesseeDetailModal({
 
             return false;
         });
-    }, [allContractRents, allRentOutRents, lessee.id, lessee.name]);
+    }, [allContractRents, lessee.id, lessee.name]);
 
     // 按 tenancyNumber 分組
     const groupedContracts = useMemo(() => {
@@ -172,7 +170,7 @@ export default function LesseeDetailModal({
         });
     };
 
-    const isLoading = loadingContract || loadingRentOut;
+    const isLoading = loadingContract;
 
     const partyTypeLabel =
         lessee.type === 'individual' ? '個人' : lessee.type === 'company' ? '公司' : '—';
@@ -278,7 +276,7 @@ export default function LesseeDetailModal({
                                                     >
                                                         <div className="flex items-center gap-2.5 flex-1 min-w-0">
                                                             <FileText className="w-4 h-4 text-blue-500 shrink-0" />
-                                                            <span className="text-sm font-bold text-zinc-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors truncate">
+                                                            <span className="text-base font-bold text-zinc-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors truncate">
                                                                 {group.tenancyNumber !== '__none__' ? group.tenancyNumber : '未分類'}
                                                             </span>
                                                             {group.totalCount > 1 && (
@@ -289,7 +287,7 @@ export default function LesseeDetailModal({
                                                         </div>
                                                         <div className="flex items-center gap-2 shrink-0">
                                                             {firstProperty && (
-                                                                <span className="hidden sm:inline-flex items-center gap-1 text-xs text-zinc-500 dark:text-white/40">
+                                                                <span className="hidden sm:inline-flex items-center gap-1 text-sm text-zinc-500 dark:text-white/40">
                                                                     <MapPin className="w-3 h-3" />
                                                                     {firstProperty.name}
                                                                 </span>
