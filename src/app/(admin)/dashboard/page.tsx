@@ -803,8 +803,9 @@ export default function DashboardPage() {
                             <div className="pb-3 space-y-0.5">
                                 {(rentingTab === 'leasing' ? leasingRows : terminatedRows).slice(0, 5).map((r: any) => {
                                     const propLabel = getPropertyLabel(r);
-                                    const ownerName = r.proprietor?.name || '—';
-                                    const tenantName = r.rentCollectionTenantName || r.tenant?.name || '—';
+                                    // 交租：tenant_id = 業主、proprietor_id = 承租人（顯示時互換）
+                                    const ownerName = r.rentCollectionTenantName || r.tenant?.name || '—';
+                                    const tenantName = r.proprietor?.name || '—';
                                     const paymentDate = r.rentCollectionPaymentDate ? formatDate(r.rentCollectionPaymentDate) : '—';
                                     return (
                                         <div key={String(r.id)} className="px-5 hover:bg-rose-50/70 dark:hover:bg-rose-500/10">

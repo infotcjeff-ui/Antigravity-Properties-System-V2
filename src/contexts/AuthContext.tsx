@@ -131,21 +131,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         try {
             const { data, error } = await supabase
                 .from('app_users')
-                .select('id, username, role, display_name, avatar')
+                .select('id, username, role, display_name')
                 .order('username', { ascending: true });
 
-            if (error) throw error;
+            if (error) {
+                console.error('Fetch users error details:', JSON.stringify(error));
+                throw error;
+            }
             const users = (data || []).map(u => ({
                 id: u.id,
                 username: u.username,
                 role: u.role as UserRole,
                 displayName: u.display_name,
-                avatar: u.avatar || undefined,
             }));
             return { success: true, users };
         } catch (err: any) {
             console.error('Fetch users error:', err);
-            const errorMessage = err?.message || err?.details || err?.hint || JSON.stringify(err) || '獲取用戶失敗';
+            const errorMessage = err?.message || err?.details || err?.hint || (typeof err === 'object' && Object.keys(err).length > 0 ? JSON.stringify(err) : '無法讀取用戶列表') || '獲取用戶失敗';
             return { success: false, error: errorMessage };
         }
     }, []);
