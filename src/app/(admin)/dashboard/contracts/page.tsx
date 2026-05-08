@@ -264,29 +264,31 @@ export default function ContractsPage() {
         }, 0);
     }, [filteredByAmountDate]);
 
-    /** 計算到目前為止的月份數 */
-    const calcMonthsToNow = (startDate: Date): number => {
+    /** 計算兩個日期之間的覆蓋月份數（頭尾 inclusive，endDate 預設為今天） */
+    const calcMonthsBetween = (startDate: Date, endDate?: Date | null): number => {
         const start = new Date(startDate);
-        const now = new Date();
+        const end = endDate ? new Date(endDate) : new Date();
         const startYear = start.getFullYear();
         const startMonth = start.getMonth();
-        const nowYear = now.getFullYear();
-        const nowMonth = now.getMonth();
-        let months = (nowYear - startYear) * 12 + (nowMonth - startMonth);
-        const lastDayOfStartMonth = new Date(startYear, startMonth + 1, 0).getDate();
-        if (start.getDate() >= lastDayOfStartMonth) months += 1;
+        const endYear = end.getFullYear();
+        const endMonth = end.getMonth();
+        let months = (endYear - startYear) * 12 + (endMonth - startMonth) + 1;
         return Math.max(0, months);
     };
 
-    /** 已收到金額：合約開始日至目前的月份數 × 月租（租賃/出租均適用） */
+    /** 已收到金額：合約開始日至 amountDateEnd（或今天）的月份數 × 月租，上限為合約期滿月數 */
     const totalReceivedAmount = useMemo(() => {
         return filteredByAmountDate.reduce((sum, c) => {
             const monthly = Number(c.rentOutMonthlyRental) || 0;
             if (!c.rentOutStartDate) return sum;
-            const months = calcMonthsToNow(new Date(c.rentOutStartDate));
+            const contractMonths = c.rentOutStartDate && c.rentOutEndDate
+                ? calcFullMonths(new Date(c.rentOutStartDate), new Date(c.rentOutEndDate))
+                : Infinity;
+            const monthsToFilter = calcMonthsBetween(new Date(c.rentOutStartDate), amountDateEnd ? new Date(amountDateEnd) : null);
+            const months = Math.min(monthsToFilter, contractMonths);
             return sum + monthly * months;
         }, 0);
-    }, [filteredByAmountDate]);
+    }, [filteredByAmountDate, amountDateEnd]);
 
     /** 按金：租賃合約顯示已付按金，出租合約顯示已收按金 */
     const totalDeposit = useMemo(() => {
@@ -426,8 +428,8 @@ export default function ContractsPage() {
                                         <DollarSign className={`w-4 h-4 ${isLeaseInTab ? 'text-violet-600' : 'text-amber-600'}`} />
                                     </div>
                                     <div>
-                                        <p className={`text-sm font-semibold tracking-wide ${isLeaseInTab ? 'text-violet-700' : 'text-amber-700'}`}>{isLeaseInTab ? '租賃合計' : '出租合計'}</p>
-                                        <p className={`text-xs mt-0.5 ${isLeaseInTab ? 'text-violet-500/70' : 'text-amber-600/70'}`}>已收 / 合計</p>
+                                        <p className={`text-base font-bold tracking-wide ${isLeaseInTab ? 'text-violet-700' : 'text-amber-700'}`}>{isLeaseInTab ? '租賃合計' : '出租合計'}</p>
+                                        <p className={`text-sm mt-0.5 ${isLeaseInTab ? 'text-violet-500/70' : 'text-amber-600/70'}`}>已收租金 / 合約總租金</p>
                                     </div>
                                 </div>
                                 {/* 按金：compact badge 在 header */}
@@ -441,34 +443,63 @@ export default function ContractsPage() {
                                 </div>
                             </div>
 
-                            <div className="flex-1 flex flex-col justify-center gap-1">
-                                <div className="flex items-baseline gap-2">
-                                    <span className={`text-2xl font-black tabular-nums leading-none drop-shadow-lg ${isLeaseInTab ? 'text-violet-600' : 'text-amber-600'}`}>
-                                        $
-                                    </span>
-                                    <span className={`text-4xl font-black tabular-nums leading-none tracking-tight drop-shadow-lg ${isLeaseInTab ? 'text-violet-800' : 'text-amber-800'}`}>
-                                        {totalReceivedAmount.toLocaleString()}
-                                    </span>
-                                    <span className={`text-sm font-medium ${isLeaseInTab ? 'text-violet-500/70' : 'text-amber-600/70'}`}>
-                                        /
-                                    </span>
-                                    <span className={`text-xl font-bold tabular-nums leading-none ${isLeaseInTab ? 'text-violet-500' : 'text-amber-500'}`}>
-                                        ${totalMonthlyAmount.toLocaleString()}
-                                    </span>
+                            <div className="flex-1 flex items-center gap-4">
+                                {/* 已收金額 */}
+                                <div className="flex items-center gap-2">
+                                    <div className="flex flex-col">
+                                        <div className="flex items-center gap-1.5 mb-1">
+                                            <span className={`text-sm font-bold uppercase tracking-widest px-1.5 py-0.5 rounded-sm ${isLeaseInTab ? 'bg-violet-500/15 text-violet-600' : 'bg-amber-500/15 text-amber-600'}`}>
+                                                已收
+                                            </span>
+                                        </div>
+                                        <div className="flex items-baseline gap-0.5">
+                                            <span className={`text-2xl font-black tabular-nums leading-none ${isLeaseInTab ? 'text-violet-800' : 'text-amber-800'}`}>$</span>
+                                            <span className={`text-[2.1rem] font-black tabular-nums leading-none tracking-tight ${isLeaseInTab ? 'text-violet-800' : 'text-amber-800'}`}>
+                                                {totalReceivedAmount.toLocaleString()}
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className={`w-px h-12 self-center shrink-0 ${isLeaseInTab ? 'bg-violet-300/40' : 'bg-amber-300/40'}`} />
+
+                                {/* 合計金額 */}
+                                <div className="flex flex-col">
+                                        <div className="flex items-center gap-1.5 mb-1">
+                                            <span className={`text-sm font-bold uppercase tracking-widest px-1.5 py-0.5 rounded-sm ${isLeaseInTab ? 'bg-violet-100 text-violet-500 dark:bg-violet-500/15 dark:text-violet-400/70' : 'bg-amber-100 text-amber-500 dark:bg-amber-500/15 dark:text-amber-400/70'}`}>
+                                                總數
+                                            </span>
+                                        </div>
+                                    <div className="flex items-baseline gap-0.5">
+                                        <span className={`text-base font-bold tabular-nums leading-none ${isLeaseInTab ? 'text-violet-500/70' : 'text-amber-500/70'}`}>$</span>
+                                        <span className={`text-xl font-bold tabular-nums leading-none ${isLeaseInTab ? 'text-violet-500/70' : 'text-amber-500/70'}`}>
+                                            {totalMonthlyAmount.toLocaleString()}
+                                        </span>
+                                    </div>
                                 </div>
                             </div>
 
                             {/* 日期篩選 */}
-                            <div className={`flex items-center gap-1 mt-3 backdrop-blur-md border rounded-lg px-3 py-2 ${
-                                isLeaseInTab ? 'bg-violet-500/10 border-violet-300/30' : 'bg-amber-500/10 border-amber-300/30'
-                            }`}>
+                            <div className="flex items-center gap-2 mt-3">
                                 <Calendar className={`w-4 h-4 shrink-0 ${isLeaseInTab ? 'text-violet-700' : 'text-amber-700'}`} />
-                                <input type="date" value={amountDateStart} onChange={(e) => setAmountDateStart(e.target.value)} max={amountDateEnd || undefined} className={`bg-transparent text-xs focus:outline-none cursor-pointer w-24 ${isLeaseInTab ? 'text-violet-700 dark:text-violet-300' : 'text-amber-700 dark:text-amber-300'}`} />
-                                <span className={`text-xs shrink-0 ${isLeaseInTab ? 'text-violet-400/60' : 'text-amber-500/60'}`}>—</span>
-                                <input type="date" value={amountDateEnd} onChange={(e) => setAmountDateEnd(e.target.value)} min={amountDateStart || undefined} className={`bg-transparent text-xs focus:outline-none cursor-pointer w-24 ${isLeaseInTab ? 'text-violet-700 dark:text-violet-300' : 'text-amber-700 dark:text-amber-300'}`} />
+                                <input
+                                    type="date"
+                                    value={amountDateStart}
+                                    onChange={(e) => setAmountDateStart(e.target.value)}
+                                    max={amountDateEnd || undefined}
+                                    className={`flex-1 px-3 py-1.5 text-sm bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-white/15 rounded-lg focus:outline-none focus:ring-2 cursor-pointer ${isLeaseInTab ? 'text-violet-700 dark:text-violet-300 focus:ring-violet-400/40' : 'text-amber-700 dark:text-amber-300 focus:ring-amber-400/40'}`}
+                                />
+                                <span className={`text-sm shrink-0 font-medium ${isLeaseInTab ? 'text-violet-600 dark:text-violet-400' : 'text-amber-600 dark:text-amber-400'}`}>至</span>
+                                <input
+                                    type="date"
+                                    value={amountDateEnd}
+                                    onChange={(e) => setAmountDateEnd(e.target.value)}
+                                    min={amountDateStart || undefined}
+                                    className={`flex-1 px-3 py-1.5 text-sm bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-white/15 rounded-lg focus:outline-none focus:ring-2 cursor-pointer ${isLeaseInTab ? 'text-violet-700 dark:text-violet-300 focus:ring-violet-400/40' : 'text-amber-700 dark:text-amber-300 focus:ring-amber-400/40'}`}
+                                />
                                 {(amountDateStart || amountDateEnd) && (
-                                    <button onClick={() => { setAmountDateStart(''); setAmountDateEnd(''); }} className={`p-0.5 rounded transition-all ${isLeaseInTab ? 'text-violet-400/70 hover:text-violet-700 hover:bg-violet-500/10' : 'text-amber-500/70 hover:text-amber-700 hover:bg-amber-500/10'}`}>
-                                        <X className="w-3.5 h-3.5" />
+                                    <button onClick={() => { setAmountDateStart(''); setAmountDateEnd(''); }} className={`p-1 rounded transition-all ${isLeaseInTab ? 'text-violet-400 hover:text-violet-700 hover:bg-violet-50 dark:hover:bg-violet-500/10' : 'text-amber-400 hover:text-amber-700 hover:bg-amber-50 dark:hover:bg-amber-500/10'}`}>
+                                        <X className="w-4 h-4" />
                                     </button>
                                 )}
                             </div>
@@ -702,7 +733,7 @@ export default function ContractsPage() {
                                                     className="flex-1 min-w-0 px-3 py-2.5 text-sm bg-zinc-50 dark:bg-white/5 border border-zinc-200 dark:border-white/10 rounded-xl text-zinc-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-amber-500/30 cursor-pointer"
                                                     placeholder="開始"
                                                 />
-                                                <span className="text-zinc-400 dark:text-white/30 text-xs shrink-0">~</span>
+                                                <span className="text-zinc-400 dark:text-white/30 text-xs shrink-0">至</span>
                                                 <input
                                                     type="date"
                                                     value={filterDateEnd}
@@ -838,7 +869,7 @@ export default function ContractsPage() {
                                                     className="flex-1 min-w-0 px-3 py-2.5 text-sm bg-zinc-50 dark:bg-white/5 border border-zinc-200 dark:border-white/10 rounded-xl text-zinc-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-amber-500/30 cursor-pointer"
                                                     placeholder="開始"
                                                 />
-                                                <span className="text-zinc-400 dark:text-white/30 text-xs shrink-0">~</span>
+                                                <span className="text-zinc-400 dark:text-white/30 text-xs shrink-0">至</span>
                                                 <input
                                                     type="date"
                                                     value={filterDateEnd}
