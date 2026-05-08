@@ -429,7 +429,7 @@ export default function ContractsPage() {
                                     </div>
                                     <div>
                                         <p className={`text-base font-bold tracking-wide ${isLeaseInTab ? 'text-violet-700' : 'text-amber-700'}`}>{isLeaseInTab ? '租賃合計' : '出租合計'}</p>
-                                        <p className={`text-sm mt-0.5 ${isLeaseInTab ? 'text-violet-500/70' : 'text-amber-600/70'}`}>已收租金 / 合約總租金</p>
+                                        <p className={`text-sm mt-0.5 ${isLeaseInTab ? 'text-violet-500/70' : 'text-amber-600/70'}`}>{isLeaseInTab ? '已付租金 / 合約總租金' : '已收租金 / 合約總租金'}</p>
                                     </div>
                                 </div>
                                 {/* 按金：compact badge 在 header */}
@@ -444,12 +444,12 @@ export default function ContractsPage() {
                             </div>
 
                             <div className="flex-1 flex items-center gap-4">
-                                {/* 已收金額 */}
+                                {/* 已付/已收金額 */}
                                 <div className="flex items-center gap-2">
                                     <div className="flex flex-col">
                                         <div className="flex items-center gap-1.5 mb-1">
                                             <span className={`text-sm font-bold uppercase tracking-widest px-1.5 py-0.5 rounded-sm ${isLeaseInTab ? 'bg-violet-500/15 text-violet-600' : 'bg-amber-500/15 text-amber-600'}`}>
-                                                已收
+                                                {isLeaseInTab ? '已付' : '已收'}
                                             </span>
                                         </div>
                                         <div className="flex items-baseline gap-0.5">
