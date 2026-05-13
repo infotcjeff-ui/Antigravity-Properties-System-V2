@@ -364,12 +364,10 @@ export default function LesseeDetailModal({
                                                                                         <span className="flex items-center gap-1 text-sm text-zinc-400 dark:text-white/30">
                                                                                             <Calendar className="w-3 h-3 shrink-0" />
                                                                                             {formatDate(startDate)}
-                                                                                            {endDate && ` — ${formatDate(endDate)}`}
-                                                                                            {startDate && endDate && (
-                                                                                                <span className="ml-1 text-xs bg-zinc-100 dark:bg-white/10 px-1.5 py-0.5 rounded-md">
-                                                                                                    {formatDuration(calcFullMonths(new Date(startDate), new Date(endDate)))}
-                                                                                                </span>
-                                                                                            )}
+                                                                                            {endDate ? ` — ${formatDate(endDate)}` : ' — 現在'}
+                                                                                            <span className="ml-1 text-xs bg-zinc-100 dark:bg-white/10 px-1.5 py-0.5 rounded-md">
+                                                                                                {formatDuration(calcFullMonths(new Date(startDate), endDate ? new Date(endDate) : new Date()))}
+                                                                                            </span>
                                                                                         </span>
                                                                                     )}
                                                                                     {deposit > 0 && (

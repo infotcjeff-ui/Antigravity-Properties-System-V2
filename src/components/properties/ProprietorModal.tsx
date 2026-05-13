@@ -32,6 +32,7 @@ export default function ProprietorModal({ onClose, onSuccess, mode = 'proprietor
     const [error, setError] = useState('');
     const [existingTenants, setExistingTenants] = useState<Proprietor[]>([]);
     const [showTenantList, setShowTenantList] = useState(false);
+    const [revealIdNumber, setRevealIdNumber] = useState(false);
     const tenantInputRef = useRef<HTMLInputElement>(null);
 
     const [formData, setFormData] = useState({
@@ -42,6 +43,7 @@ export default function ProprietorModal({ onClose, onSuccess, mode = 'proprietor
         englishName: initialData?.englishName || '',
         shortName: initialData?.shortName || '',
         brNumber: initialData?.brNumber ?? (initialData as any)?.description ?? '',
+        idNumber: (initialData as any)?.idNumber ?? '',
     });
 
     // 業主代碼/承租人編號: 業主用propertyCode或自動產生；承租人用placeholder不預填
@@ -149,6 +151,7 @@ export default function ProprietorModal({ onClose, onSuccess, mode = 'proprietor
                         englishName: formData.englishName,
                         shortName: formData.shortName,
                         brNumber: formData.brNumber,
+                        idNumber: formData.idNumber,
                     });
                 } else {
                     setError('更新失敗');
@@ -166,6 +169,7 @@ export default function ProprietorModal({ onClose, onSuccess, mode = 'proprietor
                         type: formData.type,
                         category: formData.category,
                         brNumber: formData.brNumber,
+                        idNumber: formData.idNumber,
                     } as Partial<Proprietor>);
                 } else {
                     setError('創建失敗');
@@ -305,6 +309,23 @@ export default function ProprietorModal({ onClose, onSuccess, mode = 'proprietor
                                                     <p className="text-sm font-medium text-zinc-900 dark:text-white whitespace-pre-wrap wrap-break-word">
                                                         {formData.brNumber}
                                                     </p>
+                                                </div>
+                                            ) : null}
+                                            {formData.idNumber ? (
+                                                <div className="p-3 bg-zinc-50 dark:bg-white/5 rounded-xl border border-zinc-100 dark:border-white/5">
+                                                    <p className="text-xs text-zinc-500 dark:text-white/50 mb-1">ID Number</p>
+                                                    <div className="flex items-center gap-2">
+                                                        <p className="text-sm font-medium text-zinc-900 dark:text-white font-mono">
+                                                            {revealIdNumber ? formData.idNumber : formData.idNumber.replace(/./g, '*')}
+                                                        </p>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setRevealIdNumber(r => !r)}
+                                                            className="text-xs text-purple-500 hover:text-purple-600 dark:text-purple-400 dark:hover:text-purple-300 font-medium transition-colors"
+                                                        >
+                                                            {revealIdNumber ? '隱藏' : '顯示'}
+                                                        </button>
+                                                    </div>
                                                 </div>
                                             ) : null}
                                             <div className="p-3 bg-zinc-50 dark:bg-white/5 rounded-xl border border-zinc-100 dark:border-white/5 md:col-span-2">
@@ -498,6 +519,21 @@ export default function ProprietorModal({ onClose, onSuccess, mode = 'proprietor
                                     />
                                 </div>
                             </div>
+                            {formData.category === 'private_individual' && (
+                                <div className="space-y-2">
+                                    <label className="block text-sm font-medium text-zinc-700 dark:text-white/80">
+                                        ID Number
+                                    </label>
+                                    <input
+                                        type="text"
+                                        name="idNumber"
+                                        value={formData.idNumber}
+                                        onChange={handleChange}
+                                        className="w-full px-4 py-3 bg-zinc-50 dark:bg-white/5 border border-zinc-200 dark:border-white/10 rounded-xl text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-purple-500/50 transition-all"
+                                        placeholder="請輸入身份證號碼"
+                                    />
+                                </div>
+                            )}
                         </>
                     )}
 

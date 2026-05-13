@@ -75,7 +75,9 @@ function stripLotNewOldPrefixes(text: string): string {
 
 
 /**
- * 租務列表「租借位置」欄：優先顯示記錄所選地段，否則顯示該物業之地段。
+ * 租務列表「租借位置」欄：優先顯示記錄所選地段。
+ * - rent_out：若記錄無地段（合約亦未選地段），顯示「暂无可用地段」而非整個 lotIndex。
+ * - 合約記錄：若記錄無地段，顯示該物業之地段。
  * 若記錄所選地段為「部分地方」，則在該地段後附加「（部分地方）」標示。
  */
 function formatRentListLotCell(
@@ -94,15 +96,15 @@ function formatRentListLotCell(
 
     let rentLots: string[] = [];
     if (Array.isArray(raw) && raw.length) {
-        rentLots = raw.map((x) => stripLotNewOldPrefixes(String(x))).filter(Boolean);
+        rentLots = raw.map((x) => stripLotNewOldPrefixes(String(x))).filter(Boolean).filter(v => !String(v).startsWith('__other_custom__:') && !String(v).startsWith('其他：'));
     } else if (typeof raw === 'string' && raw.trim()) {
         try {
             const p = JSON.parse(raw);
             if (Array.isArray(p)) {
-                rentLots = p.map((x: unknown) => stripLotNewOldPrefixes(String(x))).filter(Boolean);
+                rentLots = p.map((x: unknown) => stripLotNewOldPrefixes(String(x))).filter(Boolean).filter(v => !String(v).startsWith('__other_custom__:') && !String(v).startsWith('其他：'));
             }
         } catch {
-            rentLots = raw.split(',').map(s => stripLotNewOldPrefixes(s.trim())).filter(Boolean);
+            rentLots = raw.split(',').map(s => stripLotNewOldPrefixes(s.trim())).filter(Boolean).filter(v => !String(v).startsWith('__other_custom__:') && !String(v).startsWith('其他：'));
         }
     }
 
@@ -122,6 +124,10 @@ function formatRentListLotCell(
                 ))}
             </>
         );
+    }
+
+    if (r.type === 'rent_out') {
+        return '暫無';
     }
 
     const li = stripLotNewOldPrefixes((propertyLotIndex || '').trim());
@@ -148,24 +154,25 @@ function LotCellWithTooltip({
 
     const rentLots: string[] = (() => {
         if (Array.isArray(raw) && raw.length) {
-            return raw.map(x => stripLotNewOldPrefixes(String(x))).filter(Boolean);
+            return raw.map(x => stripLotNewOldPrefixes(String(x))).filter(Boolean).filter(v => !String(v).startsWith('__other_custom__:') && !String(v).startsWith('其他：'));
         }
         if (typeof raw === 'string' && raw.trim()) {
             try {
                 const p = JSON.parse(raw);
-                if (Array.isArray(p)) return p.map((x: unknown) => stripLotNewOldPrefixes(String(x))).filter(Boolean);
+                if (Array.isArray(p)) return p.map((x: unknown) => stripLotNewOldPrefixes(String(x))).filter(Boolean).filter(v => !String(v).startsWith('__other_custom__:') && !String(v).startsWith('其他：'));
             } catch {
-                return raw.split(',').map(s => stripLotNewOldPrefixes(s.trim())).filter(Boolean);
+                return raw.split(',').map(s => stripLotNewOldPrefixes(s.trim())).filter(Boolean).filter(v => !String(v).startsWith('__other_custom__:') && !String(v).startsWith('其他：'));
             }
         }
         return [];
     })();
 
     const display = formatRentListLotCell(rent, propertyLotIndex);
+    const isNoLotPlaceholder = display === '暫無' || display === '暂无可用地段' || display === '—';
 
     if (!rentLots.length) {
         return (
-            <div className="text-zinc-700 dark:text-white/80 text-sm leading-relaxed line-clamp-2">
+            <div className={`text-sm leading-relaxed line-clamp-2 ${isNoLotPlaceholder ? 'text-zinc-400 dark:text-white/40 italic' : 'text-zinc-700 dark:text-white/80'}`}>
                 {display}
             </div>
         );
@@ -206,19 +213,25 @@ function LotCellWithTooltip({
     );
 
     return (
-        <div className="text-zinc-700 dark:text-white/80 text-sm leading-relaxed line-clamp-2 overflow-hidden group">
-            <Tooltip
-                content={tooltipContent}
-                placement="top"
-                classNames={{
-                    content: 'bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white p-3 rounded-xl shadow-xl border border-zinc-200 dark:border-white/10 max-w-xs',
-                }}
-            >
-                <span className="cursor-default hover:underline decoration-dashed decoration-zinc-400/50 underline-offset-2">
+        <div className="text-sm leading-relaxed line-clamp-2 overflow-hidden group">
+            {isNoLotPlaceholder ? (
+                <span className="text-zinc-400 dark:text-white/40 italic">
                     {display}
-                    <Info className="inline-block ml-1 w-3 h-3 text-zinc-400 dark:text-white/40 align-middle opacity-0 group-hover:opacity-100 transition-opacity" />
                 </span>
-            </Tooltip>
+            ) : (
+                <Tooltip
+                    content={tooltipContent}
+                    placement="top"
+                    classNames={{
+                        content: 'bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white p-3 rounded-xl shadow-xl border border-zinc-200 dark:border-white/10 max-w-xs',
+                    }}
+                >
+                    <span className="cursor-default hover:underline decoration-dashed decoration-zinc-400/50 underline-offset-2 text-zinc-700 dark:text-white/80">
+                        {display}
+                        <Info className="inline-block ml-1 w-3 h-3 text-zinc-400 dark:text-white/40 align-middle opacity-0 group-hover:opacity-100 transition-opacity" />
+                    </span>
+                </Tooltip>
+            )}
         </div>
     );
 }
@@ -314,6 +327,8 @@ const landUseTypes = [
     { value: 'os', label: 'OS 露天貯物' },
     { value: 'v', label: 'V 鄉村式發展' },
     { value: 'ou', label: 'OU 其他指定用途' },
+    { value: 'r_d', label: 'R(D) 住宅(丁類)' },
+    { value: 'r_a5', label: 'R(A)5 住宅(甲類)5' },
 ];
 
 export default function PropertyForm({ property, onClose, onSuccess }: PropertyFormProps) {
@@ -501,12 +516,12 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
         return `${years}年${months}個月`;
     };
 
-    /** 租期顯示：DD/MM/YYYY 日月年格式，單行顯示 */
+    /** 租期顯示：DD/MM/YYYY 日月年格式，單行顯示；無結束日期時顯示「現在」 */
     const formatLeasePeriod = (start: Date | null, end: Date | null, months: number): string => {
         const pad = (n: number) => String(n).padStart(2, '0');
         const fmt = (d: Date) => `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()}`;
         const startStr = start ? fmt(start) : '—';
-        const endStr = end ? fmt(end) : '—';
+        const endStr = end ? fmt(end) : '現在';
         const periodStr = formatMonthsToYearMonth(months);
         return periodStr !== '—'
             ? `${startStr} ~ ${endStr} (${periodStr})`

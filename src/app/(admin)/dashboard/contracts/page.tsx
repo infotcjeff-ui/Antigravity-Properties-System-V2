@@ -1068,7 +1068,7 @@ export default function ContractsPage() {
                                                 ) : (
                                                     <>
                                                         <td className="p-3 text-zinc-600 dark:text-white/70 text-sm max-w-28">
-                                                            <div className="truncate" title={subLandlordName || '-'}>{subLandlordName || <span className="text-zinc-300 dark:text-white/20">—</span>}</div>
+                                                            <div className="truncate" title={subLandlordName || '無'}>{subLandlordName || '無'}</div>
                                                         </td>
                                                         <td className="p-3 text-zinc-600 dark:text-white/70 text-sm max-w-28">
                                                             <div className="truncate" title={lesseeName || '-'}>{lesseeName || <span className="text-zinc-300 dark:text-white/20">—</span>}</div>
@@ -1089,11 +1089,11 @@ export default function ContractsPage() {
                                                 <td className="p-3 text-zinc-500 dark:text-white/50 text-sm leading-relaxed">
                                                     <div className="whitespace-nowrap">{startDate ? new Date(startDate).toLocaleDateString() : '-'}</div>
                                                     <div className="whitespace-nowrap">
-                                                        ~ {endDate ? new Date(endDate).toLocaleDateString() : '-'}
-                                                        {startDate && endDate
+                                                        ~ {endDate ? new Date(endDate).toLocaleDateString() : '現在'}
+                                                        {startDate
                                                             ? ` (${
                                                                   (() => {
-                                                                      const m = calcFullMonths(new Date(startDate), new Date(endDate));
+                                                                      const m = calcFullMonths(new Date(startDate), endDate ? new Date(endDate) : new Date());
                                                                       return formatDuration(m);
                                                                   })()
                                                               })`
@@ -1277,8 +1277,8 @@ export default function ContractsPage() {
                                                 ) : (
                                                     <>
                                                         <p className="text-xs text-zinc-500 dark:text-white/50 mt-2">二房東</p>
-                                                        <p className="text-sm font-medium text-zinc-800 dark:text-white/90 truncate" title={subLandlordName || '—'}>
-                                                            {subLandlordName || <span className="text-zinc-300 dark:text-white/20">—</span>}
+                                                        <p className="text-sm font-medium text-zinc-800 dark:text-white/90 truncate" title={subLandlordName || '無'}>
+                                                            {subLandlordName || '無'}
                                                         </p>
                                                         <p className="text-xs text-zinc-500 dark:text-white/50 mt-2">現時租客</p>
                                                         <p className="text-sm font-medium text-zinc-800 dark:text-white/90 truncate" title={lesseeName || '—'}>
@@ -1305,11 +1305,11 @@ export default function ContractsPage() {
                                         <div className="text-sm text-zinc-500 dark:text-white/50 leading-relaxed">
                                             <div>{startDate ? new Date(startDate).toLocaleDateString() : '-'}</div>
                                             <div>
-                                                ~ {endDate ? new Date(endDate).toLocaleDateString() : '-'}
-                                                {startDate && endDate
+                                                ~ {endDate ? new Date(endDate).toLocaleDateString() : '現在'}
+                                                {startDate
                                                     ? ` (${
                                                           (() => {
-                                                              const m = calcFullMonths(new Date(startDate), new Date(endDate));
+                                                              const m = calcFullMonths(new Date(startDate), endDate ? new Date(endDate) : new Date());
                                                               return formatDuration(m);
                                                           })()
                                                       })`
@@ -1357,7 +1357,7 @@ export default function ContractsPage() {
                                                     );
                                                 })()
                                             ) : (
-                                                <span className="text-zinc-300 dark:text-white/20">—</span>
+                                                <span className="text-zinc-400 dark:text-white/50">現在</span>
                                             )}
                                         </div>
                                         <p className="text-sm text-zinc-500 dark:text-white/50">

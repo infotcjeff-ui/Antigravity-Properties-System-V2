@@ -10,8 +10,10 @@ import PropertyForm from '@/components/properties/PropertyForm';
 import { Building2, Plus, Search, Pencil, Trash2, Eye, CheckSquare, Square, UserPlus, X } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import AnimatedSelect from '@/components/ui/AnimatedSelect';
-import { formatLotArea, formatLotIndexPlainJoined } from '@/lib/formatters';
+import { formatLotArea, formatLotIndexPlainJoined, parseLotEntries } from '@/lib/formatters';
 import { useLanguage } from '@/components/common/LanguageSwitcher';
+import { Tooltip } from '@heroui/react';
+import { Info } from 'lucide-react';
 
 const statusColors: Record<string, string> = {
     holding: 'bg-emerald-600 dark:bg-emerald-500/80 text-white',
@@ -177,6 +179,17 @@ export default function ManagePropertiesPage() {
                     <h1 className="text-2xl font-bold text-zinc-900 dark:text-white">物業概覽</h1>
                     <p className="text-zinc-500 dark:text-white/50 mt-1">管理所有物業資產</p>
                 </div>
+                {currentUser && (
+                    <motion.button
+                        whileHover={{ scale: 1.02 }}
+                        whileTap={{ scale: 0.98 }}
+                        onClick={() => setShowForm(true)}
+                        className="px-5 py-2.5 bg-gradient-to-r from-purple-600 to-blue-600 rounded-xl text-white font-medium shadow-lg shadow-purple-500/20 hover:shadow-purple-500/30 transition-shadow flex items-center gap-2"
+                    >
+                        <Plus className="w-5 h-5" />
+                        新增物業
+                    </motion.button>
+                )}
             </div>
 
             {/* Search & Filters */}
@@ -233,6 +246,8 @@ export default function ManagePropertiesPage() {
                     <option value="conservation_area">保育區</option>
                     <option value="residential_c">住宅(丙類)</option>
                     <option value="recreation_use">休憩用地</option>
+                    <option value="r_d">R(D) 住宅(丁類)</option>
+                    <option value="r_a5">R(A)5 住宅(甲類)5</option>
                 </select>
             </div>
 
@@ -330,11 +345,57 @@ export default function ManagePropertiesPage() {
                                                     </div>
                                                 </div>
                                             </td>
-                                            <td className="p-4">
+                                            <td className="p-4 max-w-[220px] align-top">
                                                 {(() => {
                                                     const text = formatLotIndexPlainJoined(property.lotIndex);
                                                     if (!text) return <span className="text-zinc-600 dark:text-white/70 text-sm">-</span>;
-                                                    return <span className="text-zinc-600 dark:text-white/70 text-sm">{text}</span>;
+                                                    const entries = parseLotEntries(property.lotIndex);
+                                                    const newLots = entries.filter(e => e.type === 'new').map(e => e.value);
+                                                    const oldLots = entries.filter(e => e.type === 'old').map(e => e.value);
+                                                    const tooltipContent = (
+                                                            <div className="space-y-2 text-sm">
+                                                                <div className="text-xs font-semibold text-zinc-500 dark:text-white/60 uppercase tracking-wider border-b border-zinc-100 dark:border-white/10 pb-1.5">
+                                                                    地段詳情
+                                                                </div>
+                                                                {newLots.length > 0 && (
+                                                                    <div>
+                                                                        <div className="text-xs text-emerald-600 dark:text-emerald-400 font-medium mb-1">新:</div>
+                                                                        <div className="space-y-1">
+                                                                            {newLots.map((lot, i) => (
+                                                                                <div key={i} className="text-sm text-zinc-800 dark:text-white font-medium">{lot}</div>
+                                                                            ))}
+                                                                        </div>
+                                                                    </div>
+                                                                )}
+                                                                {oldLots.length > 0 && (
+                                                                    <div>
+                                                                        <div className="text-xs text-amber-600 dark:text-amber-400 font-medium mb-1">舊:</div>
+                                                                        <div className="space-y-1">
+                                                                            {oldLots.map((lot, i) => (
+                                                                                <div key={i} className="text-sm text-zinc-800 dark:text-white font-medium">{lot}</div>
+                                                                            ))}
+                                                                        </div>
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                    );
+                                                    return (
+                                                        <Tooltip
+                                                            content={tooltipContent}
+                                                            placement="top"
+                                                            classNames={{
+                                                                content: 'bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white p-3 rounded-xl shadow-xl border border-zinc-200 dark:border-white/10 max-w-xs',
+                                                            }}
+                                                        >
+                                                            <span
+                                                                className="cursor-default group flex items-start gap-1 text-zinc-600 dark:text-white/70 text-sm line-clamp-2 overflow-hidden w-full"
+                                                                style={{ display: '-webkit-box', WebkitBoxOrient: 'vertical' }}
+                                                            >
+                                                                {text}
+                                                                <Info className="w-3 h-3 text-zinc-400 dark:text-white/40 align-middle shrink-0 mt-0.5 opacity-0 group-hover:opacity-100 transition-opacity" />
+                                                            </span>
+                                                        </Tooltip>
+                                                    );
                                                 })()}
                                             </td>
                                             <td className="p-4 text-zinc-600 dark:text-white/70 text-sm">{formatLotArea(property.lotArea)}</td>

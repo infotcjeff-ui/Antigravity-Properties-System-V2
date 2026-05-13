@@ -797,6 +797,7 @@ export default function PropertyDetailsPage() {
                                                         ? rentOutLesseeLabel || otherParty?.name || '-'
                                                         : null;
                                                 const rentLotRowText = formatRentHistoryLotCellText(property.lotIndex, rent);
+                                                const displayLotText = rentLotRowText || (rent.type === 'rent_out' ? '暫無' : '-');
                                                 return (
                                                     <div
                                                         key={rent.id}
@@ -824,9 +825,9 @@ export default function PropertyDetailsPage() {
                                                             </div>
                                                             <div
                                                                 className="text-zinc-900 dark:text-white font-bold text-sm mt-1 min-w-0 max-w-full truncate"
-                                                                title={rentLotRowText || undefined}
+                                                                title={displayLotText || undefined}
                                                             >
-                                                                {rentLotRowText || '-'}
+                                                                {displayLotText}
                                                             </div>
                                                         </div>
                                                         {isRentingTab ? (

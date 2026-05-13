@@ -48,6 +48,8 @@ export interface Proprietor {
   shortName: string; // Proprietor Short Name / 業主簡稱
   /** BR Number / 商業登記號碼（對應資料庫 br_number） */
   brNumber?: string;
+  /** ID Number / 身份證號碼（個人類別用） */
+  idNumber?: string;
   createdBy?: string; // UUID of the user who created this record
   createdAt: Date;
   updatedAt: Date;
@@ -92,6 +94,8 @@ export interface Rent {
   /** 按金「收據」對應之付款方式（與收／交租付款方式選項一致） */
   rentOutDepositPaymentMethod?: RentCollectionPaymentMethod;
   rentOutDepositReceiptNumber?: string; // 按金收據號碼（非支票時）
+  /** 按金支票收據號碼 */
+  rentOutDepositChequeReceiptNumber?: string | null;
   rentOutDepositChequeBank?: string;
   rentOutDepositChequeNumber?: string;
   /** 支票影像或 FPS 轉帳證明（base64 data URL） */

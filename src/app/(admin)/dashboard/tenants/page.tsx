@@ -1005,14 +1005,18 @@ function SubLandlordDetailModal({
                                                                                 </div>
                                                                             )}
                                                                             {/* 4. 地段 */}
-                                                                            {rentProperty?.lotIndex && (
-                                                                                <div className="flex items-center gap-2">
-                                                                                    <Hash className="w-4 h-4 text-zinc-400 dark:text-white/40 shrink-0" />
-                                                                                    <span className="text-sm font-mono text-zinc-600 dark:text-white/60">
-                                                                                        {formatRentHistoryLotCellText(rentProperty.lotIndex, rent)}
-                                                                                    </span>
-                                                                                </div>
-                                                                            )}
+                                                                            {rentProperty?.lotIndex && (() => {
+                                                                                const lotText = formatRentHistoryLotCellText(rentProperty.lotIndex, rent);
+                                                                                const displayLotText = lotText || (rent.type === 'rent_out' ? '暫無' : null);
+                                                                                return displayLotText ? (
+                                                                                    <div className="flex items-center gap-2">
+                                                                                        <Hash className="w-4 h-4 text-zinc-400 dark:text-white/40 shrink-0" />
+                                                                                        <span className="text-sm font-mono text-zinc-600 dark:text-white/60">
+                                                                                            {displayLotText}
+                                                                                        </span>
+                                                                                    </div>
+                                                                                ) : null;
+                                                                            })()}
                                                                             {/* 5. 租期 + 出租金額（同一行，金額靠右） */}
                                                                             {(rent.rentOutStartDate || rent.rentOutEndDate) && (
                                                                                 <div className="flex items-center justify-between gap-3">

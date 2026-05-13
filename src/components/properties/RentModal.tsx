@@ -20,7 +20,7 @@ import { RENT_OUT_CONTRACT_STATUS_OPTIONS, getRentOutOrContractListNumber } from
 import ProprietorModal from '@/components/properties/ProprietorModal';
 import RentOutFormModal from '@/components/properties/RentOutFormModal';
 import CurrentTenantDetailModal from '@/components/properties/CurrentTenantDetailModal';
-import { dedupeRecordsByDisplayName, formatNumberWithCommas, parsePriceInput, parsePropertyLotSegments } from '@/lib/formatters';
+import { dedupeRecordsByDisplayName, formatNumberWithCommas, parsePriceInput, parsePropertyLotSegments, parseLotEntries } from '@/lib/formatters';
 import AnimatedMultiSelect from '@/components/ui/AnimatedMultiSelect';
 import dynamic from 'next/dynamic';
 import 'react-quill-new/dist/quill.snow.css';
@@ -129,6 +129,10 @@ export default function RentModal({
     const [showChildLotAreaModal, setShowChildLotAreaModal] = useState(false);
     const [childLotAreaForm, setChildLotAreaForm] = useState({ name: '', area: '' });
     const [childLotAreaSaving, setChildLotAreaSaving] = useState(false);
+    /** 內聯新增地段：新地段 / 舊地段 / 自訂 */
+    const [inlineLotAddType, setInlineLotAddType] = useState<'new' | 'old' | null>(null);
+    const [inlineLotAddInput, setInlineLotAddInput] = useState('');
+    const [inlineLotAddLoading, setInlineLotAddLoading] = useState(false);
     const { data: subLandlords = [] } = useSubLandlordsQuery();
     const { data: currentTenants = [] } = useCurrentTenantsQuery();
     const { data: allProperties = [] } = usePropertiesQuery();
@@ -181,6 +185,7 @@ export default function RentModal({
                 rentOutDepositChequePaymentDate: formatDate(
                     (rent as any).rentOutDepositChequePaymentDate ?? (rent as any).rent_out_deposit_cheque_payment_date,
                 ),
+                rentOutDepositChequeReceiptNumber: (rent as any).rentOutDepositChequeReceiptNumber || '',
                 rentOutDepositPaymentDate: formatDate(
                     (rent as any).rentOutDepositPaymentDate ?? (rent as any).rent_out_deposit_payment_date,
                 ),
@@ -312,6 +317,7 @@ export default function RentModal({
             rentOutDepositChequeNumber: '',
             rentOutDepositChequeImage: '',
             rentOutDepositChequePaymentDate: '',
+            rentOutDepositChequeReceiptNumber: '',
             rentOutDepositPaymentDate: '',
             rentOutDepositBankInImage: '',
             rentOutDepositReceiveDate: '',
@@ -549,7 +555,8 @@ export default function RentModal({
      * - 否則不顯示後綴
      */
     const selectedLotDisplayText = useMemo(() => {
-        const lots: string[] = Array.isArray(formData.rentPropertyLot) ? formData.rentPropertyLot : [];
+        const raw: string[] = Array.isArray(formData.rentPropertyLot) ? formData.rentPropertyLot : [];
+        const lots = raw.filter(v => !String(v).startsWith('__other_custom__:') && !String(v).startsWith('其他：'));
         const partial: Record<string, boolean> = formData.rentPropertyLotPartial || {};
         if (!lots.length) return '';
         return lots
@@ -586,7 +593,7 @@ export default function RentModal({
         } else if (typeof partialRaw === 'string' && partialRaw.trim()) {
             try { partial = JSON.parse(partialRaw); } catch { /* ignore */ }
         }
-        return { lots, partial };
+        return { lots: lots.filter(v => !String(v).startsWith('__other_custom__:') && !String(v).startsWith('其他：')), partial };
     }, [formData.type, formData.rentCollectionContractNumber, contractsOnProperty]);
 
     /** 地段多選下拉選項 */
@@ -595,11 +602,57 @@ export default function RentModal({
         [propertyLotSegmentOptions],
     );
 
-    /** 已選地段陣列 */
+    /** 已選地段陣列（過濾廢棄的自定義地段格式） */
     const selectedLots = useMemo(
-        () => (Array.isArray(formData.rentPropertyLot) ? formData.rentPropertyLot : []) as string[],
+        () => {
+            const raw: string[] = Array.isArray(formData.rentPropertyLot) ? formData.rentPropertyLot : [];
+            return raw.filter(v => !String(v).startsWith('__other_custom__:') && !String(v).startsWith('其他：'));
+        },
         [formData.rentPropertyLot],
     );
+
+    /** 地段序列化（與 PropertyForm.tsx 的 serializeLotEntries 相同邏輯） */
+    const serializeLotEntries = (entries: { type: 'new' | 'old'; value: string }[]): string =>
+        entries.map(e => `${e.type === 'new' ? '新' : '舊'}:${e.value}`).join('\n');
+
+    /**
+     * 內聯新增地段：
+     * 1. 解析現有 lotIndex，附加新地段
+     * 2. 呼叫 updateProperty 更新 properties 表
+     * 3. 更新本地狀態（properties、contractsWithRel）
+     * 4. 自動將新地段寫入 formData.rentPropertyLot（自動選取）
+     */
+    const handleInlineLotAdd = async (targetPropertyId: string) => {
+        const trimmed = inlineLotAddInput.trim();
+        if (!trimmed || !targetPropertyId || !inlineLotAddType) return;
+        setInlineLotAddLoading(true);
+        try {
+            const prop = properties.find(p => p.id === targetPropertyId);
+            const existing = prop?.lotIndex || '';
+            const entries = parseLotEntries(existing);
+            entries.push({ type: inlineLotAddType, value: trimmed });
+            const updated = serializeLotEntries(entries);
+            const ok = await updateProperty(targetPropertyId, { lotIndex: updated });
+            if (ok) {
+                setProperties(prev => prev.map(p => p.id === targetPropertyId ? { ...p, lotIndex: updated } : p));
+                await queryClient.invalidateQueries({ queryKey: ['properties'] });
+                await queryClient.invalidateQueries({ queryKey: ['properties-with-relations'] });
+
+                // 自動將新地段寫入 formData.rentPropertyLot 並選取
+                const newSegs = parsePropertyLotSegments(updated);
+                setFormData(prev => {
+                    const existingLots: string[] = Array.isArray(prev.rentPropertyLot) ? prev.rentPropertyLot : [];
+                    // 避免重複選取
+                    const merged = [...new Set([...existingLots, ...newSegs])];
+                    return { ...prev, rentPropertyLot: merged };
+                });
+            }
+            setInlineLotAddType(null);
+            setInlineLotAddInput('');
+        } finally {
+            setInlineLotAddLoading(false);
+        }
+    };
 
     const openChildPropertyModal = () => {
         const focusId = propertyId || formData.propertyId;
@@ -1080,7 +1133,7 @@ export default function RentModal({
                         const arr: string[] = Array.isArray(formData.rentPropertyLot)
                             ? formData.rentPropertyLot.map(v => String(v).trim()).filter(Boolean)
                             : [];
-                        return arr.length > 0 ? JSON.stringify(arr) : null;
+                        return arr.length > 0 ? JSON.stringify(arr.filter(v => !String(v).startsWith('__other_custom__:') && !String(v).startsWith('其他：'))) : null;
                     })(),
                     rentPropertyLotPartial: (() => {
                         const obj: Record<string, boolean> = formData.rentPropertyLotPartial || {};
@@ -1152,7 +1205,7 @@ export default function RentModal({
                         const arr: string[] = Array.isArray(formData.rentPropertyLot)
                             ? formData.rentPropertyLot.map(v => String(v).trim()).filter(Boolean)
                             : [];
-                        return arr.length > 0 ? JSON.stringify(arr) : null;
+                        return arr.length > 0 ? JSON.stringify(arr.filter(v => !String(v).startsWith('__other_custom__:') && !String(v).startsWith('其他：'))) : null;
                     })(),
                     rentPropertyLotPartial: (() => {
                         const obj: Record<string, boolean> = formData.rentPropertyLotPartial || {};
@@ -1205,6 +1258,10 @@ export default function RentModal({
                                 ? new Date(formData.rentOutDepositChequePaymentDate)
                                 : null
                             : null,
+                    rentOutDepositChequeReceiptNumber:
+                        formData.rentOutDepositPaymentMethod === 'cheque'
+                            ? formData.rentOutDepositChequeReceiptNumber?.trim() || null
+                            : null,
                     rentOutDepositPaymentDate: rentOutDepositPaymentDateForSave,
                     rentOutDepositBankInImage:
                         formData.rentOutDepositPaymentMethod === 'bank_in'
@@ -1234,7 +1291,7 @@ export default function RentModal({
                         const arr: string[] = Array.isArray(formData.rentPropertyLot)
                             ? formData.rentPropertyLot.map(v => String(v).trim()).filter(Boolean)
                             : [];
-                        return arr.length > 0 ? JSON.stringify(arr) : null;
+                        return arr.length > 0 ? JSON.stringify(arr.filter(v => !String(v).startsWith('__other_custom__:') && !String(v).startsWith('其他：'))) : null;
                     })(),
                     rentPropertyLotPartial: (() => {
                         const obj: Record<string, boolean> = formData.rentPropertyLotPartial || {};
@@ -1250,7 +1307,7 @@ export default function RentModal({
                     // 合約保存成功後，同步地段到所有關聯的收租記錄
                     if (formData.type === 'contract') {
                         const lots = Array.isArray(formData.rentPropertyLot)
-                            ? formData.rentPropertyLot.map(v => String(v).trim()).filter(Boolean)
+                            ? formData.rentPropertyLot.map(v => String(v).trim()).filter(Boolean).filter(v => !String(v).startsWith('__other_custom__:') && !String(v).startsWith('其他：'))
                             : [];
                         await syncContractLotsToRentOutRecords(
                             rent.id,
@@ -1273,7 +1330,7 @@ export default function RentModal({
                     // 合約新建成功後，同步地段到所有關聯的收租記錄
                     if (formData.type === 'contract') {
                         const lots = Array.isArray(formData.rentPropertyLot)
-                            ? formData.rentPropertyLot.map(v => String(v).trim()).filter(Boolean)
+                            ? formData.rentPropertyLot.map(v => String(v).trim()).filter(Boolean).filter(v => !String(v).startsWith('__other_custom__:') && !String(v).startsWith('其他：'))
                             : [];
                         await syncContractLotsToRentOutRecords(
                             id,
@@ -1685,7 +1742,18 @@ export default function RentModal({
                     )}
                     {(formData.type === 'renting' || formData.type === 'contract') && (
                         <div className="space-y-3">
-                            <label className={labelClass}>物業地段</label>
+                            <div className="flex items-center justify-between">
+                                <label className={labelClass}>物業地段</label>
+                                {formData.propertyId && (
+                                    <button
+                                        type="button"
+                                        onClick={() => { setInlineLotAddType('new'); setInlineLotAddInput(''); }}
+                                        className="px-3 py-1 text-xs bg-blue-50 dark:bg-blue-500/20 text-blue-600 dark:text-blue-400 rounded-lg hover:bg-blue-100 dark:hover:bg-blue-500/30 border border-blue-100 dark:border-blue-500/30 transition-colors"
+                                    >
+                                        + 新增地段
+                                    </button>
+                                )}
+                            </div>
 
                             {/* 尚未選擇物業時的提示 */}
                             {!formData.propertyId ? (
@@ -1693,9 +1761,67 @@ export default function RentModal({
                                     請先選擇物業
                                 </p>
                             ) : propertyLotSegmentOptions.length === 0 ? (
-                                <p className="text-sm text-zinc-400 dark:text-white/40 italic">
-                                    此物業暫無地段資料
-                                </p>
+                                <div className="space-y-2">
+                                    <p className="text-sm text-zinc-400 dark:text-white/40 italic">
+                                        此物業暫無地段資料
+                                    </p>
+                                    {/* 無地段時直接顯示新增表單 */}
+                                    {inlineLotAddType !== null && (
+                                        <div className="flex gap-2 items-center p-3 bg-blue-50 dark:bg-blue-500/10 rounded-xl border border-blue-100 dark:border-blue-500/20">
+                                            {inlineLotAddType === 'new' ? (
+                                                <span className="shrink-0 px-2 py-0.5 text-xs bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 rounded font-medium">新</span>
+                                            ) : (
+                                                <span className="shrink-0 px-2 py-0.5 text-xs bg-zinc-300 dark:bg-white/20 text-zinc-600 dark:text-white/70 rounded font-medium">舊</span>
+                                            )}
+                                            <input
+                                                type="text"
+                                                value={inlineLotAddInput}
+                                                onChange={(e) => setInlineLotAddInput(e.target.value)}
+                                                placeholder="例如: DD 111 LOT 1523, 1539"
+                                                className="flex-1 px-3 py-1.5 bg-white dark:bg-white/5 border border-blue-200 dark:border-blue-500/30 rounded-lg text-sm text-zinc-900 dark:text-white placeholder-zinc-400"
+                                                autoFocus
+                                                onKeyDown={(e) => {
+                                                    if (e.key === 'Enter' && inlineLotAddInput.trim()) {
+                                                        handleInlineLotAdd(formData.propertyId);
+                                                    }
+                                                }}
+                                            />
+                                            <button
+                                                type="button"
+                                                onClick={() => handleInlineLotAdd(formData.propertyId)}
+                                                disabled={!inlineLotAddInput.trim() || inlineLotAddLoading}
+                                                className="px-3 py-1.5 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50 text-sm shrink-0"
+                                            >
+                                                {inlineLotAddLoading ? '儲存中…' : '確認'}
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => { setInlineLotAddType(null); setInlineLotAddInput(''); }}
+                                                className="px-3 py-1.5 text-zinc-500 dark:text-white/50 hover:text-zinc-700 dark:hover:text-white text-sm shrink-0"
+                                            >
+                                                取消
+                                            </button>
+                                        </div>
+                                    )}
+                                    {inlineLotAddType === null && (
+                                        <div className="flex gap-2">
+                                            <button
+                                                type="button"
+                                                onClick={() => setInlineLotAddType('new')}
+                                                className="px-4 py-2 bg-blue-500/20 text-blue-600 dark:text-blue-400 rounded-lg hover:bg-blue-500/30 text-sm"
+                                            >
+                                                新地段
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => setInlineLotAddType('old')}
+                                                className="px-4 py-2 bg-zinc-200 dark:bg-white/10 text-zinc-700 dark:text-white/80 rounded-lg hover:bg-zinc-300 dark:hover:bg-white/20 text-sm"
+                                            >
+                                                舊地段
+                                            </button>
+                                        </div>
+                                    )}
+                                </div>
                             ) : (
                                 <>
                                     {/* 多選下拉 */}
@@ -1708,6 +1834,45 @@ export default function RentModal({
                                         placeholder="選擇地段"
                                         disabled={false}
                                     />
+
+                                    {/* 內聯新增地段表單（交租/合約，有現有地段時） */}
+                                    {inlineLotAddType !== null && (
+                                        <div className="flex gap-2 items-center p-3 bg-blue-50 dark:bg-blue-500/10 rounded-xl border border-blue-100 dark:border-blue-500/20">
+                                            {inlineLotAddType === 'new' ? (
+                                                <span className="shrink-0 px-2 py-0.5 text-xs bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 rounded font-medium">新</span>
+                                            ) : (
+                                                <span className="shrink-0 px-2 py-0.5 text-xs bg-zinc-300 dark:bg-white/20 text-zinc-600 dark:text-white/70 rounded font-medium">舊</span>
+                                            )}
+                                            <input
+                                                type="text"
+                                                value={inlineLotAddInput}
+                                                onChange={(e) => setInlineLotAddInput(e.target.value)}
+                                                placeholder="例如: DD 111 LOT 1523, 1539"
+                                                className="flex-1 px-3 py-1.5 bg-white dark:bg-white/5 border border-blue-200 dark:border-blue-500/30 rounded-lg text-sm text-zinc-900 dark:text-white placeholder-zinc-400"
+                                                autoFocus
+                                                onKeyDown={(e) => {
+                                                    if (e.key === 'Enter' && inlineLotAddInput.trim()) {
+                                                        handleInlineLotAdd(formData.propertyId);
+                                                    }
+                                                }}
+                                            />
+                                            <button
+                                                type="button"
+                                                onClick={() => handleInlineLotAdd(formData.propertyId)}
+                                                disabled={!inlineLotAddInput.trim() || inlineLotAddLoading}
+                                                className="px-3 py-1.5 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50 text-sm shrink-0"
+                                            >
+                                                {inlineLotAddLoading ? '儲存中…' : '確認'}
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => { setInlineLotAddType(null); setInlineLotAddInput(''); }}
+                                                className="px-3 py-1.5 text-zinc-500 dark:text-white/50 hover:text-zinc-700 dark:hover:text-white text-sm shrink-0"
+                                            >
+                                                取消
+                                            </button>
+                                        </div>
+                                    )}
 
                                     {selectedLots.length > 0 && (
                                 <div className="space-y-2">
@@ -1766,10 +1931,19 @@ export default function RentModal({
 
                             <div className="space-y-4">
                                 {renderCollectionContractRefField()}
-                                {/* 根據選擇的合約顯示只讀的物业地段 */}
+                                {/* 根據選擇的合約顯示物业租借位置（可新增地段） */}
                                 {selectedContractLotInfo && selectedContractLotInfo.lots.length > 0 && (
                                     <div className="space-y-2">
-                                        <label className={labelClass}>物業租借位置</label>
+                                        <div className="flex items-center justify-between">
+                                            <label className={labelClass}>物業租借位置</label>
+                                            <button
+                                                type="button"
+                                                onClick={() => { setInlineLotAddType('new'); setInlineLotAddInput(''); }}
+                                                className="px-3 py-1 text-xs bg-purple-50 dark:bg-purple-500/20 text-purple-600 dark:text-purple-400 rounded-lg hover:bg-purple-100 dark:hover:bg-purple-500/30 border border-purple-100 dark:border-purple-500/30 transition-colors"
+                                            >
+                                                + 新增地段
+                                            </button>
+                                        </div>
                                         <div className="space-y-2">
                                             {selectedContractLotInfo.lots.map((lot) => {
                                                 const isPartial = !!selectedContractLotInfo.partial[lot];
@@ -1785,6 +1959,44 @@ export default function RentModal({
                                                 );
                                             })}
                                         </div>
+                                        {/* 內聯新增地段表單（收租） */}
+                                        {inlineLotAddType !== null && formData.propertyId && (
+                                            <div className="flex gap-2 items-center mt-2 p-3 bg-purple-50 dark:bg-purple-500/10 rounded-xl border border-purple-100 dark:border-purple-500/20">
+                                                {inlineLotAddType === 'new' ? (
+                                                    <span className="shrink-0 px-2 py-0.5 text-xs bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 rounded font-medium">新</span>
+                                                ) : (
+                                                    <span className="shrink-0 px-2 py-0.5 text-xs bg-zinc-300 dark:bg-white/20 text-zinc-600 dark:text-white/70 rounded font-medium">舊</span>
+                                                )}
+                                                <input
+                                                    type="text"
+                                                    value={inlineLotAddInput}
+                                                    onChange={(e) => setInlineLotAddInput(e.target.value)}
+                                                    placeholder="例如: DD 111 LOT 1523, 1539"
+                                                    className="flex-1 px-3 py-1.5 bg-white dark:bg-white/5 border border-purple-200 dark:border-purple-500/30 rounded-lg text-sm text-zinc-900 dark:text-white placeholder-zinc-400"
+                                                    autoFocus
+                                                    onKeyDown={(e) => {
+                                                        if (e.key === 'Enter' && inlineLotAddInput.trim()) {
+                                                            handleInlineLotAdd(formData.propertyId);
+                                                        }
+                                                    }}
+                                                />
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleInlineLotAdd(formData.propertyId)}
+                                                    disabled={!inlineLotAddInput.trim() || inlineLotAddLoading}
+                                                    className="px-3 py-1.5 bg-purple-500 text-white rounded-lg hover:bg-purple-600 disabled:opacity-50 text-sm shrink-0"
+                                                >
+                                                    {inlineLotAddLoading ? '儲存中…' : '確認'}
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => { setInlineLotAddType(null); setInlineLotAddInput(''); }}
+                                                    className="px-3 py-1.5 text-zinc-500 dark:text-white/50 hover:text-zinc-700 dark:hover:text-white text-sm shrink-0"
+                                                >
+                                                    取消
+                                                </button>
+                                            </div>
+                                        )}
                                         <p className="text-xs text-zinc-400 dark:text-white/40 italic">
                                             已選：{selectedContractLotInfo.lots.map(lot => selectedContractLotInfo.partial[lot] ? `${lot}（部分地方）` : lot).join('、')}
                                         </p>
@@ -2555,7 +2767,7 @@ export default function RentModal({
                                                       }
                                                     : {}),
                                                 ...(v !== 'bank_in' ? { rentOutDepositBankInImage: '' } : {}),
-                                                ...(v === 'cheque' || v === '' ? { rentOutDepositReceiptNumber: '' } : {}),
+                                                ...(v === 'cheque' || v === '' ? { rentOutDepositReceiptNumber: '', rentOutDepositChequeReceiptNumber: '' } : {}),
                                             }));
                                         }}
                                         className={inputClass}
@@ -2614,6 +2826,17 @@ export default function RentModal({
                                             value={formData.rentOutDepositChequePaymentDate ?? ''}
                                             onChange={handleChange}
                                             className={inputClass}
+                                        />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <label className={labelClass}>收據號碼</label>
+                                        <input
+                                            type="text"
+                                            name="rentOutDepositChequeReceiptNumber"
+                                            value={formData.rentOutDepositChequeReceiptNumber}
+                                            onChange={handleChange}
+                                            className={inputClass}
+                                            placeholder="收據號碼"
                                         />
                                     </div>
                                     <div className="space-y-2">

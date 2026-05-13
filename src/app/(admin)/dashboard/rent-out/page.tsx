@@ -22,6 +22,7 @@ import {
 import {
     normalizeRentPropertyLotSelection,
     parseRentPropertyLotPartialFromRow,
+    parsePropertyLotSegments,
 } from '@/lib/formatters';
 import { BentoCard } from '@/components/layout/BentoGrid';
 import RentModal from '@/components/properties/RentModal';
@@ -443,7 +444,7 @@ export default function RentOutPage() {
                                                         {(() => {
                                                             const selected = normalizeRentPropertyLotSelection(rent.rentPropertyLot ?? (rent as any).rent_property_lot);
                                                             const partial = parseRentPropertyLotPartialFromRow(rent.rentPropertyLotPartial ?? (rent as any).rent_property_lot_partial);
-                                                            if (!selected.length) return <span className="text-zinc-300 dark:text-white/20">—</span>;
+                                                            if (!selected.length) return <span className="text-zinc-300 dark:text-white/20">暫無</span>;
                                                             const lots = selected.map(lot => partial[lot] ? `${lot}（部分地方）` : lot);
                                                             if (lots.length > 1) {
                                                                 return <span className="truncate block" title={lots.join('、')}>{lots[0]}...</span>;
@@ -589,7 +590,7 @@ export default function RentOutPage() {
                                                         {(() => {
                                                             const selected = normalizeRentPropertyLotSelection(rent.rentPropertyLot ?? (rent as any).rent_property_lot);
                                                             const partial = parseRentPropertyLotPartialFromRow(rent.rentPropertyLotPartial ?? (rent as any).rent_property_lot_partial);
-                                                            if (!selected.length) return null;
+                                                            if (!selected.length) return <span className="text-zinc-300 dark:text-white/20">暫無</span>;
                                                             const lots = selected.map(lot => partial[lot] ? `${lot}（部分地方）` : lot);
                                                             if (lots.length > 1) {
                                                                 return <span className="truncate block" title={lots.join('、')}>{lots[0]}...</span>;

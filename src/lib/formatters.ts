@@ -96,17 +96,17 @@ export function parseRentPropertyLotPartialFromRow(raw: unknown): Record<string,
  */
 export function normalizeRentPropertyLotSelection(raw: unknown): string[] {
     if (raw == null) return [];
-    if (Array.isArray(raw)) return raw.map((s) => stripPropertyCodePrefix(String(s).trim())).filter(Boolean);
+    if (Array.isArray(raw)) return raw.map((s) => stripPropertyCodePrefix(String(s).trim())).filter(Boolean).filter(v => !String(v).startsWith('__other_custom__:') && !String(v).startsWith('其他：'));
     if (typeof raw === 'string') {
         const t = raw.trim();
         if (!t) return [];
         try {
             const p = JSON.parse(t) as unknown;
-            if (Array.isArray(p)) return p.map((s) => stripPropertyCodePrefix(String(s).trim())).filter(Boolean);
+            if (Array.isArray(p)) return p.map((s) => stripPropertyCodePrefix(String(s).trim())).filter(Boolean).filter(v => !String(v).startsWith('__other_custom__:') && !String(v).startsWith('其他：'));
         } catch {
             /* fall through */
         }
-        return t.split(',').map((s) => stripPropertyCodePrefix(s.trim())).filter(Boolean);
+        return t.split(',').map((s) => stripPropertyCodePrefix(s.trim())).filter(Boolean).filter(v => !String(v).startsWith('__other_custom__:') && !String(v).startsWith('其他：'));
     }
     return [];
 }
@@ -124,10 +124,15 @@ function rentHistoryPartialAppliesToLot(partial: Record<string, boolean>, lot: s
     return false;
 }
 
-/** 單筆租務在「租務記錄」物業欄的地段顯示：無 新:/舊:；勾選部份地方者後綴「 (部份地方)」。 */
+/**
+ * 單筆租務在「租務記錄」物業欄的地段顯示：無 新:/舊:；勾選部份地方者後綴「 (部份地方)」。
+ * - rent_out 類型：若記錄無地段選擇，返回空字串（ caller 可據此顯示「暫無」）
+ * - 合約／交租等：fallback 至 propertyLotIndex
+ */
 export function formatRentHistoryLotCellText(
     propertyLotIndex: string | null | undefined,
     rent: {
+        type?: string;
         rentPropertyLot?: string | string[] | null;
         rentPropertyLotPartial?: Record<string, boolean> | string | null;
         rent_property_lot?: string | null;
@@ -138,10 +143,23 @@ export function formatRentHistoryLotCellText(
     const partial = parseRentPropertyLotPartialFromRow(partialRaw);
     const selectedRaw = rent.rentPropertyLot ?? rent.rent_property_lot;
     const selected = normalizeRentPropertyLotSelection(selectedRaw);
+    if (selected.length > 0) {
+        const suffix = ' (部份地方)';
+        const parts = selected
+            .map((lot) => {
+                const trimmed = lot.trim();
+                if (!trimmed) return '';
+                return rentHistoryPartialAppliesToLot(partial, trimmed) ? `${trimmed}${suffix}` : trimmed;
+            })
+            .filter(Boolean);
+        return parts.join(' , ');
+    }
+    if (rent.type === 'rent_out') {
+        return '';
+    }
     const allSegs = parsePropertyLotSegments(propertyLotIndex);
-    const lotsToShow = selected.length > 0 ? selected : allSegs;
     const suffix = ' (部份地方)';
-    const parts = lotsToShow
+    const parts = allSegs
         .map((lot) => {
             const trimmed = lot.trim();
             if (!trimmed) return '';

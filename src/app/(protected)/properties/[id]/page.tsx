@@ -1042,11 +1042,12 @@ export default function PropertyDetailsPage() {
                                                                         ) : null}
                                                                         {(() => {
                                                                             const lotText = formatRentHistoryLotCellText(property.lotIndex, rent);
-                                                                            return lotText ? (
+                                                                            const displayLotText = lotText || (rent.type === 'rent_out' ? '暫無' : null);
+                                                                            return displayLotText ? (
                                                                                 <div className="text-xs text-zinc-500 dark:text-white/60">
                                                                                     {t('Contract Lot', '合約地段')}:{' '}
                                                                                     <span className="text-emerald-600 dark:text-emerald-400 font-medium">
-                                                                                        {lotText}
+                                                                                        {displayLotText}
                                                                                     </span>
                                                                                 </div>
                                                                             ) : null;
@@ -1069,7 +1070,8 @@ export default function PropertyDetailsPage() {
                                                                     >
                                                                         {(() => {
                                                                             const lotText = formatRentHistoryLotCellText(property.lotIndex, rent);
-                                                                            return lotText ? `地段：${lotText}` : null;
+                                                                            const displayLotText = lotText || (rent.type === 'rent_out' ? '暫無' : null);
+                                                                            return displayLotText ? `地段：${displayLotText}` : null;
                                                                         })()}
                                                                     </div>
                                                                 </div>

@@ -1374,6 +1374,9 @@ export function useRents() {
             if (rod.rentOutDepositChequeBank) rentData.rent_out_deposit_cheque_bank = rod.rentOutDepositChequeBank;
             if (rod.rentOutDepositChequeNumber) rentData.rent_out_deposit_cheque_number = rod.rentOutDepositChequeNumber;
             if (rod.rentOutDepositChequeImage) rentData.rent_out_deposit_cheque_image = rod.rentOutDepositChequeImage;
+            if ((rod as any).rentOutDepositChequeReceiptNumber !== undefined) {
+                rentData.rent_out_deposit_cheque_receipt_number = (rod as any).rentOutDepositChequeReceiptNumber || null;
+            }
             if (rod.rentOutDepositPaymentDate) rentData.rent_out_deposit_payment_date = rod.rentOutDepositPaymentDate;
             if (rod.rentOutDepositBankInImage) rentData.rent_out_deposit_bank_in_image = rod.rentOutDepositBankInImage;
             if (rent.rentOutDepositReceiveDate) rentData.rent_out_deposit_receive_date = rent.rentOutDepositReceiveDate;
@@ -1642,6 +1645,9 @@ export function useRents() {
             }
             if (udep.rentOutDepositChequeImage !== undefined) {
                 rentData.rent_out_deposit_cheque_image = udep.rentOutDepositChequeImage || null;
+            }
+            if ((udep as any).rentOutDepositChequeReceiptNumber !== undefined) {
+                rentData.rent_out_deposit_cheque_receipt_number = (udep as any).rentOutDepositChequeReceiptNumber || null;
             }
             if (udep.rentOutDepositPaymentDate !== undefined) {
                 rentData.rent_out_deposit_payment_date = udep.rentOutDepositPaymentDate || null;

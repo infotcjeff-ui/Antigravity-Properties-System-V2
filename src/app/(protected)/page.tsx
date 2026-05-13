@@ -1,20 +1,17 @@
 'use client';
 
-import { useEffect, useState, useCallback, useMemo } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
-import { motion, AnimatePresence } from 'framer-motion';
-import { useProperties, usePropertiesQuery } from '@/hooks/useStorage';
+import { useEffect, useState, useMemo } from 'react';
+import { motion } from 'framer-motion';
+import { usePropertiesQuery } from '@/hooks/useStorage';
 import type { Property } from '@/lib/db';
 import PropertyCard from '@/components/properties/PropertyCard';
 import PropertyMapDynamic from '@/components/properties/PropertyMapDynamic';
-import PropertyForm from '@/components/properties/PropertyForm';
-import { Building2, Grid3X3, Map, Search, Plus, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Building2, Grid3X3, Map, Search, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 
 type ViewMode = 'grid' | 'map';
 
 export default function PropertiesPage() {
-    const queryClient = useQueryClient();
     const { data: qProperties, isLoading: qLoading } = usePropertiesQuery({ bypassIsolation: true });
     const { isAuthenticated, user } = useAuth();
     const userDisplayName = user?.displayName || user?.username || '';
@@ -22,7 +19,6 @@ export default function PropertiesPage() {
     const [searchQuery, setSearchQuery] = useState('');
     const [statusFilter, setStatusFilter] = useState<string>('all');
     const [typeFilter, setTypeFilter] = useState<string>('all');
-    const [showPropertyForm, setShowPropertyForm] = useState(false);
     const [currentPage, setCurrentPage] = useState(1);
     const ITEMS_PER_PAGE = 12;
 
@@ -81,17 +77,6 @@ export default function PropertiesPage() {
                     <h1 className="text-3xl font-bold text-zinc-900 dark:text-white">物業</h1>
                     <p className="text-zinc-500 dark:text-white/50 mt-1">{userDisplayName}{userDisplayName ? '，' : ''}歡迎回來。隨時查看您的物業資訊。</p>
                 </div>
-                {isAuthenticated && (
-                    <motion.button
-                        whileHover={{ scale: 1.02 }}
-                        whileTap={{ scale: 0.98 }}
-                        onClick={() => setShowPropertyForm(true)}
-                        className="px-5 py-2.5 bg-gradient-to-r from-purple-600 to-blue-600 rounded-xl text-white font-medium shadow-lg shadow-purple-500/20 hover:shadow-purple-500/30 transition-shadow flex items-center gap-2"
-                    >
-                        <Plus className="w-5 h-5" />
-                        新增物業
-                    </motion.button>
-                )}
             </div>
 
             {/* Filters and View Toggle */}
@@ -252,20 +237,6 @@ export default function PropertiesPage() {
                 <PropertyMapDynamic properties={filteredProperties} />
             )}
 
-            {/* Property Form Modal */}
-            <AnimatePresence>
-                {showPropertyForm && (
-                    <PropertyForm
-                        onClose={() => setShowPropertyForm(false)}
-                        onSuccess={async () => {
-                            setShowPropertyForm(false);
-                            // Explicitly refetch to ensure the list is updated
-                            await queryClient.invalidateQueries({ queryKey: ['properties'] });
-                            await queryClient.refetchQueries({ queryKey: ['properties'] });
-                        }}
-                    />
-                )}
-            </AnimatePresence>
         </div>
     );
 }

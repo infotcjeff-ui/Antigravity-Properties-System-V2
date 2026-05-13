@@ -76,7 +76,9 @@
       "village_dev": "鄉村式發展",
       "conservation_area": "保育區",
       "residential_c": "住宅(丙類)",
-      "recreation_use": "休憩用地"
+      "recreation_use": "休憩用地",
+      "r_d": "住宅(丁類)",
+      "r_a5": "住宅(甲類)5"
     }
   },
   "proprietor": {

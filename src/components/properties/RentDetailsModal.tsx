@@ -218,7 +218,13 @@ export default function RentDetailsModal({ rent, property, currentTenants = [], 
                                     value={(rent as any).rentOutDepositReceiptNumber}
                                 />
                             ) : null}
-                            <DetailRow label={t('Deposit Receive Date', '按金收取日期')} value={formatDate(rent.rentOutDepositReceiveDate)} />
+                            <DetailRow
+                                label={t(
+                                    (rent as any).rentOutStatus === 'leasing_in' ? 'Deposit Payment Date' : 'Deposit Receive Date',
+                                    (rent as any).rentOutStatus === 'leasing_in' ? '按金支付日期' : '按金收取日期',
+                                )}
+                                value={formatDate(rent.rentOutDepositReceiveDate)}
+                            />
                             <DetailRow label={t('Deposit Return Date', '按金退回日期')} value={formatDate(rent.rentOutDepositReturnDate)} />
                             <DetailRow label={t('Deposit Return Amount', '按金退回金額')} value={formatCurrency(rent.rentOutDepositReturnAmount)} />
                             {rent.type !== 'contract' && (rent as any).rentCollectionPaymentMethod ? (

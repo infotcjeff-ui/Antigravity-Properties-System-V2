@@ -45,7 +45,7 @@ type CurrentTenantFormData = {
     type: 'company' | 'individual';
     category: string;
     brNumber: string;
-    tenancyNumber: string;
+    idNumber: string;
 };
 
 type FormData = SubLandlordFormData | CurrentTenantFormData;
@@ -81,7 +81,7 @@ export default function RentOutFormModal({ mode, editItem, onClose, onSuccess, o
                 type: (ct?.type || 'company') as 'company' | 'individual',
                 category: ct?.category ?? 'group_company',
                 brNumber: ct?.brNumber ?? '',
-                tenancyNumber: editItem?.tenancyNumber || '',
+                idNumber: (ct as any)?.idNumber ?? '',
             };
         }
         return {
@@ -124,8 +124,8 @@ export default function RentOutFormModal({ mode, editItem, onClose, onSuccess, o
                 type: ct.type,
                 category: ct.category as CurrentTenant['category'],
                 brNumber: ct.brNumber.trim() || undefined,
-                tenancyNumber: ct.tenancyNumber || undefined,
-            };
+                idNumber: ct.idNumber.trim() || undefined,
+            } as any;
         }
         const sl = formData as SubLandlordFormData;
         return {
@@ -309,17 +309,19 @@ export default function RentOutFormModal({ mode, editItem, onClose, onSuccess, o
                                         />
                                     </div>
                                 </div>
-                                <div className="space-y-2">
-                                    <label className={labelClass}>出租號碼</label>
-                                    <input
-                                        type="text"
-                                        name="tenancyNumber"
-                                        value={(formData as CurrentTenantFormData).tenancyNumber}
-                                        onChange={handleChange}
-                                        className={inputClass}
-                                        placeholder="RO-001"
-                                    />
-                                </div>
+                                {(formData as CurrentTenantFormData).category === 'private_individual' && (
+                                    <div className="space-y-2">
+                                        <label className={labelClass}>ID Number</label>
+                                        <input
+                                            type="text"
+                                            name="idNumber"
+                                            value={(formData as CurrentTenantFormData).idNumber}
+                                            onChange={handleChange}
+                                            className={inputClass}
+                                            placeholder="請輸入身份證號碼"
+                                        />
+                                    </div>
+                                )}
                             </>
                         ) : (
                             <div className="space-y-4">

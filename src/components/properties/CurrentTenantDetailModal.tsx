@@ -43,6 +43,7 @@ export default function CurrentTenantDetailModal({
     const [activeTab, setActiveTab] = useState<CurrentTenantDetailTab>('contracts');
     const [contractsPage, setContractsPage] = useState(1);
     const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
+    const [revealIdNumber, setRevealIdNumber] = useState(false);
 
     // 只在 modal 首次開啟時初始化 collapsedGroups，之後由用戶操作控制
     const hasInitializedRef = useRef(false);
@@ -280,14 +281,18 @@ export default function CurrentTenantDetailModal({
                                                                                     </div>
                                                                                 )}
                                                                                 {/* 地段：優先顯示該合約所選地段，否則顯示物业全部地段 */}
-                                                                                {rentProperty?.lotIndex && (
-                                                                                    <div className="flex items-center gap-2">
-                                                                                        <Hash className="w-4 h-4 text-zinc-400 dark:text-white/40 shrink-0" />
-                                                                                        <span className="text-sm text-zinc-600 dark:text-white/60">
-                                                                                            {formatRentHistoryLotCellText(rentProperty.lotIndex, rent)}
-                                                                                        </span>
-                                                                                    </div>
-                                                                                )}
+                                                                                {rentProperty?.lotIndex && (() => {
+                                                                                    const lotText = formatRentHistoryLotCellText(rentProperty.lotIndex, rent);
+                                                                                    const displayLotText = lotText || (rent.type === 'rent_out' ? '暫無' : null);
+                                                                                    return displayLotText ? (
+                                                                                        <div className="flex items-center gap-2">
+                                                                                            <Hash className="w-4 h-4 text-zinc-400 dark:text-white/40 shrink-0" />
+                                                                                            <span className="text-sm text-zinc-600 dark:text-white/60">
+                                                                                                {displayLotText}
+                                                                                            </span>
+                                                                                        </div>
+                                                                                    ) : null;
+                                                                                })()}
                                                                                 {/* 租期 + 租金同行，右側顯示租金 */}
                                                                                 {(rent.rentOutStartDate || rent.startDate || rent.rentOutEndDate || rent.endDate || rent.rentOutMonthlyRental != null) && (
                                                                                     <div className="flex items-center justify-between gap-3">
@@ -386,6 +391,23 @@ export default function CurrentTenantDetailModal({
                                         <span className="inline-flex px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
                                             {proprietorCategoryLabelZh(currentTenant.category, 'modal')}
                                         </span>
+                                    </div>
+                                )}
+                                {(currentTenant as any).idNumber && (
+                                    <div className="p-4 bg-zinc-50 dark:bg-white/5 rounded-xl border border-zinc-100 dark:border-white/5">
+                                        <p className="text-sm text-zinc-500 dark:text-white/40 mb-1">ID Number</p>
+                                        <div className="flex items-center gap-2">
+                                            <p className="text-base font-medium text-zinc-900 dark:text-white font-mono">
+                                                {revealIdNumber ? (currentTenant as any).idNumber : (currentTenant as any).idNumber.replace(/./g, '*')}
+                                            </p>
+                                            <button
+                                                type="button"
+                                                onClick={() => setRevealIdNumber(r => !r)}
+                                                className="text-xs text-purple-500 hover:text-purple-600 dark:text-purple-400 dark:hover:text-purple-300 font-medium transition-colors"
+                                            >
+                                                {revealIdNumber ? '隱藏' : '顯示'}
+                                            </button>
+                                        </div>
                                     </div>
                                 )}
                                 {(currentTenant.depositReceived != null || currentTenant.depositReceiptNumber) && (
