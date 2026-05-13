@@ -231,7 +231,25 @@ export default function RentDetailsModal({ rent, property, currentTenants = [], 
                                 label={t('Payment Status', '付款狀態')}
                                 value={paymentStatus}
                             />
-                            {(rent as any).rentCollectionPaymentDate ? (
+                            {rent.type !== 'contract' && (rent as any).rentCollectionPaymentMethod === 'cheque' ? (
+                                <>
+                                    <DetailRow label={t('Cheque bank', '支票銀行')} value={(rent as any).rentCollectionChequeBank} />
+                                    <DetailRow label={t('Cheque number', '支票號碼')} value={(rent as any).rentCollectionChequeNumber} />
+                                    {(rent as any).rentCollectionChequePaymentDate ? (
+                                        <DetailRow
+                                            label={t('Cheque date', '支票日期')}
+                                            value={formatDate((rent as any).rentCollectionChequePaymentDate)}
+                                        />
+                                    ) : null}
+                                    {(rent as any).rentCollectionChequeActualPaymentDate ? (
+                                        <DetailRow
+                                            label={t('Payment date', '付款日期')}
+                                            value={formatDate((rent as any).rentCollectionChequeActualPaymentDate)}
+                                        />
+                                    ) : null}
+                                </>
+                            ) : null}
+                            {rent.type !== 'contract' && (rent as any).rentCollectionPaymentMethod && (rent as any).rentCollectionPaymentMethod !== 'cheque' && (rent as any).rentCollectionPaymentDate ? (
                                 <DetailRow
                                     label={t('Payment Date', '付款日期')}
                                     value={formatDate((rent as any).rentCollectionPaymentDate)}

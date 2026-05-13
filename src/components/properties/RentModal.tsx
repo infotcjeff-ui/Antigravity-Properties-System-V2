@@ -222,6 +222,12 @@ export default function RentModal({
                 rentCollectionChequeBank: (rent as any).rentCollectionChequeBank || '',
                 rentCollectionChequeNumber: (rent as any).rentCollectionChequeNumber || '',
                 rentCollectionChequeImage: (rent as any).rentCollectionChequeImage || '',
+                rentCollectionChequePaymentDate: formatDate(
+                    (rent as any).rentCollectionChequePaymentDate ?? (rent as any).rent_collection_cheque_payment_date,
+                ),
+                rentCollectionChequeActualPaymentDate: formatDate(
+                    (rent as any).rentCollectionChequeActualPaymentDate ?? (rent as any).rent_collection_cheque_actual_payment_date,
+                ),
                 rentCollectionBankInImage: (rent as any).rentCollectionBankInImage || '',
                 rentCollectionNotes: rent.notes || '',
                 // 與 rentCollectionDate 一致：必須為 yyyy-mm-dd，否則 type="date" 受控值無效，變更無法寫入 state
@@ -334,6 +340,8 @@ export default function RentModal({
             rentCollectionChequeBank: '',
             rentCollectionChequeNumber: '',
             rentCollectionChequeImage: '',
+            rentCollectionChequePaymentDate: '',
+            rentCollectionChequeActualPaymentDate: '',
             rentCollectionBankInImage: '',
             rentCollectionNotes: '',
             rentCollectionPaymentDate: '',
@@ -1037,6 +1045,18 @@ export default function RentModal({
                         formData.rentCollectionChequeImage
                             ? formData.rentCollectionChequeImage
                             : undefined,
+                    rentCollectionChequePaymentDate:
+                        formData.rentCollectionPaymentMethod === 'cheque'
+                            ? formData.rentCollectionPaymentDate
+                                ? new Date(formData.rentCollectionPaymentDate)
+                                : null
+                            : null,
+                    rentCollectionChequeActualPaymentDate:
+                        formData.rentCollectionPaymentMethod === 'cheque'
+                            ? formData.rentCollectionChequeActualPaymentDate
+                                ? new Date(formData.rentCollectionChequeActualPaymentDate)
+                                : null
+                            : null,
                     rentCollectionPaymentDate: rentCollectionPaymentDateForSave,
                     rentCollectionBankInImage:
                         formData.rentCollectionPaymentMethod === 'bank_in'
@@ -1084,6 +1104,18 @@ export default function RentModal({
                         formData.rentCollectionChequeImage
                             ? formData.rentCollectionChequeImage
                             : undefined,
+                    rentCollectionChequePaymentDate:
+                        formData.rentCollectionPaymentMethod === 'cheque'
+                            ? formData.rentCollectionPaymentDate
+                                ? new Date(formData.rentCollectionPaymentDate)
+                                : null
+                            : null,
+                    rentCollectionChequeActualPaymentDate:
+                        formData.rentCollectionPaymentMethod === 'cheque'
+                            ? formData.rentCollectionChequeActualPaymentDate
+                                ? new Date(formData.rentCollectionChequeActualPaymentDate)
+                                : null
+                            : null,
                     rentCollectionPaymentDate: rentCollectionPaymentDateForSave,
                     rentCollectionBankInImage:
                         formData.rentCollectionPaymentMethod === 'bank_in'
@@ -1872,6 +1904,16 @@ export default function RentModal({
                                         />
                                     </div>
                                     <div className="space-y-2">
+                                        <label className={labelClass}>付款日期</label>
+                                        <input
+                                            type="date"
+                                            name="rentCollectionChequeActualPaymentDate"
+                                            value={formData.rentCollectionChequeActualPaymentDate}
+                                            onChange={handleChange}
+                                            className={inputClass}
+                                        />
+                                    </div>
+                                    <div className="space-y-2">
                                         <label className={labelClass}>支票影像（選填）</label>
                                         <div className="flex flex-wrap items-center gap-3">
                                             <label className="px-4 py-2 rounded-xl border border-dashed border-zinc-300 dark:border-white/20 text-sm text-blue-600 dark:text-blue-400 cursor-pointer hover:bg-blue-50 dark:hover:bg-blue-500/10 transition-colors">
@@ -2188,6 +2230,16 @@ export default function RentModal({
                                             type="date"
                                             name="rentCollectionPaymentDate"
                                             value={formData.rentCollectionPaymentDate}
+                                            onChange={handleChange}
+                                            className={inputClass}
+                                        />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <label className={labelClass}>付款日期</label>
+                                        <input
+                                            type="date"
+                                            name="rentCollectionChequeActualPaymentDate"
+                                            value={formData.rentCollectionChequeActualPaymentDate}
                                             onChange={handleChange}
                                             className={inputClass}
                                         />

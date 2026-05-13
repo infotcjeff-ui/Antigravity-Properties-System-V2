@@ -120,7 +120,11 @@ export interface Rent {
   rentCollectionChequeNumber?: string;
   /** 支票影像（base64 data URL） */
   rentCollectionChequeImage?: string;
-  /** 付款日期（入數時填寫） */
+  /** 支票日期（支票上的日期） */
+  rentCollectionChequePaymentDate?: Date;
+  /** 付款日期（支票兌現日期） */
+  rentCollectionChequeActualPaymentDate?: Date;
+  /** 付款日期（入數/FPS 等其他方式） */
   rentCollectionPaymentDate?: Date;
   /** 入數憑證／截圖（base64 data URL） */
   rentCollectionBankInImage?: string;
