@@ -228,6 +228,7 @@ export default function RentModal({
                 rentCollectionChequeActualPaymentDate: formatDate(
                     (rent as any).rentCollectionChequeActualPaymentDate ?? (rent as any).rent_collection_cheque_actual_payment_date,
                 ),
+                rentCollectionChequeReceiptNumber: (rent as any).rentCollectionChequeReceiptNumber || '',
                 rentCollectionBankInImage: (rent as any).rentCollectionBankInImage || '',
                 rentCollectionNotes: rent.notes || '',
                 // 與 rentCollectionDate 一致：必須為 yyyy-mm-dd，否則 type="date" 受控值無效，變更無法寫入 state
@@ -342,6 +343,7 @@ export default function RentModal({
             rentCollectionChequeImage: '',
             rentCollectionChequePaymentDate: '',
             rentCollectionChequeActualPaymentDate: '',
+            rentCollectionChequeReceiptNumber: '',
             rentCollectionBankInImage: '',
             rentCollectionNotes: '',
             rentCollectionPaymentDate: '',
@@ -1057,6 +1059,10 @@ export default function RentModal({
                                 ? new Date(formData.rentCollectionChequeActualPaymentDate)
                                 : null
                             : null,
+                    rentCollectionChequeReceiptNumber:
+                        formData.rentCollectionPaymentMethod === 'cheque'
+                            ? formData.rentCollectionChequeReceiptNumber?.trim() || null
+                            : null,
                     rentCollectionPaymentDate: rentCollectionPaymentDateForSave,
                     rentCollectionBankInImage:
                         formData.rentCollectionPaymentMethod === 'bank_in'
@@ -1115,6 +1121,10 @@ export default function RentModal({
                             ? formData.rentCollectionChequeActualPaymentDate
                                 ? new Date(formData.rentCollectionChequeActualPaymentDate)
                                 : null
+                            : null,
+                    rentCollectionChequeReceiptNumber:
+                        formData.rentCollectionPaymentMethod === 'cheque'
+                            ? formData.rentCollectionChequeReceiptNumber?.trim() || null
                             : null,
                     rentCollectionPaymentDate: rentCollectionPaymentDateForSave,
                     rentCollectionBankInImage:
@@ -1852,7 +1862,7 @@ export default function RentModal({
                                                     ? { rentCollectionChequeBank: '', rentCollectionChequeNumber: '', rentCollectionChequeImage: '' }
                                                     : {}),
                                                 ...(v !== 'bank_in' ? { rentCollectionBankInImage: '' } : {}),
-                                                ...(v === 'cheque' || v === '' ? { rentCollectionReceiptNumber: '' } : {}),
+                                                ...(v === 'cheque' || v === '' ? { rentCollectionReceiptNumber: '', rentCollectionChequeReceiptNumber: '' } : {}),
                                             }));
                                         }}
                                         className={inputClass}
@@ -1911,6 +1921,17 @@ export default function RentModal({
                                             value={formData.rentCollectionChequeActualPaymentDate}
                                             onChange={handleChange}
                                             className={inputClass}
+                                        />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <label className={labelClass}>收據號碼</label>
+                                        <input
+                                            type="text"
+                                            name="rentCollectionChequeReceiptNumber"
+                                            value={formData.rentCollectionChequeReceiptNumber}
+                                            onChange={handleChange}
+                                            className={inputClass}
+                                            placeholder="收據號碼"
                                         />
                                     </div>
                                     <div className="space-y-2">
@@ -2183,7 +2204,7 @@ export default function RentModal({
                                                     ? { rentCollectionChequeBank: '', rentCollectionChequeNumber: '', rentCollectionChequeImage: '' }
                                                     : {}),
                                                 ...(v !== 'bank_in' ? { rentCollectionBankInImage: '' } : {}),
-                                                ...(v === 'cheque' || v === '' ? { rentCollectionReceiptNumber: '' } : {}),
+                                                ...(v === 'cheque' || v === '' ? { rentCollectionReceiptNumber: '', rentCollectionChequeReceiptNumber: '' } : {}),
                                             }));
                                         }}
                                         className={inputClass}
@@ -2242,6 +2263,17 @@ export default function RentModal({
                                             value={formData.rentCollectionChequeActualPaymentDate}
                                             onChange={handleChange}
                                             className={inputClass}
+                                        />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <label className={labelClass}>收據號碼</label>
+                                        <input
+                                            type="text"
+                                            name="rentCollectionChequeReceiptNumber"
+                                            value={formData.rentCollectionChequeReceiptNumber}
+                                            onChange={handleChange}
+                                            className={inputClass}
+                                            placeholder="收據號碼"
                                         />
                                     </div>
                                     <div className="space-y-2">

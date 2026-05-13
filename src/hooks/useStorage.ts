@@ -1398,6 +1398,9 @@ export function useRents() {
             if (rc.rentCollectionChequeBank) rentData.rent_collection_cheque_bank = rc.rentCollectionChequeBank;
             if (rc.rentCollectionChequeNumber) rentData.rent_collection_cheque_number = rc.rentCollectionChequeNumber;
             if (rc.rentCollectionChequeImage) rentData.rent_collection_cheque_image = rc.rentCollectionChequeImage;
+            if ((rc as any).rentCollectionChequeReceiptNumber !== undefined) {
+                rentData.rent_collection_cheque_receipt_number = (rc as any).rentCollectionChequeReceiptNumber || null;
+            }
             if (rc.rentCollectionPaymentDate) rentData.rent_collection_payment_date = rc.rentCollectionPaymentDate;
             if (rc.rentCollectionBankInImage !== undefined) {
                 rentData.rent_collection_bank_in_image = rc.rentCollectionBankInImage;
@@ -1666,6 +1669,9 @@ export function useRents() {
             if (urc.rentCollectionChequeBank !== undefined) rentData.rent_collection_cheque_bank = urc.rentCollectionChequeBank || null;
             if (urc.rentCollectionChequeNumber !== undefined) rentData.rent_collection_cheque_number = urc.rentCollectionChequeNumber || null;
             if (urc.rentCollectionChequeImage !== undefined) rentData.rent_collection_cheque_image = urc.rentCollectionChequeImage || null;
+            if ((urc as any).rentCollectionChequeReceiptNumber !== undefined) {
+                rentData.rent_collection_cheque_receipt_number = (urc as any).rentCollectionChequeReceiptNumber || null;
+            }
             if (urc.rentCollectionPaymentDate !== undefined) rentData.rent_collection_payment_date = urc.rentCollectionPaymentDate || null;
             if ((urc as any).rentCollectionBankInImage !== undefined) {
                 rentData.rent_collection_bank_in_image = (urc as any).rentCollectionBankInImage || null;

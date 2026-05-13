@@ -124,6 +124,8 @@ export interface Rent {
   rentCollectionChequePaymentDate?: Date;
   /** 付款日期（支票兌現日期） */
   rentCollectionChequeActualPaymentDate?: Date;
+  /** 支票收據號碼 */
+  rentCollectionChequeReceiptNumber?: string | null;
   /** 付款日期（入數/FPS 等其他方式） */
   rentCollectionPaymentDate?: Date;
   /** 入數憑證／截圖（base64 data URL） */
