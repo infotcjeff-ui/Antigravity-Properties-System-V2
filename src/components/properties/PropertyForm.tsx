@@ -3,7 +3,6 @@
 import { useState, useEffect, useRef, useMemo, type ReactNode } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
-import { Info } from 'lucide-react';
 import { Tooltip } from '@heroui/react';
 import { useProperties, useProprietorsQuery, usePropertiesWithRelationsQuery, useRents, useRentsQuery, useRentsWithRelationsQuery, useSubLandlordsQuery, useUsersQuery } from '@/hooks/useStorage';
 import { compressImage } from '@/lib/imageUtils';
@@ -172,7 +171,7 @@ function LotCellWithTooltip({
 
     if (!rentLots.length) {
         return (
-            <div className={`text-sm leading-relaxed line-clamp-2 ${isNoLotPlaceholder ? 'text-zinc-400 dark:text-white/40 italic' : 'text-zinc-700 dark:text-white/80'}`}>
+            <div className={`text-sm leading-relaxed truncate ${isNoLotPlaceholder ? 'text-zinc-400 dark:text-white/40 italic' : 'text-zinc-700 dark:text-white/80'}`}>
                 {display}
             </div>
         );
@@ -180,6 +179,13 @@ function LotCellWithTooltip({
 
     const partialLots = rentLots.filter(lot => partial[lot]);
     const nonPartialLots = rentLots.filter(lot => !partial[lot]);
+
+    const fullText = (() => {
+        const parts: string[] = [];
+        if (nonPartialLots.length) parts.push(...nonPartialLots);
+        if (partialLots.length) parts.push(...partialLots.map(l => `${l}（部分地方）`));
+        return parts.join('、') || display;
+    })();
 
     const tooltipContent = (
         <div className="space-y-2 text-sm">
@@ -213,26 +219,17 @@ function LotCellWithTooltip({
     );
 
     return (
-        <div className="text-sm leading-relaxed line-clamp-2 overflow-hidden group">
-            {isNoLotPlaceholder ? (
-                <span className="text-zinc-400 dark:text-white/40 italic">
-                    {display}
-                </span>
-            ) : (
-                <Tooltip
-                    content={tooltipContent}
-                    placement="top"
-                    classNames={{
-                        content: 'bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white p-3 rounded-xl shadow-xl border border-zinc-200 dark:border-white/10 max-w-xs',
-                    }}
-                >
-                    <span className="cursor-default hover:underline decoration-dashed decoration-zinc-400/50 underline-offset-2 text-zinc-700 dark:text-white/80">
-                        {display}
-                        <Info className="inline-block ml-1 w-3 h-3 text-zinc-400 dark:text-white/40 align-middle opacity-0 group-hover:opacity-100 transition-opacity" />
-                    </span>
-                </Tooltip>
-            )}
-        </div>
+        <Tooltip
+            content={tooltipContent}
+            placement="top"
+            classNames={{
+                content: 'bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white p-3 rounded-xl shadow-xl border border-zinc-200 dark:border-white/10 max-w-xs',
+            }}
+        >
+            <span className="cursor-default truncate block text-zinc-700 dark:text-white/80">
+                {fullText}
+            </span>
+        </Tooltip>
     );
 }
 
@@ -764,11 +761,19 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                                     propertyLotIndex={formData.lotIndex || property?.lotIndex || ''}
                                 />
                             </div>
-                            <div className="flex flex-col overflow-hidden min-w-0 justify-center">
+                            <div className="flex flex-col overflow-hidden min-w-0 justify-start">
                                 {startDate ? (
-                                    <span className="text-zinc-800 dark:text-white/90 tabular-nums text-sm leading-snug">
-                                        {formatLeasePeriod(startDate, endDate, months)}
-                                    </span>
+                                    <Tooltip
+                                        content={formatLeasePeriod(startDate, endDate, months)}
+                                        placement="top"
+                                        classNames={{
+                                            content: 'bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white px-3 py-2 rounded-lg shadow-xl border border-zinc-200 dark:border-white/10 text-sm',
+                                        }}
+                                    >
+                                        <span className="cursor-default truncate block text-zinc-800 dark:text-white/90 tabular-nums text-sm leading-snug">
+                                            {formatLeasePeriod(startDate, endDate, months)}
+                                        </span>
+                                    </Tooltip>
                                 ) : (
                                     <span className="text-zinc-500 dark:text-white/40 italic text-sm">未設定</span>
                                 )}
@@ -944,11 +949,19 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                                     propertyLotIndex={formData.lotIndex || property?.lotIndex || ''}
                                 />
                             </div>
-                            <div className="flex flex-col overflow-hidden min-w-0 justify-center">
+                            <div className="flex flex-col overflow-hidden min-w-0 justify-start">
                                 {startDate ? (
-                                    <span className="text-zinc-800 dark:text-white/90 tabular-nums text-sm leading-snug">
-                                        {formatLeasePeriod(startDate, endDate, months)}
-                                    </span>
+                                    <Tooltip
+                                        content={formatLeasePeriod(startDate, endDate, months)}
+                                        placement="top"
+                                        classNames={{
+                                            content: 'bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white px-3 py-2 rounded-lg shadow-xl border border-zinc-200 dark:border-white/10 text-sm',
+                                        }}
+                                    >
+                                        <span className="cursor-default truncate block text-zinc-800 dark:text-white/90 tabular-nums text-sm leading-snug">
+                                            {formatLeasePeriod(startDate, endDate, months)}
+                                        </span>
+                                    </Tooltip>
                                 ) : (
                                     <span className="text-zinc-500 dark:text-white/40 italic text-sm">未設定</span>
                                 )}
