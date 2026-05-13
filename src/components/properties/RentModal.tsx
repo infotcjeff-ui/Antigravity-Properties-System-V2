@@ -1803,7 +1803,7 @@ export default function RentModal({
                                             </button>
                                         </div>
                                     )}
-                                    {inlineLotAddType === null && (
+                                    {inlineLotAddType === null && !loadingData && (
                                         <div className="flex gap-2">
                                             <button
                                                 type="button"
