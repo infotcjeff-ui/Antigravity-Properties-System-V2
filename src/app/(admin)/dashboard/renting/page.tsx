@@ -13,6 +13,7 @@ import {
     hasRentCollectionPaidAmount,
     labelRentCollectionPaymentMethod,
     matchesRentPaymentMethodFilter,
+    getRentCollectionPaymentDate,
     type RentCollectionPayListStatus,
     type RentPaymentMethodFilterValue,
 } from '@/lib/rentPaymentDisplay';
@@ -416,7 +417,7 @@ export default function RentingPage() {
                                                     {payMethod}
                                                 </td>
                                                 <td className="p-4 text-zinc-600 dark:text-white/70 text-sm tabular-nums">
-                                                    {formatDateDMY(rent.rentCollectionPaymentDate) || '—'}
+                                                    {getRentCollectionPaymentDate(rent) || '—'}
                                                 </td>
                                                 <td
                                                     className={`p-4 text-sm font-medium ${

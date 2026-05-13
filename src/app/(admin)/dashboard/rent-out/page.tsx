@@ -483,9 +483,13 @@ export default function RentOutPage() {
                                                     {payMethod}
                                                 </td>
                                                 <td className="p-4 text-zinc-500 dark:text-white/50 text-sm">
-                                                    {rent.rentCollectionPaymentDate
-                                                        ? formatDateDMY(rent.rentCollectionPaymentDate)
-                                                        : <span className="text-zinc-300 dark:text-white/30">—</span>
+                                                    {rent.rentCollectionPaymentMethod === 'cheque'
+                                                        ? rent.rentCollectionChequeActualPaymentDate
+                                                            ? formatDateDMY(rent.rentCollectionChequeActualPaymentDate)
+                                                            : '暫無'
+                                                        : rent.rentCollectionPaymentDate
+                                                            ? formatDateDMY(rent.rentCollectionPaymentDate)
+                                                            : <span className="text-zinc-300 dark:text-white/30">—</span>
                                                     }
                                                 </td>
                                                 <td className={`p-4 text-sm ${payListStatus === 'paid' ? 'text-zinc-400 dark:text-white/40' : 'text-red-500 font-medium'}`}>

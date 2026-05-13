@@ -332,6 +332,28 @@ export function getPropertyCurrentTenantsWithLots(
     return result;
 }
 
+/** 交租／收租列表「付款日期」：支票時顯示支票資料付款日，否則顯示一般付款日；無值時顯示空字串 */
+export function getRentCollectionPaymentDate(rent: {
+    rentCollectionPaymentMethod?: 'cheque' | 'fps' | 'cash' | 'bank_in' | string | null;
+    rentCollectionPaymentDate?: Date | string | null;
+    rentCollectionChequePaymentDate?: Date | string | null;
+    rent_collection_payment_method?: string | null;
+    rent_collection_payment_date?: string | Date | null;
+    rent_collection_cheque_payment_date?: string | Date | null;
+}): string {
+    const raw = rent as Record<string, unknown>;
+    const method = rent.rentCollectionPaymentMethod
+        ?? (typeof raw.rent_collection_payment_method === 'string' ? raw.rent_collection_payment_method : null);
+    if (method === 'cheque') {
+        const chequeDate = rent.rentCollectionChequePaymentDate
+            ?? (raw.rent_collection_cheque_payment_date as string | Date | null);
+        return formatDateDMY(coerceRentDateField(chequeDate as string | Date | null));
+    }
+    const payDate = rent.rentCollectionPaymentDate
+        ?? (raw.rent_collection_payment_date as string | Date | null);
+    return formatDateDMY(coerceRentDateField(payDate as string | Date | null));
+}
+
 /** 收／交租表單之付款方式（含按金方式、出租合約按金方式） */
 export function labelRentCollectionPaymentMethod(
     method?: 'cheque' | 'fps' | 'cash' | 'bank_in' | string | null,
