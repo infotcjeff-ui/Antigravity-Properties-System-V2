@@ -35,6 +35,8 @@ const landUseTypeLabels: Record<string, string> = {
     conservation_area: '保育區',
     residential_c: '住宅(丙類)',
     recreation_use: '休憩用地',
+    r_d: 'R(D) 住宅(丁類)',
+    r_a5: 'R(A)5 住宅(甲類)5',
 };
 
 const statusLabels: Record<string, string> = {
@@ -239,13 +241,6 @@ export default function ManagePropertiesPage() {
                     <option value="os">OS 露天貯物</option>
                     <option value="v">V 鄉村式發展</option>
                     <option value="ou">OU 其他指定用途</option>
-                    <option value="open_storage">露天倉儲</option>
-                    <option value="residential_a">住宅(甲)</option>
-                    <option value="open_space">開放空間</option>
-                    <option value="village_dev">鄉村式發展</option>
-                    <option value="conservation_area">保育區</option>
-                    <option value="residential_c">住宅(丙類)</option>
-                    <option value="recreation_use">休憩用地</option>
                     <option value="r_d">R(D) 住宅(丁類)</option>
                     <option value="r_a5">R(A)5 住宅(甲類)5</option>
                 </select>
