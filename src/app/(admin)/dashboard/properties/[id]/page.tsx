@@ -917,7 +917,9 @@ export default function PropertyDetailsPage() {
                                                             >
                                                                 <div>
                                                                     {formatEnDate(startDate)}
-                                                                    {startDate && endDate ? ` ~ ${formatEnDate(endDate)}` : ''}
+                                                                    {startDate && endDate
+                                                                        ? ` ~ ${formatEnDate(endDate)}`
+                                                                        : startDate ? ' ~ 現在' : ''}
                                                                 </div>
                                                                 {periodsDisplay && (
                                                                     <div>({fmtYears(periodsDisplay)})</div>

@@ -1193,7 +1193,9 @@ export default function PropertyDetailsPage() {
                                                             <div className="text-sm text-zinc-600 dark:text-white/70 leading-relaxed">
                                                                 <div>
                                                                     {formatEnDate(startDate)}
-                                                                    {startDate && endDate ? ` ~ ${formatEnDate(endDate)}` : ''}
+                                                                    {startDate && endDate
+                                                                        ? ` ~ ${formatEnDate(endDate)}`
+                                                                        : startDate ? ' ~ 現在' : ''}
                                                                 </div>
                                                                 {periodsDisplay && (
                                                                     <div>({fmtYears(periodsDisplay)})</div>
