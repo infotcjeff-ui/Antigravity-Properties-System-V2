@@ -359,6 +359,7 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
     const [showLeaseLotAddModal, setShowLeaseLotAddModal] = useState(false);
     const [leaseLotAddMode, setLeaseLotAddMode] = useState<'new' | 'old' | null>(null);
     const [tempLeaseLotInput, setTempLeaseLotInput] = useState('');
+    const [pendingLotRemovals, setPendingLotRemovals] = useState<Set<number>>(new Set());
     const [editingLotIndex, setEditingLotIndex] = useState<number | null>(null);
     const [editingLotValue, setEditingLotValue] = useState('');
     const [editingLotType, setEditingLotType] = useState<'new' | 'old'>('new');
@@ -428,22 +429,38 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
     };
 
     const removeLotEntry = (index: number) => {
-        const next = lotEntries.filter((_, i) => i !== index);
-        setFormData(prev => ({ ...prev, lotIndex: serializeLotEntries(next) }));
+        const entry = lotEntries[index];
+        if (!entry) return;
+        if (!window.confirm(`是否確認移除此地段？\n\n「${entry.value}」\n\n按下確認後，將在更新物業時移除。`)) return;
+        if (editingLotIndex === index) cancelEditLotEntry();
+        setPendingLotRemovals(prev => new Set([...prev, index]));
+    };
+
+    const restoreLotEntry = (index: number) => {
+        setPendingLotRemovals(prev => {
+            const next = new Set(prev);
+            next.delete(index);
+            return next;
+        });
     };
 
     const startEditLotEntry = (index: number) => {
         const entry = lotEntries[index];
         if (entry) {
             setEditingLotIndex(index);
-            setEditingLotValue(entry.value);
+            setEditingLotValue(entry.value.replace(/\s*\(租賃地段\)$/, ''));
         }
     };
 
     const saveEditLotEntry = () => {
         if (editingLotIndex === null || !editingLotValue.trim()) return;
         const next = [...lotEntries];
-        next[editingLotIndex] = { type: editingLotType, value: editingLotValue.trim() };
+        const entry = next[editingLotIndex];
+        const wasLease = entry.value.endsWith('(租賃地段)');
+        next[editingLotIndex] = {
+            type: editingLotType,
+            value: wasLease ? `${editingLotValue.trim()} (租賃地段)` : editingLotValue.trim()
+        };
         setFormData(prev => ({ ...prev, lotIndex: serializeLotEntries(next) }));
         setEditingLotIndex(null);
         setEditingLotValue('');
@@ -1202,11 +1219,15 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
             const finalImages = orderedImages.map(x => typeof x === 'string' ? x : uploadedImageUrls[imgUrlIdx++]);
             const finalGeoMaps = orderedGeoMaps.map(x => typeof x === 'string' ? x : uploadedGeoMapUrls[geoUrlIdx++]);
 
+            // 過濾掉待移除的地段
+            const finalLotEntries = lotEntries.filter((_, i) => !pendingLotRemovals.has(i));
+            const finalLotIndex = serializeLotEntries(finalLotEntries);
+
             const propertyData = {
                 name: formData.name.trim(),
                 code: formData.code.trim().toUpperCase(),
                 address: formData.address.trim(),
-                lotIndex: formData.lotIndex,
+                lotIndex: finalLotIndex,
                 lotArea: formData.lotArea,
                 type: formData.type as Property['type'],
                 status: formData.status as Property['status'],
@@ -1251,6 +1272,7 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
             }
 
             onSuccess();
+            setPendingLotRemovals(new Set());
         } catch (err) {
             console.error('Submit error:', err);
             setError(`Save failed: ${err instanceof Error ? err.message : 'Unknown error'}`);
@@ -1680,44 +1702,82 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                                                         舊
                                                     </button>
                                                 </div>
-                                                <input
-                                                    type="text"
-                                                    value={editingLotValue}
-                                                    onChange={(e) => setEditingLotValue(e.target.value)}
-                                                    className="flex-1 min-w-0 px-3 py-1.5 bg-white dark:bg-white/5 border border-zinc-200 dark:border-white/10 rounded-lg text-sm text-zinc-900 dark:text-white"
-                                                    placeholder="例如: DD 111 LOT 1523, 1539"
-                                                    autoFocus
-                                                />
+                                                {lotEntries[editingLotIndex]?.value.endsWith('(租賃地段)') ? (
+                                                    <div className="flex gap-1 items-center flex-1 min-w-0">
+                                                        <input
+                                                            type="text"
+                                                            value={editingLotValue}
+                                                            onChange={(e) => setEditingLotValue(e.target.value)}
+                                                            className="flex-1 min-w-0 px-3 py-1.5 bg-white dark:bg-white/5 border border-zinc-200 dark:border-white/10 rounded-lg text-sm text-zinc-900 dark:text-white"
+                                                            placeholder="輸入地段"
+                                                            autoFocus
+                                                        />
+                                                        <span className="shrink-0 text-sm text-teal-600 dark:text-teal-400 font-medium">(租賃地段)</span>
+                                                    </div>
+                                                ) : (
+                                                    <input
+                                                        type="text"
+                                                        value={editingLotValue}
+                                                        onChange={(e) => setEditingLotValue(e.target.value)}
+                                                        className="flex-1 min-w-0 px-3 py-1.5 bg-white dark:bg-white/5 border border-zinc-200 dark:border-white/10 rounded-lg text-sm text-zinc-900 dark:text-white"
+                                                        placeholder="例如: DD 111 LOT 1523, 1539"
+                                                        autoFocus
+                                                    />
+                                                )}
                                                 <div className="flex gap-1 shrink-0">
                                                     <button
                                                         type="button"
                                                         onClick={saveEditLotEntry}
                                                         disabled={!editingLotValue.trim()}
-                                                        className="px-3 py-1.5 bg-purple-500 text-white rounded-lg hover:bg-purple-600 disabled:opacity-50 text-xs"
+                                                        className="px-3 py-1.5 bg-purple-500 text-white rounded-lg hover:bg-purple-600 disabled:opacity-50 text-xs cursor-pointer"
                                                     >
                                                         確認
                                                     </button>
                                                     <button
                                                         type="button"
                                                         onClick={cancelEditLotEntry}
-                                                        className="px-3 py-1.5 text-zinc-500 hover:text-zinc-700 dark:hover:text-white/70 text-xs"
+                                                        className="px-3 py-1.5 text-zinc-500 hover:text-zinc-700 dark:hover:text-white/70 text-xs cursor-pointer"
                                                     >
                                                         取消
                                                     </button>
                                                 </div>
+                                            </>
+                                        ) : pendingLotRemovals.has(i) ? (
+                                            <>
+                                                <span className={`shrink-0 px-2 py-0.5 rounded text-xs font-medium bg-zinc-300/50 dark:bg-white/5 text-zinc-400 dark:text-white/30 line-through`}>
+                                                    {entry.type === 'new' ? '新' : '舊'}
+                                                </span>
+                                                <span className="flex-1 text-sm text-zinc-400 dark:text-white/30 line-through break-all">{entry.value}</span>
+                                                <span className="shrink-0 text-xs text-red-400 dark:text-red-400">待移除</span>
+                                                {isAuthenticated && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => restoreLotEntry(i)}
+                                                        className="px-2 py-1 bg-emerald-100 dark:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 rounded-lg hover:bg-emerald-200 dark:hover:bg-emerald-500/30 text-xs cursor-pointer"
+                                                    >
+                                                        恢復
+                                                    </button>
+                                                )}
                                             </>
                                         ) : (
                                             <>
                                                 <span className={`shrink-0 px-2 py-0.5 rounded text-xs font-medium ${entry.type === 'new' ? 'bg-emerald-500/20 text-emerald-600 dark:text-emerald-400' : 'bg-zinc-200 dark:bg-white/10 text-zinc-600 dark:text-white/70'}`}>
                                                     {entry.type === 'new' ? '新' : '舊'}
                                                 </span>
-                                                <span className="flex-1 text-sm text-zinc-900 dark:text-white break-all">{entry.value}</span>
+                                                {entry.value.endsWith('(租賃地段)') ? (
+                                                    <span className="flex-1 text-sm text-zinc-900 dark:text-white break-all">
+                                                        {entry.value.replace(/\s*\(租賃地段\)$/, '')}
+                                                        <span className="text-teal-600 dark:text-teal-400 font-medium"> (租賃地段)</span>
+                                                    </span>
+                                                ) : (
+                                                    <span className="flex-1 text-sm text-zinc-900 dark:text-white break-all">{entry.value}</span>
+                                                )}
                                                 {isAuthenticated && (
                                                     <div className="flex items-center gap-1 shrink-0">
                                                         <button
                                                             type="button"
                                                             onClick={() => startEditLotEntry(i)}
-                                                            className="p-1 text-zinc-400 hover:text-purple-500 rounded"
+                                                            className="p-1 text-zinc-400 hover:text-purple-500 rounded cursor-pointer"
                                                             title="編輯"
                                                         >
                                                             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
@@ -1725,7 +1785,7 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                                                         <button
                                                             type="button"
                                                             onClick={() => removeLotEntry(i)}
-                                                            className="p-1 text-zinc-400 hover:text-red-500 rounded"
+                                                            className="p-1 text-zinc-400 hover:text-red-500 rounded cursor-pointer"
                                                             title="移除"
                                                         >
                                                             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
