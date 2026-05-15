@@ -356,6 +356,9 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
     const [showLotAddModal, setShowLotAddModal] = useState(false);
     const [lotAddMode, setLotAddMode] = useState<'new' | 'old' | null>(null);
     const [tempLotInput, setTempLotInput] = useState('');
+    const [showLeaseLotAddModal, setShowLeaseLotAddModal] = useState(false);
+    const [leaseLotAddMode, setLeaseLotAddMode] = useState<'new' | 'old' | null>(null);
+    const [tempLeaseLotInput, setTempLeaseLotInput] = useState('');
     const [editingLotIndex, setEditingLotIndex] = useState<number | null>(null);
     const [editingLotValue, setEditingLotValue] = useState('');
     const [editingLotType, setEditingLotType] = useState<'new' | 'old'>('new');
@@ -409,6 +412,19 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
         setShowLotAddModal(false);
         setLotAddMode(null);
         setTempLotInput('');
+    };
+
+    const appendLeaseLotIndex = (newLot: string, mode: 'new' | 'old') => {
+        const trimmed = newLot.trim();
+        if (!trimmed) return;
+        const entry = { type: mode, value: `${trimmed} (租賃地段)` };
+        setFormData(prev => ({
+            ...prev,
+            lotIndex: serializeLotEntries([...lotEntries, entry]),
+        }));
+        setShowLeaseLotAddModal(false);
+        setLeaseLotAddMode(null);
+        setTempLeaseLotInput('');
     };
 
     const removeLotEntry = (index: number) => {
@@ -1622,13 +1638,22 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                         <div className="flex items-center justify-between">
                             <label className="block text-sm font-medium text-zinc-700 dark:text-white/80">物業地段</label>
                             {isAuthenticated && (
-                                <button
-                                    type="button"
-                                    onClick={() => setShowLotAddModal(true)}
-                                    className="px-4 py-2 bg-purple-50 dark:bg-purple-500/20 text-purple-600 dark:text-purple-400 rounded-xl hover:bg-purple-100 dark:hover:bg-purple-500/30 border border-purple-100 dark:border-purple-500/30 text-sm font-medium transition-all duration-300"
-                                >
-                                    + 新增地段
-                                </button>
+                                <div className="flex gap-2">
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowLotAddModal(true)}
+                                        className="px-4 py-2 bg-purple-50 dark:bg-purple-500/20 text-purple-600 dark:text-purple-400 rounded-xl hover:bg-purple-100 dark:hover:bg-purple-500/30 border border-purple-100 dark:border-purple-500/30 text-sm font-medium transition-all duration-300"
+                                    >
+                                        + 新增地段
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowLeaseLotAddModal(true)}
+                                        className="px-4 py-2 bg-teal-50 dark:bg-teal-500/20 text-teal-600 dark:text-teal-400 rounded-xl hover:bg-teal-100 dark:hover:bg-teal-500/30 border border-teal-100 dark:border-teal-500/30 text-sm font-medium transition-all duration-300"
+                                    >
+                                        + 新增租賃地段
+                                    </button>
+                                </div>
                             )}
                         </div>
                         <div className="min-h-12 px-4 py-3 bg-zinc-50 dark:bg-white/5 border border-zinc-200 dark:border-white/10 rounded-xl space-y-2">
@@ -1788,6 +1813,89 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                                         <button
                                             type="button"
                                             onClick={() => { setLotAddMode(null); setTempLotInput(''); }}
+                                            className="px-4 py-2 text-zinc-500 hover:text-zinc-700 text-sm"
+                                        >
+                                            返回
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                        {/* 租賃地段新增 Modal */}
+                        {showLeaseLotAddModal && (
+                            <div className="mt-3 p-4 bg-teal-50/50 dark:bg-teal-500/10 rounded-xl border border-teal-200 dark:border-teal-500/30 space-y-3">
+                                <p className="text-sm font-medium text-teal-700 dark:text-teal-400">新增租賃地段</p>
+                                {leaseLotAddMode === null ? (
+                                    <div className="flex gap-2">
+                                        <button
+                                            type="button"
+                                            onClick={() => setLeaseLotAddMode('new')}
+                                            className="px-4 py-2 bg-teal-500/20 text-teal-600 dark:text-teal-400 rounded-lg hover:bg-teal-500/30 text-sm"
+                                        >
+                                            新地段
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => setLeaseLotAddMode('old')}
+                                            className="px-4 py-2 bg-zinc-200 dark:bg-white/10 text-zinc-700 dark:text-white/80 rounded-lg hover:bg-zinc-300 dark:hover:bg-white/20 text-sm"
+                                        >
+                                            舊地段
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => { setShowLeaseLotAddModal(false); setLeaseLotAddMode(null); }}
+                                            className="px-4 py-2 text-zinc-500 dark:text-white/50 hover:text-zinc-700 dark:hover:text-white text-sm"
+                                        >
+                                            取消
+                                        </button>
+                                    </div>
+                                ) : leaseLotAddMode === 'new' ? (
+                                    <div className="flex gap-2 items-center">
+                                        <input
+                                            type="text"
+                                            value={tempLeaseLotInput}
+                                            onChange={(e) => setTempLeaseLotInput(e.target.value)}
+                                            placeholder="例如: DD 111 LOT 1523, 1539"
+                                            className="flex-1 px-3 py-2 bg-white dark:bg-white/5 border border-teal-200 dark:border-teal-500/30 rounded-lg text-sm text-zinc-900 dark:text-white placeholder-zinc-400"
+                                            autoFocus
+                                        />
+                                        <button
+                                            type="button"
+                                            onClick={() => appendLeaseLotIndex(tempLeaseLotInput, 'new')}
+                                            disabled={!tempLeaseLotInput.trim()}
+                                            className="px-4 py-2 bg-teal-500 text-white rounded-lg hover:bg-teal-600 disabled:opacity-50 text-sm"
+                                        >
+                                            確認
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => { setLeaseLotAddMode(null); setTempLeaseLotInput(''); }}
+                                            className="px-4 py-2 text-zinc-500 hover:text-zinc-700 text-sm"
+                                        >
+                                            返回
+                                        </button>
+                                    </div>
+                                ) : (
+                                    <div className="flex gap-2 items-center">
+                                        <input
+                                            type="text"
+                                            value={tempLeaseLotInput}
+                                            onChange={(e) => setTempLeaseLotInput(e.target.value)}
+                                            placeholder="輸入舊地段，例如: DD 111 LOT 1523, 1539"
+                                            className="flex-1 px-3 py-2 bg-white dark:bg-white/5 border border-teal-200 dark:border-teal-500/30 rounded-lg text-sm text-zinc-900 dark:text-white placeholder-zinc-400"
+                                            autoFocus
+                                        />
+                                        <button
+                                            type="button"
+                                            onClick={() => appendLeaseLotIndex(tempLeaseLotInput, 'old')}
+                                            disabled={!tempLeaseLotInput.trim()}
+                                            className="px-4 py-2 bg-teal-500 text-white rounded-lg hover:bg-teal-600 disabled:opacity-50 text-sm"
+                                        >
+                                            確認
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => { setLeaseLotAddMode(null); setTempLeaseLotInput(''); }}
                                             className="px-4 py-2 text-zinc-500 hover:text-zinc-700 text-sm"
                                         >
                                             返回
