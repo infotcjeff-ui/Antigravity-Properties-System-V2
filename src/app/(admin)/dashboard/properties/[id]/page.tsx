@@ -37,6 +37,8 @@ import {
     X,
     Map,
     Image as ImageIcon,
+    ChevronDown,
+    ChevronUp,
     Users,
 } from 'lucide-react';
 import { useLanguage } from '@/components/common/LanguageSwitcher';
@@ -329,6 +331,7 @@ export default function PropertyDetailsPage() {
     const [selectedRent, setSelectedRent] = useState<Rent | null>(null);
     const [imageError, setImageError] = useState(false);
     const [mainTab, setMainTab] = useState<'overview' | 'location' | 'policy' | 'booking'>('overview');
+    const [isLotIndexExpanded, setIsLotIndexExpanded] = useState(false);
 
     const mainTabs = [
         { id: 'overview' as const, en: 'Overview', zh: '概覽' },
@@ -517,11 +520,38 @@ export default function PropertyDetailsPage() {
                             </div>
                             <div className="bg-zinc-50 dark:bg-white/5 rounded-xl p-4 border border-zinc-100 dark:border-none">
                                 <p className="text-zinc-400 dark:text-white/40 text-sm">{t('Lot Index', '物業地段')}</p>
-                                <p className="font-medium mt-1 text-zinc-900 dark:text-white">
-                                    {property.lotIndex
-                                        ? formatLotIndexPlainJoined(property.lotIndex) || '暫無。'
-                                        : '暫無。'}
-                                </p>
+                                {(() => {
+                                    const rawLots = property.lotIndex ? formatLotIndexPlainJoined(property.lotIndex) : '';
+                                    const lines = (rawLots || '').split(' , ').filter(Boolean);
+                                    const isMultiLine = lines.length > 1;
+                                    const displayText = isMultiLine
+                                        ? lines.slice(0, 1).join(' , ')
+                                        : rawLots || '暫無。';
+                                    const restText = isMultiLine ? lines.slice(1).join(' , ') : '';
+                                    return (
+                                        <div className="mt-1">
+                                            <p className="font-medium text-zinc-900 dark:text-white">
+                                                {displayText || '暫無。'}
+                                                {isMultiLine && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setIsLotIndexExpanded(!isLotIndexExpanded)}
+                                                        className="ml-2 inline-flex items-center gap-0.5 text-xs text-blue-500 hover:text-blue-600 dark:text-blue-400 dark:hover:text-blue-300 cursor-pointer"
+                                                    >
+                                                        {isLotIndexExpanded ? (
+                                                            <><ChevronUp className="w-3 h-3" /> {t('Collapse', '收合')}</>
+                                                        ) : (
+                                                            <><ChevronDown className="w-3 h-3" /> +{lines.length - 1} {t('more', '項')}</>
+                                                        )}
+                                                    </button>
+                                                )}
+                                            </p>
+                                            {isMultiLine && isLotIndexExpanded && restText && (
+                                                <p className="font-medium text-zinc-900 dark:text-white mt-1">{restText}</p>
+                                            )}
+                                        </div>
+                                    );
+                                })()}
                             </div>
                             <div className="bg-zinc-50 dark:bg-white/5 rounded-xl p-4 border border-zinc-100 dark:border-none">
                                 <p className="text-zinc-400 dark:text-white/40 text-sm">{t('Lot Area', '地段面積')}</p>

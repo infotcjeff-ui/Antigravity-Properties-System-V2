@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState, useRef } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { usePropertyWithRelationsQuery, useSubLandlordsQuery, useCurrentTenantsQuery } from '@/hooks/useStorage';
 import {
     formatLotArea,
@@ -294,6 +294,7 @@ export default function PropertyDetailsPage() {
     const [imageError, setImageError] = useState(false);
     const [isNotesExpanded, setIsNotesExpanded] = useState(false);
     const [rentHistoryTab, setRentHistoryTab] = useState<RentHistoryTabKey>('rent_out');
+    const [isLotIndexExpanded, setIsLotIndexExpanded] = useState(false);
     const [mainTab, setMainTab] = useState<'overview' | 'location' | 'policy' | 'booking'>('overview');
     const [showNotesToggle, setShowNotesToggle] = useState(false);
     const [rentPage, setRentPage] = useState(1);
@@ -389,6 +390,15 @@ export default function PropertyDetailsPage() {
         () => getPropertyCurrentTenantsWithLots(property, currentTenants),
         [property, currentTenants],
     );
+
+    // Auto-play: advance current tenant slider every 3s when multiple tenants exist
+    useEffect(() => {
+        if (propertyCurrentTenantsWithLots.length <= 1) return;
+        const interval = setInterval(() => {
+            setCurrentTenantIndex((i) => (i + 1) % propertyCurrentTenantsWithLots.length);
+        }, 3000);
+        return () => clearInterval(interval);
+    }, [propertyCurrentTenantsWithLots.length]);
 
     const nextImage = () => {
         if (property?.images && property.images.length > 0) {
@@ -678,11 +688,38 @@ export default function PropertyDetailsPage() {
                             </div>
                             <div className="bg-zinc-50 dark:bg-white/5 rounded-xl p-4 border border-zinc-100 dark:border-none">
                                 <p className="text-zinc-400 dark:text-white/40 text-sm">{t('Lot Index', '物業地段')}</p>
-                                <p className="font-medium mt-1 text-zinc-900 dark:text-white">
-                                    {property.lotIndex
-                                        ? formatLotIndexPlainJoined(property.lotIndex) || '暫無。'
-                                        : '暫無。'}
-                                </p>
+                                {(() => {
+                                    const rawLots = property.lotIndex ? formatLotIndexPlainJoined(property.lotIndex) : '';
+                                    const lines = (rawLots || '').split(' , ').filter(Boolean);
+                                    const isMultiLine = lines.length > 1;
+                                    const displayText = isMultiLine
+                                        ? lines.slice(0, 1).join(' , ')
+                                        : rawLots || '暫無。';
+                                    const restText = isMultiLine ? lines.slice(1).join(' , ') : '';
+                                    return (
+                                        <div className="mt-1">
+                                            <p className="font-medium text-zinc-900 dark:text-white">
+                                                {displayText || '暫無。'}
+                                                {isMultiLine && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setIsLotIndexExpanded(!isLotIndexExpanded)}
+                                                        className="ml-2 inline-flex items-center gap-0.5 text-xs text-blue-500 hover:text-blue-600 dark:text-blue-400 dark:hover:text-blue-300 cursor-pointer"
+                                                    >
+                                                        {isLotIndexExpanded ? (
+                                                            <><ChevronUp className="w-3 h-3" /> {t('Collapse', '收合')}</>
+                                                        ) : (
+                                                            <><ChevronDown className="w-3 h-3" /> +{lines.length - 1} {t('more', '項')}</>
+                                                        )}
+                                                    </button>
+                                                )}
+                                            </p>
+                                            {isMultiLine && isLotIndexExpanded && restText && (
+                                                <p className="font-medium text-zinc-900 dark:text-white mt-1">{restText}</p>
+                                            )}
+                                        </div>
+                                    );
+                                })()}
                             </div>
                             <div className="bg-zinc-50 dark:bg-white/5 rounded-xl p-4 border border-zinc-100 dark:border-none">
                                 <p className="text-zinc-400 dark:text-white/40 text-sm">{t('Lot Area', '地段面積')}</p>
@@ -769,8 +806,17 @@ export default function PropertyDetailsPage() {
                                     {(() => {
                                         const currentCT = propertyCurrentTenantsWithLots[currentTenantIndex];
                                         const ct = currentCT.tenant;
+                                        const direction = 1; // 自動播放方向固定向右
                                         return (
-                                            <div className="flex items-start gap-4">
+                                            <AnimatePresence mode="popLayout" initial={false}>
+                                                <motion.div
+                                                    key={currentTenantIndex}
+                                                    initial={{ opacity: 0, x: direction > 0 ? 30 : -30 }}
+                                                    animate={{ opacity: 1, x: 0 }}
+                                                    exit={{ opacity: 0, x: direction > 0 ? -30 : 30 }}
+                                                    transition={{ duration: 0.25, ease: 'easeInOut' }}
+                                                    className="flex items-start gap-4 min-w-0 flex-1"
+                                                >
                                                 <div className="w-12 h-12 shrink-0 rounded-full bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center text-white font-semibold">
                                                     {(ct.name || '?').charAt(0).toUpperCase()}
                                                 </div>
@@ -803,7 +849,8 @@ export default function PropertyDetailsPage() {
                                                         </p>
                                                     )}
                                                 </div>
-                                            </div>
+                                            </motion.div>
+                                            </AnimatePresence>
                                         );
                                     })()}
 
