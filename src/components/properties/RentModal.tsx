@@ -13,7 +13,7 @@ import {
     useRentsWithRelationsQuery,
     syncContractLotsToRentOutRecords,
 } from '@/hooks/useStorage';
-import { X, ExternalLink, Building2, FileText } from 'lucide-react';
+import { X, ExternalLink, Building2, FileText, Plus, Trash2 } from 'lucide-react';
 import { fileToBase64, compressImage, validateImageUpload } from '@/lib/imageUtils';
 import type { Proprietor, Property, Rent, RentCollectionPaymentMethod, SubLandlord, CurrentTenant } from '@/lib/db';
 import { RENT_OUT_CONTRACT_STATUS_OPTIONS, getRentOutOrContractListNumber } from '@/lib/rentPaymentDisplay';
@@ -70,6 +70,40 @@ const CONTRACT_NATURE_OPTIONS = [
     { value: 'temporary_parking', label: '臨時車位' },
     { value: 'rental_venue', label: '租用埸地' },
 ] as const;
+
+/** 按金資料-entry 類型 */
+interface DepositEntry {
+    rentOutDepositReceived: string;
+    rentOutDepositPaymentMethod: '' | RentCollectionPaymentMethod;
+    rentOutDepositReceiptNumber: string;
+    rentOutDepositChequeBank: string;
+    rentOutDepositChequeNumber: string;
+    rentOutDepositChequeImage: string;
+    rentOutDepositChequePaymentDate: string;
+    rentOutDepositChequeReceiptNumber: string;
+    rentOutDepositPaymentDate: string;
+    rentOutDepositBankInImage: string;
+    rentOutDepositReceiveDate: string;
+    rentOutDepositReturnDate: string;
+    rentOutDepositReturnAmount: string;
+}
+
+/** 預設空白按金 entry */
+const DEFAULT_DEPOSIT_ENTRY: DepositEntry = {
+    rentOutDepositReceived: '',
+    rentOutDepositPaymentMethod: '',
+    rentOutDepositReceiptNumber: '',
+    rentOutDepositChequeBank: '',
+    rentOutDepositChequeNumber: '',
+    rentOutDepositChequeImage: '',
+    rentOutDepositChequePaymentDate: '',
+    rentOutDepositChequeReceiptNumber: '',
+    rentOutDepositPaymentDate: '',
+    rentOutDepositBankInImage: '',
+    rentOutDepositReceiveDate: '',
+    rentOutDepositReturnDate: '',
+    rentOutDepositReturnAmount: '',
+};
 
 const RENT_PAYMENT_METHOD_VALUES: readonly RentCollectionPaymentMethod[] = ['cheque', 'fps', 'cash', 'bank_in'];
 
@@ -364,6 +398,10 @@ export default function RentModal({
         };
     });
 
+    const [showDepositSection, setShowDepositSection] = useState(false);
+    /** 按金資料 entries（可新增多個） */
+    const [depositEntries, setDepositEntries] = useState<DepositEntry[]>([]);
+
     const contractsOnProperty = useMemo(() => {
         const pid = formData.propertyId;
         if (!pid) return [] as Rent[];
@@ -481,6 +519,29 @@ export default function RentModal({
         setProprietors(propsData);
         setProperties(propertiesData);
         setLoadingData(false);
+
+        // 按金資料 migration：若現有 formData 有按金值，初始化 depositEntries
+        if (rent?.id) {
+            const entry: DepositEntry = {
+                rentOutDepositReceived: formData.rentOutDepositReceived,
+                rentOutDepositPaymentMethod: formData.rentOutDepositPaymentMethod,
+                rentOutDepositReceiptNumber: formData.rentOutDepositReceiptNumber,
+                rentOutDepositChequeBank: formData.rentOutDepositChequeBank,
+                rentOutDepositChequeNumber: formData.rentOutDepositChequeNumber,
+                rentOutDepositChequeImage: formData.rentOutDepositChequeImage,
+                rentOutDepositChequePaymentDate: formData.rentOutDepositChequePaymentDate,
+                rentOutDepositChequeReceiptNumber: formData.rentOutDepositChequeReceiptNumber,
+                rentOutDepositPaymentDate: formData.rentOutDepositPaymentDate,
+                rentOutDepositBankInImage: formData.rentOutDepositBankInImage,
+                rentOutDepositReceiveDate: formData.rentOutDepositReceiveDate,
+                rentOutDepositReturnDate: formData.rentOutDepositReturnDate,
+                rentOutDepositReturnAmount: formData.rentOutDepositReturnAmount,
+            };
+            if (entry.rentOutDepositReceived || entry.rentOutDepositReceiveDate) {
+                setDepositEntries([entry]);
+                setShowDepositSection(true);
+            }
+        }
     };
 
     useEffect(() => {
@@ -977,6 +1038,84 @@ export default function RentModal({
         setFormData(prev => ({ ...prev, [name]: parsed }));
     };
 
+    /** 按金 entry 的一般欄位變更 */
+    const handleDepositEntryChange = (index: number, name: keyof DepositEntry, value: string) => {
+        setDepositEntries(prev => {
+            const next = [...prev];
+            next[index] = { ...next[index], [name]: value };
+            // 支付方式變更時清除相關細節
+            if (name === 'rentOutDepositPaymentMethod') {
+                const v = value as '' | RentCollectionPaymentMethod;
+                next[index] = {
+                    ...next[index],
+                    rentOutDepositPaymentMethod: v,
+                    rentOutDepositChequeBank: '',
+                    rentOutDepositChequeNumber: '',
+                    rentOutDepositChequeImage: '',
+                    rentOutDepositBankInImage: '',
+                    rentOutDepositReceiptNumber: '',
+                    rentOutDepositChequeReceiptNumber: '',
+                };
+            }
+            return next;
+        });
+    };
+
+    /** 按金 entry 的金額欄位 */
+    const handleDepositEntryPriceChange = (index: number, name: keyof DepositEntry, value: string) => {
+        const parsed = parsePriceInput(value);
+        setDepositEntries(prev => {
+            const next = [...prev];
+            next[index] = { ...next[index], [name]: parsed };
+            return next;
+        });
+    };
+
+    /** 按金 entry 的支票/FPS 圖片上傳 */
+    const onDepositEntryChequeImageChange = async (index: number, e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        e.target.value = '';
+        if (!file || !file.type.startsWith('image/')) return;
+        const entry = depositEntries[index];
+        const existing = entry?.rentOutDepositChequeImage;
+        const check = validateImageUpload(existing ? [existing] : [], [file], 'property');
+        if (!check.valid) { setError(check.error || '圖片無效'); return; }
+        try {
+            const blob = await compressImage(file, { maxWidth: 1600, maxHeight: 1600, quality: 0.75 });
+            const b64 = await fileToBase64(blob);
+            setDepositEntries(prev => {
+                const next = [...prev];
+                next[index] = { ...next[index], rentOutDepositChequeImage: b64 };
+                return next;
+            });
+        } catch { setError('圖片處理失敗'); }
+    };
+
+    /** 按金 entry 的入數憑證上傳 */
+    const onDepositEntryBankInImageChange = async (index: number, e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        e.target.value = '';
+        if (!file || !file.type.startsWith('image/')) return;
+        const entry = depositEntries[index];
+        const existing = entry?.rentOutDepositBankInImage;
+        const check = validateImageUpload(existing ? [existing] : [], [file], 'property');
+        if (!check.valid) { setError(check.error || '圖片無效'); return; }
+        try {
+            const blob = await compressImage(file, { maxWidth: 1600, maxHeight: 1600, quality: 0.75 });
+            const b64 = await fileToBase64(blob);
+            setDepositEntries(prev => {
+                const next = [...prev];
+                next[index] = { ...next[index], rentOutDepositBankInImage: b64 };
+                return next;
+            });
+        } catch { setError('圖片處理失敗'); }
+    };
+
+    /** 新增一個空白按金 entry */
+    const addDepositEntry = () => {
+        setDepositEntries(prev => [...prev, { ...DEFAULT_DEPOSIT_ENTRY }]);
+    };
+
     const handleProprietorCreated = async (id: string) => {
         await loadData();
         if (formData.type === 'rent_out') {
@@ -1022,14 +1161,19 @@ export default function RentModal({
             setError('請選擇關聯的物業');
             return;
         }
-        if (formData.type === 'contract' && formData.rentOutDepositPaymentMethod === 'cheque') {
-            if (!formData.rentOutDepositChequeBank?.trim()) {
-                setError('請填寫按金支票銀行');
-                return;
-            }
-            if (!formData.rentOutDepositChequeNumber?.trim()) {
-                setError('請填寫按金支票號碼');
-                return;
+        if (formData.type === 'contract' && showDepositSection && depositEntries.length > 0) {
+            for (let i = 0; i < depositEntries.length; i++) {
+                const entry = depositEntries[i];
+                if (entry.rentOutDepositPaymentMethod === 'cheque') {
+                    if (!entry.rentOutDepositChequeBank?.trim()) {
+                        setError(`按金 ${i + 1}：請填寫支票銀行`);
+                        return;
+                    }
+                    if (!entry.rentOutDepositChequeNumber?.trim()) {
+                        setError(`按金 ${i + 1}：請填寫支票號碼`);
+                        return;
+                    }
+                }
             }
         }
         setSaving(true);
@@ -1217,23 +1361,27 @@ export default function RentModal({
                 // 合約記錄：以 rentOut* 欄位儲存（已移除實際結束日／出租人／租借地址欄位，寫入時清空舊值）
                 const propRow = properties.find(p => p.id === formData.propertyId);
                 const contractLocation = (propRow?.address || '').trim() || defaultLocation || '';
-                const parseRentOutDepositPaymentDate = (): Date | null => {
-                    const raw = String(formData.rentOutDepositPaymentDate || '').trim();
-                    if (!raw) return null;
+
+                // 優先取 depositEntries（新版 UI），否則回退 formData（舊版已編輯記錄）
+                const deposit = (depositEntries.length > 0 ? depositEntries[0] : null) as DepositEntry | null;
+                const parseDate = (raw: string): Date | null => {
                     const d = new Date(raw);
-                    return Number.isNaN(d.getTime()) ? null : d;
+                    return !raw || Number.isNaN(d.getTime()) ? null : d;
                 };
-                const rentOutDepositPaymentDateForSave = parseRentOutDepositPaymentDate();
-                const depositRaw = String(formData.rentOutDepositReceived || '').replace(/,/g, '').trim();
-                const depositAmt = parseFloat(depositRaw);
-                const hasDepositAmount = depositRaw !== '' && !Number.isNaN(depositAmt);
+                const parsePrice = (raw: string): number | null => {
+                    const v = parseFloat(String(raw || '').replace(/,/g, '').trim());
+                    return isNaN(v) ? null : v;
+                };
+                const depositMethod = deposit?.rentOutDepositPaymentMethod || null;
+                const depositCheque = depositMethod === 'cheque';
+                const depositNonCheque = depositMethod && depositMethod !== 'cheque';
                 rentData = {
                     ...rentData,
                     rentOutTenancyNumber: formData.rentOutTenancyNumber,
-                    rentOutPricing: parseFloat(formData.rentOutPricing) || undefined,
-                    rentOutMonthlyRental: parseFloat(formData.rentOutMonthlyRental) || undefined,
-                    rentOutPeriods: parseInt(formData.rentOutPeriods) || undefined,
-                    rentOutTotalAmount: parseFloat(formData.rentOutTotalAmount) || undefined,
+                    rentOutPricing: parsePrice(formData.rentOutPricing) || undefined,
+                    rentOutMonthlyRental: parsePrice(formData.rentOutMonthlyRental) || undefined,
+                    rentOutPeriods: formData.rentOutPeriods ? parseInt(formData.rentOutPeriods) : undefined,
+                    rentOutTotalAmount: parsePrice(formData.rentOutTotalAmount) || undefined,
                     rentOutStartDate: formData.rentOutStartDate ? new Date(formData.rentOutStartDate) : undefined,
                     rentOutEndDate: formData.rentOutEndDate ? new Date(formData.rentOutEndDate) : undefined,
                     rentOutActualEndDate: null,
@@ -1241,39 +1389,19 @@ export default function RentModal({
                         const v = String(formData.rentOutContractNature ?? '').trim();
                         return v === '' ? null : v;
                     })(),
-                    rentOutDepositReceived: hasDepositAmount ? depositAmt : null,
-                    rentOutDepositPaymentMethod: formData.rentOutDepositPaymentMethod || null,
-                    rentOutDepositChequeBank:
-                        formData.rentOutDepositPaymentMethod === 'cheque' ? formData.rentOutDepositChequeBank.trim() : null,
-                    rentOutDepositChequeNumber:
-                        formData.rentOutDepositPaymentMethod === 'cheque' ? formData.rentOutDepositChequeNumber.trim() : null,
-                    rentOutDepositChequeImage:
-                        (formData.rentOutDepositPaymentMethod === 'cheque' || formData.rentOutDepositPaymentMethod === 'fps') &&
-                        formData.rentOutDepositChequeImage
-                            ? formData.rentOutDepositChequeImage
-                            : null,
-                    rentOutDepositChequePaymentDate:
-                        formData.rentOutDepositPaymentMethod === 'cheque'
-                            ? formData.rentOutDepositChequePaymentDate
-                                ? new Date(formData.rentOutDepositChequePaymentDate)
-                                : null
-                            : null,
-                    rentOutDepositChequeReceiptNumber:
-                        formData.rentOutDepositPaymentMethod === 'cheque'
-                            ? formData.rentOutDepositChequeReceiptNumber?.trim() || null
-                            : null,
-                    rentOutDepositPaymentDate: rentOutDepositPaymentDateForSave,
-                    rentOutDepositBankInImage:
-                        formData.rentOutDepositPaymentMethod === 'bank_in'
-                            ? formData.rentOutDepositBankInImage || null
-                            : null,
-                    rentOutDepositReceiptNumber:
-                        formData.rentOutDepositPaymentMethod && formData.rentOutDepositPaymentMethod !== 'cheque'
-                            ? formData.rentOutDepositReceiptNumber?.trim() || null
-                            : null,
-                    rentOutDepositReceiveDate: formData.rentOutDepositReceiveDate ? new Date(formData.rentOutDepositReceiveDate) : undefined,
-                    rentOutDepositReturnDate: formData.rentOutDepositReturnDate ? new Date(formData.rentOutDepositReturnDate) : undefined,
-                    rentOutDepositReturnAmount: parseFloat(formData.rentOutDepositReturnAmount) || undefined,
+                    rentOutDepositReceived: deposit ? parsePrice(deposit.rentOutDepositReceived) : null,
+                    rentOutDepositPaymentMethod: depositMethod,
+                    rentOutDepositChequeBank: depositCheque && deposit ? deposit.rentOutDepositChequeBank.trim() : null,
+                    rentOutDepositChequeNumber: depositCheque && deposit ? deposit.rentOutDepositChequeNumber.trim() : null,
+                    rentOutDepositChequeImage: (depositCheque || deposit?.rentOutDepositPaymentMethod === 'fps') && deposit?.rentOutDepositChequeImage ? deposit.rentOutDepositChequeImage : null,
+                    rentOutDepositChequePaymentDate: depositCheque && deposit?.rentOutDepositChequePaymentDate ? new Date(deposit.rentOutDepositChequePaymentDate) : null,
+                    rentOutDepositChequeReceiptNumber: depositCheque && deposit ? (deposit.rentOutDepositChequeReceiptNumber?.trim() || null) : null,
+                    rentOutDepositPaymentDate: deposit?.rentOutDepositPaymentDate ? new Date(deposit.rentOutDepositPaymentDate) : null,
+                    rentOutDepositBankInImage: deposit?.rentOutDepositPaymentMethod === 'bank_in' && deposit?.rentOutDepositBankInImage ? deposit.rentOutDepositBankInImage : null,
+                    rentOutDepositReceiptNumber: depositNonCheque && deposit ? (deposit.rentOutDepositReceiptNumber?.trim() || null) : null,
+                    rentOutDepositReceiveDate: deposit?.rentOutDepositReceiveDate ? new Date(deposit.rentOutDepositReceiveDate) : undefined,
+                    rentOutDepositReturnDate: deposit?.rentOutDepositReturnDate ? new Date(deposit.rentOutDepositReturnDate) : undefined,
+                    rentOutDepositReturnAmount: deposit ? parsePrice(deposit.rentOutDepositReturnAmount) : undefined,
                     rentOutAddressDetail: null,
                     location: contractLocation,
                     rentOutStatus: formData.rentOutStatus,
@@ -2737,247 +2865,220 @@ export default function RentModal({
                                 </select>
                             </div>
 
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div className="space-y-2">
-                                    <label className={labelClass}>{contractSectionPrefix}按金</label>
-                                    <input
-                                        type="text"
-                                        name="rentOutDepositReceived"
-                                        value={formatNumberWithCommas(formData.rentOutDepositReceived)}
-                                        onChange={(e) => handlePriceChange('rentOutDepositReceived', e.target.value)}
-                                        className={inputClass}
-                                        placeholder="0"
-                                    />
-                                </div>
-                                <div className="space-y-2">
-                                    <label className={labelClass}>按金支付方式</label>
-                                    <select
-                                        name="rentOutDepositPaymentMethod"
-                                        value={formData.rentOutDepositPaymentMethod}
-                                        onChange={(e) => {
-                                            const v = e.target.value as '' | RentCollectionPaymentMethod;
-                                            setFormData((prev) => ({
-                                                ...prev,
-                                                rentOutDepositPaymentMethod: v,
-                                                ...(v === '' || v === 'cash'
-                                                    ? {
-                                                          rentOutDepositChequeBank: '',
-                                                          rentOutDepositChequeNumber: '',
-                                                          rentOutDepositChequeImage: '',
-                                                      }
-                                                    : {}),
-                                                ...(v !== 'bank_in' ? { rentOutDepositBankInImage: '' } : {}),
-                                                ...(v === 'cheque' || v === '' ? { rentOutDepositReceiptNumber: '', rentOutDepositChequeReceiptNumber: '' } : {}),
-                                            }));
-                                        }}
-                                        className={inputClass}
-                                    >
-                                        <option value="" className="bg-white dark:bg-[#1a1a2e]">請選擇</option>
-                                        <option value="cash" className="bg-white dark:bg-[#1a1a2e]">現金</option>
-                                        <option value="cheque" className="bg-white dark:bg-[#1a1a2e]">支票</option>
-                                        <option value="fps" className="bg-white dark:bg-[#1a1a2e]">FPS轉帳</option>
-                                        <option value="bank_in" className="bg-white dark:bg-[#1a1a2e]">入數</option>
-                                    </select>
-                                </div>
-                            </div>
+                            {(() => {
+                                const prefix = contractSectionPrefix;
+                                return (
+                                    <div className="space-y-4">
+                                        {/* Section header */}
+                                        <div className="flex items-center justify-between">
+                                            <h4 className={`text-sm font-semibold ${contractSectionTitleClass}`}>
+                                                {prefix}按金資料
+                                            </h4>
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    setShowDepositSection(true);
+                                                    addDepositEntry();
+                                                }}
+                                                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-400 hover:bg-amber-200 dark:hover:bg-amber-500/30 transition-colors"
+                                            >
+                                                <Plus className="w-3.5 h-3.5" />
+                                                新增按金資料
+                                            </button>
+                                        </div>
 
-                            {formData.rentOutDepositPaymentMethod === 'cheque' && (
-                                <div className={rentPaymentDetailBoxClass}>
-                                    <p className={rentPaymentDetailTitleClass}>支票資料</p>
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                        <div className="space-y-2">
-                                            <label className={labelClass}>銀行</label>
-                                            <input
-                                                type="text"
-                                                name="rentOutDepositChequeBank"
-                                                value={formData.rentOutDepositChequeBank}
-                                                onChange={handleChange}
-                                                className={inputClass}
-                                                placeholder="例如：匯豐銀行"
-                                            />
-                                        </div>
-                                        <div className="space-y-2">
-                                            <label className={labelClass}>支票號碼</label>
-                                            <input
-                                                type="text"
-                                                name="rentOutDepositChequeNumber"
-                                                value={formData.rentOutDepositChequeNumber}
-                                                onChange={handleChange}
-                                                className={inputClass}
-                                                placeholder="支票號碼"
-                                            />
-                                        </div>
+                                        {/* Deposit entries */}
+                                        {showDepositSection && depositEntries.length === 0 && (
+                                            <p className="text-sm text-zinc-400 dark:text-zinc-500 py-4 text-center">尚無按金資料，點擊上方「新增按金資料」按鈕加入</p>
+                                        )}
+
+                                        {showDepositSection && depositEntries.map((entry, idx) => (
+                                            <div key={idx} className={`rounded-xl border ${idx === 0 ? 'border-amber-300 dark:border-amber-500/30' : 'border-zinc-200 dark:border-white/10'} bg-amber-50/50 dark:bg-amber-500/5 p-4 space-y-3`}>
+                                                {/* Entry header */}
+                                                <div className="flex items-center justify-between">
+                                                    <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${idx === 0 ? 'bg-amber-200 text-amber-800 dark:bg-amber-500/30 dark:text-amber-300' : 'bg-zinc-200 text-zinc-600 dark:bg-white/10 dark:text-zinc-400'}`}>
+                                                        按金 {idx + 1}
+                                                    </span>
+                                                    {depositEntries.length > 1 && (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => {
+                                                                const contractNum = formData.rentOutTenancyNumber || '(該合約)';
+                                                                if (window.confirm(`確定要移除 (${contractNum}) 的 按金 ${idx + 1} 嗎？`)) {
+                                                                    setDepositEntries(prev => prev.filter((_, i) => i !== idx));
+                                                                }
+                                                            }}
+                                                            className="text-xs text-red-500 hover:text-red-600 dark:text-red-400 flex items-center gap-1"
+                                                        >
+                                                            <Trash2 className="w-3.5 h-3.5" />
+                                                            移除
+                                                        </button>
+                                                    )}
+                                                </div>
+
+                                                {/* 按金 + 支付方式 */}
+                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                    <div className="space-y-2">
+                                                        <label className={labelClass}>{prefix}按金</label>
+                                                        <input
+                                                            type="text"
+                                                            value={formatNumberWithCommas(entry.rentOutDepositReceived)}
+                                                            onChange={(e) => handleDepositEntryPriceChange(idx, 'rentOutDepositReceived', e.target.value)}
+                                                            className={inputClass}
+                                                            placeholder="0"
+                                                        />
+                                                    </div>
+                                                    <div className="space-y-2">
+                                                        <label className={labelClass}>按金支付方式</label>
+                                                        <select
+                                                            value={entry.rentOutDepositPaymentMethod}
+                                                            onChange={(e) => handleDepositEntryChange(idx, 'rentOutDepositPaymentMethod', e.target.value)}
+                                                            className={inputClass}
+                                                        >
+                                                            <option value="" className="bg-white dark:bg-[#1a1a2e]">請選擇</option>
+                                                            <option value="cash" className="bg-white dark:bg-[#1a1a2e]">現金</option>
+                                                            <option value="cheque" className="bg-white dark:bg-[#1a1a2e]">支票</option>
+                                                            <option value="fps" className="bg-white dark:bg-[#1a1a2e]">FPS轉帳</option>
+                                                            <option value="bank_in" className="bg-white dark:bg-[#1a1a2e]">入數</option>
+                                                        </select>
+                                                    </div>
+                                                </div>
+
+                                                {/* 支票 */}
+                                                {entry.rentOutDepositPaymentMethod === 'cheque' && (
+                                                    <div className={rentPaymentDetailBoxClass}>
+                                                        <p className={rentPaymentDetailTitleClass}>支票資料</p>
+                                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                            <div className="space-y-2">
+                                                                <label className={labelClass}>銀行</label>
+                                                                <input type="text" value={entry.rentOutDepositChequeBank} onChange={(e) => handleDepositEntryChange(idx, 'rentOutDepositChequeBank', e.target.value)} className={inputClass} placeholder="例如：匯豐銀行" />
+                                                            </div>
+                                                            <div className="space-y-2">
+                                                                <label className={labelClass}>支票號碼</label>
+                                                                <input type="text" value={entry.rentOutDepositChequeNumber} onChange={(e) => handleDepositEntryChange(idx, 'rentOutDepositChequeNumber', e.target.value)} className={inputClass} placeholder="支票號碼" />
+                                                            </div>
+                                                        </div>
+                                                        <div className="space-y-2">
+                                                            <label className={labelClass}>支票日期</label>
+                                                            <input type="date" value={entry.rentOutDepositPaymentDate} onChange={(e) => handleDepositEntryChange(idx, 'rentOutDepositPaymentDate', e.target.value)} className={inputClass} />
+                                                        </div>
+                                                        <div className="space-y-2">
+                                                            <label className={labelClass}>付款日期</label>
+                                                            <input type="date" value={entry.rentOutDepositChequePaymentDate} onChange={(e) => handleDepositEntryChange(idx, 'rentOutDepositChequePaymentDate', e.target.value)} className={inputClass} />
+                                                        </div>
+                                                        <div className="space-y-2">
+                                                            <label className={labelClass}>收據號碼</label>
+                                                            <input type="text" value={entry.rentOutDepositChequeReceiptNumber} onChange={(e) => handleDepositEntryChange(idx, 'rentOutDepositChequeReceiptNumber', e.target.value)} className={inputClass} placeholder="收據號碼" />
+                                                        </div>
+                                                        <div className="space-y-2">
+                                                            <label className={labelClass}>支票影像（選填）</label>
+                                                            <div className="flex flex-wrap items-center gap-3">
+                                                                <label className="px-4 py-2 rounded-xl border border-dashed border-zinc-300 dark:border-white/20 text-sm text-blue-600 dark:text-blue-400 cursor-pointer hover:bg-blue-50 dark:hover:bg-blue-500/10 transition-colors">
+                                                                    上載圖片
+                                                                    <input type="file" accept="image/*" className="hidden" onChange={(e) => onDepositEntryChequeImageChange(idx, e)} />
+                                                                </label>
+                                                                {entry.rentOutDepositChequeImage && (
+                                                                    <>
+                                                                        <button type="button" onClick={() => { const next = [...depositEntries]; next[idx] = { ...next[idx], rentOutDepositChequeImage: '' }; setDepositEntries(next); }} className="text-sm text-red-500 hover:underline">移除</button>
+                                                                        <img src={entry.rentOutDepositChequeImage} alt="支票預覽" className="h-20 rounded-lg border border-zinc-200 dark:border-white/10 object-contain" />
+                                                                    </>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                )}
+
+                                                {/* FPS */}
+                                                {entry.rentOutDepositPaymentMethod === 'fps' && (
+                                                    <div className={rentPaymentDetailBoxClass}>
+                                                        <p className={rentPaymentDetailTitleClass}>FPS 轉帳</p>
+                                                        <div className="space-y-2">
+                                                            <label className={labelClass}>付款日期</label>
+                                                            <input type="date" value={entry.rentOutDepositPaymentDate} onChange={(e) => handleDepositEntryChange(idx, 'rentOutDepositPaymentDate', e.target.value)} className={inputClass} />
+                                                        </div>
+                                                        <div className="space-y-2">
+                                                            <label className={labelClass}>收據號碼</label>
+                                                            <input type="text" value={entry.rentOutDepositReceiptNumber} onChange={(e) => handleDepositEntryChange(idx, 'rentOutDepositReceiptNumber', e.target.value)} className={inputClass} placeholder="選填" />
+                                                        </div>
+                                                        <div className="space-y-2">
+                                                            <label className={labelClass}>轉帳證明／截圖（選填）</label>
+                                                            <div className="flex flex-wrap items-center gap-3">
+                                                                <label className="px-4 py-2 rounded-xl border border-dashed border-zinc-300 dark:border-white/20 text-sm text-blue-600 dark:text-blue-400 cursor-pointer hover:bg-blue-50 dark:hover:bg-blue-500/10 transition-colors">
+                                                                    上載圖片
+                                                                    <input type="file" accept="image/*" className="hidden" onChange={(e) => onDepositEntryChequeImageChange(idx, e)} />
+                                                                </label>
+                                                                {entry.rentOutDepositChequeImage && (
+                                                                    <>
+                                                                        <button type="button" onClick={() => { const next = [...depositEntries]; next[idx] = { ...next[idx], rentOutDepositChequeImage: '' }; setDepositEntries(next); }} className="text-sm text-red-500 hover:underline">移除</button>
+                                                                        <img src={entry.rentOutDepositChequeImage} alt="轉帳證明預覽" className="h-20 rounded-lg border border-zinc-200 dark:border-white/10 object-contain" />
+                                                                    </>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                )}
+
+                                                {/* 現金 */}
+                                                {entry.rentOutDepositPaymentMethod === 'cash' && (
+                                                    <div className={rentPaymentDetailBoxClass}>
+                                                        <p className={rentPaymentDetailTitleClass}>現金資料</p>
+                                                        <div className="space-y-2">
+                                                            <label className={labelClass}>付款日期</label>
+                                                            <input type="date" value={entry.rentOutDepositPaymentDate} onChange={(e) => handleDepositEntryChange(idx, 'rentOutDepositPaymentDate', e.target.value)} className={inputClass} />
+                                                        </div>
+                                                        <div className="space-y-2">
+                                                            <label className={labelClass}>收據號碼</label>
+                                                            <input type="text" value={entry.rentOutDepositReceiptNumber} onChange={(e) => handleDepositEntryChange(idx, 'rentOutDepositReceiptNumber', e.target.value)} className={inputClass} placeholder="選填" />
+                                                        </div>
+                                                    </div>
+                                                )}
+
+                                                {/* 入數 */}
+                                                {entry.rentOutDepositPaymentMethod === 'bank_in' && (
+                                                    <div className={rentPaymentDetailBoxClass}>
+                                                        <p className={rentPaymentDetailTitleClass}>入數資料</p>
+                                                        <div className="space-y-2">
+                                                            <label className={labelClass}>付款日期</label>
+                                                            <input type="date" value={entry.rentOutDepositPaymentDate} onChange={(e) => handleDepositEntryChange(idx, 'rentOutDepositPaymentDate', e.target.value)} className={inputClass} />
+                                                        </div>
+                                                        <div className="space-y-2">
+                                                            <label className={labelClass}>收據號碼</label>
+                                                            <input type="text" value={entry.rentOutDepositReceiptNumber} onChange={(e) => handleDepositEntryChange(idx, 'rentOutDepositReceiptNumber', e.target.value)} className={inputClass} placeholder="選填" />
+                                                        </div>
+                                                        <div className="space-y-2">
+                                                            <label className={labelClass}>入數憑證／截圖（選填）</label>
+                                                            <div className="flex flex-wrap items-center gap-3">
+                                                                <label className="px-4 py-2 rounded-xl border border-dashed border-zinc-300 dark:border-white/20 text-sm text-blue-600 dark:text-blue-400 cursor-pointer hover:bg-blue-50 dark:hover:bg-blue-500/10 transition-colors">
+                                                                    上載圖片
+                                                                    <input type="file" accept="image/*" className="hidden" onChange={(e) => onDepositEntryBankInImageChange(idx, e)} />
+                                                                </label>
+                                                                {entry.rentOutDepositBankInImage && (
+                                                                    <>
+                                                                        <button type="button" onClick={() => { const next = [...depositEntries]; next[idx] = { ...next[idx], rentOutDepositBankInImage: '' }; setDepositEntries(next); }} className="text-sm text-red-500 hover:underline">移除</button>
+                                                                        <img src={entry.rentOutDepositBankInImage} alt="入數憑證預覽" className="h-20 rounded-lg border border-zinc-200 dark:border-white/10 object-contain" />
+                                                                    </>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                )}
+
+                                                {/* 退回日期 + 退回金額 */}
+                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                    <div className="space-y-2">
+                                                        <label className={labelClass}>{prefix}按金退回日期</label>
+                                                        <input type="date" value={entry.rentOutDepositReturnDate} onChange={(e) => handleDepositEntryChange(idx, 'rentOutDepositReturnDate', e.target.value)} className={inputClass} />
+                                                    </div>
+                                                    <div className="space-y-2">
+                                                        <label className={labelClass}>{prefix}按金退回金額</label>
+                                                        <input type="text" value={formatNumberWithCommas(entry.rentOutDepositReturnAmount)} onChange={(e) => handleDepositEntryPriceChange(idx, 'rentOutDepositReturnAmount', e.target.value)} className={inputClass} placeholder="100,000" />
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        ))}
                                     </div>
-                                    <div className="space-y-2">
-                                        <label className={labelClass}>支票日期</label>
-                                        <input
-                                            type="date"
-                                            name="rentOutDepositPaymentDate"
-                                            value={formData.rentOutDepositPaymentDate}
-                                            onChange={handleChange}
-                                            className={inputClass}
-                                        />
-                                    </div>
-                                    <div className="space-y-2">
-                                        <label className={labelClass}>付款日期</label>
-                                        <input
-                                            type="date"
-                                            name="rentOutDepositChequePaymentDate"
-                                            value={formData.rentOutDepositChequePaymentDate ?? ''}
-                                            onChange={handleChange}
-                                            className={inputClass}
-                                        />
-                                    </div>
-                                    <div className="space-y-2">
-                                        <label className={labelClass}>收據號碼</label>
-                                        <input
-                                            type="text"
-                                            name="rentOutDepositChequeReceiptNumber"
-                                            value={formData.rentOutDepositChequeReceiptNumber}
-                                            onChange={handleChange}
-                                            className={inputClass}
-                                            placeholder="收據號碼"
-                                        />
-                                    </div>
-                                    <div className="space-y-2">
-                                        <label className={labelClass}>支票影像（選填）</label>
-                                        <div className="flex flex-wrap items-center gap-3">
-                                            <label className="px-4 py-2 rounded-xl border border-dashed border-zinc-300 dark:border-white/20 text-sm text-blue-600 dark:text-blue-400 cursor-pointer hover:bg-blue-50 dark:hover:bg-blue-500/10 transition-colors">
-                                                上載圖片
-                                                <input type="file" accept="image/*" className="hidden" onChange={onDepositChequeImageChange} />
-                                            </label>
-                                            {formData.rentOutDepositChequeImage && (
-                                                <>
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => setFormData((prev) => ({ ...prev, rentOutDepositChequeImage: '' }))}
-                                                        className="text-sm text-red-500 hover:underline"
-                                                    >
-                                                        移除
-                                                    </button>
-                                                    <img
-                                                        src={formData.rentOutDepositChequeImage}
-                                                        alt="支票預覽"
-                                                        className="h-20 rounded-lg border border-zinc-200 dark:border-white/10 object-contain"
-                                                    />
-                                                </>
-                                            )}
-                                        </div>
-                                    </div>
-                                </div>
-                            )}
-                            {formData.rentOutDepositPaymentMethod === 'fps' && (
-                                <div className={rentPaymentDetailBoxClass}>
-                                    <p className={rentPaymentDetailTitleClass}>FPS 轉帳</p>
-                                    <div className="space-y-2">
-                                        <label className={labelClass}>付款日期</label>
-                                        <input
-                                            type="date"
-                                            name="rentOutDepositPaymentDate"
-                                            value={formData.rentOutDepositPaymentDate}
-                                            onChange={handleChange}
-                                            className={inputClass}
-                                        />
-                                    </div>
-                                    {renderContractDepositReceiptField()}
-                                    <div className="space-y-2">
-                                        <label className={labelClass}>轉帳證明／截圖（選填）</label>
-                                        <div className="flex flex-wrap items-center gap-3">
-                                            <label className="px-4 py-2 rounded-xl border border-dashed border-zinc-300 dark:border-white/20 text-sm text-blue-600 dark:text-blue-400 cursor-pointer hover:bg-blue-50 dark:hover:bg-blue-500/10 transition-colors">
-                                                上載圖片
-                                                <input type="file" accept="image/*" className="hidden" onChange={onDepositChequeImageChange} />
-                                            </label>
-                                            {formData.rentOutDepositChequeImage && (
-                                                <>
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => setFormData((prev) => ({ ...prev, rentOutDepositChequeImage: '' }))}
-                                                        className="text-sm text-red-500 hover:underline"
-                                                    >
-                                                        移除
-                                                    </button>
-                                                    <img
-                                                        src={formData.rentOutDepositChequeImage}
-                                                        alt="轉帳證明預覽"
-                                                        className="h-20 rounded-lg border border-zinc-200 dark:border-white/10 object-contain"
-                                                    />
-                                                </>
-                                            )}
-                                        </div>
-                                    </div>
-                                </div>
-                            )}
-                            {formData.rentOutDepositPaymentMethod === 'cash' && (
-                                <div className={rentPaymentDetailBoxClass}>
-                                    <p className={rentPaymentDetailTitleClass}>現金資料</p>
-                                    <div className="space-y-2">
-                                        <label className={labelClass}>付款日期</label>
-                                        <input
-                                            type="date"
-                                            name="rentOutDepositPaymentDate"
-                                            value={formData.rentOutDepositPaymentDate}
-                                            onChange={handleChange}
-                                            className={inputClass}
-                                        />
-                                    </div>
-                                    {renderContractDepositReceiptField()}
-                                </div>
-                            )}
-                            {formData.rentOutDepositPaymentMethod === 'bank_in' && (
-                                <div className={rentPaymentDetailBoxClass}>
-                                    <p className={rentPaymentDetailTitleClass}>入數資料</p>
-                                    <div className="space-y-2">
-                                        <label className={labelClass}>付款日期</label>
-                                        <input
-                                            type="date"
-                                            name="rentOutDepositPaymentDate"
-                                            value={formData.rentOutDepositPaymentDate}
-                                            onChange={handleChange}
-                                            className={inputClass}
-                                        />
-                                    </div>
-                                    {renderContractDepositReceiptField()}
-                                    <div className="space-y-2">
-                                        <label className={labelClass}>入數憑證／截圖（選填）</label>
-                                        <div className="flex flex-wrap items-center gap-3">
-                                            <label className="px-4 py-2 rounded-xl border border-dashed border-zinc-300 dark:border-white/20 text-sm text-blue-600 dark:text-blue-400 cursor-pointer hover:bg-blue-50 dark:hover:bg-blue-500/10 transition-colors">
-                                                上載圖片
-                                                <input type="file" accept="image/*" className="hidden" onChange={onDepositBankInImageChange} />
-                                            </label>
-                                            {formData.rentOutDepositBankInImage && (
-                                                <>
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => setFormData((prev) => ({ ...prev, rentOutDepositBankInImage: '' }))}
-                                                        className="text-sm text-red-500 hover:underline"
-                                                    >
-                                                        移除
-                                                    </button>
-                                                    <img
-                                                        src={formData.rentOutDepositBankInImage}
-                                                        alt="入數憑證預覽"
-                                                        className="h-20 rounded-lg border border-zinc-200 dark:border-white/10 object-contain"
-                                                    />
-                                                </>
-                                            )}
-                                        </div>
-                                    </div>
-                                </div>
-                            )}
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div className="space-y-2">
-                                    <label className={labelClass}>{contractSectionPrefix}按金收取日期</label>
-                                    <input type="date" name="rentOutDepositReceiveDate" value={formData.rentOutDepositReceiveDate} onChange={handleChange} className={inputClass} />
-                                </div>
-                                <div className="space-y-2">
-                                    <label className={labelClass}>{contractSectionPrefix}按金退回日期</label>
-                                    <input type="date" name="rentOutDepositReturnDate" value={formData.rentOutDepositReturnDate} onChange={handleChange} className={inputClass} />
-                                </div>
-                            </div>
-                            <div className="space-y-2">
-                                <label className={labelClass}>{contractSectionPrefix}按金退回金額</label>
-                                <input type="text" name="rentOutDepositReturnAmount" value={formatNumberWithCommas(formData.rentOutDepositReturnAmount)} onChange={(e) => handlePriceChange('rentOutDepositReturnAmount', e.target.value)} className={inputClass} placeholder="100,000" />
-                            </div>
+                                );
+                            })()}
 
                             <div className="space-y-2">
                                 <label className={labelClass}>{contractSectionPrefix}合約租務狀態</label>

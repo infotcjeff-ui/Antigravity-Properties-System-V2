@@ -309,6 +309,7 @@ const propertyTypes = [
     { value: 'co_investment', label: '合作投資' },
     { value: 'external_lease', label: '外租物業' },
     { value: 'managed_asset', label: '代管資產' },
+    { value: 'agent_management', label: '代理管理' },
 ];
 
 const propertyStatuses = [
@@ -359,6 +360,9 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
     const [showLeaseLotAddModal, setShowLeaseLotAddModal] = useState(false);
     const [leaseLotAddMode, setLeaseLotAddMode] = useState<'new' | 'old' | null>(null);
     const [tempLeaseLotInput, setTempLeaseLotInput] = useState('');
+    const [showGovShortLeaseAddModal, setShowGovShortLeaseAddModal] = useState(false);
+    const [govShortLeaseAddMode, setGovShortLeaseAddMode] = useState<'new' | 'old' | null>(null);
+    const [tempGovShortLeaseInput, setTempGovShortLeaseInput] = useState('');
     const [pendingLotRemovals, setPendingLotRemovals] = useState<Set<number>>(new Set());
     const [editingLotIndex, setEditingLotIndex] = useState<number | null>(null);
     const [editingLotValue, setEditingLotValue] = useState('');
@@ -426,6 +430,19 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
         setShowLeaseLotAddModal(false);
         setLeaseLotAddMode(null);
         setTempLeaseLotInput('');
+    };
+
+    const appendGovShortLeaseIndex = (newLot: string, mode: 'new' | 'old') => {
+        const trimmed = newLot.trim();
+        if (!trimmed) return;
+        const entry = { type: mode, value: `${trimmed} (政府短期租約)` };
+        setFormData(prev => ({
+            ...prev,
+            lotIndex: serializeLotEntries([...lotEntries, entry]),
+        }));
+        setShowGovShortLeaseAddModal(false);
+        setGovShortLeaseAddMode(null);
+        setTempGovShortLeaseInput('');
     };
 
     const removeLotEntry = (index: number) => {
@@ -1675,6 +1692,13 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                                     >
                                         + 新增租賃地段
                                     </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowGovShortLeaseAddModal(true)}
+                                        className="px-4 py-2 bg-amber-50 dark:bg-amber-500/20 text-amber-600 dark:text-amber-400 rounded-xl hover:bg-amber-100 dark:hover:bg-amber-500/30 border border-amber-100 dark:border-amber-500/30 text-sm font-medium transition-all duration-300"
+                                    >
+                                        + 新增政府短期租約
+                                    </button>
                                 </div>
                             )}
                         </div>
@@ -1713,6 +1737,18 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                                                             autoFocus
                                                         />
                                                         <span className="shrink-0 text-sm text-teal-600 dark:text-teal-400 font-medium">(租賃地段)</span>
+                                                    </div>
+                                                ) : lotEntries[editingLotIndex]?.value.endsWith('(政府短期租約)') ? (
+                                                    <div className="flex gap-1 items-center flex-1 min-w-0">
+                                                        <input
+                                                            type="text"
+                                                            value={editingLotValue}
+                                                            onChange={(e) => setEditingLotValue(e.target.value)}
+                                                            className="flex-1 min-w-0 px-3 py-1.5 bg-white dark:bg-white/5 border border-zinc-200 dark:border-white/10 rounded-lg text-sm text-zinc-900 dark:text-white"
+                                                            placeholder="輸入地段"
+                                                            autoFocus
+                                                        />
+                                                        <span className="shrink-0 text-sm text-amber-600 dark:text-amber-400 font-medium">(政府短期租約)</span>
                                                     </div>
                                                 ) : (
                                                     <input
@@ -1768,6 +1804,11 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                                                     <span className="flex-1 text-sm text-zinc-900 dark:text-white break-all">
                                                         {entry.value.replace(/\s*\(租賃地段\)$/, '')}
                                                         <span className="text-teal-600 dark:text-teal-400 font-medium"> (租賃地段)</span>
+                                                    </span>
+                                                ) : entry.value.endsWith('(政府短期租約)') ? (
+                                                    <span className="flex-1 text-sm text-zinc-900 dark:text-white break-all">
+                                                        {entry.value.replace(/\s*\(政府短期租約\)$/, '')}
+                                                        <span className="text-amber-600 dark:text-amber-400 font-medium"> (政府短期租約)</span>
                                                     </span>
                                                 ) : (
                                                     <span className="flex-1 text-sm text-zinc-900 dark:text-white break-all">{entry.value}</span>
@@ -1956,6 +1997,89 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                                         <button
                                             type="button"
                                             onClick={() => { setLeaseLotAddMode(null); setTempLeaseLotInput(''); }}
+                                            className="px-4 py-2 text-zinc-500 hover:text-zinc-700 text-sm"
+                                        >
+                                            返回
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                        {/* 政府短期租約新增 Modal */}
+                        {showGovShortLeaseAddModal && (
+                            <div className="mt-3 p-4 bg-amber-50/50 dark:bg-amber-500/10 rounded-xl border border-amber-200 dark:border-amber-500/30 space-y-3">
+                                <p className="text-sm font-medium text-amber-700 dark:text-amber-400">新增政府短期租約</p>
+                                {govShortLeaseAddMode === null ? (
+                                    <div className="flex gap-2">
+                                        <button
+                                            type="button"
+                                            onClick={() => setGovShortLeaseAddMode('new')}
+                                            className="px-4 py-2 bg-amber-500/20 text-amber-600 dark:text-amber-400 rounded-lg hover:bg-amber-500/30 text-sm"
+                                        >
+                                            新地段
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => setGovShortLeaseAddMode('old')}
+                                            className="px-4 py-2 bg-zinc-200 dark:bg-white/10 text-zinc-700 dark:text-white/80 rounded-lg hover:bg-zinc-300 dark:hover:bg-white/20 text-sm"
+                                        >
+                                            舊地段
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => { setShowGovShortLeaseAddModal(false); setGovShortLeaseAddMode(null); }}
+                                            className="px-4 py-2 text-zinc-500 dark:text-white/50 hover:text-zinc-700 dark:hover:text-white text-sm"
+                                        >
+                                            取消
+                                        </button>
+                                    </div>
+                                ) : govShortLeaseAddMode === 'new' ? (
+                                    <div className="flex gap-2 items-center">
+                                        <input
+                                            type="text"
+                                            value={tempGovShortLeaseInput}
+                                            onChange={(e) => setTempGovShortLeaseInput(e.target.value)}
+                                            placeholder="例如: DD 111 LOT 1523, 1539"
+                                            className="flex-1 px-3 py-2 bg-white dark:bg-white/5 border border-amber-200 dark:border-amber-500/30 rounded-lg text-sm text-zinc-900 dark:text-white placeholder-zinc-400"
+                                            autoFocus
+                                        />
+                                        <button
+                                            type="button"
+                                            onClick={() => appendGovShortLeaseIndex(tempGovShortLeaseInput, 'new')}
+                                            disabled={!tempGovShortLeaseInput.trim()}
+                                            className="px-4 py-2 bg-amber-500 text-white rounded-lg hover:bg-amber-600 disabled:opacity-50 text-sm"
+                                        >
+                                            確認
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => { setGovShortLeaseAddMode(null); setTempGovShortLeaseInput(''); }}
+                                            className="px-4 py-2 text-zinc-500 hover:text-zinc-700 text-sm"
+                                        >
+                                            返回
+                                        </button>
+                                    </div>
+                                ) : (
+                                    <div className="flex gap-2 items-center">
+                                        <input
+                                            type="text"
+                                            value={tempGovShortLeaseInput}
+                                            onChange={(e) => setTempGovShortLeaseInput(e.target.value)}
+                                            placeholder="輸入舊地段，例如: DD 111 LOT 1523, 1539"
+                                            className="flex-1 px-3 py-2 bg-white dark:bg-white/5 border border-amber-200 dark:border-amber-500/30 rounded-lg text-sm text-zinc-900 dark:text-white placeholder-zinc-400"
+                                            autoFocus
+                                        />
+                                        <button
+                                            type="button"
+                                            onClick={() => appendGovShortLeaseIndex(tempGovShortLeaseInput, 'old')}
+                                            disabled={!tempGovShortLeaseInput.trim()}
+                                            className="px-4 py-2 bg-amber-500 text-white rounded-lg hover:bg-amber-600 disabled:opacity-50 text-sm"
+                                        >
+                                            確認
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => { setGovShortLeaseAddMode(null); setTempGovShortLeaseInput(''); }}
                                             className="px-4 py-2 text-zinc-500 hover:text-zinc-700 text-sm"
                                         >
                                             返回

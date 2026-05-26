@@ -132,7 +132,7 @@ export default function ContractsPage() {
     );
     const leaseInContracts = useMemo(
         () =>
-            sortByStartDateOldestFirst(
+            sortByEndDateNearestFirst(
                 (contracts as any[]).filter((c) => (c.rentOutStatus || c.status) === 'leasing_in')
             ),
         [contracts]
