@@ -30,6 +30,11 @@ export default function TenantsPage() {
     const queryClient = useQueryClient();
     const [activeTab, setActiveTab] = useState<ProprietorManageTab>('owners');
     const [searchQuery, setSearchQuery] = useState('');
+    const [ownersPage, setOwnersPage] = useState(1);
+    const [lesseesPage, setLesseesPage] = useState(1);
+    const [subLandlordsPage, setSubLandlordsPage] = useState(1);
+    const [currentTenantsPage, setCurrentTenantsPage] = useState(1);
+    const PAGE_SIZE = 15;
 
     // Tenants (承租人)
     const { data: allProprietors, isLoading: tenantsLoading } = useProprietorsQuery();
@@ -117,6 +122,14 @@ export default function TenantsPage() {
             (x.tenancyNumber || '').toLowerCase().includes(q)
         );
     }, [currentTenants, searchQuery]);
+
+    // Reset page when search changes
+    useEffect(() => {
+        setOwnersPage(1);
+        setLesseesPage(1);
+        setSubLandlordsPage(1);
+        setCurrentTenantsPage(1);
+    }, [searchQuery]);
 
     const handleDeleteMergedProprietor = async (p: Proprietor) => {
         const isLessee = !!p.code?.startsWith('T');
@@ -323,7 +336,10 @@ export default function TenantsPage() {
                         <button
                             key={tab}
                             type="button"
-                            onClick={() => setActiveTab(tab)}
+                            onClick={() => {
+                                setActiveTab(tab);
+                                setSearchQuery('');
+                            }}
                             className={`flex-1 sm:flex-none px-2 sm:px-3 py-2 sm:py-2 rounded-lg sm:rounded-xl text-xs sm:text-sm font-semibold tracking-tight transition-all min-h-9 sm:min-h-10 ${activeTab === tab
                                 ? 'bg-white dark:bg-white/20 text-purple-700 dark:text-purple-300 shadow-md ring-1 ring-purple-500/20'
                                 : 'text-zinc-600 dark:text-white/65 hover:text-zinc-900 dark:hover:text-white'}`}
@@ -335,262 +351,355 @@ export default function TenantsPage() {
             </div>
 
             {/* Content based on active tab */}
-            {(activeTab === 'owners' || activeTab === 'lessees') && (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
-                    {(activeTab === 'owners' ? filteredOwners : filteredLessees).length === 0 ? (
-                        <div className="col-span-full glass-card flex flex-col items-center justify-center py-24 text-zinc-400 dark:text-white/40">
-                            <svg className="w-20 h-20 mb-6 opacity-20" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
-                            </svg>
-                            <p className="text-xl font-medium">
-                                {activeTab === 'owners'
-                                    ? '暫無業主資料。請按「+ 新增業主」新增。'
-                                    : '暫無承租人資料。請按「+ 新增承租人」新增。'}
-                            </p>
-                        </div>
-                    ) : (
-                        (activeTab === 'owners' ? filteredOwners : filteredLessees).map((p, index) => {
-                            const isLessee = activeTab === 'lessees';
-                            const ringHover = isLessee ? 'hover:ring-blue-500/30' : 'hover:ring-purple-500/30';
-                            const titleHover = isLessee
-                                ? 'group-hover:text-blue-600 dark:group-hover:text-blue-400'
-                                : 'group-hover:text-purple-600 dark:group-hover:text-purple-400';
-                            const avatarGrad = isLessee
-                                ? 'from-blue-500 via-indigo-600 to-violet-700 shadow-blue-500/25'
-                                : 'from-purple-500 via-violet-600 to-indigo-700 shadow-purple-500/25';
-                            return (
-                                <motion.div
-                                    key={p.id}
-                                    initial={{ opacity: 0, y: 20 }}
-                                    animate={{ opacity: 1, y: 0 }}
-                                    transition={{ delay: index * 0.05 }}
-                                    className={`mobile-card md:glass-card group hover:ring-2 ${ringHover} transition-all relative overflow-hidden h-full p-4 sm:p-5 rounded-2xl`}
-                                >
-                                    <div className="absolute top-2 right-2 sm:top-3 sm:right-3 z-10 flex flex-row flex-wrap items-center justify-end gap-1 sm:gap-2 max-w-[min(100%,14rem)] sm:max-w-none">
-                                        <div
-                                            className={`shrink-0 px-2 py-1 sm:px-3 sm:py-1.5 text-[10px] sm:text-xs font-bold rounded-md sm:rounded-lg ${
-                                                p.type === 'company'
-                                                    ? 'bg-blue-500/15 text-blue-600 dark:text-blue-400 ring-1 ring-blue-500/20'
-                                                    : 'bg-amber-500/15 text-amber-600 dark:text-amber-400 ring-1 ring-amber-500/20'
-                                            }`}
+            {(activeTab === 'owners' || activeTab === 'lessees') && (() => {
+                const sourceList = activeTab === 'owners' ? filteredOwners : filteredLessees;
+                const currentPage = activeTab === 'owners' ? ownersPage : lesseesPage;
+                const setPage = activeTab === 'owners' ? setOwnersPage : setLesseesPage;
+                const totalPages = Math.max(1, Math.ceil(sourceList.length / PAGE_SIZE));
+                const safePage = Math.min(currentPage, totalPages);
+                const paginatedList = sourceList.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
+                return (
+                    <>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
+                            {sourceList.length === 0 ? (
+                                <div className="col-span-full glass-card flex flex-col items-center justify-center py-24 text-zinc-400 dark:text-white/40">
+                                    <svg className="w-20 h-20 mb-6 opacity-20" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
+                                    </svg>
+                                    <p className="text-xl font-medium">
+                                        {activeTab === 'owners'
+                                            ? '暫無業主資料。請按「+ 新增業主」新增。'
+                                            : '暫無承租人資料。請按「+ 新增承租人」新增。'}
+                                    </p>
+                                </div>
+                            ) : (
+                                paginatedList.map((p, index) => {
+                                    const isLessee = activeTab === 'lessees';
+                                    const ringHover = isLessee ? 'hover:ring-blue-500/30' : 'hover:ring-purple-500/30';
+                                    const titleHover = isLessee
+                                        ? 'group-hover:text-blue-600 dark:group-hover:text-blue-400'
+                                        : 'group-hover:text-purple-600 dark:group-hover:text-purple-400';
+                                    const avatarGrad = isLessee
+                                        ? 'from-blue-500 via-indigo-600 to-violet-700 shadow-blue-500/25'
+                                        : 'from-purple-500 via-violet-600 to-indigo-700 shadow-purple-500/25';
+                                    return (
+                                        <motion.div
+                                            key={p.id}
+                                            initial={{ opacity: 0, y: 20 }}
+                                            animate={{ opacity: 1, y: 0 }}
+                                            transition={{ delay: index * 0.05 }}
+                                            className={`mobile-card md:glass-card group hover:ring-2 ${ringHover} transition-all relative overflow-hidden h-full p-4 sm:p-5 rounded-2xl`}
                                         >
-                                            {p.type === 'company' ? '公司' : '個人'}
-                                        </div>
-                                        <div
-                                            className={`shrink-0 px-2 py-1 sm:px-3 sm:py-1.5 text-[10px] sm:text-xs font-bold rounded-md sm:rounded-lg ${
-                                                isLessee
-                                                    ? 'bg-sky-500/15 text-sky-700 dark:text-sky-400 ring-1 ring-sky-500/20'
-                                                    : 'bg-purple-500/15 text-purple-700 dark:text-purple-400 ring-1 ring-purple-500/20'
-                                            }`}
-                                        >
-                                            {isLessee ? '承租人' : '業主'}
-                                        </div>
-                                        {!isLessee && (
-                                            <div
-                                                className={`shrink-0 px-2 py-1 sm:px-3 sm:py-1.5 text-[10px] sm:text-xs font-semibold rounded-md sm:rounded-lg ${proprietorCategoryBadgeClassName(p.category)}`}
-                                            >
-                                                {proprietorCategoryLabelZh(p.category, 'badge')}
-                                            </div>
-                                        )}
-                                    </div>
-                                    <div className="flex items-start pr-[5.5rem] sm:pr-36 md:pr-32 lg:pr-36">
-                                        <div className="flex items-center gap-3 sm:gap-4 min-w-0 w-full">
-                                            <div
-                                                className={`w-11 h-11 sm:w-12 sm:h-12 md:w-14 md:h-14 rounded-xl bg-gradient-to-br ${avatarGrad} flex flex-col items-center justify-center text-white font-bold leading-tight shrink-0 shadow-md ring-1 ring-white/20 dark:ring-white/10 ${
-                                                    !isLessee ? 'cursor-pointer hover:scale-[1.02] transition-transform' : ''
-                                                }`}
-                                            >
-                                                <span className="text-[7px] sm:text-[9px] opacity-80 mb-0.5 font-mono tracking-tight max-w-[2.5rem] sm:max-w-14 truncate px-0.5">
-                                                    {p.code}
-                                                </span>
-                                                <span className="text-base sm:text-lg md:text-xl">{p.name.charAt(0).toUpperCase()}</span>
-                                            </div>
-                                            <div className="flex-1 min-w-0 py-0.5">
-                                                <h3
-                                                    onClick={() => {
-                                                        if (!isLessee) {
-                                                            setShowOwnerDetail(p);
-                                                        } else {
-                                                            setShowLesseeDetail(p);
-                                                        }
-                                                    }}
-                                                    className={`text-zinc-900 dark:text-white font-bold text-sm sm:text-base md:text-lg leading-snug line-clamp-2 ${titleHover} transition-colors ${!isLessee ? 'cursor-pointer' : 'group-hover:text-blue-600 dark:group-hover:text-blue-400 cursor-pointer'}`}
+                                            <div className="absolute top-2 right-2 sm:top-3 sm:right-3 z-10 flex flex-row flex-wrap items-center justify-end gap-1 sm:gap-2 max-w-[min(100%,14rem)] sm:max-w-none">
+                                                <div
+                                                    className={`shrink-0 px-2 py-1 sm:px-3 sm:py-1.5 text-[10px] sm:text-xs font-bold rounded-md sm:rounded-lg ${
+                                                        p.type === 'company'
+                                                            ? 'bg-blue-500/15 text-blue-600 dark:text-blue-400 ring-1 ring-blue-500/20'
+                                                            : 'bg-amber-500/15 text-amber-600 dark:text-amber-400 ring-1 ring-amber-500/20'
+                                                    }`}
                                                 >
-                                                    {p.shortName || p.name}
-                                                </h3>
-                                                <p className="text-zinc-600 dark:text-white/55 text-xs sm:text-sm truncate font-medium mt-1 tracking-wide">
-                                                    {p.englishName || p.name}
-                                                </p>
+                                                    {p.type === 'company' ? '公司' : '個人'}
+                                                </div>
+                                                <div
+                                                    className={`shrink-0 px-2 py-1 sm:px-3 sm:py-1.5 text-[10px] sm:text-xs font-bold rounded-md sm:rounded-lg ${
+                                                        isLessee
+                                                            ? 'bg-sky-500/15 text-sky-700 dark:text-sky-400 ring-1 ring-sky-500/20'
+                                                            : 'bg-purple-500/15 text-purple-700 dark:text-purple-400 ring-1 ring-purple-500/20'
+                                                    }`}
+                                                >
+                                                    {isLessee ? '承租人' : '業主'}
+                                                </div>
+                                                {!isLessee && (
+                                                    <div
+                                                        className={`shrink-0 px-2 py-1 sm:px-3 sm:py-1.5 text-[10px] sm:text-xs font-semibold rounded-md sm:rounded-lg ${proprietorCategoryBadgeClassName(p.category)}`}
+                                                    >
+                                                        {proprietorCategoryLabelZh(p.category, 'badge')}
+                                                    </div>
+                                                )}
+                                            </div>
+                                            <div className="flex items-start pr-[5.5rem] sm:pr-36 md:pr-32 lg:pr-36">
+                                                <div className="flex items-center gap-3 sm:gap-4 min-w-0 w-full">
+                                                    <div
+                                                        className={`w-11 h-11 sm:w-12 sm:h-12 md:w-14 md:h-14 rounded-xl bg-gradient-to-br ${avatarGrad} flex flex-col items-center justify-center text-white font-bold leading-tight shrink-0 shadow-md ring-1 ring-white/20 dark:ring-white/10 ${
+                                                            !isLessee ? 'cursor-pointer hover:scale-[1.02] transition-transform' : ''
+                                                        }`}
+                                                    >
+                                                        <span className="text-[7px] sm:text-[9px] opacity-80 mb-0.5 font-mono tracking-tight max-w-[2.5rem] sm:max-w-14 truncate px-0.5">
+                                                            {p.code}
+                                                        </span>
+                                                        <span className="text-base sm:text-lg md:text-xl">{p.name.charAt(0).toUpperCase()}</span>
+                                                    </div>
+                                                    <div className="flex-1 min-w-0 py-0.5">
+                                                        <h3
+                                                            onClick={() => {
+                                                                if (!isLessee) {
+                                                                    setShowOwnerDetail(p);
+                                                                } else {
+                                                                    setShowLesseeDetail(p);
+                                                                }
+                                                            }}
+                                                            className={`text-zinc-900 dark:text-white font-bold text-sm sm:text-base md:text-lg leading-snug line-clamp-2 ${titleHover} transition-colors ${!isLessee ? 'cursor-pointer' : 'group-hover:text-blue-600 dark:group-hover:text-blue-400 cursor-pointer'}`}
+                                                        >
+                                                            {p.shortName || p.name}
+                                                        </h3>
+                                                        <p className="text-zinc-600 dark:text-white/55 text-xs sm:text-sm truncate font-medium mt-1 tracking-wide">
+                                                            {p.englishName || p.name}
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div className="absolute bottom-3 right-3 md:hidden">
+                                                <ChevronRight className="w-5 h-5 text-zinc-300 dark:text-white/10" />
+                                            </div>
+                                            <div className="absolute bottom-3 right-3 gap-2 opacity-0 group-hover:opacity-100 hidden md:flex">
+                                                <button
+                                                    type="button"
+                                                    onClick={e => {
+                                                        e.stopPropagation();
+                                                        openMergedModal(p, true);
+                                                    }}
+                                                    className="p-2 rounded-lg text-zinc-300 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-500/10 transition-all"
+                                                >
+                                                    <Pencil className="w-4 h-4" />
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={e => {
+                                                        e.stopPropagation();
+                                                        handleDeleteMergedProprietor(p);
+                                                    }}
+                                                    className="p-2 rounded-lg text-zinc-300 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 transition-all"
+                                                >
+                                                    <Trash2 className="w-4 h-4" />
+                                                </button>
+                                            </div>
+                                        </motion.div>
+                                    );
+                                })
+                            )}
+                        </div>
+                        {sourceList.length > PAGE_SIZE && (
+                            <div className="flex items-center justify-center gap-3 pt-4 text-sm text-zinc-500 dark:text-white/50">
+                                <button
+                                    type="button"
+                                    onClick={() => setPage(p => Math.max(1, p - 1))}
+                                    disabled={safePage <= 1}
+                                    className="p-1.5 rounded-lg border border-zinc-200 dark:border-white/15 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-zinc-50 dark:hover:bg-white/5 cursor-pointer transition-colors"
+                                >
+                                    <ChevronLeft className="w-4 h-4 text-zinc-600 dark:text-white" />
+                                </button>
+                                <span className="font-medium min-w-12 text-center">
+                                    {safePage} / {totalPages}
+                                </span>
+                                <button
+                                    type="button"
+                                    onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                                    disabled={safePage >= totalPages}
+                                    className="p-1.5 rounded-lg border border-zinc-200 dark:border-white/15 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-zinc-50 dark:hover:bg-white/5 cursor-pointer transition-colors"
+                                >
+                                    <ChevronRight className="w-4 h-4 text-zinc-600 dark:text-white" />
+                                </button>
+                            </div>
+                        )}
+                    </>
+                );
+            })()}
+
+            {activeTab === 'sub_landlords' && (() => {
+                const totalPages = Math.max(1, Math.ceil(filteredSubLandlords.length / PAGE_SIZE));
+                const safePage = Math.min(subLandlordsPage, totalPages);
+                const paginatedList = filteredSubLandlords.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
+                return (
+                    <>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
+                            {filteredSubLandlords.length === 0 ? (
+                                <div className="col-span-full glass-card flex flex-col items-center justify-center py-24 text-zinc-400 dark:text-white/40">
+                                    <p className="text-xl font-medium">暫無二房東資料。請按「+ 新增」新增。</p>
+                                </div>
+                            ) : (
+                                paginatedList.map((item, i) => (
+                                    <motion.div
+                                        key={item.id}
+                                        initial={{ opacity: 0, y: 20 }}
+                                        animate={{ opacity: 1, y: 0 }}
+                                        transition={{ delay: i * 0.05 }}
+                                        className="mobile-card md:glass-card group hover:ring-2 hover:ring-blue-500/30 transition-all relative overflow-hidden h-full p-4 sm:p-5 rounded-2xl"
+                                    >
+                                        <div className="absolute top-2 right-2 sm:top-3 sm:right-3 z-10">
+                                            <div className="shrink-0 px-2 py-1 sm:px-3 sm:py-1.5 text-[10px] sm:text-xs font-bold rounded-md sm:rounded-lg bg-blue-500/15 text-blue-600 dark:text-blue-400 ring-1 ring-blue-500/20">
+                                                二房東
                                             </div>
                                         </div>
-                                    </div>
-                                    <div className="absolute bottom-3 right-3 md:hidden">
-                                        <ChevronRight className="w-5 h-5 text-zinc-300 dark:text-white/10" />
-                                    </div>
-                                    <div className="absolute bottom-3 right-3 gap-2 opacity-0 group-hover:opacity-100 hidden md:flex">
-                                        <button
-                                            type="button"
-                                            onClick={e => {
-                                                e.stopPropagation();
-                                                openMergedModal(p, true);
-                                            }}
-                                            className="p-2 rounded-lg text-zinc-300 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-500/10 transition-all"
-                                        >
-                                            <Pencil className="w-4 h-4" />
-                                        </button>
-                                        <button
-                                            type="button"
-                                            onClick={e => {
-                                                e.stopPropagation();
-                                                handleDeleteMergedProprietor(p);
-                                            }}
-                                            className="p-2 rounded-lg text-zinc-300 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 transition-all"
-                                        >
-                                            <Trash2 className="w-4 h-4" />
-                                        </button>
-                                    </div>
-                                </motion.div>
-                            );
-                        })
-                    )}
-                </div>
-            )}
-
-            {activeTab === 'sub_landlords' && (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
-                    {filteredSubLandlords.length === 0 ? (
-                        <div className="col-span-full glass-card flex flex-col items-center justify-center py-24 text-zinc-400 dark:text-white/40">
-                            <p className="text-xl font-medium">暫無二房東資料。請按「+ 新增」新增。</p>
-                        </div>
-                    ) : (
-                        filteredSubLandlords.map((item, i) => (
-                            <motion.div
-                                key={item.id}
-                                initial={{ opacity: 0, y: 20 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                transition={{ delay: i * 0.05 }}
-                                className="mobile-card md:glass-card group hover:ring-2 hover:ring-blue-500/30 transition-all relative overflow-hidden h-full p-4 sm:p-5 rounded-2xl"
-                            >
-                                <div className="absolute top-2 right-2 sm:top-3 sm:right-3 z-10">
-                                    <div className="shrink-0 px-2 py-1 sm:px-3 sm:py-1.5 text-[10px] sm:text-xs font-bold rounded-md sm:rounded-lg bg-blue-500/15 text-blue-600 dark:text-blue-400 ring-1 ring-blue-500/20">
-                                        二房東
-                                    </div>
-                                </div>
-                                <div className="flex items-start pr-[4.5rem] sm:pr-24 md:pr-20">
-                                    <div className="flex items-center gap-3 sm:gap-4 w-full min-w-0">
-                                        <div 
-                                            onClick={() => setShowSubLandlordDetail(item)}
-                                            className="w-11 h-11 sm:w-12 sm:h-12 md:w-14 md:h-14 rounded-xl bg-gradient-to-br from-blue-500 via-indigo-600 to-violet-700 flex items-center justify-center text-white font-bold leading-tight shrink-0 shadow-md shadow-blue-500/25 ring-1 ring-white/20 dark:ring-white/10 cursor-pointer hover:scale-[1.02] transition-transform"
-                                        >
-                                            <span className="text-base sm:text-lg md:text-xl">{item.name.charAt(0).toUpperCase()}</span>
-                                        </div>
-                                        <div className="flex-1 min-w-0 py-0.5">
-                                            <h3 
-                                                onClick={() => setShowSubLandlordDetail(item)}
-                                                className="text-zinc-900 dark:text-white font-bold text-sm sm:text-base md:text-lg leading-snug line-clamp-2 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors cursor-pointer"
-                                            >
-                                                {item.name}
-                                            </h3>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div className="absolute bottom-3 right-3 md:hidden">
-                                    <ChevronRight className="w-5 h-5 text-zinc-300 dark:text-white/10" />
-                                </div>
-                                <div className="absolute bottom-3 right-3 gap-2 opacity-0 group-hover:opacity-100 hidden md:flex">
-                                    <button
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            setEditSubLandlord(item);
-                                            setShowSubLandlordModal(true);
-                                        }}
-                                        className="p-2 rounded-lg text-zinc-300 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-500/10 transition-all"
-                                        title="編輯二房東"
-                                    >
-                                        <Pencil className="w-4 h-4" />
-                                    </button>
-                                    <button
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            item.id && handleDeleteSubLandlord(item.id);
-                                        }}
-                                        className="p-2 rounded-lg text-zinc-300 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 transition-all"
-                                    >
-                                        <Trash2 className="w-4 h-4" />
-                                    </button>
-                                </div>
-                            </motion.div>
-                        ))
-                    )}
-                </div>
-            )}
-
-            {activeTab === 'current_tenants' && (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
-                    {filteredCurrentTenants.length === 0 ? (
-                        <div className="col-span-full glass-card flex flex-col items-center justify-center py-24 text-zinc-400 dark:text-white/40">
-                            <p className="text-xl font-medium">暫無現時租客資料。請按「+ 新增租客」新增。</p>
-                        </div>
-                    ) : (
-                        filteredCurrentTenants.map((item, i) => (
-                            <motion.div
-                                key={item.id}
-                                initial={{ opacity: 0, y: 20 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                transition={{ delay: i * 0.05 }}
-                                onClick={() => setDetailCurrentTenant(item)}
-                                className="mobile-card md:glass-card group hover:ring-2 hover:ring-blue-500/30 transition-all relative overflow-hidden h-full p-4 sm:p-5 rounded-2xl cursor-pointer"
-                            >
-                                <div className="absolute top-2 right-2 sm:top-3 sm:right-3 z-10">
-                                    <div className="shrink-0 px-2 py-1 sm:px-3 sm:py-1.5 text-[10px] sm:text-xs font-bold rounded-md sm:rounded-lg bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 ring-1 ring-emerald-500/20">
-                                        現時租客
-                                    </div>
-                                </div>
                                         <div className="flex items-start pr-[4.5rem] sm:pr-24 md:pr-20">
-                                    <div className="flex items-center gap-3 sm:gap-4 min-w-0 w-full">
-                                        <div className="w-11 h-11 sm:w-12 sm:h-12 md:w-14 md:h-14 rounded-xl bg-gradient-to-br from-emerald-500 via-teal-600 to-cyan-700 flex flex-col items-center justify-center text-white font-bold leading-tight shrink-0 shadow-md shadow-emerald-500/25 ring-1 ring-white/20 dark:ring-white/10">
-                                            <span className="text-[6px] sm:text-[8px] opacity-80 mb-0.5 font-mono tracking-tight max-w-[2.25rem] sm:max-w-14 truncate px-0.5 text-center leading-tight">{item.englishName || item.name.charAt(0).toUpperCase()}</span>
-                                            <span className="text-base sm:text-lg md:text-xl">{item.name.charAt(0).toUpperCase()}</span>
+                                            <div className="flex items-center gap-3 sm:gap-4 w-full min-w-0">
+                                                <div
+                                                    onClick={() => setShowSubLandlordDetail(item)}
+                                                    className="w-11 h-11 sm:w-12 sm:h-12 md:w-14 md:h-14 rounded-xl bg-gradient-to-br from-blue-500 via-indigo-600 to-violet-700 flex items-center justify-center text-white font-bold leading-tight shrink-0 shadow-md shadow-blue-500/25 ring-1 ring-white/20 dark:ring-white/10 cursor-pointer hover:scale-[1.02] transition-transform"
+                                                >
+                                                    <span className="text-base sm:text-lg md:text-xl">{item.name.charAt(0).toUpperCase()}</span>
+                                                </div>
+                                                <div className="flex-1 min-w-0 py-0.5">
+                                                    <h3
+                                                        onClick={() => setShowSubLandlordDetail(item)}
+                                                        className="text-zinc-900 dark:text-white font-bold text-sm sm:text-base md:text-lg leading-snug line-clamp-2 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors cursor-pointer"
+                                                    >
+                                                        {item.name}
+                                                    </h3>
+                                                </div>
+                                            </div>
                                         </div>
-                                        <div className="flex-1 min-w-0 py-0.5">
-                                            <h3 className="text-zinc-900 dark:text-white font-bold text-sm sm:text-base md:text-lg leading-snug line-clamp-2 group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors">
-                                                {item.name}
-                                            </h3>
-                                            <p className="text-zinc-600 dark:text-white/55 text-xs sm:text-sm font-medium mt-1 truncate">
-                                                {item.englishName || '—'}
-                                            </p>
+                                        <div className="absolute bottom-3 right-3 md:hidden">
+                                            <ChevronRight className="w-5 h-5 text-zinc-300 dark:text-white/10" />
                                         </div>
-                                    </div>
+                                        <div className="absolute bottom-3 right-3 gap-2 opacity-0 group-hover:opacity-100 hidden md:flex">
+                                            <button
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    setEditSubLandlord(item);
+                                                    setShowSubLandlordModal(true);
+                                                }}
+                                                className="p-2 rounded-lg text-zinc-300 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-500/10 transition-all"
+                                                title="編輯二房東"
+                                            >
+                                                <Pencil className="w-4 h-4" />
+                                            </button>
+                                            <button
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    item.id && handleDeleteSubLandlord(item.id);
+                                                }}
+                                                className="p-2 rounded-lg text-zinc-300 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 transition-all"
+                                            >
+                                                <Trash2 className="w-4 h-4" />
+                                            </button>
+                                        </div>
+                                    </motion.div>
+                                ))
+                            )}
+                        </div>
+                        {filteredSubLandlords.length > PAGE_SIZE && (
+                            <div className="flex items-center justify-center gap-3 pt-4 text-sm text-zinc-500 dark:text-white/50">
+                                <button
+                                    type="button"
+                                    onClick={() => setSubLandlordsPage(p => Math.max(1, p - 1))}
+                                    disabled={safePage <= 1}
+                                    className="p-1.5 rounded-lg border border-zinc-200 dark:border-white/15 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-zinc-50 dark:hover:bg-white/5 cursor-pointer transition-colors"
+                                >
+                                    <ChevronLeft className="w-4 h-4 text-zinc-600 dark:text-white" />
+                                </button>
+                                <span className="font-medium min-w-12 text-center">
+                                    {safePage} / {totalPages}
+                                </span>
+                                <button
+                                    type="button"
+                                    onClick={() => setSubLandlordsPage(p => Math.min(totalPages, p + 1))}
+                                    disabled={safePage >= totalPages}
+                                    className="p-1.5 rounded-lg border border-zinc-200 dark:border-white/15 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-zinc-50 dark:hover:bg-white/5 cursor-pointer transition-colors"
+                                >
+                                    <ChevronRight className="w-4 h-4 text-zinc-600 dark:text-white" />
+                                </button>
+                            </div>
+                        )}
+                    </>
+                );
+            })()}
+
+            {activeTab === 'current_tenants' && (() => {
+                const totalPages = Math.max(1, Math.ceil(filteredCurrentTenants.length / PAGE_SIZE));
+                const safePage = Math.min(currentTenantsPage, totalPages);
+                const paginatedList = filteredCurrentTenants.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
+                return (
+                    <>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
+                            {filteredCurrentTenants.length === 0 ? (
+                                <div className="col-span-full glass-card flex flex-col items-center justify-center py-24 text-zinc-400 dark:text-white/40">
+                                    <p className="text-xl font-medium">暫無現時租客資料。請按「+ 新增租客」新增。</p>
                                 </div>
-                                <div className="absolute bottom-3 right-3 md:hidden">
-                                    <ChevronRight className="w-5 h-5 text-zinc-300 dark:text-white/10" />
-                                </div>
-                                <div className="absolute bottom-3 right-3 gap-2 opacity-0 group-hover:opacity-100 hidden md:flex">
-                                    <button
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            setEditCurrentTenant(item);
-                                            setShowCurrentTenantModal(true);
-                                        }}
-                                        className="p-2 rounded-lg text-zinc-300 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-500/10 transition-all"
+                            ) : (
+                                paginatedList.map((item, i) => (
+                                    <motion.div
+                                        key={item.id}
+                                        initial={{ opacity: 0, y: 20 }}
+                                        animate={{ opacity: 1, y: 0 }}
+                                        transition={{ delay: i * 0.05 }}
+                                        onClick={() => setDetailCurrentTenant(item)}
+                                        className="mobile-card md:glass-card group hover:ring-2 hover:ring-blue-500/30 transition-all relative overflow-hidden h-full p-4 sm:p-5 rounded-2xl cursor-pointer"
                                     >
-                                        <Pencil className="w-4 h-4" />
-                                    </button>
-                                    <button
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            item.id && handleDeleteCurrentTenant(item.id);
-                                        }}
-                                        className="p-2 rounded-lg text-zinc-300 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 transition-all"
-                                    >
-                                        <Trash2 className="w-4 h-4" />
-                                    </button>
-                                </div>
-                            </motion.div>
-                        ))
-                    )}
-                </div>
-            )}
+                                        <div className="absolute top-2 right-2 sm:top-3 sm:right-3 z-10">
+                                            <div className="shrink-0 px-2 py-1 sm:px-3 sm:py-1.5 text-[10px] sm:text-xs font-bold rounded-md sm:rounded-lg bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 ring-1 ring-emerald-500/20">
+                                                現時租客
+                                            </div>
+                                        </div>
+                                                <div className="flex items-start pr-[4.5rem] sm:pr-24 md:pr-20">
+                                            <div className="flex items-center gap-3 sm:gap-4 min-w-0 w-full">
+                                                <div className="w-11 h-11 sm:w-12 sm:h-12 md:w-14 md:h-14 rounded-xl bg-gradient-to-br from-emerald-500 via-teal-600 to-cyan-700 flex flex-col items-center justify-center text-white font-bold leading-tight shrink-0 shadow-md shadow-emerald-500/25 ring-1 ring-white/20 dark:ring-white/10">
+                                                    <span className="text-[6px] sm:text-[8px] opacity-80 mb-0.5 font-mono tracking-tight max-w-[2.25rem] sm:max-w-14 truncate px-0.5 text-center leading-tight">{item.englishName || item.name.charAt(0).toUpperCase()}</span>
+                                                    <span className="text-base sm:text-lg md:text-xl">{item.name.charAt(0).toUpperCase()}</span>
+                                                </div>
+                                                <div className="flex-1 min-w-0 py-0.5">
+                                                    <h3 className="text-zinc-900 dark:text-white font-bold text-sm sm:text-base md:text-lg leading-snug line-clamp-2 group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors">
+                                                        {item.name}
+                                                    </h3>
+                                                    <p className="text-zinc-600 dark:text-white/55 text-xs sm:text-sm font-medium mt-1 truncate">
+                                                        {item.englishName || '—'}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div className="absolute bottom-3 right-3 md:hidden">
+                                            <ChevronRight className="w-5 h-5 text-zinc-300 dark:text-white/10" />
+                                        </div>
+                                        <div className="absolute bottom-3 right-3 gap-2 opacity-0 group-hover:opacity-100 hidden md:flex">
+                                            <button
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    setEditCurrentTenant(item);
+                                                    setShowCurrentTenantModal(true);
+                                                }}
+                                                className="p-2 rounded-lg text-zinc-300 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-500/10 transition-all"
+                                            >
+                                                <Pencil className="w-4 h-4" />
+                                            </button>
+                                            <button
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    item.id && handleDeleteCurrentTenant(item.id);
+                                                }}
+                                                className="p-2 rounded-lg text-zinc-300 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 transition-all"
+                                            >
+                                                <Trash2 className="w-4 h-4" />
+                                            </button>
+                                        </div>
+                                    </motion.div>
+                                ))
+                            )}
+                        </div>
+                        {filteredCurrentTenants.length > PAGE_SIZE && (
+                            <div className="flex items-center justify-center gap-3 pt-4 text-sm text-zinc-500 dark:text-white/50">
+                                <button
+                                    type="button"
+                                    onClick={() => setCurrentTenantsPage(p => Math.max(1, p - 1))}
+                                    disabled={safePage <= 1}
+                                    className="p-1.5 rounded-lg border border-zinc-200 dark:border-white/15 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-zinc-50 dark:hover:bg-white/5 cursor-pointer transition-colors"
+                                >
+                                    <ChevronLeft className="w-4 h-4 text-zinc-600 dark:text-white" />
+                                </button>
+                                <span className="font-medium min-w-12 text-center">
+                                    {safePage} / {totalPages}
+                                </span>
+                                <button
+                                    type="button"
+                                    onClick={() => setCurrentTenantsPage(p => Math.min(totalPages, p + 1))}
+                                    disabled={safePage >= totalPages}
+                                    className="p-1.5 rounded-lg border border-zinc-200 dark:border-white/15 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-zinc-50 dark:hover:bg-white/5 cursor-pointer transition-colors"
+                                >
+                                    <ChevronRight className="w-4 h-4 text-zinc-600 dark:text-white" />
+                                </button>
+                            </div>
+                        )}
+                    </>
+                );
+            })()}
 
             {/* Modals */}
             <AnimatePresence>
@@ -1061,7 +1170,7 @@ function SubLandlordDetailModal({
                                             >
                                                 <ChevronLeft className="w-4 h-4 text-zinc-600 dark:text-white" />
                                             </button>
-                                            <span className="font-medium min-w-[3rem] text-center">
+                                            <span className="font-medium min-w-12 text-center">
                                                 {contractsPage} / {totalPages}
                                             </span>
                                             <button
