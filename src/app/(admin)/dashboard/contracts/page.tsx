@@ -338,6 +338,17 @@ export default function ContractsPage() {
             'bg-violet-100 text-violet-900 border border-violet-400/70 dark:bg-violet-950/55 dark:text-violet-100 dark:border-violet-500/55',
     };
 
+    /** 根據剩餘日子計算行背景色（只對有 endDate 的記效合約有意義） */
+    const getRowBgByRemaining = (status: string, endDate: string | null): string => {
+        if (!endDate) return '';
+        const diff = Math.ceil((new Date(endDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+        if (diff < 0) return '!bg-red-50/70 dark:!bg-red-950/20';
+        if (diff === 0) return '!bg-red-100/70 dark:!bg-red-950/30';
+        if (diff <= 30) return '!bg-red-50/60 dark:!bg-red-950/15';
+        if (diff <= 90) return '!bg-yellow-50/60 dark:!bg-yellow-950/15';
+        return '!bg-green-50/60 dark:!bg-green-950/15';
+    };
+
     const openDeleteConfirm = (e: React.MouseEvent, contract: any) => {
         e.stopPropagation();
         setDeleteConfirm({
@@ -1020,7 +1031,7 @@ export default function ContractsPage() {
                                                         setShowPropertyModal(true);
                                                     }
                                                 }}
-                                                className={`border-b transition-colors cursor-pointer ${
+                                                className={`border-b transition-colors cursor-pointer ${getRowBgByRemaining(status, endDate)} ${
                                                     isLeaseInTab
                                                         ? 'border-violet-200/50 dark:border-violet-500/15 hover:bg-violet-50/50 dark:hover:bg-violet-500/8'
                                                         : 'border-amber-200/50 dark:border-amber-500/10 hover:bg-amber-50/50 dark:hover:bg-amber-500/5'
@@ -1118,21 +1129,41 @@ export default function ContractsPage() {
                                                                     </div>
                                                                 );
                                                             }
-                                                            const y = Math.floor(diff / 365);
-                                                            const m = Math.floor((diff % 365) / 30);
-                                                            const d = diff % 30;
+                                                            let y: number, m: number, d: number;
+                                                            {
+                                                                const nowYear = now.getFullYear();
+                                                                const nowMonth = now.getMonth();
+                                                                const nowDay = now.getDate();
+                                                                const endYear = end.getFullYear();
+                                                                const endMonth = end.getMonth();
+                                                                const endDay = end.getDate();
+                                                                y = endYear - nowYear;
+                                                                m = endMonth - nowMonth;
+                                                                d = endDay - nowDay;
+                                                                if (d < 0) {
+                                                                    m -= 1;
+                                                                    const prevMonth = new Date(endYear, endMonth, 0);
+                                                                    d += prevMonth.getDate();
+                                                                }
+                                                                if (m < 0) {
+                                                                    y -= 1;
+                                                                    m += 12;
+                                                                }
+                                                            }
                                                             let parts = [];
                                                             if (y > 0) parts.push(`${y} 年`);
                                                             if (m > 0) parts.push(`${m} 個月`);
                                                             if (d > 0 || parts.length === 0) parts.push(`${d} 日`);
-                                                            return (
-                                                                <span className={`mt-1 inline-block text-sm font-bold px-1.5 py-0.5 rounded-md ${
-                                                                    diff <= 30
-                                                                        ? 'bg-red-100 dark:bg-red-500/20 text-red-600 dark:text-red-300'
-                                                                        : diff <= 90
+                                                            const isRentOut = !isLeaseInTab;
+                                                            const badgeClass = isRentOut
+                                                                ? 'bg-yellow-100 dark:bg-yellow-500/15 text-yellow-700 dark:text-yellow-300'
+                                                                : diff <= 30
+                                                                    ? 'bg-red-100 dark:bg-red-500/20 text-red-600 dark:text-red-300'
+                                                                    : diff <= 90
                                                                         ? 'bg-yellow-100 dark:bg-yellow-500/15 text-yellow-700 dark:text-yellow-300'
-                                                                        : 'bg-green-100 dark:bg-green-500/15 text-green-700 dark:text-green-300'
-                                                                }`}>
+                                                                        : 'bg-green-100 dark:bg-green-500/15 text-green-700 dark:text-green-300';
+                                                            return (
+                                                                <span className={`mt-1 inline-block text-sm font-bold px-1.5 py-0.5 rounded-md ${badgeClass}`}>
                                                                     剩 {parts.join(' ')}
                                                                 </span>
                                                             );
@@ -1232,7 +1263,7 @@ export default function ContractsPage() {
                                                 setShowPropertyModal(true);
                                             }
                                         }}
-                                        className={`mobile-card p-4 space-y-3 border ${
+                                        className={`mobile-card p-4 space-y-3 border ${getRowBgByRemaining(status, endDate)} ${
                                             isLeaseInTab
                                                 ? 'border-violet-200/60 dark:border-violet-500/25'
                                                 : 'border-amber-200/50 dark:border-amber-500/20'
@@ -1337,9 +1368,27 @@ export default function ContractsPage() {
                                                             </span>
                                                         );
                                                     }
-                                                    const y = Math.floor(diff / 365);
-                                                    const m = Math.floor((diff % 365) / 30);
-                                                    const d = diff % 30;
+                                                    let y: number, m: number, d: number;
+                                                    {
+                                                        const nowYear = now.getFullYear();
+                                                        const nowMonth = now.getMonth();
+                                                        const nowDay = now.getDate();
+                                                        const endYear = end.getFullYear();
+                                                        const endMonth = end.getMonth();
+                                                        const endDay = end.getDate();
+                                                        y = endYear - nowYear;
+                                                        m = endMonth - nowMonth;
+                                                        d = endDay - nowDay;
+                                                        if (d < 0) {
+                                                            m -= 1;
+                                                            const prevMonth = new Date(endYear, endMonth, 0);
+                                                            d += prevMonth.getDate();
+                                                        }
+                                                        if (m < 0) {
+                                                            y -= 1;
+                                                            m += 12;
+                                                        }
+                                                    }
                                                     let parts = [];
                                                     if (y > 0) parts.push(`${y} 年`);
                                                     if (m > 0) parts.push(`${m} 個月`);

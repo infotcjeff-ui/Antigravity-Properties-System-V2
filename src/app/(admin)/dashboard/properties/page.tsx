@@ -51,6 +51,7 @@ const typeLabels: Record<string, string> = {
     co_investment: '合作投資',
     external_lease: '外租物業',
     managed_asset: '代管資產',
+    agent_management: '代理管理',
 };
 
 export default function ManagePropertiesPage() {
@@ -218,6 +219,7 @@ export default function ManagePropertiesPage() {
                     <option value="co_investment">合作投資</option>
                     <option value="external_lease">外租物業</option>
                     <option value="managed_asset">代管資產</option>
+                    <option value="agent_management">代理管理</option>
                 </select>
                 <select
                     value={filterStatus}
