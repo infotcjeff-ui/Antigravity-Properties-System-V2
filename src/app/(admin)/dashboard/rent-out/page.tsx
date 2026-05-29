@@ -361,14 +361,14 @@ export default function RentOutPage() {
                                 </select>
                             </div>
                             <div className="w-full min-w-0 lg:w-auto lg:shrink-0 lg:min-w-[304px]">
-                                <label className="text-xs font-medium text-zinc-500 dark:text-white/50">租約期間</label>
+                                <label className="text-xs font-medium text-zinc-500 dark:text-white/50">收租期間</label>
                                 <div className="mt-1 flex flex-nowrap items-center gap-2">
                                     <input
                                         type="date"
                                         value={filterLeaseFrom}
                                         onChange={(e) => setFilterLeaseFrom(e.target.value)}
                                         className={`${filterSelectClass} mt-0 w-[140px] shrink-0`}
-                                        aria-label="租約期間開始"
+                                        aria-label="收租期間開始"
                                     />
                                     <span className="text-zinc-400 dark:text-white/40 text-sm shrink-0">至</span>
                                     <input
@@ -376,7 +376,7 @@ export default function RentOutPage() {
                                         value={filterLeaseTo}
                                         onChange={(e) => setFilterLeaseTo(e.target.value)}
                                         className={`${filterSelectClass} mt-0 w-[140px] shrink-0`}
-                                        aria-label="租約期間結束"
+                                        aria-label="收租期間結束"
                                     />
                                 </div>
                             </div>
@@ -402,7 +402,7 @@ export default function RentOutPage() {
                                         <th className="p-4 font-medium">繳付金額</th>
                                         <th className="p-4 font-medium">付款方式</th>
                                         <th className="p-4 font-medium">付款日期</th>
-                                        <th className="p-4 font-medium">租約期間</th>
+                                        <th className="p-4 font-medium">收租期間</th>
                                         <th className="p-4 font-medium">備註</th>
                                         <th className="p-4 font-medium">租務狀態</th>
                                         <th className="p-4 font-medium">操作</th>
@@ -669,7 +669,7 @@ export default function RentOutPage() {
                                             <div className="col-span-2">
                                                 <div className="flex items-center gap-1.5 mb-1">
                                                     <Calendar className="w-3 h-3 text-blue-500" />
-                                                    <p className="text-[10px] text-zinc-400 uppercase font-bold tracking-wider">租約期間</p>
+                                                    <p className="text-[10px] text-zinc-400 uppercase font-bold tracking-wider">收租期間</p>
                                                 </div>
                                                 <p className={`font-bold text-sm ${payListStatus === 'paid' ? 'text-zinc-400 dark:text-white/40' : 'text-red-500'}`}>
                                                     {formatDateRangeDMY(startDate, endDate)}

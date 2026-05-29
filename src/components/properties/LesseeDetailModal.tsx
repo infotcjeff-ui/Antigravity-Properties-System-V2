@@ -425,7 +425,7 @@ export default function LesseeDetailModal({
                                     <p className="text-base font-bold text-zinc-900 dark:text-white">{lessee.name}</p>
                                 </div>
                                 <div className="p-4 bg-zinc-50 dark:bg-white/5 rounded-xl border border-zinc-100 dark:border-white/5">
-                                    <p className="text-sm text-zinc-500 dark:text-white/40 mb-1">代碼</p>
+                                    <p className="text-sm text-zinc-500 dark:text-white/40 mb-1">承租人編號</p>
                                     <p className="text-base font-medium text-zinc-900 dark:text-white">
                                         {lessee.code || '—'}
                                     </p>

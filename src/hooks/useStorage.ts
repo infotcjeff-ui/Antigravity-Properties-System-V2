@@ -1056,6 +1056,12 @@ export function useProprietors() {
             if (proprietor.brNumber !== undefined) {
                 data.br_number = proprietor.brNumber === '' ? null : proprietor.brNumber;
             }
+            if ((proprietor as any).lotIndex !== undefined) {
+                data.lot_index = (proprietor as any).lotIndex === '' ? null : (proprietor as any).lotIndex;
+            }
+            if ((proprietor as any).idNumber !== undefined) {
+                data.id_number = (proprietor as any).idNumber === '' ? null : (proprietor as any).idNumber;
+            }
 
             const { error: sbError } = await supabase
                 .from('proprietors')
@@ -1065,7 +1071,7 @@ export function useProprietors() {
             return id;
         } catch (err: any) {
             setError('Failed to add proprietor to cloud');
-            console.error(err);
+            console.error('addProprietor error:', err?.message, err?.details, err?.hint, err?.code, JSON.stringify(err));
             return null;
         } finally {
             setLoading(false);
@@ -1087,6 +1093,12 @@ export function useProprietors() {
             if (updates.brNumber !== undefined) {
                 updateData.br_number = updates.brNumber === '' ? null : updates.brNumber;
             }
+            if ((updates as any).lotIndex !== undefined) {
+                updateData.lot_index = (updates as any).lotIndex === '' ? null : (updates as any).lotIndex;
+            }
+            if ((updates as any).idNumber !== undefined) {
+                updateData.id_number = (updates as any).idNumber === '' ? null : (updates as any).idNumber;
+            }
             // Remove undefined
             Object.keys(updateData).forEach(key => updateData[key] === undefined && delete updateData[key]);
 
@@ -1097,9 +1109,9 @@ export function useProprietors() {
 
             if (sbError) throw sbError;
             return true;
-        } catch (err) {
+        } catch (err: any) {
             setError('Failed to update proprietor in cloud');
-            console.error(err);
+            console.error('updateProprietor error:', err?.message, err?.details, err?.hint, err?.code, JSON.stringify(err));
             return false;
         } finally {
             setLoading(false);
@@ -1377,6 +1389,9 @@ export function useRents() {
             if ((rod as any).rentOutDepositChequeReceiptNumber !== undefined) {
                 rentData.rent_out_deposit_cheque_receipt_number = (rod as any).rentOutDepositChequeReceiptNumber || null;
             }
+            if ((rod as any).rentOutDepositChequePaymentDate !== undefined) {
+                rentData.rent_out_deposit_cheque_payment_date = (rod as any).rentOutDepositChequePaymentDate || null;
+            }
             if (rod.rentOutDepositPaymentDate) rentData.rent_out_deposit_payment_date = rod.rentOutDepositPaymentDate;
             if (rod.rentOutDepositBankInImage) rentData.rent_out_deposit_bank_in_image = rod.rentOutDepositBankInImage;
             if (rent.rentOutDepositReceiveDate) rentData.rent_out_deposit_receive_date = rent.rentOutDepositReceiveDate;
@@ -1405,6 +1420,9 @@ export function useRents() {
                 rentData.rent_collection_cheque_receipt_number = (rc as any).rentCollectionChequeReceiptNumber || null;
             }
             if (rc.rentCollectionPaymentDate) rentData.rent_collection_payment_date = rc.rentCollectionPaymentDate;
+            if ((rc as any).rentCollectionChequeActualPaymentDate !== undefined) {
+                rentData.rent_collection_cheque_actual_payment_date = (rc as any).rentCollectionChequeActualPaymentDate || null;
+            }
             if (rc.rentCollectionBankInImage !== undefined) {
                 rentData.rent_collection_bank_in_image = rc.rentCollectionBankInImage;
             }
@@ -1649,6 +1667,9 @@ export function useRents() {
             if ((udep as any).rentOutDepositChequeReceiptNumber !== undefined) {
                 rentData.rent_out_deposit_cheque_receipt_number = (udep as any).rentOutDepositChequeReceiptNumber || null;
             }
+            if ((udep as any).rentOutDepositChequePaymentDate !== undefined) {
+                rentData.rent_out_deposit_cheque_payment_date = (udep as any).rentOutDepositChequePaymentDate || null;
+            }
             if (udep.rentOutDepositPaymentDate !== undefined) {
                 rentData.rent_out_deposit_payment_date = udep.rentOutDepositPaymentDate || null;
             }
@@ -1679,6 +1700,9 @@ export function useRents() {
                 rentData.rent_collection_cheque_receipt_number = (urc as any).rentCollectionChequeReceiptNumber || null;
             }
             if (urc.rentCollectionPaymentDate !== undefined) rentData.rent_collection_payment_date = urc.rentCollectionPaymentDate || null;
+            if ((urc as any).rentCollectionChequeActualPaymentDate !== undefined) {
+                rentData.rent_collection_cheque_actual_payment_date = (urc as any).rentCollectionChequeActualPaymentDate || null;
+            }
             if ((urc as any).rentCollectionBankInImage !== undefined) {
                 rentData.rent_collection_bank_in_image = (urc as any).rentCollectionBankInImage || null;
             }

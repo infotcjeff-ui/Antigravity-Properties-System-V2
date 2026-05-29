@@ -50,6 +50,8 @@ export interface Proprietor {
   brNumber?: string;
   /** ID Number / 身份證號碼（個人類別用） */
   idNumber?: string;
+  /** 物業地段（對應資料庫 lot_index） */
+  lotIndex?: string;
   createdBy?: string; // UUID of the user who created this record
   createdAt: Date;
   updatedAt: Date;
@@ -71,7 +73,7 @@ export interface Rent {
   type: 'renting' | 'rent_out' | 'contract'; // 交租 or 收租 or 合約記錄
 
   // Legacy fields (kept for backward compatibility)
-  location?: string; // 租借位置
+  location?: string; // 租用位置
   amount?: number;
   currency?: string;
   startDate?: Date;

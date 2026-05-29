@@ -74,7 +74,7 @@ function stripLotNewOldPrefixes(text: string): string {
 
 
 /**
- * 租務列表「租借位置」欄：優先顯示記錄所選地段。
+ * 租務列表「租用位置」欄：優先顯示記錄所選地段。
  * - rent_out：若記錄無地段（合約亦未選地段），顯示「暂无可用地段」而非整個 lotIndex。
  * - 合約記錄：若記錄無地段，顯示該物業之地段。
  * 若記錄所選地段為「部分地方」，則在該地段後附加「（部分地方）」標示。
@@ -133,7 +133,7 @@ function formatRentListLotCell(
     return li || '—';
 }
 
-/** 租借位置單元格：hover tooltip 顯示詳細地段資訊 */
+/** 租用位置單元格：hover tooltip 顯示詳細地段資訊 */
 function LotCellWithTooltip({
     rent,
     propertyLotIndex,
@@ -190,7 +190,7 @@ function LotCellWithTooltip({
     const tooltipContent = (
         <div className="space-y-2 text-sm">
             <div className="text-xs font-semibold text-zinc-500 dark:text-white/60 uppercase tracking-wider border-b border-zinc-100 dark:border-white/10 pb-1.5">
-                租借位置詳情
+                租用位置詳情
             </div>
             {nonPartialLots.length > 0 && (
                 <div>
@@ -613,7 +613,7 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                     ) : (
                         <div className="font-bold">承租人</div>
                     )}
-                    <div className="font-bold">租借位置</div>
+                    <div className="font-bold">租用位置</div>
                     <div className="font-bold">租期</div>
                     <div className="font-bold">繳付狀態</div>
                     <div className="font-bold">租金/月</div>
@@ -934,7 +934,7 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                     <div className="font-bold">業主</div>
                     <div className="font-bold">二房東</div>
                     <div className="font-bold">現時租客</div>
-                    <div className="font-bold">租借位置</div>
+                    <div className="font-bold">租用位置</div>
                     <div className="font-bold">租期</div>
                     <div className="font-bold">租金/月</div>
                     <div className="font-bold">{isLeaseIn ? '已付按金' : '已收按金'}</div>
@@ -2232,12 +2232,13 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                             ) : (
                                 <div className="border border-zinc-200 dark:border-white/10 rounded-xl overflow-hidden">
                                     {/* Table Header */}
-                                    <div className="grid grid-cols-[4rem_minmax(0,1fr)_6rem_minmax(0,1fr)_4.5rem] gap-x-2.5 gap-y-1 px-3 py-3 bg-zinc-100/80 dark:bg-white/5 text-sm font-semibold text-zinc-700 dark:text-white/80 uppercase tracking-wider border-b border-zinc-200 dark:border-white/10 items-center">
-                                        <div className="shrink-0">代碼</div>
+                                    <div className="grid grid-cols-6 gap-2 px-3 py-3 bg-zinc-100/80 dark:bg-white/5 text-sm font-semibold text-zinc-700 dark:text-white/80 uppercase tracking-wider border-b border-zinc-200 dark:border-white/10 items-center">
+                                        <div>業主代碼</div>
                                         <div className="min-w-0">業主名稱</div>
-                                        <div className="shrink-0 whitespace-nowrap">業主性質</div>
+                                        <div className="whitespace-nowrap">地段</div>
+                                        <div className="whitespace-nowrap">業主性質</div>
                                         <div className="min-w-0">擁有人類別</div>
-                                        <div className="text-center shrink-0 justify-self-center">操作</div>
+                                        <div className="text-center">操作</div>
                                     </div>
                                     {/* Table Rows */}
                                     {formData.proprietorIds.map((propId) => {
@@ -2251,9 +2252,9 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                                             : '-';
 
                                         return (
-                                            <div key={propId} className="grid grid-cols-[4rem_minmax(0,1fr)_6rem_minmax(0,1fr)_4.5rem] gap-x-2.5 gap-y-1 px-3 py-3 border-b border-zinc-100 dark:border-white/5 text-sm hover:bg-zinc-50/50 dark:hover:bg-white/1 transition-colors items-center last:border-0">
-                                                {/* 代碼 */}
-                                                <div className="text-zinc-600 dark:text-white/60 font-mono text-sm font-medium shrink-0">
+                                            <div key={propId} className="grid grid-cols-6 gap-2 px-3 py-3 border-b border-zinc-100 dark:border-white/5 text-sm hover:bg-zinc-50/50 dark:hover:bg-white/1 transition-colors items-center last:border-0">
+                                                {/* 業主代碼 */}
+                                                <div className="text-zinc-600 dark:text-white/60 font-mono text-sm font-medium">
                                                     {selectedProprietor?.code || '-'}
                                                 </div>
 
@@ -2262,18 +2263,23 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                                                     {selectedProprietor?.name || '(載入中...)'}
                                                 </div>
 
+                                                {/* 地段 */}
+                                                <div className="text-zinc-700 dark:text-white/80 text-sm whitespace-nowrap overflow-hidden text-ellipsis" title={((selectedProprietor as any)?.lotIndex || '').replace(/^(新|舊):\s*/, '')}>
+                                                    {((selectedProprietor as any)?.lotIndex || '').replace(/^(新|舊):\s*/, '') || '暫無'}
+                                                </div>
+
                                                 {/* 業主性質 */}
-                                                <div className="text-zinc-700 dark:text-white/80 text-sm shrink-0 whitespace-nowrap">
+                                                <div className="text-zinc-700 dark:text-white/80 text-sm whitespace-nowrap">
                                                     {typeLabel}
                                                 </div>
 
                                                 {/* 擁有人類別 */}
-                                                <div className="text-zinc-700 dark:text-white/80 text-sm min-w-0 leading-snug">
+                                                <div className="text-zinc-700 dark:text-white/80 text-sm min-w-0 leading-snug truncate" title={categoryLabel}>
                                                     {categoryLabel}
                                                 </div>
 
                                                 {/* 操作：編輯業主、移除連結 */}
-                                                <div className="flex items-center justify-center gap-0.5 shrink-0 justify-self-center">
+                                                <div className="flex items-center justify-center gap-0.5">
                                                     {isAuthenticated && selectedProprietor?.id && (
                                                         <button
                                                             type="button"
@@ -2594,6 +2600,7 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                     key={proprietorModalInitial?.id ?? 'new-proprietor'}
                     mode={proprietorModalMode}
                     propertyCode={property?.code || formData.code}
+                    propertyLotIndex={formData.lotIndex || property?.lotIndex || ''}
                     initialData={proprietorModalInitial ?? undefined}
                     initialEditing={proprietorModalInitial ? true : undefined}
                     onClose={() => {

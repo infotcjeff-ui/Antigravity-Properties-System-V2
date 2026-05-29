@@ -460,7 +460,7 @@ export default function ContractsPage() {
                                     <div className="flex flex-col">
                                         <div className="flex items-center gap-1.5 mb-1">
                                             <span className={`text-sm font-bold uppercase tracking-widest px-1.5 py-0.5 rounded-sm ${isLeaseInTab ? 'bg-violet-500/15 text-violet-600' : 'bg-amber-500/15 text-amber-600'}`}>
-                                                {isLeaseInTab ? '已付' : '已收'}
+                                                {isLeaseInTab ? '應付租金' : '應收租金'}
                                             </span>
                                         </div>
                                         <div className="flex items-baseline gap-0.5">
@@ -478,7 +478,7 @@ export default function ContractsPage() {
                                 <div className="flex flex-col">
                                         <div className="flex items-center gap-1.5 mb-1">
                                             <span className={`text-sm font-bold uppercase tracking-widest px-1.5 py-0.5 rounded-sm ${isLeaseInTab ? 'bg-violet-100 text-violet-500 dark:bg-violet-500/15 dark:text-violet-400/70' : 'bg-amber-100 text-amber-500 dark:bg-amber-500/15 dark:text-amber-400/70'}`}>
-                                                總數
+                                                {isLeaseInTab ? '應付總租金' : '應收總租金'}
                                             </span>
                                         </div>
                                     <div className="flex items-baseline gap-0.5">

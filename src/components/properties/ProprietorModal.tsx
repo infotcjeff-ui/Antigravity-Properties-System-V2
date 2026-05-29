@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Building2, Users, X } from 'lucide-react';
 import { useProprietors } from '@/hooks/useStorage';
 import { type Proprietor } from '@/lib/db';
-import { normalizeDuplicateName, proprietorCategoryLabelZh } from '@/lib/formatters';
+import { normalizeDuplicateName, proprietorCategoryLabelZh, parseLotEntries } from '@/lib/formatters';
 import AnimatedSelect from '@/components/ui/AnimatedSelect';
 
 /** 擁有人類別：依標籤字數由少至多，同字數依繁中排序 */
@@ -20,12 +20,13 @@ interface ProprietorModalProps {
     mode?: 'proprietor' | 'tenant';
     initialData?: Proprietor | null;
     propertyCode?: string; // 當前物業編號，用於產生業主代碼
+    propertyLotIndex?: string; // 當前物業地段，用於地段下拉選項
     initialEditing?: boolean; // 控制初始是否為編輯模式
     /** 取消時回到詳情模式（而非關閉整個 popup） */
     onCancel?: () => void;
 }
 
-export default function ProprietorModal({ onClose, onSuccess, mode = 'proprietor', initialData, propertyCode, initialEditing, onCancel }: ProprietorModalProps) {
+export default function ProprietorModal({ onClose, onSuccess, mode = 'proprietor', initialData, propertyCode, propertyLotIndex, initialEditing, onCancel }: ProprietorModalProps) {
     const { getProprietors, addProprietor, updateProprietor, loading } = useProprietors();
     const [saving, setSaving] = useState(false);
     const [isEditing, setIsEditing] = useState(initialEditing !== undefined ? initialEditing : !initialData);
@@ -44,6 +45,7 @@ export default function ProprietorModal({ onClose, onSuccess, mode = 'proprietor
         shortName: initialData?.shortName || '',
         brNumber: initialData?.brNumber ?? (initialData as any)?.description ?? '',
         idNumber: (initialData as any)?.idNumber ?? '',
+        lotIndex: (initialData as any)?.lotIndex || '',
     });
 
     // 業主代碼/承租人編號: 業主用propertyCode或自動產生；承租人用placeholder不預填
@@ -152,6 +154,7 @@ export default function ProprietorModal({ onClose, onSuccess, mode = 'proprietor
                         shortName: formData.shortName,
                         brNumber: formData.brNumber,
                         idNumber: formData.idNumber,
+                        lotIndex: formData.lotIndex,
                     });
                 } else {
                     setError('更新失敗');
@@ -170,6 +173,7 @@ export default function ProprietorModal({ onClose, onSuccess, mode = 'proprietor
                         category: formData.category,
                         brNumber: formData.brNumber,
                         idNumber: formData.idNumber,
+                        lotIndex: formData.lotIndex,
                     } as Partial<Proprietor>);
                 } else {
                     setError('創建失敗');
@@ -519,6 +523,34 @@ export default function ProprietorModal({ onClose, onSuccess, mode = 'proprietor
                                     />
                                 </div>
                             </div>
+
+                            {/* Row 4: 地段 */}
+                            {mode === 'proprietor' && propertyLotIndex && (
+                                <div className="space-y-2">
+                                    <label className="block text-sm font-medium text-zinc-700 dark:text-white/80">
+                                        地段
+                                    </label>
+                                    <AnimatedSelect
+                                        name="lotIndex"
+                                        value={formData.lotIndex}
+                                        onChange={(value) => handleChange({ target: { name: 'lotIndex', value } } as any)}
+                                        options={
+                                            [
+                                                { value: '', label: '(不指定)' },
+                                                ...(() => {
+                                                    const entries = parseLotEntries(propertyLotIndex);
+                                                    return entries.map(e => ({
+                                                        value: `${e.type === 'old' ? '舊:' : '新:'}${e.value}`,
+                                                        label: e.value,
+                                                    }));
+                                                })(),
+                                            ]
+                                        }
+                                        placeholder="選擇地段"
+                                    />
+                                </div>
+                            )}
+
                             {formData.category === 'private_individual' && (
                                 <div className="space-y-2">
                                     <label className="block text-sm font-medium text-zinc-700 dark:text-white/80">

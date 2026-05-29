@@ -626,7 +626,7 @@ export default function RentModal({
     }, [formData.rentPropertyLot, formData.rentPropertyLotPartial]);
 
     /**
-     * 收租記錄：根據選擇的合約編號取得對應的物业租借位置資料（只用於顯示）
+     * 收租記錄：根據選擇的合約編號取得對應的物业租用位置資料（只用於顯示）
      */
     const selectedContractLotInfo = useMemo(() => {
         if (formData.type !== 'rent_out') return null;
@@ -1493,8 +1493,9 @@ export default function RentModal({
     const renderCollectionContractRefField = () => {
         const nums = leaseOutContractNumbers;
         const hint =
-            '依該物業「出租合約」之合約號碼帶入；多於一筆時請選擇。無合約時可手動輸入。';
+            '依該物業「出租合約」之合約號碼帶入；多於一筆時請選擇。沒有合約時可選擇「沒有合約」。';
         const val = formData.rentCollectionContractNumber || '';
+        const isNoContract = val === '__no_contract__';
         return (
             <div className="space-y-2">
                 <label className={labelClass}>收租記錄編號</label>
@@ -1502,12 +1503,29 @@ export default function RentModal({
                 {nums.length > 0 ? (
                     <select
                         name="rentCollectionContractNumber"
-                        value={val}
-                        onChange={handleChange}
+                        value={isNoContract ? '' : val}
+                        onChange={(e) => {
+                            const v = e.target.value;
+                            if (v === '__no_contract__') {
+                                // 沒有合約：清空合約編號，並填入該物業的地段
+                                const prop = allProperties.find(p => p.id === formData.propertyId);
+                                const lotStr = prop?.lotIndex || '';
+                                const segs = parsePropertyLotSegments(lotStr);
+                                setFormData(prev => ({
+                                    ...prev,
+                                    rentCollectionContractNumber: '',
+                                    rentPropertyLot: segs,
+                                    rentPropertyLotPartial: {},
+                                }));
+                            } else {
+                                handleChange(e);
+                            }
+                        }}
                         className={inputClass}
                     >
                         <option value="">請選擇</option>
-                        {val && !nums.includes(val) ? (
+                        <option value="__no_contract__">沒有合約</option>
+                        {val && !nums.includes(val) && !isNoContract ? (
                             <option value={val}>{val}（已存）</option>
                         ) : null}
                         {nums.map((n) => (
@@ -1517,14 +1535,34 @@ export default function RentModal({
                         ))}
                     </select>
                 ) : (
-                    <input
-                        type="text"
-                        name="rentCollectionContractNumber"
-                        value={val}
-                        onChange={handleChange}
-                        className={inputClass}
-                        placeholder="暫無合約記錄時可手動填寫"
-                    />
+                    <>
+                        <input
+                            type="text"
+                            name="rentCollectionContractNumber"
+                            value={isNoContract ? '' : val}
+                            onChange={(e) => {
+                                if (e.target.value === '__no_contract__') {
+                                    const prop = allProperties.find(p => p.id === formData.propertyId);
+                                    const lotStr = prop?.lotIndex || '';
+                                    const segs = parsePropertyLotSegments(lotStr);
+                                    setFormData(prev => ({
+                                        ...prev,
+                                        rentCollectionContractNumber: '',
+                                        rentPropertyLot: segs,
+                                        rentPropertyLotPartial: {},
+                                    }));
+                                } else {
+                                    handleChange(e);
+                                }
+                            }}
+                            className={inputClass}
+                            placeholder="沒有合約記錄時可選擇「沒有合約」"
+                            list="no-contract-options"
+                        />
+                        <datalist id="no-contract-options">
+                            <option value="__no_contract__">沒有合約</option>
+                        </datalist>
+                    </>
                 )}
             </div>
         );
@@ -2059,19 +2097,44 @@ export default function RentModal({
 
                             <div className="space-y-4">
                                 {renderCollectionContractRefField()}
-                                {/* 根據選擇的合約顯示物业租借位置（可新增地段） */}
+                                {/* 沒有合約時顯示該物業的地段 */}
+                                {(() => {
+                                    const isNoContract = formData.rentCollectionContractNumber === '__no_contract__' || (formData.rentCollectionContractNumber === '' && !selectedContractLotInfo);
+                                    if (!isNoContract) return null;
+                                    const prop = allProperties.find(p => p.id === formData.propertyId);
+                                    const lotStr = prop?.lotIndex || '';
+                                    const entries = parseLotEntries(lotStr);
+                                    const lots = entries.map(e => e.value);
+                                    if (lots.length === 0) {
+                                        return (
+                                            <div className="space-y-2">
+                                                <label className={labelClass}>物業租用位置</label>
+                                                <p className="text-sm text-zinc-400 dark:text-white/40 italic px-3 py-2 bg-zinc-50 dark:bg-white/5 rounded-lg border border-zinc-200 dark:border-white/10">暫無地段</p>
+                                            </div>
+                                        );
+                                    }
+                                    return (
+                                        <div className="space-y-2">
+                                            <label className={labelClass}>物業租用位置</label>
+                                            <div className="space-y-2">
+                                                {lots.map((lot) => (
+                                                    <div
+                                                        key={lot}
+                                                        className="flex items-center gap-3 bg-zinc-50 dark:bg-white/5 rounded-lg px-3 py-2 border border-zinc-200 dark:border-white/10"
+                                                    >
+                                                        <span className="text-sm flex-1 text-zinc-700 dark:text-white/80">
+                                                            {lot}
+                                                        </span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    );
+                                })()}
+                                {/* 根據選擇的合約顯示物业租用位置 */}
                                 {selectedContractLotInfo && selectedContractLotInfo.lots.length > 0 && (
                                     <div className="space-y-2">
-                                        <div className="flex items-center justify-between">
-                                            <label className={labelClass}>物業租借位置</label>
-                                            <button
-                                                type="button"
-                                                onClick={() => { setInlineLotAddType('new'); setInlineLotAddInput(''); }}
-                                                className="px-3 py-1 text-xs bg-purple-50 dark:bg-purple-500/20 text-purple-600 dark:text-purple-400 rounded-lg hover:bg-purple-100 dark:hover:bg-purple-500/30 border border-purple-100 dark:border-purple-500/30 transition-colors"
-                                            >
-                                                + 新增地段
-                                            </button>
-                                        </div>
+                                        <label className={labelClass}>物業租用位置</label>
                                         <div className="space-y-2">
                                             {selectedContractLotInfo.lots.map((lot) => {
                                                 const isPartial = !!selectedContractLotInfo.partial[lot];
@@ -2087,47 +2150,6 @@ export default function RentModal({
                                                 );
                                             })}
                                         </div>
-                                        {/* 內聯新增地段表單（收租） */}
-                                        {inlineLotAddType !== null && formData.propertyId && (
-                                            <div className="flex gap-2 items-center mt-2 p-3 bg-purple-50 dark:bg-purple-500/10 rounded-xl border border-purple-100 dark:border-purple-500/20">
-                                                {inlineLotAddType === 'new' ? (
-                                                    <span className="shrink-0 px-2 py-0.5 text-xs bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 rounded font-medium">新</span>
-                                                ) : (
-                                                    <span className="shrink-0 px-2 py-0.5 text-xs bg-zinc-300 dark:bg-white/20 text-zinc-600 dark:text-white/70 rounded font-medium">舊</span>
-                                                )}
-                                                <input
-                                                    type="text"
-                                                    value={inlineLotAddInput}
-                                                    onChange={(e) => setInlineLotAddInput(e.target.value)}
-                                                    placeholder="例如: DD 111 LOT 1523, 1539"
-                                                    className="flex-1 px-3 py-1.5 bg-white dark:bg-white/5 border border-purple-200 dark:border-purple-500/30 rounded-lg text-sm text-zinc-900 dark:text-white placeholder-zinc-400"
-                                                    autoFocus
-                                                    onKeyDown={(e) => {
-                                                        if (e.key === 'Enter' && inlineLotAddInput.trim()) {
-                                                            handleInlineLotAdd(formData.propertyId);
-                                                        }
-                                                    }}
-                                                />
-                                                <button
-                                                    type="button"
-                                                    onClick={() => handleInlineLotAdd(formData.propertyId)}
-                                                    disabled={!inlineLotAddInput.trim() || inlineLotAddLoading}
-                                                    className="px-3 py-1.5 bg-purple-500 text-white rounded-lg hover:bg-purple-600 disabled:opacity-50 text-sm shrink-0"
-                                                >
-                                                    {inlineLotAddLoading ? '儲存中…' : '確認'}
-                                                </button>
-                                                <button
-                                                    type="button"
-                                                    onClick={() => { setInlineLotAddType(null); setInlineLotAddInput(''); }}
-                                                    className="px-3 py-1.5 text-zinc-500 dark:text-white/50 hover:text-zinc-700 dark:hover:text-white text-sm shrink-0"
-                                                >
-                                                    取消
-                                                </button>
-                                            </div>
-                                        )}
-                                        <p className="text-xs text-zinc-400 dark:text-white/40 italic">
-                                            已選：{selectedContractLotInfo.lots.map(lot => selectedContractLotInfo.partial[lot] ? `${lot}（部分地方）` : lot).join('、')}
-                                        </p>
                                     </div>
                                 )}
                                 <div className="space-y-2">
@@ -2967,8 +2989,8 @@ export default function RentModal({
                                                             <input type="date" value={entry.rentOutDepositChequePaymentDate} onChange={(e) => handleDepositEntryChange(idx, 'rentOutDepositChequePaymentDate', e.target.value)} className={inputClass} />
                                                         </div>
                                                         <div className="space-y-2">
-                                                            <label className={labelClass}>收據號碼</label>
-                                                            <input type="text" value={entry.rentOutDepositChequeReceiptNumber} onChange={(e) => handleDepositEntryChange(idx, 'rentOutDepositChequeReceiptNumber', e.target.value)} className={inputClass} placeholder="收據號碼" />
+                                                            <label className={labelClass}>{prefix === '租賃' ? 'Voucher Number' : '收據號碼'}</label>
+                                                            <input type="text" value={entry.rentOutDepositChequeReceiptNumber} onChange={(e) => handleDepositEntryChange(idx, 'rentOutDepositChequeReceiptNumber', e.target.value)} className={inputClass} placeholder={prefix === '租賃' ? 'Voucher Number' : '收據號碼'} />
                                                         </div>
                                                         <div className="space-y-2">
                                                             <label className={labelClass}>支票影像（選填）</label>
@@ -2997,8 +3019,8 @@ export default function RentModal({
                                                             <input type="date" value={entry.rentOutDepositPaymentDate} onChange={(e) => handleDepositEntryChange(idx, 'rentOutDepositPaymentDate', e.target.value)} className={inputClass} />
                                                         </div>
                                                         <div className="space-y-2">
-                                                            <label className={labelClass}>收據號碼</label>
-                                                            <input type="text" value={entry.rentOutDepositReceiptNumber} onChange={(e) => handleDepositEntryChange(idx, 'rentOutDepositReceiptNumber', e.target.value)} className={inputClass} placeholder="選填" />
+                                                            <label className={labelClass}>{prefix === '租賃' ? 'Voucher Number' : '收據號碼'}</label>
+                                                            <input type="text" value={entry.rentOutDepositReceiptNumber} onChange={(e) => handleDepositEntryChange(idx, 'rentOutDepositReceiptNumber', e.target.value)} className={inputClass} placeholder={prefix === '租賃' ? 'Voucher Number' : '選填'} />
                                                         </div>
                                                         <div className="space-y-2">
                                                             <label className={labelClass}>轉帳證明／截圖（選填）</label>
@@ -3027,8 +3049,8 @@ export default function RentModal({
                                                             <input type="date" value={entry.rentOutDepositPaymentDate} onChange={(e) => handleDepositEntryChange(idx, 'rentOutDepositPaymentDate', e.target.value)} className={inputClass} />
                                                         </div>
                                                         <div className="space-y-2">
-                                                            <label className={labelClass}>收據號碼</label>
-                                                            <input type="text" value={entry.rentOutDepositReceiptNumber} onChange={(e) => handleDepositEntryChange(idx, 'rentOutDepositReceiptNumber', e.target.value)} className={inputClass} placeholder="選填" />
+                                                            <label className={labelClass}>{prefix === '租賃' ? 'Voucher Number' : '收據號碼'}</label>
+                                                            <input type="text" value={entry.rentOutDepositReceiptNumber} onChange={(e) => handleDepositEntryChange(idx, 'rentOutDepositReceiptNumber', e.target.value)} className={inputClass} placeholder={prefix === '租賃' ? 'Voucher Number' : '選填'} />
                                                         </div>
                                                     </div>
                                                 )}
@@ -3042,8 +3064,8 @@ export default function RentModal({
                                                             <input type="date" value={entry.rentOutDepositPaymentDate} onChange={(e) => handleDepositEntryChange(idx, 'rentOutDepositPaymentDate', e.target.value)} className={inputClass} />
                                                         </div>
                                                         <div className="space-y-2">
-                                                            <label className={labelClass}>收據號碼</label>
-                                                            <input type="text" value={entry.rentOutDepositReceiptNumber} onChange={(e) => handleDepositEntryChange(idx, 'rentOutDepositReceiptNumber', e.target.value)} className={inputClass} placeholder="選填" />
+                                                            <label className={labelClass}>{prefix === '租賃' ? 'Voucher Number' : '收據號碼'}</label>
+                                                            <input type="text" value={entry.rentOutDepositReceiptNumber} onChange={(e) => handleDepositEntryChange(idx, 'rentOutDepositReceiptNumber', e.target.value)} className={inputClass} placeholder={prefix === '租賃' ? 'Voucher Number' : '選填'} />
                                                         </div>
                                                         <div className="space-y-2">
                                                             <label className={labelClass}>入數憑證／截圖（選填）</label>

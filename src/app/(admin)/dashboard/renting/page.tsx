@@ -13,6 +13,7 @@ import {
     hasRentCollectionPaidAmount,
     labelRentCollectionPaymentMethod,
     matchesRentPaymentMethodFilter,
+    rentOutPeriodOverlapsDateFilter,
     getRentCollectionPaymentDate,
     type RentCollectionPayListStatus,
     type RentPaymentMethodFilterValue,
@@ -58,6 +59,8 @@ export default function RentingPage() {
     const [filterLessee, setFilterLessee] = useState(''); // 承租人篩選
     const [expenseDateStart, setExpenseDateStart] = useState(''); // 總支出日期篩選 - 開始
     const [expenseDateEnd, setExpenseDateEnd] = useState(''); // 總支出日期篩選 - 結束
+    const [filterLeaseFrom, setFilterLeaseFrom] = useState(''); // 交租期間篩選 - 開始
+    const [filterLeaseTo, setFilterLeaseTo] = useState(''); // 交租期間篩選 - 結束
     const [listPage, setListPage] = useState(1);
     const { deleteRent } = useRents();
 
@@ -128,9 +131,12 @@ export default function RentingPage() {
             if (filterRentingPayStatus && getRentCollectionPayListStatus(r) !== filterRentingPayStatus) return false;
             if (filterOwner && landlordDisplayName(r) !== filterOwner) return false;
             if (filterLessee && lesseeDisplayName(r) !== filterLessee) return false;
+            const periodStart = r.rentCollectionDate || r.rentingStartDate || r.startDate;
+            const periodEnd = r.endDate || r.rentingEndDate;
+            if (!rentOutPeriodOverlapsDateFilter(periodStart, periodEnd, filterLeaseFrom, filterLeaseTo)) return false;
             return true;
         });
-    }, [rents, filterPaymentMethod, filterRentingPayStatus, filterOwner, filterLessee]);
+    }, [rents, filterPaymentMethod, filterRentingPayStatus, filterOwner, filterLessee, filterLeaseFrom, filterLeaseTo]);
 
     const totalListPages = Math.max(1, Math.ceil(filteredRents.length / ADMIN_LIST_PAGE_SIZE));
     const effectiveListPage = Math.min(listPage, totalListPages);
@@ -270,8 +276,8 @@ export default function RentingPage() {
                     </div>
                 ) : (
                     <>
-                        <div className="glass-card p-4 flex flex-col sm:flex-row flex-wrap gap-4 sm:items-end">
-                            <div className="flex-1 min-w-40">
+                        <div className="glass-card p-4 flex flex-col lg:flex-row lg:flex-nowrap gap-4 lg:items-end lg:overflow-x-auto lg:pb-2 max-w-full">
+                            <div className="w-full lg:w-[15%] shrink-0">
                                 <label className="text-xs font-medium text-zinc-500 dark:text-white/50">業主</label>
                                 <select
                                     value={filterOwner}
@@ -284,7 +290,7 @@ export default function RentingPage() {
                                     ))}
                                 </select>
                             </div>
-                            <div className="flex-1 min-w-40">
+                            <div className="w-full lg:w-[15%] shrink-0">
                                 <label className="text-xs font-medium text-zinc-500 dark:text-white/50">承租人</label>
                                 <select
                                     value={filterLessee}
@@ -297,7 +303,7 @@ export default function RentingPage() {
                                     ))}
                                 </select>
                             </div>
-                            <div className="flex-1 min-w-40">
+                            <div className="w-full lg:w-[15%] shrink-0">
                                 <label className="text-xs font-medium text-zinc-500 dark:text-white/50">付款方式</label>
                                 <select
                                     value={filterPaymentMethod}
@@ -312,7 +318,7 @@ export default function RentingPage() {
                                     <option value="bank_in">入數</option>
                                 </select>
                             </div>
-                            <div className="flex-1 min-w-40">
+                            <div className="w-full lg:w-[15%] shrink-0">
                                 <label className="text-xs font-medium text-zinc-500 dark:text-white/50">繳付狀態</label>
                                 <select
                                     value={filterRentingPayStatus}
@@ -323,6 +329,26 @@ export default function RentingPage() {
                                     <option value="paid">已繳付</option>
                                     <option value="unpaid">未繳付</option>
                                 </select>
+                            </div>
+                            <div className="w-full lg:w-[17%] shrink-0">
+                                <label className="text-xs font-medium text-zinc-500 dark:text-white/50">交租期間</label>
+                                <div className="mt-1 flex flex-nowrap items-center gap-2">
+                                    <input
+                                        type="date"
+                                        value={filterLeaseFrom}
+                                        onChange={(e) => setFilterLeaseFrom(e.target.value)}
+                                        className={`${filterSelectClass} mt-0 w-35 shrink-0`}
+                                        aria-label="交租期間開始"
+                                    />
+                                    <span className="text-zinc-400 dark:text-white/40 text-sm shrink-0">至</span>
+                                    <input
+                                        type="date"
+                                        value={filterLeaseTo}
+                                        onChange={(e) => setFilterLeaseTo(e.target.value)}
+                                        className={`${filterSelectClass} mt-0 w-35 shrink-0`}
+                                        aria-label="交租期間結束"
+                                    />
+                                </div>
                             </div>
                         </div>
 

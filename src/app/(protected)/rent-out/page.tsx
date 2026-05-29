@@ -283,14 +283,14 @@ export default function RentOutPage() {
                                 </select>
                             </div>
                             <div className="flex-1 min-w-[220px] sm:min-w-[280px]">
-                                <label className="text-xs font-medium text-zinc-500 dark:text-white/50">租約期間</label>
+                                <label className="text-xs font-medium text-zinc-500 dark:text-white/50">收租期間</label>
                                 <div className="mt-1 flex flex-wrap items-center gap-2">
                                     <input
                                         type="date"
                                         value={filterLeaseFrom}
                                         onChange={(e) => setFilterLeaseFrom(e.target.value)}
                                         className={`${filterSelectClass} mt-0 flex-1 min-w-[140px]`}
-                                        aria-label="租約期間開始"
+                                        aria-label="收租期間開始"
                                     />
                                     <span className="text-zinc-400 dark:text-white/40 text-sm shrink-0">至</span>
                                     <input
@@ -298,7 +298,7 @@ export default function RentOutPage() {
                                         value={filterLeaseTo}
                                         onChange={(e) => setFilterLeaseTo(e.target.value)}
                                         className={`${filterSelectClass} mt-0 flex-1 min-w-[140px]`}
-                                        aria-label="租約期間結束"
+                                        aria-label="收租期間結束"
                                     />
                                 </div>
                             </div>
@@ -421,7 +421,7 @@ export default function RentOutPage() {
                                 <th className="p-4 font-medium">出租合約號碼</th>
                                 <th className="p-4 font-medium">出租人</th>
                                 <th className="p-4 font-medium">月租</th>
-                                <th className="p-4 font-medium">租約期間</th>
+                                <th className="p-4 font-medium">收租期間</th>
                                 <th className="p-4 font-medium">狀態</th>
                                 <th className="p-4 font-medium">操作</th>
                             </tr>

@@ -424,17 +424,9 @@ export function matchesRentPaymentMethodFilter(
     return key === filter;
 }
 
-/** 篩選用：YYYY-MM-DD → 本地日曆當日 */
-function parseYmdLocal(ymd: string): Date | null {
-    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(ymd.trim());
-    if (!m) return null;
-    const d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
-    return Number.isNaN(d.getTime()) ? null : d;
-}
-
 /**
- * 收租管理「租約期間」篩選：記錄區間 [start,end]（含首尾當日）是否與篩選 [filterFrom, filterTo] 重疊；
- * filter 僅填一側則另一側視為無限；兩者皆空則通過；記錄無有效起訖則不通過。
+ * 收租管理「租約期間」篩選：記錄的 [periodStart, periodEnd] 需與篩選 [filterFrom, filterTo] 完全相等（含首尾當日）；
+ * 兩者皆空則通過；記錄起訖與篩選起訖必須完全一致才通過。
  */
 export function rentOutPeriodOverlapsDateFilter(
     periodStart: Date | string | null | undefined,
@@ -444,67 +436,50 @@ export function rentOutPeriodOverlapsDateFilter(
 ): boolean {
     const ff = (filterFrom || '').trim();
     const tt = (filterTo || '').trim();
+
+    const parseYmdToDayStart = (ymd: string): number | null => {
+        const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(ymd.trim());
+        if (!m) return null;
+        const d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+        if (Number.isNaN(d.getTime())) return null;
+        return new Date(d.getFullYear(), d.getMonth(), d.getDate(), 0, 0, 0, 0).getTime();
+    };
+
+    const parseYmdToDayEnd = (ymd: string): number | null => {
+        const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(ymd.trim());
+        if (!m) return null;
+        const d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+        if (Number.isNaN(d.getTime())) return null;
+        return new Date(d.getFullYear(), d.getMonth(), d.getDate(), 23, 59, 59, 999).getTime();
+    };
+
     if (!ff && !tt) return true;
 
-    const dayStartMs = (v: Date | string): number | null => {
-        if (v == null || v === '') return null;
-        const d = v instanceof Date ? new Date(v) : new Date(v as string);
+    const recordStartMs = (() => {
+        if (periodStart == null || periodStart === '') return null;
+        const d = periodStart instanceof Date ? periodStart : new Date(periodStart as string);
         if (Number.isNaN(d.getTime())) return null;
-        const x = new Date(d);
-        x.setHours(0, 0, 0, 0);
-        return x.getTime();
-    };
-    const dayEndMs = (v: Date | string): number | null => {
-        if (v == null || v === '') return null;
-        const d = v instanceof Date ? new Date(v) : new Date(v as string);
+        return new Date(d.getFullYear(), d.getMonth(), d.getDate(), 0, 0, 0, 0).getTime();
+    })();
+
+    const recordEndMs = (() => {
+        if (periodEnd == null || periodEnd === '') return null;
+        const d = periodEnd instanceof Date ? periodEnd : new Date(periodEnd as string);
         if (Number.isNaN(d.getTime())) return null;
-        const x = new Date(d);
-        x.setHours(23, 59, 59, 999);
-        return x.getTime();
-    };
+        return new Date(d.getFullYear(), d.getMonth(), d.getDate(), 23, 59, 59, 999).getTime();
+    })();
 
-    let lo: number;
-    let hi: number;
-    const sMs = periodStart != null && periodStart !== '' ? dayStartMs(periodStart as Date | string) : null;
-    const eMs = periodEnd != null && periodEnd !== '' ? dayEndMs(periodEnd as Date | string) : null;
-    if (sMs != null && eMs != null) {
-        lo = sMs;
-        hi = eMs;
-        if (hi < lo) {
-            const t = lo;
-            lo = hi;
-            hi = t;
-        }
-    } else if (sMs != null) {
-        lo = sMs;
-        hi = dayEndMs(periodStart as Date | string)!;
-    } else if (eMs != null) {
-        lo = dayStartMs(periodEnd as Date | string)!;
-        hi = eMs;
-    } else {
-        return false;
-    }
+    const filterStartMs = ff ? parseYmdToDayStart(ff) : null;
+    const filterEndMs = tt ? parseYmdToDayEnd(tt) : null;
 
-    let fLo = -Infinity;
-    let fHi = Infinity;
-    if (ff) {
-        const fd = parseYmdLocal(ff);
-        if (!fd) return false;
-        fd.setHours(0, 0, 0, 0);
-        fLo = fd.getTime();
-    }
-    if (tt) {
-        const td = parseYmdLocal(tt);
-        if (!td) return false;
-        td.setHours(23, 59, 59, 999);
-        fHi = td.getTime();
-    }
-    if (fLo > fHi) {
-        const x = fLo;
-        fLo = fHi;
-        fHi = x;
-    }
-    return lo <= fHi && hi >= fLo;
+    if (filterStartMs === null && filterEndMs === null) return true;
+
+    const recordStartOk = filterStartMs === null || recordStartMs !== null;
+    const recordEndOk = filterEndMs === null || recordEndMs !== null;
+    const filterStartOk = filterStartMs === null || (recordStartMs !== null && recordStartMs === filterStartMs);
+    const filterEndOk = filterEndMs === null || (recordEndMs !== null && recordEndMs === filterEndMs);
+
+    return recordStartOk && recordEndOk && filterStartOk && filterEndOk;
 }
 
 export type RentOutListStatusKey = 'expired' | 'renting' | 'listing' | 'other';
