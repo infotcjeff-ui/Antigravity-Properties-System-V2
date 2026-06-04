@@ -41,7 +41,7 @@ function formatBytes(bytes: number): string {
     return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
 }
 
-async function fetchAllTableData(supabase: ReturnType<typeof createClient>) {
+async function fetchAllTableData(supabase: any) {
     const tables = [
         'properties',
         'proprietors',
@@ -75,7 +75,7 @@ async function fetchAllTableData(supabase: ReturnType<typeof createClient>) {
     return { data, totalRecords };
 }
 
-async function fetchStorageImages(supabase: ReturnType<typeof createClient>) {
+async function fetchStorageImages(supabase: any) {
     try {
         const { data, error } = await supabase.storage
             .from('properties')
