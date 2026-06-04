@@ -84,8 +84,8 @@ async function fetchStorageImages(supabase: any) {
         if (error || !data) return [];
 
         return data
-            .filter(f => f.name && /\.(jpg|jpeg|png|webp|gif|pdf)$/i.test(f.name))
-            .map(f => ({
+            .filter((f: any) => f.name && /\.(jpg|jpeg|png|webp|gif|pdf)$/i.test(f.name))
+            .map((f: any) => ({
                 name: f.name,
                 created_at: f.created_at,
                 url: `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/properties/${f.name}`,
@@ -115,7 +115,7 @@ export async function GET(request: NextRequest) {
                 return NextResponse.json({ error: 'Cannot list backups' }, { status: 500 });
             }
 
-            const targetFile = files.find(f => f.id === downloadId || f.name === downloadId);
+            const targetFile = files.find((f: any) => f.id === downloadId || f.name === downloadId);
             if (!targetFile) {
                 return NextResponse.json({ error: 'Backup not found' }, { status: 404 });
             }
@@ -153,7 +153,7 @@ export async function GET(request: NextRequest) {
             const { data: files } = await supabaseAdmin.storage.from(BACKUP_BUCKET).list('', { limit: 1000 });
             if (!files) return NextResponse.json({ error: 'Cannot list backups' }, { status: 500 });
 
-            const targetFile = files.find(f => f.id === previewId || f.name === previewId);
+            const targetFile = files.find((f: any) => f.id === previewId || f.name === previewId);
             if (!targetFile) return NextResponse.json({ error: 'Backup not found' }, { status: 404 });
 
             const { data: fileData } = await supabaseAdmin.storage.from(BACKUP_BUCKET).download(targetFile.name);
@@ -176,7 +176,7 @@ export async function GET(request: NextRequest) {
                 const zipEntries = zip.getEntries();
 
                 const preview: Record<string, any[]> = {};
-                for (const entry of zipEntries) {
+                for (const entry of zipEntries as any) {
                     if (entry.entryName.endsWith('.json')) {
                         const tableName = entry.entryName.replace('.json', '');
                         const content = zip.readAsText(entry);
@@ -198,8 +198,8 @@ export async function GET(request: NextRequest) {
         const { data: files } = await supabaseAdmin.storage.from(BACKUP_BUCKET).list('', { limit: 1000 });
 
         const backups = (files || [])
-            .filter(f => f.name.endsWith('.enc'))
-            .map(f => {
+            .filter((f: any) => f.name.endsWith('.enc'))
+            .map((f: any) => {
                 const nameParts = f.name.replace('.enc', '').split('_');
                 const recordCount = parseInt(nameParts[nameParts.length - 1]) || 0;
                 return {
@@ -327,7 +327,7 @@ export async function DELETE(request: NextRequest) {
         const { data: files } = await supabaseAdmin.storage.from(BACKUP_BUCKET).list('', { limit: 1000 });
         if (!files) return NextResponse.json({ error: 'Cannot list backups' }, { status: 500 });
 
-        const targetFile = files.find(f => f.id === id || f.name === id);
+        const targetFile = files.find((f: any) => f.id === id || f.name === id);
         if (!targetFile) return NextResponse.json({ error: 'Backup not found' }, { status: 404 });
 
         const { error } = await supabaseAdmin.storage.from(BACKUP_BUCKET).remove([targetFile.name]);
