@@ -140,7 +140,7 @@ export async function GET(request: NextRequest) {
 
             const timestamp = new Date().toISOString().slice(0, 10);
 
-            return new NextResponse(decryptedBuffer, {
+            return new NextResponse(new Uint8Array(decryptedBuffer), {
                 headers: {
                     'Content-Type': 'application/zip',
                     'Content-Disposition': `attachment; filename="${timestamp}_backup.zip"`,
