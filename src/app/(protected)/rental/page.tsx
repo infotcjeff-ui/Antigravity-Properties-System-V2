@@ -76,9 +76,9 @@ export default function RentalPage() {
         });
         switch (sortOption) {
             case 'area_asc':
-                return filtered.sort((a, b) => (a.lotArea || 0) - (b.lotArea || 0));
+                return filtered.sort((a, b) => Number(a.lotArea || 0) - Number(b.lotArea || 0));
             case 'area_desc':
-                return filtered.sort((a, b) => (b.lotArea || 0) - (a.lotArea || 0));
+                return filtered.sort((a, b) => Number(b.lotArea || 0) - Number(a.lotArea || 0));
             default: // 'newest'
                 return filtered.sort((a, b) => {
                     const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
