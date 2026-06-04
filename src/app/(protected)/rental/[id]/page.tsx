@@ -151,11 +151,11 @@ function LotDetailModal({
                             <p className="text-sm font-semibold text-zinc-500 dark:text-white/50">圖片</p>
                             {entry.media.length === 1 ? (
                                 <img
-                                    src={entry.media[0].u}
+                                    src={entry.media![0].u}
                                     alt={entry.value}
                                     className="w-full rounded-xl object-contain cursor-pointer hover:opacity-80 transition-opacity bg-zinc-50 dark:bg-white/5 border border-zinc-200 dark:border-white/10"
                                     style={{ maxHeight: '60vh' }}
-                                    onClick={() => onImageClick(entry.media[0].u)}
+                                    onClick={() => onImageClick(entry.media![0].u)}
                                     onError={(e) => { e.currentTarget.style.display = 'none'; }}
                                 />
                             ) : (
@@ -653,7 +653,7 @@ export default function RentalPropertyPage() {
                                                     {entry.media?.[0]?.u ? (
                                                         <div className="w-14 h-14 rounded-lg overflow-hidden shrink-0 bg-zinc-100 dark:bg-white/5">
                                                             <img
-                                                                src={entry.media[0].u}
+                                                                src={entry.media![0].u}
                                                                 alt={entry.value}
                                                                 className="w-full h-full object-cover"
                                                                 onError={(e) => { e.currentTarget.style.display = 'none'; }}
