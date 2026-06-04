@@ -1281,9 +1281,11 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
 
         const compressedBlobs = await Promise.all(validFiles.map(f => compressImage(f.file as File | Blob)));
 
-        const uploadPromises = compressedBlobs.map(async (blob: Blob, i) => {
+        const uploadPromises = validFiles.map(async (item, i) => {
+            const blob = compressedBlobs[i];
+            if (!blob) return null;
             const uploadFormData = new FormData();
-            uploadFormData.append('file', blob, validFiles[i]!.file.name);
+            uploadFormData.append('file', blob, item.file.name);
             uploadFormData.append('folder', folder);
 
             const res = await fetch('/api/upload', {
@@ -1313,7 +1315,7 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
             return { u: data.url, s: blob.size };
         });
 
-        return Promise.all(uploadPromises);
+        return Promise.all(uploadPromises).then(results => results.filter((r): r is { u: string; s: number } => r !== null));
     };
 
     const handleSubmit = async (e: React.FormEvent) => {
