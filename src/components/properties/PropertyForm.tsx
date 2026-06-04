@@ -1283,7 +1283,7 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
 
         const uploadPromises = compressedBlobs.map(async (blob: Blob, i) => {
             const uploadFormData = new FormData();
-            uploadFormData.append('file', blob, validFiles[i].file.name);
+            uploadFormData.append('file', blob, validFiles[i]!.file.name);
             uploadFormData.append('folder', folder);
 
             const res = await fetch('/api/upload', {
@@ -2190,7 +2190,7 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                                                 <span className="text-sm font-medium text-zinc-500 dark:text-white/50">圖片</span>
                                                 {viewLotEntry.media.length === 1 ? (
                                                     <img
-                                                        src={viewLotEntry.media[0].u}
+                                                        src={viewLotEntry.media![0].u}
                                                         alt=""
                                                         className="w-full rounded-xl object-contain border border-zinc-200 dark:border-white/10 bg-zinc-50 dark:bg-white/5"
                                                         style={{ maxHeight: '40vh' }}

@@ -108,7 +108,7 @@ export default function RentalPage() {
 
     useEffect(() => {
         if (viewMode === 'list' && filteredProperties.length > 0 && !selectedPropertyId) {
-            setSelectedPropertyId(filteredProperties[0].id || null);
+            setSelectedPropertyId(filteredProperties[0]?.id ?? null);
         }
     }, [viewMode, filteredProperties, selectedPropertyId]);
 
