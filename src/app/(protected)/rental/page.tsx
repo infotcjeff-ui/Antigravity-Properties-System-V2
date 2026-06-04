@@ -300,7 +300,7 @@ export default function RentalPage() {
                             {filteredProperties.map((property, index) => (
                                 <button
                                     key={property.id}
-                                    onClick={() => setSelectedPropertyId(property.id)}
+                                    onClick={() => setSelectedPropertyId(property.id ?? null)}
                                     className={`w-full text-left px-3 py-3 transition-all cursor-pointer ${
                                         selectedPropertyId === property.id
                                             ? 'bg-purple-500/5 dark:bg-purple-500/10 border-l-2 border-purple-500'
@@ -505,7 +505,7 @@ export default function RentalPage() {
                                         {/* Navigation Footer */}
                                         <div className="p-4 border-t border-zinc-100 dark:border-white/5 flex items-center justify-between">
                                             <button
-                                                onClick={() => prevProperty && setSelectedPropertyId(prevProperty.id)}
+                                                onClick={() => prevProperty?.id && setSelectedPropertyId(prevProperty.id)}
                                                 disabled={nextIndex === 0}
                                                 className="flex items-center gap-1.5 px-3 py-2 text-sm text-zinc-500 dark:text-white/40 hover:text-zinc-700 dark:hover:text-white disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer transition-colors"
                                             >
@@ -516,7 +516,7 @@ export default function RentalPage() {
                                                 {nextIndex + 1} / {filteredProperties.length}
                                             </span>
                                             <button
-                                                onClick={() => nextProperty && setSelectedPropertyId(nextProperty.id)}
+                                                onClick={() => nextProperty?.id && setSelectedPropertyId(nextProperty.id)}
                                                 disabled={nextIndex === filteredProperties.length - 1}
                                                 className="flex items-center gap-1.5 px-3 py-2 text-sm text-zinc-500 dark:text-white/40 hover:text-zinc-700 dark:hover:text-white disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer transition-colors"
                                             >
@@ -541,7 +541,7 @@ export default function RentalPage() {
                             properties={filteredProperties}
                             onPropertyClick={(property) => {
                                 setViewMode('list');
-                                setSelectedPropertyId(property.id);
+                                setSelectedPropertyId(property.id ?? null);
                             }}
                         />
             ) : (
