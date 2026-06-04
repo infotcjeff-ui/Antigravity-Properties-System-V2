@@ -410,9 +410,19 @@ export default function ManagePropertiesPage() {
                                             </td>
                                             <td className="p-4 text-zinc-600 dark:text-white/70">{typeLabels[property.type]}</td>
                                             <td className="p-4">
-                                                <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${statusColors[property.status]}`}>
-                                                    {statusLabels[property.status]}
-                                                </span>
+                                                {(() => {
+                                                    const statuses = (property.status || '').split(',').map(s => s.trim()).filter(Boolean);
+                                                    if (statuses.length === 0) return <span className="text-zinc-400 dark:text-white/30 text-sm">-</span>;
+                                                    return (
+                                                        <div className="flex flex-wrap gap-1">
+                                                            {statuses.map((s) => (
+                                                                <span key={s} className={`px-2.5 py-1 rounded-full text-xs font-medium ${statusColors[s] || 'bg-zinc-100 dark:bg-white/10 text-zinc-500 dark:text-white/40'}`}>
+                                                                    {statusLabels[s] || s}
+                                                                </span>
+                                                            ))}
+                                                        </div>
+                                                    );
+                                                })()}
                                             </td>
                                             {isAdmin && (
                                                 <td className="p-4 text-zinc-600 dark:text-white/70 text-sm">
@@ -487,10 +497,17 @@ export default function ManagePropertiesPage() {
                                                     <p className="text-xs text-zinc-500 dark:text-white/40 font-mono tracking-tight">{property.code}</p>
                                                 </div>
                                             </div>
-                                            <div className="flex flex-col items-end gap-2">
-                                                <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${statusColors[property.status]}`}>
-                                                    {statusLabels[property.status]}
-                                                </span>
+                                            <div className="flex flex-wrap items-end gap-2">
+                                                {(() => {
+                                                    const statuses = (property.status || '').split(',').map(s => s.trim()).filter(Boolean);
+                                                    return statuses.length > 0 ? statuses.map((s) => (
+                                                        <span key={s} className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${statusColors[s] || 'bg-zinc-100 dark:bg-white/10 text-zinc-500 dark:text-white/40'}`}>
+                                                            {statusLabels[s] || s}
+                                                        </span>
+                                                    )) : (
+                                                        <span className="text-zinc-400 dark:text-white/30 text-xs">-</span>
+                                                    );
+                                                })()}
                                             </div>
                                         </div>
 

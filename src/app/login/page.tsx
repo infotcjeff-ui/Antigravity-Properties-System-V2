@@ -23,7 +23,12 @@ export default function LoginPage() {
             if (authData) {
                 const parsed = JSON.parse(authData);
                 if (parsed.isAuthenticated) {
-                    router.push('/dashboard');
+                    const role = parsed.user?.role;
+                    if (role === 'client') {
+                        router.push('/dashboard/users');
+                    } else {
+                        router.push('/dashboard');
+                    }
                 }
             }
         } catch {
@@ -39,7 +44,21 @@ export default function LoginPage() {
         const result = await login(username, password, rememberMe);
 
         if (result.success) {
-            router.push('/dashboard');
+            try {
+                const authData = localStorage.getItem('pms_auth');
+                if (authData) {
+                    const parsed = JSON.parse(authData);
+                    if (parsed.user?.role === 'client') {
+                        router.push('/dashboard/users');
+                    } else {
+                        router.push('/dashboard');
+                    }
+                } else {
+                    router.push('/dashboard');
+                }
+            } catch {
+                router.push('/dashboard');
+            }
         } else {
             setError(result.error || '用戶名或密碼錯誤');
             setIsLoading(false);

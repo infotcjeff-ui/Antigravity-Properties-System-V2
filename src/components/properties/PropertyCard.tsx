@@ -11,11 +11,13 @@ import { formatLotArea, formatLotIndexPlainJoined } from '@/lib/formatters';
 interface PropertyCardProps {
     property: Property;
     index?: number;
+    basePath?: string;
+    showOnlyStatus?: string;
 }
 
 const statusColors: Record<string, string> = {
     holding: 'bg-emerald-600/80 text-white border-emerald-500/50',
-    renting: 'bg-blue-500/20 text-blue-400 border-blue-500/30',
+    renting: 'bg-blue-600/80 text-white border-blue-500/50',
     sold: 'bg-gray-500/20 text-gray-400 border-gray-500/30',
     suspended: 'bg-red-500/20 text-red-400 border-red-500/30',
 };
@@ -32,9 +34,10 @@ const typeLabels: Record<string, string> = {
     co_investment: '合作投資',
     external_lease: '外租物業',
     managed_asset: '代管資產',
+    agent_management: '代理管理',
 };
 
-export default function PropertyCard({ property, index = 0 }: PropertyCardProps) {
+export default function PropertyCard({ property, index = 0, basePath = '/properties', showOnlyStatus }: PropertyCardProps) {
     const { isAuthenticated } = useAuth();
     const [imageError, setImageError] = useState(false);
     const lotPlainJoined = property.lotIndex ? formatLotIndexPlainJoined(property.lotIndex) : '';
@@ -64,10 +67,12 @@ export default function PropertyCard({ property, index = 0 }: PropertyCardProps)
                 )}
 
                 {/* Status Badge - Top Right */}
-                <div className="absolute top-3 right-3">
-                    <span className={`px-3 py-1 rounded-full text-xs font-medium border backdrop-blur-sm ${statusColors[property.status]} ${!isAuthenticated ? 'blur-sm' : ''}`}>
-                        {statusLabels[property.status]}
-                    </span>
+                <div className="absolute top-3 right-3 flex flex-col gap-1">
+                    {property.status.split(',').map(s => s.trim()).filter(Boolean).filter(s => !showOnlyStatus || s === showOnlyStatus).map(s => (
+                        <span key={s} className={`px-3 py-1 rounded-full text-xs font-medium border backdrop-blur-sm ${statusColors[s] || 'bg-zinc-500/20 text-zinc-400'} ${!isAuthenticated ? 'blur-sm' : ''}`}>
+                            {statusLabels[s] || s}
+                        </span>
+                    ))}
                 </div>
 
                 {/* Type Badge - Top Left */}
@@ -137,7 +142,7 @@ export default function PropertyCard({ property, index = 0 }: PropertyCardProps)
     if (!isAuthenticated) return cardContent;
 
     return (
-        <Link href={`/properties/${property.id}`}>
+        <Link href={`${basePath}/${property.id}`}>
             {cardContent}
         </Link>
     );

@@ -76,7 +76,7 @@ export default function ProtectedLayout({
     const isPublicRoute = publicRoutes.includes(pathname);
 
     // Protected routes require authentication
-    const protectedRoutes = ['/proprietors', '/rent-out', '/renting', '/relations'];
+    const protectedRoutes = ['/proprietors', '/rent-out', '/renting', '/relations', '/rental'];
     const isProtectedRoute = protectedRoutes.includes(pathname);
 
     // If on a protected route and not authenticated, redirect to login
@@ -113,13 +113,49 @@ export default function ProtectedLayout({
     return (
         <ThemeProvider>
             <NotificationProvider>
-                <div className="min-h-screen bg-background text-foreground transition-colors duration-300 flex flex-col md:flex-row">
+                <style jsx global>{`
+                    html, body {
+                        overflow: hidden;
+                        height: 100%;
+                    }
+                    /* 保留滾動功能，只隱藏滾動條 */
+                    .scrollable-x {
+                        scrollbar-width: none; /* Firefox */
+                        -ms-overflow-style: none; /* IE/Edge */
+                    }
+                    .scrollable-x::-webkit-scrollbar {
+                        display: none; /* Chrome/Safari/Opera */
+                    }
+                    .scrollable-y {
+                        scrollbar-width: none;
+                        -ms-overflow-style: none;
+                    }
+                    .scrollable-y::-webkit-scrollbar {
+                        display: none;
+                    }
+                    /* 備註專屬滾動條 */
+                    .notes-scroll::-webkit-scrollbar {
+                        width: 4px;
+                    }
+                    .notes-scroll::-webkit-scrollbar-track {
+                        background: transparent;
+                    }
+                    .notes-scroll::-webkit-scrollbar-thumb {
+                        background: #a855f7;
+                        border-radius: 2px;
+                    }
+                    .notes-scroll {
+                        scrollbar-width: thin;
+                        scrollbar-color: #a855f7 transparent;
+                    }
+                `}</style>
+                <div className="h-screen overflow-hidden bg-background text-foreground transition-colors duration-300 flex flex-col md:flex-row">
                     {/* Sidebar - Hidden on mobile, fixed on desktop */}
-                    <div className="hidden md:block">
+                    <div className="hidden md:block shrink-0">
                         <Sidebar isAuthenticated={isAuthenticated} />
                     </div>
 
-                    <div className="flex-1 md:ml-[280px] transition-all duration-300">
+                    <div className="flex-1 md:ml-70 flex flex-col overflow-hidden transition-all duration-300">
                         <TopBar
                             isAuthenticated={isAuthenticated}
                             placeholder="搜尋物業..."
@@ -131,7 +167,7 @@ export default function ProtectedLayout({
                                 animate={{ opacity: 1, y: 0 }}
                                 exit={{ opacity: 0, y: -10 }}
                                 transition={{ duration: 0.2 }}
-                                className="p-6"
+                                className="flex-1 overflow-hidden px-6 pt-6 pb-0"
                             >
                                 {children}
                             </motion.main>

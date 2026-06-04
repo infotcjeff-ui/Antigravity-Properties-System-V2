@@ -4,7 +4,7 @@ import React, { createContext, useContext, useState, useEffect, useCallback } fr
 import { useRouter } from 'next/navigation';
 
 // Auth types
-export type UserRole = 'admin' | 'user';
+export type UserRole = 'admin' | 'user' | 'client';
 
 export interface User {
     id: string;
@@ -12,17 +12,18 @@ export interface User {
     displayName?: string;
     role: UserRole;
     avatar?: string;
+    phone?: string;
 }
 
 interface AuthContextType {
     user: User | null;
     isAuthenticated: boolean;
     isLoading: boolean;
-    login: (username: string, password: string, rememberMe?: boolean) => Promise<{ success: boolean; error?: string }>;
+    login: (username: string, password: string, rememberMe?: boolean) => Promise<{ success: boolean; role?: UserRole; error?: string }>;
     logout: () => void;
-    registerUser: (username: string, password: string, role: UserRole, displayName?: string) => Promise<{ success: boolean; error?: string }>;
+    registerUser: (username: string, password: string, role: UserRole, displayName?: string, phone?: string) => Promise<{ success: boolean; error?: string }>;
     getUsers: () => Promise<{ success: boolean; users?: User[]; error?: string }>;
-    updateUser: (userId: string, updates: { password?: string; role?: UserRole; displayName?: string }) => Promise<{ success: boolean; error?: string }>;
+    updateUser: (userId: string, updates: { password?: string; role?: UserRole; displayName?: string; phone?: string }) => Promise<{ success: boolean; error?: string }>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -84,6 +85,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 displayName: data.display_name,
                 role: data.role as UserRole,
                 avatar: data.avatar || undefined,
+                phone: data.phone || undefined,
             };
 
             setUser(userData);
@@ -96,7 +98,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             };
             localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(authData));
 
-            return { success: true };
+            return { success: true, role: userData.role };
         } catch (err) {
             console.error('Login error:', err);
             return { success: false, error: '登入失敗' };
@@ -109,12 +111,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         username: string,
         password: string,
         role: UserRole = 'user',
-        displayName?: string
+        displayName?: string,
+        phone?: string
     ): Promise<{ success: boolean; error?: string }> => {
         try {
             const { data, error } = await supabase
                 .from('app_users')
-                .insert([{ username, password, role, display_name: displayName || username }])
+                .insert([{ username, password, role, display_name: displayName || username, phone: phone || null }])
                 .select()
                 .single();
 
@@ -131,7 +134,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         try {
             const { data, error } = await supabase
                 .from('app_users')
-                .select('id, username, role, display_name')
+                .select('id, username, role, display_name, phone')
                 .order('username', { ascending: true });
 
             if (error) {
@@ -143,6 +146,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 username: u.username,
                 role: u.role as UserRole,
                 displayName: u.display_name,
+                phone: u.phone || undefined,
             }));
             return { success: true, users };
         } catch (err: any) {
@@ -154,13 +158,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const updateUser = useCallback(async (
         userId: string,
-        updates: { password?: string; role?: UserRole; displayName?: string }
+        updates: { password?: string; role?: UserRole; displayName?: string; phone?: string }
     ): Promise<{ success: boolean; error?: string }> => {
         try {
             const dbUpdates: any = { ...updates };
             if (updates.displayName) {
                 dbUpdates.display_name = updates.displayName;
                 delete dbUpdates.displayName;
+            }
+            if ('phone' in dbUpdates) {
+                dbUpdates.phone = updates.phone || null;
             }
 
             const { error } = await supabase

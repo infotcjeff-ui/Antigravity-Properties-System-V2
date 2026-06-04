@@ -43,6 +43,7 @@ export default function RelationsPage() {
         co_investment: '合作投資',
         external_lease: '外租物業',
         managed_asset: '代管資產',
+        agent_management: '代理管理',
     };
 
     if (isLoading) {

@@ -4,7 +4,7 @@ import Compressor from 'compressorjs';
  * Image Utilities for Base64 conversion and validation
  */
 
-const MAX_IMAGES = 5;
+const MAX_IMAGES = 8;
 const MAX_GEO_MAPS = 2;
 const MAX_TOTAL_SIZE_MB = 10; // Increased limit slightly since we compress now
 const MAX_TOTAL_SIZE_BYTES = MAX_TOTAL_SIZE_MB * 1024 * 1024;
@@ -91,24 +91,53 @@ export const isValidBase64Image = (str: string): boolean => {
 
 /**
  * Compress image using compressorjs
+ * 接受 File | Blob，並自動將非標準 File-like 物件轉為 Blob 以確保跨框架相容性。
+ * 傳入 null / undefined 時會 reject 並附帶明確錯誤訊息。
  */
 export const compressImage = async (
-    file: File,
+    file: File | Blob | null | undefined,
     options: { maxWidth?: number; maxHeight?: number; quality?: number } = {}
 ): Promise<Blob> => {
+    const savedSettings = (() => {
+        try {
+            const stored = localStorage.getItem('compression-settings');
+            if (stored) return JSON.parse(stored);
+        } catch {}
+        return null;
+    })();
+
+    // 健壯性：確保傳入的是真正的 File 或 Blob。
+    // 某些框架（如 React Dropzone + 跨框架包裝）傳入的物件有 .name / .size / .type，
+    // 但並非標準 File 實例，Compressor 會報 "first argument must be a File or Blob"。
+    // 同時過濾 null/undefined 等無效輸入，避免後續存取屬性時拋錯。
+    if (file == null) {
+        return Promise.reject(new Error('compressImage: 傳入無效的檔案（null / undefined）'));
+    }
+
+    if (file instanceof Blob) {
+        return new Promise((resolve, reject) => {
+            new Compressor(file, {
+                quality: options.quality ?? (savedSettings ? savedSettings.quality / 100 : 0.7),
+                maxWidth: options.maxWidth ?? (savedSettings ? savedSettings.maxWidth : 1920),
+                maxHeight: options.maxHeight ?? (savedSettings ? savedSettings.maxHeight : 1920),
+                convertSize: 500000,
+                success(result) { resolve(result); },
+                error(err) { console.error('Compression error:', err.message); reject(err); },
+            });
+        });
+    }
+
+    // File-like object（非標準 File 實例，如跨框架包裝物件）
+    const mimeType = (file as File).type || 'image/jpeg';
+    const fileBlob = new Blob([file as unknown as BlobPart], { type: mimeType });
     return new Promise((resolve, reject) => {
-        new Compressor(file, {
-            quality: options.quality || 0.7,
-            maxWidth: options.maxWidth || 1920,
-            maxHeight: options.maxHeight || 1920,
-            convertSize: 500000, // Convert to JPEG if over 500KB
-            success(result) {
-                resolve(result);
-            },
-            error(err) {
-                console.error('Compression error:', err.message);
-                reject(err);
-            },
+        new Compressor(fileBlob, {
+            quality: options.quality ?? (savedSettings ? savedSettings.quality / 100 : 0.7),
+            maxWidth: options.maxWidth ?? (savedSettings ? savedSettings.maxWidth : 1920),
+            maxHeight: options.maxHeight ?? (savedSettings ? savedSettings.maxHeight : 1920),
+            convertSize: 500000,
+            success(result) { resolve(result); },
+            error(err) { console.error('Compression error:', err.message); reject(err); },
         });
     });
 };

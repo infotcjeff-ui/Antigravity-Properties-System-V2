@@ -60,7 +60,13 @@ function stripPropertyCodePrefix(text: string): string {
 
 export function parsePropertyLotSegments(lotIndex: string | null | undefined): string[] {
     if (!lotIndex?.trim()) return [];
-    return lotIndex
+    const text = lotIndex.trim();
+    // 新 JSON 格式：每行一個 JSON 物件
+    if (text.startsWith('{')) {
+        return parseLotEntries(lotIndex).map(e => stripPropertyCodePrefix(e.value));
+    }
+    // 舊格式：以 新:/舊: 分段
+    return text
         .split(/(?:新|舊):/)
         .map((s) => stripPropertyCodePrefix(s.trim()))
         .filter(Boolean);
@@ -169,15 +175,66 @@ export function formatRentHistoryLotCellText(
     return parts.join(' , ');
 }
 
-/** Parse lotIndex string into entries with 新/舊 type. Handles legacy format. */
-export function parseLotEntries(lotIndex: string | null | undefined): { type: 'new' | 'old'; value: string }[] {
+/**
+ * LotEntry 類型定義
+ * 序列化格式（JSON per line）:
+ *   {"t":"新","v":"地段值","m":[{"u":"url","s":1234}],"n":"備註"}
+ * 兼容舊格式 "新:地段值" 或純地段值
+ */
+export interface MediaItem {
+    u: string; // url
+    s: number; // size in bytes
+}
+
+export interface LotEntry {
+    type: 'new' | 'old';
+    value: string;
+    media?: MediaItem[];
+    note?: string;
+}
+
+/** Parse lotIndex string into LotEntry array. Handles legacy format. */
+export function parseLotEntries(lotIndex: string | null | undefined): LotEntry[] {
     if (!lotIndex?.trim()) return [];
-    return lotIndex.split(/\n|\s*\|\s*/).filter(Boolean).map(part => {
+    return lotIndex.split(/\n/).filter(Boolean).map(part => {
         const t = part.trim();
+        // 新格式：JSON
+        if (t.startsWith('{')) {
+            try {
+                const obj = JSON.parse(t) as { t?: string; v?: string; m?: MediaItem[] | string[]; n?: string };
+                // 兼容舊格式 m: ["url1", "url2"] → 轉成 [{u, s:0}]
+                const media: MediaItem[] | undefined = obj.m ? (
+                    typeof obj.m[0] === 'string'
+                        ? (obj.m as string[]).map(u => ({ u, s: 0 }))
+                        : obj.m as MediaItem[]
+                ) : undefined;
+                return {
+                    type: (obj.t === '舊' ? 'old' : 'new') as 'new' | 'old',
+                    value: obj.v || '',
+                    media,
+                    note: obj.n,
+                };
+            } catch {
+                // fall through to legacy
+            }
+        }
+        // 舊格式：前綴 "新:" 或 "舊:"
         if (t.startsWith('新:')) return { type: 'new' as const, value: t.slice(2).trim() };
         if (t.startsWith('舊:')) return { type: 'old' as const, value: t.slice(2).trim() };
-        return { type: 'new' as const, value: t }; // legacy: treat as 新
+        return { type: 'new' as const, value: t };
     }).filter(e => e.value);
+}
+
+/** Serialize LotEntry array to string */
+export function serializeLotEntries(entries: LotEntry[]): string {
+    return entries.map(e =>
+        JSON.stringify({
+            t: e.type === 'new' ? '新' : '舊',
+            v: e.value,
+            m: (e.media?.length ?? 0) > 0 ? e.media : undefined,
+            n: e.note || undefined,
+        })
+    ).join('\n');
 }
 
 /** 比對名稱是否重複：去頭尾空白、合併連續空白、英文不分大小寫 */

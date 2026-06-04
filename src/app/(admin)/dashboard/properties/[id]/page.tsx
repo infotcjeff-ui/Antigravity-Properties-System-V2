@@ -170,6 +170,7 @@ const typeLabels: Record<string, string> = {
     co_investment: '合作投資',
     external_lease: '外租物業',
     managed_asset: '代管資產',
+    agent_management: '代理管理',
 };
 
 type RentHistoryTabKey = 'rent_out' | 'renting' | 'contract_lease_in' | 'contract_lease_out';

@@ -60,7 +60,8 @@
       "group_asset": "集團資產",
       "co_investment": "合作投資",
       "external_lease": "外租物業",
-      "managed_asset": "代管資產"
+      "managed_asset": "代管資產",
+      "agent_management": "代理管理"
     },
     "statuses": {
       "holding": "持有中",

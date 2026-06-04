@@ -77,7 +77,7 @@ export default function PropertyMap({ properties, onPropertyClick }: PropertyMap
         : 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
 
     return (
-        <div className="glass-card overflow-hidden bg-white dark:bg-white/5 flex flex-col" style={{ height: '600px', borderRadius: '16px' }}>
+        <div className="glass-card overflow-hidden bg-white dark:bg-white/5 flex flex-col" style={{ height: '100%' }}>
             {propertiesWithLocation.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-16 text-zinc-400 dark:text-white/40 h-full flex-1">
                     <svg className="w-16 h-16 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -127,27 +127,37 @@ export default function PropertyMap({ properties, onPropertyClick }: PropertyMap
                                 }}
                             >
                                 <Popup>
-                                    <div className="p-1 min-w-[200px]">
-                                        <h3 className="font-semibold text-base text-zinc-900">{property.name}</h3>
-                                        <p className="text-xs text-zinc-500 mt-0.5">{property.code}</p>
-                                        <p className="text-sm text-zinc-600 mt-2 line-clamp-2">{property.address}</p>
-                                        <div className="mt-3 flex items-center gap-2">
-                                            <span
-                                                className="px-2 py-0.5 rounded text-[10px] font-bold text-white uppercase tracking-wider"
-                                                style={{ backgroundColor: statusColors[property.status] }}
-                                            >
-                                                {property.status === 'holding' ? '持有中' : property.status === 'renting' ? '出租中' : property.status === 'sold' ? '已售出' : '已暫停'}
-                                            </span>
+                                    <a
+                                        href="#"
+                                        onClick={(e) => {
+                                            e.preventDefault();
+                                            if (onPropertyClick) onPropertyClick(property);
+                                        }}
+                                        className="block no-underline text-inherit"
+                                    >
+                                        <div className="p-1 min-w-50 cursor-pointer">
+                                            {property.images && property.images.length > 0 ? (
+                                                <img
+                                                    src={property.images[0]}
+                                                    alt={property.name}
+                                                    className="w-full h-28 object-cover rounded-lg mb-2"
+                                                />
+                                            ) : null}
+                                            <h3 className="font-semibold text-base text-zinc-900">{property.name}</h3>
+                                            <p className="text-sm text-zinc-600 mt-1 line-clamp-2">{property.address}</p>
+                                            <div className="mt-3 flex items-center gap-2">
+                                                <span
+                                                    className="px-2 py-0.5 rounded text-[10px] font-bold text-white uppercase tracking-wider"
+                                                    style={{ backgroundColor: statusColors[property.status] }}
+                                                >
+                                                    {property.status === 'holding' ? '持有中' : property.status === 'renting' ? '出租中' : property.status === 'sold' ? '已售出' : '已暫停'}
+                                                </span>
+                                            </div>
+                                            <div className="mt-3 px-2 py-1.5 bg-purple-600 text-white text-xs text-center rounded-lg font-medium">
+                                                前往詳情
+                                            </div>
                                         </div>
-                                        {onPropertyClick && (
-                                            <button
-                                                onClick={() => onPropertyClick(property)}
-                                                className="mt-4 w-full px-3 py-2 bg-purple-600 text-white text-xs font-medium rounded-lg hover:bg-purple-700 transition-colors shadow-sm"
-                                            >
-                                                查看詳情
-                                            </button>
-                                        )}
-                                    </div>
+                                    </a>
                                 </Popup>
                             </Marker>
                         ))}

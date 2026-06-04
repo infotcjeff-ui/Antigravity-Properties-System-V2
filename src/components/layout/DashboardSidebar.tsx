@@ -18,6 +18,8 @@ import {
     Trash2,
     FileText,
     Image as ImageIcon,
+    Download,
+    Archive,
 } from 'lucide-react';
 import ThemeToggle from './ThemeToggle';
 import { useLanguage } from '@/components/common/LanguageSwitcher';
@@ -147,93 +149,129 @@ export default function DashboardSidebar({ userRole = 'client' }: DashboardSideb
                 </Link>
             </div>
 
-            {/* Navigation */}
-            <nav className="flex-1 p-4 overflow-y-auto">
-                    <p className="px-4 text-sm text-zinc-400 dark:text-white/40 uppercase tracking-wider mb-3">
-                    管理
-                </p>
-                <ul className="space-y-1">
-                    {dashboardNavItems.map((item) => (
-                        <li key={item.label}>
-                            <Link
-                                href={item.href}
-                                className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${isActive(item.href)
-                                    ? 'bg-purple-500/20 text-purple-700 dark:text-white'
-                                    : 'text-zinc-600 dark:text-white/60 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-white/5'
-                                    }`}
-                            >
-                                {item.icon}
-                                <span className="font-medium text-base">{item.labelZh}</span>
-                            </Link>
-                        </li>
-                    ))}
-                </ul>
+                {/* Navigation */}
+                <nav className="flex-1 p-4 overflow-y-auto">
+                    {userRole === 'client' ? (
+                        <>
+                            <p className="px-4 text-sm text-zinc-400 dark:text-white/40 uppercase tracking-wider mb-3">
+                                帳號
+                            </p>
+                            <ul className="space-y-1">
+                                <li>
+                                    <Link
+                                        href="/dashboard/users"
+                                        className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${isActive('/dashboard/users')
+                                            ? 'bg-purple-500/20 text-purple-700 dark:text-white'
+                                            : 'text-zinc-600 dark:text-white/60 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-white/5'
+                                            }`}
+                                    >
+                                        <Users className="w-5 h-5" />
+                                        <span className="font-medium text-base">帳號管理</span>
+                                    </Link>
+                                </li>
+                            </ul>
+                        </>
+                    ) : (
+                        <>
+                            <p className="px-4 text-sm text-zinc-400 dark:text-white/40 uppercase tracking-wider mb-3">
+                                管理
+                            </p>
+                            <ul className="space-y-1">
+                                {dashboardNavItems.map((item) => (
+                                    <li key={item.label}>
+                                        <Link
+                                            href={item.href}
+                                            className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${isActive(item.href)
+                                                ? 'bg-purple-500/20 text-purple-700 dark:text-white'
+                                                : 'text-zinc-600 dark:text-white/60 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-white/5'
+                                                }`}
+                                        >
+                                            {item.icon}
+                                            <span className="font-medium text-base">{item.labelZh}</span>
+                                        </Link>
+                                    </li>
+                                ))}
+                            </ul>
 
-                {/* Settings Section */}
-                {userRole === 'admin' && (
-                    <>
-                        <p className="px-4 text-sm text-zinc-400 dark:text-white/40 uppercase tracking-wider mb-3 mt-6 font-medium">
-                            設定
-                        </p>
-                        <ul className="space-y-1">
-                            <li>
-                                <Link
-                                    href="/dashboard/users"
-                                    className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${isActive('/dashboard/users')
-                                        ? 'bg-purple-500/20 text-purple-700 dark:text-white'
-                                        : 'text-zinc-600 dark:text-white/60 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-white/5'
-                                        }`}
-                                >
-                                    <Users className="w-5 h-5" />
-                                    <span className="font-medium text-base">帳號管理</span>
-                                </Link>
-                            </li>
-                            <li>
-                                <Link
-                                    href="/dashboard/settings"
-                                    className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${isActive('/dashboard/settings') && !isActive('/dashboard/settings/trash')
-                                        ? 'bg-purple-500/20 text-purple-700 dark:text-white'
-                                        : 'text-zinc-600 dark:text-white/60 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-white/5'
-                                        }`}
-                                >
-                                    <Settings className="w-5 h-5" />
-                                    <span className="font-medium text-base">系統設定</span>
-                                </Link>
-                            </li>
-                        </ul>
+                            {/* Settings Section */}
+                            {userRole === 'admin' && (
+                                <>
+                                    <p className="px-4 text-sm text-zinc-400 dark:text-white/40 uppercase tracking-wider mb-3 mt-6 font-medium">
+                                        設定
+                                    </p>
+                                    <ul className="space-y-1">
+                                        <li>
+                                            <Link
+                                                href="/dashboard/users"
+                                                className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${isActive('/dashboard/users')
+                                                    ? 'bg-purple-500/20 text-purple-700 dark:text-white'
+                                                    : 'text-zinc-600 dark:text-white/60 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-white/5'
+                                                    }`}
+                                            >
+                                                <Users className="w-5 h-5" />
+                                                <span className="font-medium text-base">帳號管理</span>
+                                            </Link>
+                                        </li>
+                                        <li>
+                                            <Link
+                                                href="/dashboard/settings"
+                                                className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${isActive('/dashboard/settings') && !isActive('/dashboard/settings/trash')
+                                                    ? 'bg-purple-500/20 text-purple-700 dark:text-white'
+                                                    : 'text-zinc-600 dark:text-white/60 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-white/5'
+                                                    }`}
+                                            >
+                                                <Settings className="w-5 h-5" />
+                                                <span className="font-medium text-base">系統設定</span>
+                                            </Link>
+                                        </li>
+                                    </ul>
 
-                        <p className="px-4 text-sm text-zinc-400 dark:text-white/40 uppercase tracking-wider mb-3 mt-6 font-medium">
-                            工具
-                        </p>
-                        <ul className="space-y-1">
-                            <li>
-                                <Link
-                                    href="/dashboard/uploads"
-                                    className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${isActive('/dashboard/uploads')
-                                        ? 'bg-purple-500/20 text-purple-700 dark:text-white'
-                                        : 'text-zinc-600 dark:text-white/60 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-white/5'
-                                        }`}
-                                >
-                                    <ImageIcon className="w-5 h-5" />
-                                    <span className="font-medium text-base">已上載</span>
-                                </Link>
-                            </li>
-                            <li>
-                                <Link
-                                    href="/dashboard/settings/trash"
-                                    className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${isActive('/dashboard/settings/trash')
-                                        ? 'bg-purple-500/20 text-purple-700 dark:text-white'
-                                        : 'text-zinc-600 dark:text-white/60 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-white/5'
-                                        }`}
-                                >
-                                    <Trash2 className="w-5 h-5" />
-                                    <span className="font-medium text-base">垃圾桶</span>
-                                </Link>
-                            </li>
-                        </ul>
-                    </>
-                )}
-            </nav>
+                                    <p className="px-4 text-sm text-zinc-400 dark:text-white/40 uppercase tracking-wider mb-3 mt-6 font-medium">
+                                        工具
+                                    </p>
+                                    <ul className="space-y-1">
+                                        <li>
+                                            <Link
+                                                href="/dashboard/uploads"
+                                                className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${isActive('/dashboard/uploads')
+                                                    ? 'bg-purple-500/20 text-purple-700 dark:text-white'
+                                                    : 'text-zinc-600 dark:text-white/60 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-white/5'
+                                                    }`}
+                                            >
+                                                <ImageIcon className="w-5 h-5" />
+                                                <span className="font-medium text-base">已上載</span>
+                                            </Link>
+                                        </li>
+                                        <li>
+                                            <Link
+                                                href="/dashboard/backup"
+                                                className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${isActive('/dashboard/backup')
+                                                    ? 'bg-purple-500/20 text-purple-700 dark:text-white'
+                                                    : 'text-zinc-600 dark:text-white/60 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-white/5'
+                                                    }`}
+                                            >
+                                                <Archive className="w-5 h-5" />
+                                                <span className="font-medium text-base">備份</span>
+                                            </Link>
+                                        </li>
+                                        <li>
+                                            <Link
+                                                href="/dashboard/settings/trash"
+                                                className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${isActive('/dashboard/settings/trash')
+                                                    ? 'bg-purple-500/20 text-purple-700 dark:text-white'
+                                                    : 'text-zinc-600 dark:text-white/60 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-white/5'
+                                                    }`}
+                                            >
+                                                <Trash2 className="w-5 h-5" />
+                                                <span className="font-medium text-base">垃圾桶</span>
+                                            </Link>
+                                        </li>
+                                    </ul>
+                                </>
+                            )}
+                        </>
+                    )}
+                </nav>
 
             {/* User section */}
             <div className="p-4 border-t border-zinc-200 dark:border-white/5 space-y-3">

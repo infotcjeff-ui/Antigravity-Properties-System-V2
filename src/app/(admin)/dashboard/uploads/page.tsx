@@ -5,10 +5,12 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
     Image as ImageIcon, Trash2, Eye, X,
     RefreshCw, AlertTriangle, HardDrive, FolderOpen,
-    CheckSquare, Square
+    CheckSquare, Square, Settings
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
+import { CompressionSettings } from '@/components/uploads/CompressionSettings';
+import type { CompressionSettingsState } from '@/components/uploads/CompressionSettings';
 
 interface UploadedFile {
     filename: string;
@@ -42,6 +44,12 @@ export default function UploadsPage() {
 
     const [selectedFiles, setSelectedFiles] = useState<Set<string>>(new Set());
     const [selectMode, setSelectMode] = useState(false);
+
+    const [compressionSettings, setCompressionSettings] = useState<CompressionSettingsState>({
+        quality: 80,
+        maxWidth: 2000,
+        maxHeight: 1500,
+    });
 
     useEffect(() => {
         if (user && user.role !== 'admin') {
@@ -180,7 +188,7 @@ export default function UploadsPage() {
                         exit={{ opacity: 0, y: -50, x: '-50%' }}
                         className={`fixed top-4 left-1/2 -translate-x-1/2 z-50 px-5 py-2.5 w-[90%] max-w-sm ${toastColors[alertType]} text-white rounded-xl shadow-lg shadow-black/20 flex items-center gap-3 backdrop-blur-sm bg-opacity-90`}
                     >
-                        <RefreshCw className="w-5 h-5 flex-shrink-0" />
+                        <RefreshCw className="w-5 h-5 shrink-0" />
                         <span className="font-medium text-sm sm:text-base leading-tight">{alertMessage}</span>
                     </motion.div>
                 )}
@@ -270,7 +278,7 @@ export default function UploadsPage() {
 
                             <div className="p-3 bg-amber-50 dark:bg-amber-500/10 rounded-xl mb-5 border border-amber-200 dark:border-amber-500/20">
                                 <p className="text-sm text-amber-700 dark:text-amber-400 flex items-start gap-2">
-                                    <AlertTriangle className="w-4 h-4 mt-0.5 flex-shrink-0" />
+                                    <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
                                     <span>
                                         刪除圖片可能會影響使用這些圖片的物業頁面顯示。受影響的圖片將無法再顯示。
                                     </span>
@@ -309,12 +317,27 @@ export default function UploadsPage() {
                 </p>
             </div>
 
+            {/* 壓縮設定 */}
             <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
+                className="max-w-sm"
+            >
+                <CompressionSettings
+                    value={compressionSettings}
+                    onChange={setCompressionSettings}
+                    language={language}
+                />
+            </motion.div>
+
+            {/* 已上載檔案列表 */}
+            <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.05 }}
                 className="p-6 bg-white dark:bg-white/5 rounded-2xl border border-zinc-200 dark:border-white/10"
             >
-                <div className="flex items-center justify-between mb-6">
+                    <div className="flex items-center justify-between mb-6">
                     <div className="flex items-center gap-4">
                         <div className="w-10 h-10 rounded-xl bg-blue-500/10 flex items-center justify-center">
                             <ImageIcon className="w-5 h-5 text-blue-500" />

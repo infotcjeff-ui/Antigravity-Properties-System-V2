@@ -8,6 +8,7 @@ import PropertyCard from '@/components/properties/PropertyCard';
 import PropertyMapDynamic from '@/components/properties/PropertyMapDynamic';
 import { Building2, Grid3X3, Map, Search, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
+import SensitiveContent from '@/components/common/SensitiveContent';
 
 type ViewMode = 'grid' | 'map';
 
@@ -153,6 +154,7 @@ export default function PropertiesPage() {
             </div>
 
             {/* Content */}
+            <SensitiveContent fallbackClassName="rounded-xl overflow-hidden">
             {qLoading ? (
                 <div className="flex items-center justify-center min-h-[40vh]">
                     <motion.div
@@ -236,7 +238,7 @@ export default function PropertiesPage() {
             ) : (
                 <PropertyMapDynamic properties={filteredProperties} />
             )}
-
+            </SensitiveContent>
         </div>
     );
 }

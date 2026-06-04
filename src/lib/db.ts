@@ -12,9 +12,9 @@ export interface Property {
   lotIndex: string; // 物業地段
   lotArea: string;
   type: 'group_asset' | 'co_investment' | 'external_lease' | 'managed_asset';
-  status: 'holding' | 'renting' | 'sold' | 'suspended';
+  status: string; // comma-separated: 'holding','renting','sold','suspended'
   landUse: string;
-  images: string[]; // Base64 strings, max 5, total 5MB
+  images: string[]; // Base64 strings, max 8, total 10MB
   geoMaps: string[]; // Base64 strings, max 2
   location: {
     lat: number;

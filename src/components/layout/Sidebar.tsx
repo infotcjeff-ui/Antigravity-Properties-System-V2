@@ -32,6 +32,12 @@ const navItems: NavItem[] = [
         icon: <Building2 className="w-5 h-5" />,
         requiresAuth: false,
     },
+    {
+        label: '出租',
+        href: '/rental',
+        icon: <ArrowUpFromLine className="w-5 h-5" />,
+        requiresAuth: false,
+    },
 ];
 
 interface SidebarProps {
@@ -95,15 +101,14 @@ export default function Sidebar({ isAuthenticated = false }: SidebarProps) {
             animate={{ x: 0 }}
             className="fixed left-0 top-0 h-screen w-[280px] bg-white dark:bg-[#0f0f1a]/95 backdrop-blur-xl border-r border-zinc-200 dark:border-white/5 flex flex-col z-50 transition-colors duration-300"
         >
-            <div className="p-6 border-b border-zinc-200 dark:border-white/5">
-                <Link href="/" className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 to-blue-600 flex items-center justify-center shadow-lg shadow-purple-500/20">
-                        <Building2 className="w-5 h-5 text-white" />
-                    </div>
-                    <div>
-                        <h1 className="font-bold text-zinc-900 dark:text-white text-2xl">PMS</h1>
-                        <p className="text-zinc-500 dark:text-white/40 text-sm">物業管理系統</p>
-                    </div>
+            <div className="p-6 border-b border-zinc-200 dark:border-white/5 flex items-center justify-center">
+                <Link href="/" className="flex items-center justify-center">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                        src="/sitelogo/貨車城集團 橫 black.png"
+                        alt="貨車城集團"
+                        className="w-[80%] object-contain"
+                    />
                 </Link>
             </div>
 
@@ -221,7 +226,7 @@ export default function Sidebar({ isAuthenticated = false }: SidebarProps) {
             {/* Copyright */}
             <div className="px-6 py-4 border-t border-zinc-200 dark:border-white/5">
                 <p className="text-[10px] text-zinc-400 dark:text-white/30 text-center leading-relaxed">
-                    © 版權所有 | {new Date().getFullYear()} | 只供集團內部使用
+                    © 版權所有 | {new Date().getFullYear()}
                 </p>
             </div>
         </motion.aside>

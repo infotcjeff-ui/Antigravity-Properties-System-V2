@@ -245,6 +245,7 @@ export default function TopBar({ onSearch, placeholder = '搜尋...', isAuthenti
                                 ) : (
                                     <>
                                         <MobileNavItem href="/" icon={<Building2 className="w-5 h-5" />} label="物業列表" onClick={() => setShowMobileMenu(false)} />
+                                        <MobileNavItem href="/rental" icon={<ArrowUpFromLine className="w-5 h-5" />} label="出租" onClick={() => setShowMobileMenu(false)} />
                                         {isAuthenticated && (
                                             <>
                                                 <MobileNavItem href="/proprietors" icon={<Users className="w-5 h-5" />} label="業主列表" onClick={() => setShowMobileMenu(false)} />

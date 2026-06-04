@@ -52,7 +52,8 @@ export default function UsersPage() {
     const [newUsername, setNewUsername] = useState('');
     const [newDisplayName, setNewDisplayName] = useState('');
     const [newPassword, setNewPassword] = useState('');
-    const [newUserRole, setNewUserRole] = useState<'admin' | 'user'>('user');
+    const [newUserRole, setNewUserRole] = useState<'admin' | 'user' | 'client'>('user');
+    const [newPhone, setNewPhone] = useState('');
     const [showPassword, setShowPassword] = useState(false);
     const [isRegistering, setIsRegistering] = useState(false);
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -125,6 +126,7 @@ export default function UsersPage() {
     const [editPassword, setEditPassword] = useState('');
     const [editDisplayName, setEditDisplayName] = useState('');
     const [editRole, setEditRole] = useState<UserRole>('user');
+    const [editPhone, setEditPhone] = useState('');
     const [isUpdating, setIsUpdating] = useState(false);
     const [showEditPassword, setShowEditPassword] = useState(false);
 
@@ -132,9 +134,7 @@ export default function UsersPage() {
         const savedLang = localStorage.getItem('app-language') as 'zh-TW' | 'en' | null;
         if (savedLang) setLanguage(savedLang);
 
-        if (user?.role === 'admin') {
-            loadSystemUsersData();
-        }
+        loadSystemUsersData();
     }, [user]);
 
     const loadSystemUsersData = async () => {
@@ -142,11 +142,15 @@ export default function UsersPage() {
         try {
             const { success, users } = await getUsers();
             if (success && users) {
-                setSystemUsers(users);
+                // Client role: only see own account
+                const filtered = user?.role === 'client'
+                    ? users.filter(u => u.id === user.id)
+                    : users;
+                setSystemUsers(filtered);
 
                 // Fetch stats for all users in parallel
                 const statsArray = await Promise.all(
-                    users.map(async (u: User) => {
+                    filtered.map(async (u: User) => {
                         const stats = await fetchUserStats(u.id);
                         return { userId: u.id, stats };
                     })
@@ -175,7 +179,7 @@ export default function UsersPage() {
         }
 
         setIsRegistering(true);
-        const result = await registerUser(newUsername, newPassword, newUserRole, newDisplayName);
+        const result = await registerUser(newUsername, newPassword, newUserRole, newDisplayName, newPhone || undefined);
         setIsRegistering(false);
 
         if (result.success) {
@@ -184,6 +188,7 @@ export default function UsersPage() {
             setNewUsername('');
             setNewDisplayName('');
             setNewPassword('');
+            setNewPhone('');
             setIsAddModalOpen(false);
             loadSystemUsersData(); // Refresh list
             setTimeout(() => setShowAlert(false), 3000);
@@ -206,6 +211,7 @@ export default function UsersPage() {
         if (editDisplayName) {
             updates.displayName = editDisplayName;
         }
+        updates.phone = editPhone || undefined;
 
         const result = await updateUser(editingUser.id, updates);
         setIsUpdating(false);
@@ -215,6 +221,7 @@ export default function UsersPage() {
             setShowAlert(true);
             setEditingUser(null);
             setEditPassword('');
+            setEditPhone('');
             loadSystemUsersData();
             setTimeout(() => setShowAlert(false), 3000);
         } else {
@@ -271,12 +278,15 @@ export default function UsersPage() {
                         {t('帳號管理', 'Account Management')}
                     </h1>
                     <p className="text-zinc-500 dark:text-white/50 mt-1 hidden sm:block">
-                        {t('管理系統用戶權限及查看用戶創建的資料', 'Manage user permissions and view user-created data')}
+                        {user?.role === 'client'
+                            ? t('查看及修改你的個人資料', 'View and update your personal information')
+                            : t('管理系統用戶權限及查看用戶創建的資料', 'Manage user permissions and view user-created data')}
                     </p>
                 </div>
                 <button
                     onClick={() => setIsAddModalOpen(true)}
                     className="px-6 py-2.5 bg-indigo-500 hover:bg-indigo-600 text-white rounded-xl font-bold transition-all flex items-center gap-2 shadow-lg shadow-indigo-500/20"
+                    style={{ display: user?.role === 'client' ? 'none' : undefined }}
                 >
                     <UserPlus className="w-5 h-5" />
                     <span className="hidden sm:inline">{t('新增帳號', 'Create New Account')}</span>
@@ -338,10 +348,15 @@ export default function UsersPage() {
                                             <td className="px-6 py-4">
                                                 <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider ${u.role === 'admin'
                                                     ? 'bg-amber-500/10 text-amber-500 border border-amber-500/20'
+                                                    : u.role === 'client'
+                                                    ? 'bg-emerald-500/10 text-emerald-500 border border-emerald-500/20'
                                                     : 'bg-indigo-500/10 text-indigo-500 border border-indigo-500/20'
                                                     }`}>
-                                                    {u.role}
+                                                    {u.role === 'client' ? t('客戶', 'Client') : u.role === 'admin' ? t('管理員', 'Admin') : t('用戶', 'User')}
                                                 </span>
+                                                {u.phone && (
+                                                    <p className="text-[10px] text-zinc-400 mt-1">{u.phone}</p>
+                                                )}
                                             </td>
                                             <td className="px-6 py-4">
                                                 <div className="flex justify-center gap-4">
@@ -366,6 +381,7 @@ export default function UsersPage() {
                                                             setEditingUser(u);
                                                             setEditRole(u.role);
                                                             setEditDisplayName(u.displayName || '');
+                                                            setEditPhone(u.phone || '');
                                                             setEditPassword('');
                                                         }}
                                                         className="p-2 rounded-xl bg-zinc-100 dark:bg-white/5 hover:bg-zinc-200 dark:hover:bg-white/10 text-zinc-700 dark:text-white/70 transition-all"
@@ -373,13 +389,15 @@ export default function UsersPage() {
                                                     >
                                                         <Pencil className="w-4 h-4" />
                                                     </button>
-                                                    <button
-                                                        onClick={() => handleDelete(u.id)}
-                                                        className="p-2 rounded-xl bg-red-50 dark:bg-red-500/10 hover:bg-red-100 dark:hover:bg-red-500/20 text-red-600 dark:text-red-400 transition-all"
-                                                        title={t('刪除', 'Delete')}
-                                                    >
-                                                        <Trash2 className="w-4 h-4" />
-                                                    </button>
+                                                    {user?.role !== 'client' && (
+                                                        <button
+                                                            onClick={() => handleDelete(u.id)}
+                                                            className="p-2 rounded-xl bg-red-50 dark:bg-red-500/10 hover:bg-red-100 dark:hover:bg-red-500/20 text-red-600 dark:text-red-400 transition-all"
+                                                            title={t('刪除', 'Delete')}
+                                                        >
+                                                            <Trash2 className="w-4 h-4" />
+                                                        </button>
+                                                    )}
                                                 </div>
                                             </td>
                                         </tr>
@@ -410,10 +428,15 @@ export default function UsersPage() {
                                         </div>
                                         <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider ${u.role === 'admin'
                                             ? 'bg-amber-500/10 text-amber-500 border border-amber-500/20'
+                                            : u.role === 'client'
+                                            ? 'bg-emerald-500/10 text-emerald-500 border border-emerald-500/20'
                                             : 'bg-indigo-500/10 text-indigo-500 border border-indigo-500/20'
                                             }`}>
-                                            {u.role}
+                                            {u.role === 'client' ? t('客戶', 'Client') : u.role === 'admin' ? t('管理員', 'Admin') : t('用戶', 'User')}
                                         </span>
+                                        {u.phone && (
+                                            <p className="text-[10px] text-zinc-400 mt-1">{u.phone}</p>
+                                        )}
                                     </div>
 
                                     <div className="grid grid-cols-3 gap-3 py-3 border-y border-zinc-100 dark:border-white/5 text-center">
@@ -437,6 +460,7 @@ export default function UsersPage() {
                                                 setEditingUser(u);
                                                 setEditRole(u.role);
                                                 setEditDisplayName(u.displayName || '');
+                                                setEditPhone(u.phone || '');
                                                 setEditPassword('');
                                             }}
                                             className="flex items-center gap-2 px-4 py-2 rounded-xl bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 active:bg-indigo-100 dark:active:bg-indigo-500/20 transition-all text-sm font-semibold"
@@ -444,12 +468,14 @@ export default function UsersPage() {
                                             <Pencil className="w-4 h-4" />
                                             {t('編輯資料', 'Edit Info')}
                                         </button>
-                                        <button
-                                            onClick={() => handleDelete(u.id)}
-                                            className="p-2.5 rounded-xl bg-red-50 dark:bg-red-500/10 text-red-600 dark:text-red-400 active:bg-red-100 dark:active:bg-red-500/20 transition-colors"
-                                        >
-                                            <Trash2 className="w-4 h-4" />
-                                        </button>
+                                        {user?.role !== 'client' && (
+                                            <button
+                                                onClick={() => handleDelete(u.id)}
+                                                className="p-2.5 rounded-xl bg-red-50 dark:bg-red-500/10 text-red-600 dark:text-red-400 active:bg-red-100 dark:active:bg-red-500/20 transition-colors"
+                                            >
+                                                <Trash2 className="w-4 h-4" />
+                                            </button>
+                                        )}
                                     </div>
                                 </motion.div>
                             ))}
@@ -553,6 +579,16 @@ export default function UsersPage() {
                                         </button>
                                         <button
                                             type="button"
+                                            onClick={() => setNewUserRole('client')}
+                                            className={`flex-1 py-1.5 rounded-lg text-xs font-semibold transition-all ${newUserRole === 'client'
+                                                ? 'bg-white dark:bg-white/10 text-indigo-600 dark:text-indigo-400 shadow-sm'
+                                                : 'text-zinc-500'
+                                                }`}
+                                        >
+                                            {t('客戶', 'Client')}
+                                        </button>
+                                        <button
+                                            type="button"
                                             onClick={() => setNewUserRole('admin')}
                                             className={`flex-1 py-1.5 rounded-lg text-xs font-semibold transition-all ${newUserRole === 'admin'
                                                 ? 'bg-white dark:bg-white/10 text-indigo-600 dark:text-indigo-400 shadow-sm'
@@ -562,6 +598,19 @@ export default function UsersPage() {
                                             {t('管理員', 'Admin')}
                                         </button>
                                     </div>
+                                </div>
+
+                                <div className="space-y-2">
+                                    <label className="text-sm font-medium text-zinc-700 dark:text-white/70">
+                                        {t('電話號碼 (非必要)', 'Phone Number (Optional)')}
+                                    </label>
+                                    <input
+                                        type="tel"
+                                        value={newPhone}
+                                        onChange={(e) => setNewPhone(e.target.value)}
+                                        className="w-full px-4 py-2.5 rounded-xl bg-zinc-50 dark:bg-white/5 border border-zinc-200 dark:border-white/10 focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
+                                        placeholder={t('輸入電話號碼', 'Enter phone number')}
+                                    />
                                 </div>
 
                                 <div className="pt-4 flex gap-3">
@@ -664,7 +713,20 @@ export default function UsersPage() {
                                     </div>
                                 </div>
 
-                                {editingUser.role !== 'admin' && (
+                                <div className="space-y-2">
+                                    <label className="text-sm font-medium text-zinc-700 dark:text-white/70">
+                                        {t('電話號碼 (非必要)', 'Phone Number (Optional)')}
+                                    </label>
+                                    <input
+                                        type="tel"
+                                        value={editPhone}
+                                        onChange={(e) => setEditPhone(e.target.value)}
+                                        className="w-full px-4 py-2.5 rounded-xl bg-zinc-50 dark:bg-white/5 border border-zinc-200 dark:border-white/10 focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
+                                        placeholder={t('輸入電話號碼', 'Enter phone number')}
+                                    />
+                                </div>
+
+                                {editingUser.role !== 'admin' && user?.role !== 'client' && (
                                     <div className="space-y-2">
                                         <label className="text-sm font-medium text-zinc-700 dark:text-white/70">
                                             {t('權限角色', 'Role')}
@@ -679,6 +741,16 @@ export default function UsersPage() {
                                                     }`}
                                             >
                                                 {t('普通用戶', 'Standard User')}
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => setEditRole('client')}
+                                                className={`flex-1 py-1.5 rounded-lg text-xs font-semibold transition-all ${editRole === 'client'
+                                                    ? 'bg-white dark:bg-white/10 text-indigo-600 dark:text-indigo-400 shadow-sm'
+                                                    : 'text-zinc-500'
+                                                    }`}
+                                            >
+                                                {t('客戶', 'Client')}
                                             </button>
                                             <button
                                                 type="button"

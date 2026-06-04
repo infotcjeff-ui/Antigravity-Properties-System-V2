@@ -44,6 +44,7 @@ import RentDetailsModal from '@/components/properties/RentDetailsModal';
 import SinglePropertyMapDynamic from '@/components/properties/SinglePropertyMapDynamic';
 import { useAuth } from '@/contexts/AuthContext';
 import { Tooltip } from '@heroui/react';
+import SensitiveContent from '@/components/common/SensitiveContent';
 
 /** 租務記錄表：業主／承租人（交租：tenant_id＝業主、proprietor_id＝承租人） */
 function RentHistoryProprietorCell({ party }: { party?: Proprietor | null }) {
@@ -218,12 +219,13 @@ const statusLabels: Record<string, string> = {
     suspended: '已暫停',
 };
 
-const typeLabels: Record<string, string> = {
-    group_asset: '集團資產',
-    co_investment: '合作投資',
-    external_lease: '外租物業',
-    managed_asset: '代管資產',
-};
+    const typeLabels: Record<string, string> = {
+        group_asset: '集團資產',
+        co_investment: '合作投資',
+        external_lease: '外租物業',
+        managed_asset: '代管資產',
+        agent_management: '代理管理',
+    };
 
 type RentHistoryTabKey = 'rent_out' | 'renting' | 'contract_lease_in' | 'contract_lease_out';
 
@@ -623,6 +625,7 @@ export default function PropertyDetailsPage() {
                 </motion.div>
 
                 {/* 右欄：上方固定；分頁內容區 lg 時 overflow 捲動 */}
+                <SensitiveContent>
                 <motion.div
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
@@ -1417,6 +1420,7 @@ export default function PropertyDetailsPage() {
                     </div>
                     </div>
                 </motion.div>
+                </SensitiveContent>
             </div>
 
             {selectedRent && (
