@@ -23,6 +23,7 @@ import {
     FileText,
     Eye,
     Users,
+    User as UserIcon,
 } from 'lucide-react';
 import DOMPurify from 'dompurify';
 import { useLanguage } from '@/components/common/LanguageSwitcher';
@@ -733,7 +734,7 @@ export default function RentalPropertyPage() {
                                             href="/login"
                                             className="px-6 py-2 bg-purple-500 hover:bg-purple-600 text-white text-sm font-semibold rounded-lg transition-colors flex items-center gap-2 shadow-md hover:shadow-lg"
                                         >
-                                            <User className="w-4 h-4" />
+                                            <UserIcon className="w-4 h-4" />
                                             {t('Log In', '前往登入')}
                                         </Link>
                                     </div>
