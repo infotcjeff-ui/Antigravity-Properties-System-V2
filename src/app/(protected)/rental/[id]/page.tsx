@@ -812,7 +812,6 @@ export default function RentalPropertyPage() {
             {property.location?.lat && property.location?.lng && (
                     <SinglePropertyMapDynamic
                         property={property}
-                        className="w-full h-96"
                     />
             )}
 
