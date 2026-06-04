@@ -42,6 +42,7 @@ import {
     proprietorCategoryLabelZh,
     serializeLotEntries,
     type LotEntry,
+    type MediaItem,
 } from '@/lib/formatters';
 import { normalizePropertyLocation } from '@/lib/propertyLocation';
 import {
