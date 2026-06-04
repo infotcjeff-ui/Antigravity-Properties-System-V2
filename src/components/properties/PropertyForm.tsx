@@ -1284,7 +1284,7 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
         const uploadPromises = validFiles.map(async (item, i) => {
             const blob = compressedBlobs[i];
             if (!blob) return null;
-            const file = item.file!;
+            const file = item.file as File;
             const uploadFormData = new FormData();
             uploadFormData.append('file', blob, file.name);
             uploadFormData.append('folder', folder);
