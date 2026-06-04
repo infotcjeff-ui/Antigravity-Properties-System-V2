@@ -19,7 +19,7 @@ interface AuthContextType {
     user: User | null;
     isAuthenticated: boolean;
     isLoading: boolean;
-    login: (username: string, password: string, rememberMe?: boolean) => Promise<{ success: boolean; role?: UserRole; error?: string }>;
+    login: (username: string, password: string, rememberMe?: boolean) => Promise<{ success: boolean; error?: string }>;
     logout: () => void;
     registerUser: (username: string, password: string, role: UserRole, displayName?: string, phone?: string) => Promise<{ success: boolean; error?: string }>;
     getUsers: () => Promise<{ success: boolean; users?: User[]; error?: string }>;
@@ -98,7 +98,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             };
             localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(authData));
 
-            return { success: true, role: userData.role };
+            return { success: true };
         } catch (err) {
             console.error('Login error:', err);
             return { success: false, error: '登入失敗' };
