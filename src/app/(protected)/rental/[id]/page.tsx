@@ -62,14 +62,8 @@ const landUseLabels: Record<string, string> = {
     os: 'OS 露天貯物',
     v: 'V 鄉村式發展',
     ou: 'OU 其他指定用途',
-    unknown: '未知',
-    open_storage: '露天倉儲',
-    residential_a: '住宅(甲)',
-    open_space: '開放空間',
-    village_dev: '鄉村式發展',
-    conservation_area: '保育區',
-    residential_c: '住宅(丙類)',
-    recreation_use: '休憩用地',
+    r_d: 'R(D) 住宅(丁類)',
+    r_a5: 'R(A)5 住宅(甲類)5',
 };
 
 function StatusBadge({ status }: { status?: string | null }) {
@@ -400,7 +394,7 @@ export default function RentalPropertyPage() {
     }
 
     const landUseList = property.landUse
-        ? property.landUse.split(',').map(s => landUseLabels[s.trim()] || s.trim()).filter(Boolean)
+        ? property.landUse.split(',').map(s => landUseLabels[s.trim()]).filter(Boolean)
         : [];
     const proprietor = property.proprietor || null;
 
@@ -422,7 +416,7 @@ export default function RentalPropertyPage() {
                 <motion.div
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
-                    className="flex flex-col gap-4 w-full lg:h-[calc(100dvh-10rem)] lg:min-h-0 lg:max-h-[calc(100dvh-10rem)] rounded-2xl overflow-hidden border border-zinc-200 dark:border-white/10 bg-zinc-100 dark:bg-white/5"
+                    className="flex flex-col gap-4 w-full min-h-96 lg:h-[calc(100dvh-10rem)] lg:min-h-0 lg:max-h-[calc(100dvh-10rem)] rounded-2xl overflow-hidden border border-zinc-200 dark:border-white/10 bg-zinc-100 dark:bg-white/5"
                 >
                     {property.images && property.images.length > 0 && !imageError ? (
                         <>
@@ -645,9 +639,7 @@ export default function RentalPropertyPage() {
                                             </div>
                                             <div>
                                                 <p className="text-sm font-medium text-zinc-900 dark:text-white">{proprietor.name}</p>
-                                                {proprietor.code && (
-                                                    <p className="text-xs text-zinc-500">{proprietor.code} · {proprietorCategoryLabelZh(proprietor.category, 'card')}</p>
-                                                )}
+                                                <p className="text-xs text-zinc-500">{proprietorCategoryLabelZh(proprietor.category, 'card')}</p>
                                             </div>
                                         </div>
                                     </div>
@@ -658,7 +650,7 @@ export default function RentalPropertyPage() {
                                     <div className="p-4 bg-zinc-50 dark:bg-white/5 rounded-xl border border-zinc-200 dark:border-white/10 flex flex-wrap gap-6">
                                         {property.lotArea && (
                                             <div className="flex-1 min-w-32">
-                                                <p className="text-sm font-medium text-zinc-700 dark:text-white/80">{t('Area', '面積')}</p>
+                                                <p className="text-sm font-medium text-zinc-700 dark:text-white/80">{t('Area', '總面積')}</p>
                                                 <p className="text-lg font-bold text-zinc-900 dark:text-white mt-0.5">{formatLotArea(property.lotArea)}</p>
                                             </div>
                                         )}
@@ -680,7 +672,7 @@ export default function RentalPropertyPage() {
                                 {/* 地段（listing 顯示：圖片 + 名稱 + 備註） */}
                                 {lotEntries.length > 0 && (
                                     <div className="p-4 bg-zinc-50 dark:bg-white/5 rounded-xl border border-zinc-200 dark:border-white/10">
-                                        <p className="text-sm font-medium text-zinc-700 dark:text-white/80 mb-3">{t('Lot Index', '地段')}</p>
+                                        <p className="text-sm font-medium text-zinc-700 dark:text-white/80 mb-3">{t('Lot Index', '所有地段')}</p>
                                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                                             {lotEntries.map((entry, idx) => (
                                                 <div
@@ -744,7 +736,17 @@ export default function RentalPropertyPage() {
                                 {property.address ? (
                                     <div className="p-4 text-sm text-zinc-600 dark:text-white/70 flex items-start gap-2 border-t border-zinc-200 dark:border-white/10">
                                         <MapPin className="w-4 h-4 shrink-0 mt-0.5" />
-                                        <span>{property.address}</span>
+                                        <a
+                                            href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(property.address)}`}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="hover:text-purple-600 dark:hover:text-purple-400 transition-colors"
+                                        >
+                                            {property.address}
+                                            <span className="text-xs text-zinc-400 dark:text-white/40 ml-1.5">
+                                                {t('(Click to open Google Maps)', '（點擊打開 Google Map）')}
+                                            </span>
+                                        </a>
                                     </div>
                                 ) : null}
                             </div>

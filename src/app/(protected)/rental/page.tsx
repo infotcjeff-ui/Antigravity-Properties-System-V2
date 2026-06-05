@@ -124,7 +124,7 @@ export default function RentalPage() {
     };
 
     return (
-        <div className="flex flex-col h-full space-y-6 pb-6">
+        <div className="flex flex-col min-h-full space-y-6 pb-6">
             {/* Page header */}
             <div className="flex flex-wrap items-center justify-between gap-4">
                 <div>
@@ -274,9 +274,9 @@ export default function RentalPage() {
                     )}
                 </div>
             ) : viewMode === 'list' ? (
-                <div className="flex flex-col lg:flex-row gap-0 bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-white/10 overflow-hidden h-full">
+                    <div className="flex flex-col lg:flex-row gap-0 bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-white/10 overflow-hidden min-h-150 lg:h-[calc(100dvh-12rem)] lg:min-h-0">
                     {/* Left: scrollable property list */}
-                    <div className="w-full lg:w-2/5 xl:w-2/5 shrink-0 border-b lg:border-b-0 lg:border-r border-zinc-200 dark:border-white/10 overflow-y-auto h-full">
+                    <div className="w-full lg:w-2/5 xl:w-2/5 shrink-0 border-b lg:border-b-0 lg:border-r border-zinc-200 dark:border-white/10 overflow-y-auto lg:h-full">
                         <div className="px-3 py-2 bg-zinc-50 dark:bg-white/5">
                             <div className="flex items-center justify-between">
                                 <p className="text-sm font-semibold text-zinc-600 dark:text-white/60">
@@ -354,10 +354,10 @@ export default function RentalPage() {
                     <div className="flex-1 flex flex-col">
                         {selectedPropertyId ? (
                             (() => {
-                                const selected = filteredProperties.find(p => p.id === selectedPropertyId);
+                                const selected = filteredProperties.find(p => p.id === selectedPropertyId) ?? filteredProperties[0] ?? null;
                                 if (!selected) return null;
+                                const nextIndex = filteredProperties.findIndex(p => p.id === selected.id);
                                 const hasImages = selected.images && selected.images.length > 0;
-                                const nextIndex = filteredProperties.findIndex(p => p.id === selectedPropertyId);
                                 const nextProperty = filteredProperties[nextIndex + 1];
                                 const prevProperty = filteredProperties[nextIndex - 1];
                                 return (
@@ -456,7 +456,7 @@ export default function RentalPage() {
                                                 <div className="flex items-center gap-2 px-3 py-2 bg-zinc-50 dark:bg-white/5 rounded-xl flex-1">
                                                     <Maximize2 className="w-4 h-4 text-amber-500 shrink-0" />
                                                     <div className="min-w-0">
-                                                        <p className="text-xs text-zinc-400 dark:text-white/40">面積</p>
+                                                        <p className="text-xs text-zinc-400 dark:text-white/40">總面積</p>
                                                         <p className="text-sm font-medium text-zinc-700 dark:text-white/80 truncate">
                                                             {selected.lotArea ? `${selected.lotArea} 平方呎` : '未設定'}
                                                         </p>

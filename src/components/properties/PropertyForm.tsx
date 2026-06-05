@@ -2412,6 +2412,16 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                         </div>
                     </div>
 
+                    {/* Notes Field (Rich Text) */}
+                    <div className="space-y-2">
+                        <label className="block text-sm font-medium text-zinc-700 dark:text-white/80">備註</label>
+                        <RichTextEditor
+                            value={formData.notes}
+                            onChange={(content) => setFormData(prev => ({ ...prev, notes: content }))}
+                            placeholder="請輸入備註資訊..."
+                        />
+                    </div>
+
                     {/* Proprietor Section (Multi-Select) */}
                     {property && (
                         <div className="space-y-3">
@@ -2789,16 +2799,6 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                             </div>
                         </>
                     ) : null}
-
-                    {/* Notes Field (Rich Text) */}
-                    <div className="space-y-2">
-                        <label className="block text-sm font-medium text-zinc-700 dark:text-white/80">備註</label>
-                        <RichTextEditor
-                            value={formData.notes}
-                            onChange={(content) => setFormData(prev => ({ ...prev, notes: content }))}
-                            placeholder="請輸入備註資訊..."
-                        />
-                    </div>
 
                 </form>
 
