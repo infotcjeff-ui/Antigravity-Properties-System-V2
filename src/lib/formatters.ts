@@ -178,7 +178,7 @@ export function formatRentHistoryLotCellText(
 /**
  * LotEntry 類型定義
  * 序列化格式（JSON per line）:
- *   {"t":"新","v":"地段值","m":[{"u":"url","s":1234}],"n":"備註"}
+ *   {"t":"新","v":"地段值","m":[{"u":"url","s":1234}],"n":"備註","s":"出租中"}
  * 兼容舊格式 "新:地段值" 或純地段值
  */
 export interface MediaItem {
@@ -186,11 +186,15 @@ export interface MediaItem {
     s: number; // size in bytes
 }
 
+export type LotStatus = 'renting' | 'rented';
+
 export interface LotEntry {
     type: 'new' | 'old';
     value: string;
     media?: MediaItem[];
     note?: string;
+    lotStatus?: LotStatus;
+    lotArea?: string;
 }
 
 /** Parse lotIndex string into LotEntry array. Handles legacy format. */
@@ -201,7 +205,7 @@ export function parseLotEntries(lotIndex: string | null | undefined): LotEntry[]
         // 新格式：JSON
         if (t.startsWith('{')) {
             try {
-                const obj = JSON.parse(t) as { t?: string; v?: string; m?: MediaItem[] | string[]; n?: string };
+                const obj = JSON.parse(t) as { t?: string; v?: string; m?: MediaItem[] | string[]; n?: string; s?: string; a?: string };
                 // 兼容舊格式 m: ["url1", "url2"] → 轉成 [{u, s:0}]
                 const media: MediaItem[] | undefined = obj.m ? (
                     typeof obj.m[0] === 'string'
@@ -213,6 +217,8 @@ export function parseLotEntries(lotIndex: string | null | undefined): LotEntry[]
                     value: obj.v || '',
                     media,
                     note: obj.n,
+                    lotStatus: (obj.s === '已出租' ? 'rented' : obj.s === '出租中' ? 'renting' : undefined) as LotStatus | undefined,
+                    lotArea: obj.a,
                 };
             } catch {
                 // fall through to legacy
@@ -233,6 +239,8 @@ export function serializeLotEntries(entries: LotEntry[]): string {
             v: e.value,
             m: (e.media?.length ?? 0) > 0 ? e.media : undefined,
             n: e.note || undefined,
+            s: e.lotStatus === 'rented' ? '已出租' : e.lotStatus === 'renting' ? '出租中' : undefined,
+            a: e.lotArea || undefined,
         })
     ).join('\n');
 }

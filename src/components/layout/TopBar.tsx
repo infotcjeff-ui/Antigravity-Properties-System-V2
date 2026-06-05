@@ -4,7 +4,7 @@ import { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, Bell, Check, Trash2, LayoutDashboard, LogIn, LogOut, Database, Cloud, Menu, X, Building2, Users, ArrowUpFromLine, ArrowDownToLine, Network, Settings, FileText, User } from 'lucide-react';
+import { Search, Bell, Check, Trash2, LayoutDashboard, LogIn, LogOut, Database, Cloud, Menu, X, Building2, Users, ArrowUpFromLine, ArrowDownToLine, Network, Settings, FileText, User, TrendingUp } from 'lucide-react';
 import { useNotifications } from '@/contexts/NotificationContext';
 import ThemeToggle from './ThemeToggle';
 import { useLanguage } from '@/components/common/LanguageSwitcher';
@@ -237,6 +237,7 @@ export default function TopBar({ onSearch, placeholder = '搜尋...', isAuthenti
                                         <MobileNavItem href="/dashboard/rent-out" icon={<ArrowUpFromLine className="w-6 h-6" />} label="管理收租" onClick={() => setShowMobileMenu(false)} />
                                         <MobileNavItem href="/dashboard/renting" icon={<ArrowDownToLine className="w-6 h-6" />} label="管理交租" onClick={() => setShowMobileMenu(false)} />
                                         <MobileNavItem href="/dashboard/relations" icon={<Network className="w-6 h-6" />} label="管理關聯" onClick={() => setShowMobileMenu(false)} />
+                                        <MobileNavItem href="/dashboard/management-flow" icon={<TrendingUp className="w-6 h-6" />} label="管理流程" onClick={() => setShowMobileMenu(false)} />
 
                                         <p className="px-4 text-xs font-medium text-zinc-400 dark:text-white/40 uppercase tracking-widest mb-2 mt-6">系統</p>
                                         <MobileNavItem href="/dashboard/users" icon={<Users className="w-6 h-6" />} label="帳號管理" onClick={() => setShowMobileMenu(false)} />

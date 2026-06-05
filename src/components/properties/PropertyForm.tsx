@@ -42,6 +42,7 @@ import {
     proprietorCategoryLabelZh,
     serializeLotEntries,
     type LotEntry,
+    type LotStatus,
     type MediaItem,
 } from '@/lib/formatters';
 import { normalizePropertyLocation } from '@/lib/propertyLocation';
@@ -370,12 +371,14 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
     const [editingLotType, setEditingLotType] = useState<'new' | 'old'>('new');
     const [editingLotMedia, setEditingLotMedia] = useState<Array<{ u: string; s: number } | { file: File; preview: string }>>([]);
     const [editingLotNote, setEditingLotNote] = useState('');
+    const [editingLotStatus, setEditingLotStatus] = useState<LotStatus | undefined>(undefined);
+    const [editingLotArea, setEditingLotArea] = useState('');
     const [lotSaving, setLotSaving] = useState(false);
     /** 編輯地段的 history popup */
     const [showLotHistoryModal, setShowLotHistoryModal] = useState(false);
-    const [lotHistoryEntry, setLotHistoryEntry] = useState<{ type: 'new' | 'old'; value: string; media?: MediaItem[]; note?: string } | null>(null);
+    const [lotHistoryEntry, setLotHistoryEntry] = useState<{ type: 'new' | 'old'; value: string; media?: MediaItem[]; note?: string; lotStatus?: LotStatus; lotArea?: string } | null>(null);
     /** 查看地段 popup */
-    const [viewLotEntry, setViewLotEntry] = useState<{ type: 'new' | 'old'; value: string; media?: MediaItem[]; note?: string } | null>(null);
+    const [viewLotEntry, setViewLotEntry] = useState<{ type: 'new' | 'old'; value: string; media?: MediaItem[]; note?: string; lotStatus?: LotStatus; lotArea?: string } | null>(null);
     const [viewLotImageIdx, setViewLotImageIdx] = useState(0);
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState('');
@@ -534,6 +537,8 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
             const existingMedia: Array<string | { u: string; s: number }> = (entry.media || []).map(m => ({ u: m.u, s: m.s }));
             setEditingLotMedia(existingMedia as any);
             setEditingLotNote(entry.note || '');
+            setEditingLotStatus(entry.lotStatus);
+            setEditingLotArea(entry.lotArea || '');
         }
     };
 
@@ -554,10 +559,14 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
             value: wasLease ? `${editingLotValue.trim()} (租賃地段)` : wasGov ? `${editingLotValue.trim()} (政府短期租約)` : editingLotValue.trim(),
             media: [...existingMedia, ...uploadedNew],
             note: editingLotNote || undefined,
+            lotStatus: editingLotStatus,
+            lotArea: editingLotArea.trim() || undefined,
         };
         setFormData(prev => ({ ...prev, lotIndex: serializeLotEntries(next) }));
         setEditingLotIndex(null);
         setEditingLotValue('');
+        setEditingLotStatus(undefined);
+        setEditingLotArea('');
         } finally {
             setLotSaving(false);
         }
@@ -566,6 +575,8 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
     const cancelEditLotEntry = () => {
         setEditingLotIndex(null);
         setEditingLotValue('');
+        setEditingLotStatus(undefined);
+        setEditingLotArea('');
     };
 
     const rents = useMemo(() => {
@@ -1819,6 +1830,16 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                                                 <span className={`shrink-0 px-2 py-0.5 rounded text-xs font-medium ${entry.type === 'new' ? 'bg-emerald-500/20 text-emerald-600 dark:text-emerald-400' : 'bg-zinc-200 dark:bg-white/10 text-zinc-600 dark:text-white/70'}`}>
                                                     {entry.type === 'new' ? '新' : '舊'}
                                                 </span>
+                                                {entry.lotStatus && (
+                                                    <span className={`shrink-0 px-2 py-0.5 rounded text-xs font-medium ${entry.lotStatus === 'renting' ? 'bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-400' : 'bg-zinc-300 text-zinc-700 dark:bg-zinc-600 dark:text-zinc-300'}`}>
+                                                        {entry.lotStatus === 'renting' ? '出租中' : '已出租'}
+                                                    </span>
+                                                )}
+                                                {entry.lotArea && (
+                                                    <span className="shrink-0 px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-400">
+                                                        {entry.lotArea}
+                                                    </span>
+                                                )}
                                                 {entry.value.endsWith('(租賃地段)') ? (
                                                     <span className="flex-1 text-sm text-zinc-900 dark:text-white break-all">
                                                         {entry.value.replace(/\s*\(租賃地段\)$/, '')}
@@ -1836,7 +1857,7 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                                                     <div className="flex items-center gap-1 shrink-0">
                                                         <button
                                                             type="button"
-                                                            onClick={() => { setViewLotImageIdx(0); setViewLotEntry(entry); }}
+                                                            onClick={() => { setViewLotImageIdx(0); setViewLotEntry({ ...entry, lotStatus: entry.lotStatus, lotArea: entry.lotArea }); }}
                                                             className="p-1 text-zinc-400 hover:text-blue-500 rounded cursor-pointer"
                                                             title="查看"
                                                         >
@@ -1868,7 +1889,7 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                         </div>
                         {/* Lot Add/Edit Popup Modal */}
                         {(showLotAddModal || editingLotIndex !== null) && (
-                            <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm" onClick={(e) => { if (e.target === e.currentTarget) { setShowLotAddModal(false); setLotAddTab('base'); setLotAddMode(null); setTempLotInput(''); setEditingLotIndex(null); } }}>
+                            <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm" onClick={(e) => { if (e.target === e.currentTarget) { setShowLotAddModal(false); setLotAddTab('base'); setLotAddMode(null); setTempLotInput(''); setEditingLotIndex(null); setEditingLotStatus(undefined); setEditingLotArea(''); } }}>
                                 <div className="bg-white dark:bg-[#1a1a2e] rounded-2xl shadow-2xl w-full max-w-lg max-h-[85vh] overflow-hidden flex flex-col mx-4">
                                     {/* Header */}
                                     <div className="flex items-center justify-between p-5 border-b border-zinc-100 dark:border-white/10">
@@ -1881,7 +1902,7 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                                             {editingLotIndex !== null && (
                                                 <button
                                                     type="button"
-                                                    onClick={() => { if (editingLotIndex !== null) { const entry = lotEntries[editingLotIndex]; if (entry) setLotHistoryEntry({ type: entry.type, value: entry.value }); } }}
+                                                    onClick={() => { if (editingLotIndex !== null) { const entry = lotEntries[editingLotIndex]; if (entry) setLotHistoryEntry({ type: entry.type, value: entry.value, lotStatus: entry.lotStatus, lotArea: entry.lotArea }); } }}
                                                     className="p-2 text-zinc-400 hover:text-blue-600 dark:hover:text-blue-400 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-500/10 transition-colors"
                                                     title="查看記錄"
                                                 >
@@ -1890,7 +1911,7 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                                             )}
                                             <button
                                                 type="button"
-                                                onClick={() => { setShowLotAddModal(false); setLotAddTab('base'); setLotAddMode(null); setTempLotInput(''); setTempLotMedia([]); setTempLotNote(''); setEditingLotIndex(null); }}
+                                                onClick={() => { setShowLotAddModal(false); setLotAddTab('base'); setLotAddMode(null); setTempLotInput(''); setTempLotMedia([]); setTempLotNote(''); setEditingLotIndex(null); setEditingLotStatus(undefined); setEditingLotArea(''); }}
                                                 className="p-2 text-zinc-400 hover:text-zinc-700 dark:hover:text-white rounded-lg hover:bg-zinc-100 dark:hover:bg-white/10 transition-colors"
                                             >
                                                 <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
@@ -1957,6 +1978,30 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                                                         placeholder="例如: DD 111 LOT 1523, 1539"
                                                         className="w-full px-4 py-3 bg-zinc-50 dark:bg-white/5 border border-zinc-200 dark:border-white/10 rounded-xl text-zinc-900 dark:text-white placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-purple-500/50"
                                                         autoFocus
+                                                    />
+                                                </div>
+                                                {/* 地段狀態 */}
+                                                <div className="space-y-2">
+                                                    <label className="block text-sm font-medium text-zinc-700 dark:text-white/80">地段狀態</label>
+                                                    <select
+                                                        value={editingLotStatus ?? ''}
+                                                        onChange={(e) => setEditingLotStatus(e.target.value === '' ? undefined : e.target.value as LotStatus)}
+                                                        className="w-full px-4 py-3 bg-zinc-50 dark:bg-white/5 border border-zinc-200 dark:border-white/10 rounded-xl text-zinc-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500/50"
+                                                    >
+                                                        <option value="">未設定</option>
+                                                        <option value="renting">出租中</option>
+                                                        <option value="rented">已出租</option>
+                                                    </select>
+                                                </div>
+                                                {/* 地段面積 */}
+                                                <div className="space-y-2">
+                                                    <label className="block text-sm font-medium text-zinc-700 dark:text-white/80">地段面積</label>
+                                                    <input
+                                                        type="text"
+                                                        value={editingLotArea}
+                                                        onChange={(e) => setEditingLotArea(e.target.value)}
+                                                        placeholder="例如: 5,000 平方呎"
+                                                        className="w-full px-4 py-3 bg-zinc-50 dark:bg-white/5 border border-zinc-200 dark:border-white/10 rounded-xl text-zinc-900 dark:text-white placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-purple-500/50"
                                                     />
                                                 </div>
                                                 {/* 圖片 */}
@@ -2084,7 +2129,7 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                                     <div className="flex items-center justify-end gap-3 p-5 border-t border-zinc-100 dark:border-white/10">
                                         <button
                                             type="button"
-                                            onClick={() => { setShowLotAddModal(false); setLotAddTab('base'); setLotAddMode(null); setTempLotInput(''); setTempLotMedia([]); setTempLotNote(''); setEditingLotIndex(null); }}
+                                            onClick={() => { setShowLotAddModal(false); setLotAddTab('base'); setLotAddMode(null); setTempLotInput(''); setTempLotMedia([]); setTempLotNote(''); setEditingLotIndex(null); setEditingLotStatus(undefined); setEditingLotArea(''); }}
                                             disabled={lotSaving}
                                             className="px-5 py-2.5 text-sm font-medium text-zinc-600 dark:text-white/60 hover:text-zinc-900 dark:hover:text-white rounded-lg hover:bg-zinc-100 dark:hover:bg-white/10 transition-colors disabled:opacity-50"
                                         >
@@ -2142,8 +2187,19 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                                             <span className={`shrink-0 px-2 py-0.5 rounded text-xs font-medium ${lotHistoryEntry.type === 'new' ? 'bg-emerald-500/20 text-emerald-600 dark:text-emerald-400' : 'bg-zinc-200 dark:bg-white/10 text-zinc-600 dark:text-white/70'}`}>
                                                 {lotHistoryEntry.type === 'new' ? '新' : '舊'}
                                             </span>
+                                            {lotHistoryEntry.lotStatus && (
+                                                <span className={`shrink-0 px-2 py-0.5 rounded text-xs font-medium ${lotHistoryEntry.lotStatus === 'renting' ? 'bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-400' : 'bg-zinc-300 text-zinc-700 dark:bg-zinc-600 dark:text-zinc-300'}`}>
+                                                    {lotHistoryEntry.lotStatus === 'renting' ? '出租中' : '已出租'}
+                                                </span>
+                                            )}
                                             <span className="text-sm text-zinc-900 dark:text-white font-medium">{lotHistoryEntry.value}</span>
                                         </div>
+                                        {lotHistoryEntry.lotArea && (
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-sm font-medium text-zinc-500 dark:text-white/50">地段面積：</span>
+                                                <span className="text-sm text-zinc-900 dark:text-white">{lotHistoryEntry.lotArea}</span>
+                                            </div>
+                                        )}
                                         {lotHistoryEntry.media && lotHistoryEntry.media.length > 0 && (
                                             <div className="space-y-2">
                                                 <span className="text-sm font-medium text-zinc-500 dark:text-white/50">圖片：</span>
@@ -2186,8 +2242,24 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                                             <span className={`shrink-0 px-3 py-1 rounded-lg text-sm font-semibold ${viewLotEntry.type === 'new' ? 'bg-emerald-500/20 text-emerald-600 dark:text-emerald-400' : 'bg-zinc-200 dark:bg-white/10 text-zinc-600 dark:text-white/70'}`}>
                                                 {viewLotEntry.type === 'new' ? '新地段' : '舊地段'}
                                             </span>
+                                            {viewLotEntry.lotStatus && (
+                                                <span className={`shrink-0 px-2 py-0.5 rounded text-xs font-medium ${viewLotEntry.lotStatus === 'renting' ? 'bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-400' : 'bg-zinc-300 text-zinc-700 dark:bg-zinc-600 dark:text-zinc-300'}`}>
+                                                    {viewLotEntry.lotStatus === 'renting' ? '出租中' : '已出租'}
+                                                </span>
+                                            )}
+                                            {viewLotEntry.lotArea && (
+                                                <span className="shrink-0 px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-400">
+                                                    {viewLotEntry.lotArea}
+                                                </span>
+                                            )}
                                             <span className="text-base text-zinc-900 dark:text-white font-medium">{viewLotEntry.value}</span>
                                         </div>
+                                        {viewLotEntry.lotArea && (
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-sm font-medium text-zinc-500 dark:text-white/50">地段面積：</span>
+                                                <span className="text-sm text-zinc-900 dark:text-white">{viewLotEntry.lotArea}</span>
+                                            </div>
+                                        )}
                                         {viewLotEntry.media && viewLotEntry.media.length > 0 ? (
                                             <div className="space-y-2">
                                                 <span className="text-sm font-medium text-zinc-500 dark:text-white/50">圖片</span>

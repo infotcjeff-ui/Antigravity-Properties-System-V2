@@ -20,6 +20,7 @@ import {
     Image as ImageIcon,
     Download,
     Archive,
+    TrendingUp,
 } from 'lucide-react';
 import ThemeToggle from './ThemeToggle';
 import { useLanguage } from '@/components/common/LanguageSwitcher';
@@ -73,6 +74,12 @@ const dashboardNavItems: DashboardNavItem[] = [
         labelZh: '管理關聯',
         href: '/dashboard/relations',
         icon: <Network className="w-5 h-5" />,
+    },
+    {
+        label: 'Management Flow',
+        labelZh: '管理流程',
+        href: '/dashboard/management-flow',
+        icon: <TrendingUp className="w-5 h-5" />,
     },
 ];
 

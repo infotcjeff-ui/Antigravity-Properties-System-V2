@@ -9,6 +9,7 @@ import {
     formatLotArea,
     parseLotEntries,
     proprietorCategoryLabelZh,
+    LotStatus,
 } from '@/lib/formatters';
 import {
     ArrowLeft,
@@ -24,6 +25,8 @@ import {
     Eye,
     Users,
     User as UserIcon,
+    Ruler,
+    StickyNote,
 } from 'lucide-react';
 import DOMPurify from 'dompurify';
 import { useLanguage } from '@/components/common/LanguageSwitcher';
@@ -113,7 +116,7 @@ function LotDetailModal({
     onClose,
     onImageClick,
 }: {
-    entry: { type: 'new' | 'old'; value: string; media?: { u: string; s: number }[]; note?: string };
+    entry: { type: 'new' | 'old'; value: string; media?: { u: string; s: number }[]; note?: string; lotStatus?: LotStatus; lotArea?: string };
     onClose: () => void;
     onImageClick: (src: string) => void;
 }) {
@@ -131,34 +134,48 @@ function LotDetailModal({
                 animate={{ opacity: 1, scale: 1, y: 0 }}
                 exit={{ opacity: 0, scale: 0.95, y: 10 }}
                 transition={{ duration: 0.2 }}
-                className="bg-white dark:bg-[#1a1a2e] rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden"
+                className="bg-white dark:bg-[#1a1a2e] rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden"
                 onClick={(e) => e.stopPropagation()}
             >
                 <div className="flex items-center justify-between p-5 border-b border-zinc-100 dark:border-white/10">
                     <div className="flex items-center gap-3">
-                        <span className={`shrink-0 px-3 py-1 rounded-lg text-sm font-semibold ${entry.type === 'new' ? 'bg-emerald-500/20 text-emerald-600 dark:text-emerald-400' : 'bg-zinc-200 dark:bg-white/10 text-zinc-600 dark:text-white/70'}`}>
-                            {entry.type === 'new' ? '新地段' : '舊地段'}
+                        <span className={`shrink-0 px-3 py-1 rounded-lg text-base font-semibold ${
+                            entry.lotStatus === 'rented'
+                                ? 'bg-amber-500/20 text-amber-600 dark:text-amber-400'
+                                : entry.lotStatus === 'renting'
+                                ? 'bg-green-500/20 text-green-600 dark:text-green-400'
+                                : 'bg-zinc-200 dark:bg-white/10 text-zinc-600 dark:text-white/70'
+                        }`}>
+                            {entry.lotStatus === 'rented' ? '已出租' : entry.lotStatus === 'renting' ? '出租中' : '未出租'}
                         </span>
-                        <h3 className="text-lg font-bold text-zinc-900 dark:text-white">{entry.value}</h3>
+                        <h3 className="text-xl font-bold text-zinc-900 dark:text-white">{entry.value}</h3>
                     </div>
                     <button onClick={onClose} className="p-1.5 hover:bg-zinc-100 dark:hover:bg-white/10 rounded-lg transition-colors cursor-pointer">
                         <X className="w-5 h-5 text-zinc-500" />
                     </button>
                 </div>
 
-                <div className="p-5 space-y-5 max-h-[70vh] overflow-y-auto notes-scroll">
+                <div className="p-5 space-y-4 max-h-[70vh] overflow-y-auto notes-scroll">
                     {entry.media && entry.media.length > 0 ? (
-                        <div className="space-y-3">
-                            <p className="text-sm font-semibold text-zinc-500 dark:text-white/50">圖片</p>
+                        <div>
                             {entry.media.length === 1 ? (
-                                <img
-                                    src={entry.media![0].u}
-                                    alt={entry.value}
-                                    className="w-full rounded-xl object-contain cursor-pointer hover:opacity-80 transition-opacity bg-zinc-50 dark:bg-white/5 border border-zinc-200 dark:border-white/10"
-                                    style={{ maxHeight: '60vh' }}
-                                    onClick={() => onImageClick(entry.media![0].u)}
-                                    onError={(e) => { e.currentTarget.style.display = 'none'; }}
-                                />
+                                <div className="relative w-full rounded-xl overflow-hidden bg-zinc-50 dark:bg-white/5 border border-zinc-200 dark:border-white/10" style={{ maxHeight: '45vh' }}>
+                                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                                    <img
+                                        src={entry.media![0].u}
+                                        alt={entry.value}
+                                        className="w-full object-contain bg-zinc-50 dark:bg-white/5"
+                                        style={{ maxHeight: '45vh' }}
+                                        onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                                    />
+                                    {entry.lotStatus === 'rented' && (
+                                        <div className="absolute inset-0 flex items-center justify-center">
+                                            <div className="backdrop-blur-sm bg-black/40 rounded-xl w-full h-full flex items-center justify-center">
+                                                <span className="px-6 py-3 bg-amber-500 text-white text-xl font-bold rounded-xl shadow-lg">已出租</span>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
                             ) : (
                                 <div className="relative select-none">
                                     <div className="relative overflow-hidden rounded-xl bg-zinc-50 dark:bg-white/5" style={{ height: '45vh' }}>
@@ -167,12 +184,18 @@ function LotDetailModal({
                                                 key={idx}
                                                 src={m.u}
                                                 alt={`圖片 ${idx + 1}`}
-                                                className="absolute inset-0 w-full h-full object-contain cursor-pointer transition-opacity duration-300"
+                                                className="absolute inset-0 w-full h-full object-contain transition-opacity duration-300"
                                                 style={{ opacity: idx === currentIdx ? 1 : 0, pointerEvents: idx === currentIdx ? 'auto' : 'none' }}
-                                                onClick={() => onImageClick(m.u)}
                                                 onError={(e) => { e.currentTarget.style.display = 'none'; }}
                                             />
                                         ))}
+                                        {entry.lotStatus === 'rented' && (
+                                            <div className="absolute inset-0 flex items-center justify-center">
+                                                <div className="backdrop-blur-sm bg-black/40 rounded-xl w-full h-full flex items-center justify-center">
+                                                    <span className="px-6 py-3 bg-amber-500 text-white text-xl font-bold rounded-xl shadow-lg">已出租</span>
+                                                </div>
+                                            </div>
+                                        )}
                                     </div>
                                     <button
                                         onClick={() => setCurrentIdx(i => (i - 1 + entry.media!.length) % entry.media!.length)}
@@ -196,23 +219,37 @@ function LotDetailModal({
                                             />
                                         ))}
                                     </div>
-                                    <p className="text-center text-xs text-zinc-400 dark:text-white/40 mt-1">{currentIdx + 1} / {entry.media.length}</p>
+                                    <p className="text-center text-sm text-zinc-400 dark:text-white/40 mt-1">{currentIdx + 1} / {entry.media.length}</p>
                                 </div>
                             )}
                         </div>
                     ) : (
-                        <div className="text-center py-6 bg-zinc-50 dark:bg-white/5 rounded-xl border border-dashed border-zinc-200 dark:border-white/10">
-                            <Map className="w-8 h-8 text-zinc-300 dark:text-white/20 mx-auto mb-2" />
-                            <p className="text-sm text-zinc-400 dark:text-white/40">暫無圖片</p>
+                        <div className="flex items-center justify-center gap-2 py-4 text-zinc-400 dark:text-white/40">
+                            <Map className="w-5 h-5" />
+                            <p className="text-base">暫無圖片</p>
                         </div>
                     )}
 
-                    {entry.note && (
-                        <div className="space-y-2">
-                            <p className="text-sm font-semibold text-zinc-500 dark:text-white/50">備註</p>
-                            <div className="bg-purple-500/5 dark:bg-purple-500/10 rounded-xl p-4 border-l-4 border-purple-500">
-                                <p className="text-sm text-zinc-700 dark:text-white/80 whitespace-pre-wrap">{entry.note}</p>
-                            </div>
+                    {(entry.lotArea || entry.note) && (
+                        <div className="bg-zinc-50 dark:bg-white/5 rounded-xl divide-y divide-zinc-200 dark:divide-white/10">
+                            {entry.lotArea && (
+                                <div className="flex items-start gap-3 px-4 py-3">
+                                    <Ruler className="w-4 h-4 text-blue-500 mt-0.5 shrink-0" />
+                                    <div className="min-w-0">
+                                        <p className="text-sm font-medium text-zinc-500 dark:text-white/40 mb-0.5">地段面積</p>
+                                        <p className="text-base text-zinc-700 dark:text-white/80 whitespace-pre-wrap">{entry.lotArea}</p>
+                                    </div>
+                                </div>
+                            )}
+                            {entry.note && (
+                                <div className="flex items-start gap-3 px-4 py-3">
+                                    <StickyNote className="w-4 h-4 text-purple-500 mt-0.5 shrink-0" />
+                                    <div className="min-w-0">
+                                        <p className="text-sm font-medium text-zinc-500 dark:text-white/40 mb-0.5">備註</p>
+                                        <p className="text-base text-zinc-700 dark:text-white/80 whitespace-pre-wrap">{entry.note}</p>
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     )}
                 </div>
@@ -244,7 +281,7 @@ export default function RentalPropertyPage() {
     const GALLERY_VISIBLE = 5;
 
     const lotEntries = useMemo(() => parseLotEntries(property?.lotIndex ?? null), [property?.lotIndex]);
-    const [viewLotEntry, setViewLotEntry] = useState<{ type: 'new' | 'old'; value: string; media?: { u: string; s: number }[]; note?: string } | null>(null);
+    const [viewLotEntry, setViewLotEntry] = useState<{ type: 'new' | 'old'; value: string; media?: { u: string; s: number }[]; note?: string; lotStatus?: LotStatus; lotArea?: string } | null>(null);
 
     // 瀏覽次數
     const [viewCounts, setViewCounts] = useState<ViewCounts>({ viewCount: 0, liveCount: 0 });
@@ -666,15 +703,16 @@ export default function RentalPropertyPage() {
                                                         </div>
                                                     )}
                                                     <div className="flex-1 min-w-0">
-                                                        <div className="flex items-center gap-2 mb-1">
-                                                            <span className={`shrink-0 px-1.5 py-0.5 rounded text-[11px] font-semibold ${entry.type === 'new' ? 'bg-emerald-500/20 text-emerald-600 dark:text-emerald-400' : 'bg-zinc-200 dark:bg-white/10 text-zinc-600 dark:text-white/60'}`}>
-                                                                {entry.type === 'new' ? '新' : '舊'}
-                                                            </span>
-                                                            <span className="text-sm font-semibold text-zinc-900 dark:text-white truncate">{entry.value}</span>
-                                                        </div>
-                                                        {entry.note && (
-                                                            <p className="text-xs text-zinc-500 dark:text-white/40 line-clamp-1">{entry.note}</p>
-                                                        )}
+                                                        <span className={`inline-block px-1.5 py-0.5 rounded text-[11px] font-semibold mb-1 ${
+                                                            entry.lotStatus === 'rented'
+                                                                ? 'bg-amber-500/20 text-amber-600 dark:text-amber-400'
+                                                                : entry.lotStatus === 'renting'
+                                                                ? 'bg-green-500/20 text-green-600 dark:text-green-400'
+                                                                : 'bg-zinc-200 dark:bg-white/10 text-zinc-600 dark:text-white/60'
+                                                        }`}>
+                                                            {entry.lotStatus === 'rented' ? '已出租' : entry.lotStatus === 'renting' ? '出租中' : '未出租'}
+                                                        </span>
+                                                        <p className="text-sm font-semibold text-zinc-900 dark:text-white truncate">{entry.value}</p>
                                                     </div>
                                                     {entry.media && entry.media.length > 0 && (
                                                         <div className="shrink-0 flex items-center gap-1 text-zinc-400 dark:text-white/30 group-hover:text-purple-500 transition-colors">
