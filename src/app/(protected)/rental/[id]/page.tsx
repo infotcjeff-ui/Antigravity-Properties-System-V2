@@ -71,16 +71,17 @@ function StatusBadge({ status }: { status?: string | null }) {
     const statuses = status.split(',').map(s => s.trim()).filter(Boolean).filter(s => s === 'renting');
     if (statuses.length === 0) return null;
     return (
-        <div className="flex flex-wrap gap-1.5">
+        <>
             {statuses.map(s => (
                 <span
                     key={s}
-                    className={`px-3 py-1 rounded-full text-xs font-medium border backdrop-blur-sm ${statusColors[s] || 'bg-zinc-500/20 text-zinc-400'}`}
+                    className={`relative ml-2 sm:ml-3 inline-block px-2 sm:px-3 py-0.5 sm:py-1 rounded-full text-xs sm:text-sm font-semibold border shadow-sm whitespace-nowrap align-middle overflow-hidden ${statusColors[s] || 'bg-zinc-500/20 text-zinc-400'}`}
                 >
-                    {statusLabels[s] || s}
+                    <span className="absolute inset-0 shimmer-overlay opacity-40" />
+                    <span className="relative z-10">{statusLabels[s] || s}</span>
                 </span>
             ))}
-        </div>
+        </>
     );
 }
 
@@ -481,6 +482,22 @@ export default function RentalPropertyPage() {
                                 )}
                             </div>
                             <style jsx global>{`
+                                .shimmer-overlay {
+                                    background: linear-gradient(
+                                        110deg,
+                                        transparent 20%,
+                                        rgba(255, 255, 255, 0.5) 45%,
+                                        rgba(255, 255, 255, 0.8) 50%,
+                                        rgba(255, 255, 255, 0.5) 55%,
+                                        transparent 80%
+                                    );
+                                    background-size: 200% 100%;
+                                    animation: shimmer-slide 3s ease-in-out infinite;
+                                }
+                                @keyframes shimmer-slide {
+                                    0% { background-position: 200% 0; }
+                                    100% { background-position: -200% 0; }
+                                }
                                 .rich-text-content ul {
                                     list-style-type: disc;
                                     margin-left: 1.5rem;
@@ -529,6 +546,22 @@ export default function RentalPropertyPage() {
                                 )}
                             </div>
                             <style jsx global>{`
+                                .shimmer-overlay {
+                                    background: linear-gradient(
+                                        110deg,
+                                        transparent 20%,
+                                        rgba(255, 255, 255, 0.5) 45%,
+                                        rgba(255, 255, 255, 0.8) 50%,
+                                        rgba(255, 255, 255, 0.5) 55%,
+                                        transparent 80%
+                                    );
+                                    background-size: 200% 100%;
+                                    animation: shimmer-slide 3s ease-in-out infinite;
+                                }
+                                @keyframes shimmer-slide {
+                                    0% { background-position: 200% 0; }
+                                    100% { background-position: -200% 0; }
+                                }
                                 .rich-text-content ul {
                                     list-style-type: disc;
                                     margin-left: 1.5rem;
@@ -570,14 +603,10 @@ export default function RentalPropertyPage() {
                 >
                     {/* 名稱與狀態 */}
                     <div>
-                        <div className="flex items-start justify-between gap-4 flex-wrap">
-                            <div>
-                                <h1 className="text-2xl lg:text-3xl font-bold text-zinc-900 dark:text-white">
-                                    {property.name || t('Unnamed Property', '未命名物業')}
-                                </h1>
-                            </div>
+                        <h1 className="text-2xl lg:text-3xl font-bold text-zinc-900 dark:text-white leading-tight">
+                            {property.name || t('Unnamed Property', '未命名物業')}
                             <StatusBadge status={property.status} />
-                        </div>
+                        </h1>
                         {property.type && (
                             <p className="text-sm text-zinc-500 dark:text-white/50 mt-2">
                                 {typeLabels[property.type] || property.type}

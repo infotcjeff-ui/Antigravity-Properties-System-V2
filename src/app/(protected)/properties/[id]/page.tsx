@@ -532,6 +532,22 @@ export default function PropertyDetailsPage() {
                                 )}
                             </div>
                             <style jsx global>{`
+                                .shimmer-overlay {
+                                    background: linear-gradient(
+                                        110deg,
+                                        transparent 20%,
+                                        rgba(255, 255, 255, 0.5) 45%,
+                                        rgba(255, 255, 255, 0.8) 50%,
+                                        rgba(255, 255, 255, 0.5) 55%,
+                                        transparent 80%
+                                    );
+                                    background-size: 200% 100%;
+                                    animation: shimmer-slide 3s ease-in-out infinite;
+                                }
+                                @keyframes shimmer-slide {
+                                    0% { background-position: 200% 0; }
+                                    100% { background-position: -200% 0; }
+                                }
                                 .rich-text-content ul {
                                     list-style-type: disc;
                                     margin-left: 1.5rem;
@@ -592,6 +608,22 @@ export default function PropertyDetailsPage() {
                                 )}
                             </div>
                             <style jsx global>{`
+                                .shimmer-overlay {
+                                    background: linear-gradient(
+                                        110deg,
+                                        transparent 20%,
+                                        rgba(255, 255, 255, 0.5) 45%,
+                                        rgba(255, 255, 255, 0.8) 50%,
+                                        rgba(255, 255, 255, 0.5) 55%,
+                                        transparent 80%
+                                    );
+                                    background-size: 200% 100%;
+                                    animation: shimmer-slide 3s ease-in-out infinite;
+                                }
+                                @keyframes shimmer-slide {
+                                    0% { background-position: 200% 0; }
+                                    100% { background-position: -200% 0; }
+                                }
                                 .rich-text-content ul {
                                     list-style-type: disc;
                                     margin-left: 1.5rem;
@@ -635,14 +667,17 @@ export default function PropertyDetailsPage() {
                     <div className="shrink-0 flex flex-col gap-5">
                     <div className="flex justify-between items-start gap-4">
                         <div className="min-w-0 flex-1">
-                            <h1 className="text-2xl sm:text-3xl font-bold text-zinc-900 dark:text-white leading-tight">{property.name}</h1>
+                            <h1 className="text-2xl sm:text-3xl font-bold text-zinc-900 dark:text-white leading-tight">
+                                {property.name}
+                                <span className={`relative ml-3 inline-block px-3 py-1 rounded-full text-sm font-semibold border shadow-sm whitespace-nowrap align-middle overflow-hidden ${statusColors[property.status]}`}>
+                                    <span className="absolute inset-0 shimmer-overlay opacity-40" />
+                                    <span className="relative z-10">{statusLabels[property.status]}</span>
+                                </span>
+                            </h1>
                             <p className="text-sm text-zinc-500 dark:text-white/50 mt-1">
                                 {t('Code', '編號')}: {property.code}
                             </p>
                         </div>
-                        <span className={`shrink-0 px-4 py-2 rounded-full text-sm font-semibold border shadow-sm whitespace-nowrap ${statusColors[property.status]}`}>
-                            {statusLabels[property.status]}
-                        </span>
                     </div>
 
                     {property.address ? (
