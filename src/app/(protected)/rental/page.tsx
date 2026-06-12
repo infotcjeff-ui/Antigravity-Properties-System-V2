@@ -51,7 +51,7 @@ function parseLotValues(lotIndex: string | null | undefined): string {
             }
             return t;
         })
-        .filter(Boolean)
+        .filter(value => value.startsWith('DD'))
         .join('、');
 }
 
@@ -68,6 +68,19 @@ export default function RentalPage() {
     const [sortOption, setSortOption] = useState<'newest' | 'area_asc' | 'area_desc'>('newest');
     const ITEMS_PER_PAGE = 12;
 
+    const getPropertyCreatedAtTime = (property: Property) => {
+        const createdAt = property.createdAt;
+        if (!createdAt) return 0;
+
+        if (createdAt instanceof Date) {
+            const time = createdAt.getTime();
+            return Number.isNaN(time) ? 0 : time;
+        }
+
+        const time = new Date(createdAt).getTime();
+        return Number.isNaN(time) ? 0 : time;
+    };
+
     const properties = useMemo(() => {
         if (!qProperties) return [];
         const filtered = [...qProperties].filter(p => {
@@ -80,11 +93,7 @@ export default function RentalPage() {
             case 'area_desc':
                 return filtered.sort((a, b) => Number(b.lotArea || 0) - Number(a.lotArea || 0));
             default: // 'newest'
-                return filtered.sort((a, b) => {
-                    const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
-                    const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
-                    return dateB - dateA;
-                });
+                return filtered.sort((a, b) => getPropertyCreatedAtTime(a) - getPropertyCreatedAtTime(b));
         }
     }, [qProperties, sortOption]);
 
@@ -396,8 +405,9 @@ export default function RentalPage() {
                                                                             className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
                                                                         />
                                                                         {isLast && remaining > 0 && (
-                                                                            <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+                                                                            <div className="absolute inset-0 bg-black/50 flex flex-col items-center justify-center gap-1">
                                                                                 <div className="text-white font-semibold text-sm">+{remaining}</div>
+                                                                                <div className="text-white/90 text-xs font-medium">查看所有</div>
                                                                             </div>
                                                                         )}
                                                                         <div className="absolute inset-0 group-hover:bg-black/10 transition-colors" />

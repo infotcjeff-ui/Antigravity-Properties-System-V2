@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { MapContainer, TileLayer, Marker, Popup, Circle, useMap } from 'react-leaflet';
 import L, { LatLngBounds } from 'leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -52,6 +53,7 @@ const createIcon = (color: string) => {
 };
 
 export default function PropertyMap({ properties, onPropertyClick }: PropertyMapProps) {
+    const router = useRouter();
     const { theme } = useTheme();
     const isDark = theme === 'dark';
     const [selectedProperty, setSelectedProperty] = useState<Property | null>(null);
@@ -77,9 +79,9 @@ export default function PropertyMap({ properties, onPropertyClick }: PropertyMap
         : 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
 
     return (
-        <div className="glass-card overflow-hidden bg-white dark:bg-white/5 flex flex-col" style={{ height: '100%' }}>
+        <div className="overflow-hidden bg-white dark:bg-white/5 flex flex-col rounded-2xl" style={{ height: 'calc(100vh - 14rem)', minHeight: '500px' }}>
             {propertiesWithLocation.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-16 text-zinc-400 dark:text-white/40 h-full flex-1">
+                <div className="flex flex-col items-center justify-center py-16 text-zinc-400 dark:text-white/40 flex-1">
                     <svg className="w-16 h-16 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
                     </svg>
@@ -92,6 +94,7 @@ export default function PropertyMap({ properties, onPropertyClick }: PropertyMap
                         center={defaultCenter}
                         zoom={12}
                         scrollWheelZoom={true}
+                        className="h-full! w-full!"
                         style={{ height: '100%', width: '100%', zIndex: 0 }}
                     >
                         <TileLayer
@@ -127,24 +130,46 @@ export default function PropertyMap({ properties, onPropertyClick }: PropertyMap
                                 }}
                             >
                                 <Popup>
-                                    <a
-                                        href="#"
-                                        onClick={(e) => {
-                                            e.preventDefault();
-                                            if (onPropertyClick) onPropertyClick(property);
-                                        }}
-                                        className="block no-underline text-inherit"
-                                    >
                                         <div className="p-1 min-w-50 cursor-pointer">
                                             {property.images && property.images.length > 0 ? (
+                                                // eslint-disable-next-line @next/next/no-img-element
                                                 <img
                                                     src={property.images[0]}
                                                     alt={property.name}
-                                                    className="w-full h-28 object-cover rounded-lg mb-2"
+                                                    className="w-full h-28 object-cover rounded-lg mb-2 cursor-pointer hover:opacity-90 transition-opacity"
+                                                    onClick={() => router.push(`/rental/${property.id}`)}
                                                 />
                                             ) : null}
                                             <h3 className="font-semibold text-base text-zinc-900">{property.name}</h3>
-                                            <p className="text-sm text-zinc-600 mt-1 line-clamp-2">{property.address}</p>
+                                            <div className="flex items-center gap-1 mt-1">
+                                                <svg className="w-3.5 h-3.5 text-zinc-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                                    <path strokeLinecap="round" strokeLinejoin="round" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                                                    <path strokeLinecap="round" strokeLinejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                                                </svg>
+                                                <p className="text-sm text-zinc-600 line-clamp-2">{property.address}</p>
+                                            </div>
+                                            {(property.lotArea || property.lotIndex) && (
+                                                <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-zinc-500">
+                                                    {property.lotArea && (
+                                                        <span className="flex items-center gap-1">
+                                                            <span className="font-medium">面積:</span>
+                                                            <span>{property.lotArea} 平方呎</span>
+                                                        </span>
+                                                    )}
+                                                    {property.lotIndex && (
+                                                        <span className="flex items-center gap-1">
+                                                            <span className="font-medium">地段:</span>
+                                                            <span>共 {
+                                                                property.lotIndex
+                                                                    .split(/\n/)
+                                                                    .map(p => p.trim())
+                                                                    .filter(p => p.length > 0)
+                                                                    .length
+                                                            } 個</span>
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            )}
                                             <div className="mt-3 flex items-center gap-2">
                                                 <span
                                                     className="px-2 py-0.5 rounded text-[10px] font-bold text-white uppercase tracking-wider"
@@ -153,11 +178,13 @@ export default function PropertyMap({ properties, onPropertyClick }: PropertyMap
                                                     {property.status === 'holding' ? '持有中' : property.status === 'renting' ? '出租中' : property.status === 'sold' ? '已售出' : '已暫停'}
                                                 </span>
                                             </div>
-                                            <div className="mt-3 px-2 py-1.5 bg-purple-600 text-white text-xs text-center rounded-lg font-medium">
+                                            <div
+                                                className="mt-3 px-2 py-1.5 bg-purple-600 text-white text-xs text-center rounded-lg font-medium"
+                                                onClick={(e) => { e.stopPropagation(); router.push(`/rental/${property.id}`); }}
+                                            >
                                                 前往詳情
                                             </div>
                                         </div>
-                                    </a>
                                 </Popup>
                             </Marker>
                         ))}
