@@ -114,25 +114,6 @@ export default function ProtectedLayout({
         <ThemeProvider>
             <NotificationProvider>
                 <style jsx global>{`
-                    html, body {
-                        overflow: hidden;
-                        height: 100%;
-                    }
-                    /* 保留滾動功能，只隱藏滾動條 */
-                    .scrollable-x {
-                        scrollbar-width: none; /* Firefox */
-                        -ms-overflow-style: none; /* IE/Edge */
-                    }
-                    .scrollable-x::-webkit-scrollbar {
-                        display: none; /* Chrome/Safari/Opera */
-                    }
-                    .scrollable-y {
-                        scrollbar-width: none;
-                        -ms-overflow-style: none;
-                    }
-                    .scrollable-y::-webkit-scrollbar {
-                        display: none;
-                    }
                     /* 備註專屬滾動條 */
                     .notes-scroll::-webkit-scrollbar {
                         width: 4px;
@@ -167,7 +148,7 @@ export default function ProtectedLayout({
                                 animate={{ opacity: 1, y: 0 }}
                                 exit={{ opacity: 0, y: -10 }}
                                 transition={{ duration: 0.2 }}
-                                className="flex-1 overflow-hidden px-6 pt-6 pb-0"
+                                className="flex-1 overflow-y-auto px-6 pt-6 pb-6"
                             >
                                 {children}
                             </motion.main>

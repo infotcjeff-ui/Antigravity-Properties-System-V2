@@ -97,14 +97,17 @@ export default function AdminLayout({
             </div>
 
             {/* Main Content - No margin on mobile, fixed margin on desktop */}
-            <div className="flex-1 md:ml-[280px] min-h-screen flex flex-col transition-all duration-300">
-                <TopBar
-                    isAuthenticated={isAuthenticated}
-                    isAdmin={true}
-                    placeholder="搜尋物業..."
-                />
+            <div className="flex-1 md:ml-70 min-h-screen flex flex-col transition-all duration-300">
+                {/* TopBar - sticky on desktop so it stays visible while content scrolls */}
+                <div className="md:sticky md:top-0 md:z-30 md:bg-white md:dark:bg-[#0f0f1a]">
+                    <TopBar
+                        isAuthenticated={isAuthenticated}
+                        isAdmin={true}
+                        placeholder="搜尋物業..."
+                    />
+                </div>
 
-                {/* Content */}
+                {/* Content - scrollable with custom inset scrollbar */}
                 <AnimatePresence mode="wait">
                     <motion.main
                         key={pathname}
@@ -112,7 +115,7 @@ export default function AdminLayout({
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0, y: -10 }}
                         transition={{ duration: 0.2 }}
-                        className="p-6"
+                        className="p-6 overflow-y-auto overflow-x-hidden flex-1"
                     >
                         {children}
                     </motion.main>
