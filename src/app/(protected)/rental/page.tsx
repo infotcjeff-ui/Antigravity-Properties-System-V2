@@ -133,10 +133,9 @@ export default function RentalPage() {
     };
 
     return (
-        // On PC: fixed height, no scroll. On mobile: flexible height, can scroll.
-        <div className="flex flex-col min-h-full md:h-full md:overflow-hidden space-y-6 pb-6 md:pb-0">
+        <div className="flex flex-col min-h-full space-y-6 pb-6">
             {/* Page header */}
-            <div className="flex flex-wrap items-center justify-between gap-4 shrink-0">
+            <div className="flex flex-wrap items-center justify-between gap-4">
                 <div>
                     <h1 className="text-3xl font-bold text-zinc-900 dark:text-white flex items-center gap-3">
                         <ArrowUpFromLine className="w-8 h-8" />
@@ -163,7 +162,7 @@ export default function RentalPage() {
                 </div>
 
                 {/* View Toggle */}
-                <div className="flex items-center bg-zinc-100 dark:bg-white/5 rounded-xl p-1 shrink-0">
+                <div className="flex items-center bg-zinc-100 dark:bg-white/5 rounded-xl p-1">
                     <button
                         onClick={() => setViewMode('grid')}
                         className={`px-4 py-2 rounded-lg transition-all flex items-center gap-2 ${viewMode === 'grid'
@@ -200,10 +199,10 @@ export default function RentalPage() {
                 </div>
             </div>
 
-            {/* Content - PC: fills remaining space, no scroll. Mobile: flex grow, can scroll. */}
-            <div className="flex-1 min-h-0 md:min-h-0 flex flex-col">
+            {/* Content */}
+            <div className="flex-1 min-h-0" style={{ minHeight: '600px' }}>
             {qLoading ? (
-                <div className="flex items-center justify-center flex-1">
+                <div className="flex items-center justify-center" style={{ height: '100%' }}>
                     <motion.div
                         animate={{ opacity: [0.3, 1, 0.3] }}
                         transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut" }}
@@ -211,8 +210,8 @@ export default function RentalPage() {
                     />
                 </div>
             ) : viewMode === 'grid' ? (
-                <div className="flex-1 flex flex-col min-h-0">
-                    <div className="flex-1 min-h-0 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 content-start overflow-y-auto">
+                <div className="flex-1 space-y-10 min-h-0">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 h-full content-start">
                         {paginatedProperties.length === 0 ? (
                             <div className="flex flex-col items-center justify-center py-20 text-zinc-400 dark:text-white/20 col-span-full">
                                 <Building2 className="w-16 h-16 mb-4 opacity-50" />
@@ -234,7 +233,7 @@ export default function RentalPage() {
 
                     {/* Pagination UI */}
                     {totalPages > 1 && (
-                        <div className="flex items-center justify-center gap-2 pt-4 border-t border-zinc-100 dark:border-white/5 shrink-0">
+                        <div className="flex items-center justify-center gap-2 pt-4 border-t border-zinc-100 dark:border-white/5">
                             <button
                                 onClick={() => handlePageChange(Math.max(1, currentPage - 1))}
                                 disabled={currentPage === 1}
@@ -284,10 +283,10 @@ export default function RentalPage() {
                     )}
                 </div>
             ) : viewMode === 'list' ? (
-                    <div className="flex flex-col lg:flex-row gap-0 bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-white/10 overflow-hidden flex-1 min-h-0">
+                    <div className="flex flex-col lg:flex-row gap-0 bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-white/10 overflow-hidden min-h-150 lg:h-[calc(100dvh-12rem)] lg:min-h-0">
                     {/* Left: scrollable property list */}
-                    <div className="w-full lg:w-2/5 xl:w-2/5 shrink-0 border-b lg:border-b-0 lg:border-r border-zinc-200 dark:border-white/10 overflow-y-auto">
-                        <div className="px-3 py-2 bg-zinc-50 dark:bg-white/5 sticky top-0 z-10">
+                    <div className="w-full lg:w-2/5 xl:w-2/5 shrink-0 border-b lg:border-b-0 lg:border-r border-zinc-200 dark:border-white/10 overflow-y-auto lg:h-full">
+                        <div className="px-3 py-2 bg-zinc-50 dark:bg-white/5">
                             <div className="flex items-center justify-between">
                                 <p className="text-sm font-semibold text-zinc-600 dark:text-white/60">
                                     {filteredProperties.length} 項出租
@@ -306,7 +305,7 @@ export default function RentalPage() {
                                 </div>
                             </div>
                         </div>
-                        <div className="divide-y divide-zinc-100 dark:divide-white/5">
+                        <div>
                             {filteredProperties.map((property, index) => (
                                 <button
                                     key={property.id}
@@ -361,7 +360,7 @@ export default function RentalPage() {
                     </div>
 
                     {/* Right: property detail panel */}
-                    <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+                    <div className="flex-1 flex flex-col">
                         {selectedPropertyId ? (
                             (() => {
                                 const selected = filteredProperties.find(p => p.id === selectedPropertyId) ?? filteredProperties[0] ?? null;
@@ -374,8 +373,8 @@ export default function RentalPage() {
                                     <>
                                         {/* Image Gallery */}
                                         {hasImages ? (
-                                            <div className="p-4 md:p-6 shrink-0">
-                                                <div className="flex gap-2" style={{ height: 'clamp(200px, 30vh, 360px)' }}>
+                                            <div className="p-6 pt-4">
+                                                <div className="flex gap-2" style={{ height: '360px' }}>
                                                     {/* Main image */}
                                                     <div
                                                         className="flex-1 relative rounded-xl overflow-hidden cursor-pointer group"
@@ -390,7 +389,7 @@ export default function RentalPage() {
                                                     </div>
                                                     {/* Side thumbnails */}
                                                     {selected.images.length > 1 && (
-                                                        <div className="flex flex-col gap-2 w-28 shrink-0">
+                                                        <div className="flex flex-col gap-2 w-28">
                                                             {selected.images.slice(1, 4).map((img, i) => {
                                                                 const isLast = i === Math.min(selected.images!.length - 2, 2);
                                                                 const remaining = selected.images!.length - 4;
@@ -420,15 +419,16 @@ export default function RentalPage() {
                                                 </div>
                                             </div>
                                         ) : (
-                                            <div className="p-4 md:p-6 shrink-0">
-                                                <div className="w-full bg-zinc-100 dark:bg-white/5 flex items-center justify-center rounded-xl" style={{ height: 'clamp(200px, 30vh, 360px)' }}>
+                                            <div className="p-6">
+                                                <div className="w-full bg-zinc-100 dark:bg-white/5 flex items-center justify-center rounded-xl" style={{ height: '360px' }}>
                                                     <Building2 className="w-12 h-12 text-zinc-300 dark:text-white/10" />
                                                 </div>
                                             </div>
                                         )}
 
-                                        {/* Property Details - scrollable if content too tall */}
-                                        <div className="p-4 md:p-6 space-y-4 overflow-y-auto flex-1 min-h-0">
+                                        {/* Property Details */}
+                                        <div className="p-6 space-y-4 overflow-y-auto max-md:overflow-y-visible" style={{ maxHeight: 'calc(100vh - 520px)' }}>
+
                                             {/* Title + Address */}
                                             <div>
                                                 <h2 className="text-xl font-bold text-zinc-900 dark:text-white">
@@ -513,28 +513,26 @@ export default function RentalPage() {
                                         </div>
 
                                         {/* Navigation Footer */}
-                                        <div className="p-4 border-t border-zinc-100 dark:border-white/5 shrink-0">
-                                            <div className="flex items-center justify-between">
-                                                <button
-                                                    onClick={() => prevProperty?.id && setSelectedPropertyId(prevProperty.id)}
-                                                    disabled={nextIndex === 0}
-                                                    className="flex items-center gap-1.5 px-3 py-2 text-sm text-zinc-500 dark:text-white/40 hover:text-zinc-700 dark:hover:text-white disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer transition-colors"
-                                                >
-                                                    <ChevronLeft className="w-4 h-4" />
-                                                    上一項
-                                                </button>
-                                                <span className="text-xs text-zinc-400 dark:text-white/30">
-                                                    {nextIndex + 1} / {filteredProperties.length}
-                                                </span>
-                                                <button
-                                                    onClick={() => nextProperty?.id && setSelectedPropertyId(nextProperty.id)}
-                                                    disabled={nextIndex === filteredProperties.length - 1}
-                                                    className="flex items-center gap-1.5 px-3 py-2 text-sm text-zinc-500 dark:text-white/40 hover:text-zinc-700 dark:hover:text-white disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer transition-colors"
-                                                >
-                                                    下一項
-                                                    <ChevronRight className="w-4 h-4" />
-                                                </button>
-                                            </div>
+                                        <div className="p-4 border-t border-zinc-100 dark:border-white/5 flex items-center justify-between">
+                                            <button
+                                                onClick={() => prevProperty?.id && setSelectedPropertyId(prevProperty.id)}
+                                                disabled={nextIndex === 0}
+                                                className="flex items-center gap-1.5 px-3 py-2 text-sm text-zinc-500 dark:text-white/40 hover:text-zinc-700 dark:hover:text-white disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer transition-colors"
+                                            >
+                                                <ChevronLeft className="w-4 h-4" />
+                                                上一項
+                                            </button>
+                                            <span className="text-xs text-zinc-400 dark:text-white/30">
+                                                {nextIndex + 1} / {filteredProperties.length}
+                                            </span>
+                                            <button
+                                                onClick={() => nextProperty?.id && setSelectedPropertyId(nextProperty.id)}
+                                                disabled={nextIndex === filteredProperties.length - 1}
+                                                className="flex items-center gap-1.5 px-3 py-2 text-sm text-zinc-500 dark:text-white/40 hover:text-zinc-700 dark:hover:text-white disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer transition-colors"
+                                            >
+                                                下一項
+                                                <ChevronRight className="w-4 h-4" />
+                                            </button>
                                         </div>
                                     </>
                                 );
@@ -549,15 +547,13 @@ export default function RentalPage() {
                     </div>
                 </div>
             ) : isAuthenticated ? (
-                <div className="flex-1 min-h-0">
-                    <PropertyMapDynamic
+                <PropertyMapDynamic
                             properties={filteredProperties}
                             onPropertyClick={(property) => {
                                 setViewMode('list');
                                 setSelectedPropertyId(property.id ?? null);
                             }}
                         />
-                </div>
             ) : (
                 <div className="flex flex-col items-center justify-center min-h-[40vh] text-zinc-400 dark:text-white/20">
                     <Map className="w-16 h-16 mb-4 opacity-30" />
