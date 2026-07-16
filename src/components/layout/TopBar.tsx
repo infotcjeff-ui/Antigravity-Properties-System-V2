@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
+import { createPortal } from 'react-dom';
 import { Search, Bell, Check, Trash2, LayoutDashboard, LogIn, LogOut, Database, Cloud, Menu, X, Building2, Users, ArrowUpFromLine, ArrowDownToLine, Network, Settings, FileText, User, TrendingUp } from 'lucide-react';
 import { useNotifications } from '@/contexts/NotificationContext';
 import ThemeToggle from './ThemeToggle';
@@ -135,7 +136,7 @@ export default function TopBar({ onSearch, placeholder = '搜尋...', isAuthenti
                                 <motion.button
                                     whileHover={{ scale: 1.02 }}
                                     whileTap={{ scale: 0.98 }}
-                                    className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-purple-600 to-blue-600 rounded-xl text-white font-medium shadow-lg shadow-purple-500/20 hover:shadow-purple-500/30 transition-shadow"
+                                    className="flex items-center gap-2 px-4 py-2.5 bg-linear-to-r from-purple-600 to-blue-600 rounded-xl text-white font-medium shadow-lg shadow-purple-500/20 hover:shadow-purple-500/30 transition-shadow"
                                 >
                                     <LayoutDashboard className="w-4 h-4" />
                                     <span className="text-base">{isAdmin ? "返回主頁" : "物業管理"}</span>
@@ -160,7 +161,7 @@ export default function TopBar({ onSearch, placeholder = '搜尋...', isAuthenti
                                 <motion.button
                                     whileHover={{ scale: 1.02 }}
                                     whileTap={{ scale: 0.98 }}
-                                    className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-purple-600 to-blue-600 rounded-xl text-white font-medium shadow-lg shadow-purple-500/20 hover:shadow-purple-500/30 transition-shadow"
+                                    className="flex items-center gap-2 px-4 py-2.5 bg-linear-to-r from-purple-600 to-blue-600 rounded-xl text-white font-medium shadow-lg shadow-purple-500/20 hover:shadow-purple-500/30 transition-shadow"
                                 >
                                     <LayoutDashboard className="w-4 h-4" />
                                     <span className="text-base">{isAdmin ? "返回主頁" : "物業管理"}</span>
@@ -184,7 +185,7 @@ export default function TopBar({ onSearch, placeholder = '搜尋...', isAuthenti
                             <motion.button
                                 whileHover={{ scale: 1.02 }}
                                 whileTap={{ scale: 0.98 }}
-                                className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-purple-600 to-blue-600 rounded-xl text-white font-medium shadow-lg shadow-purple-500/20 hover:shadow-purple-500/30 transition-shadow"
+                                className="flex items-center gap-2 px-5 py-2.5 bg-linear-to-r from-purple-600 to-blue-600 rounded-xl text-white font-medium shadow-lg shadow-purple-500/20 hover:shadow-purple-500/30 transition-shadow"
                             >
                                 <LogIn className="w-4 h-4" />
                                 <span className="text-base">登入</span>
@@ -194,7 +195,8 @@ export default function TopBar({ onSearch, placeholder = '搜尋...', isAuthenti
                 </div>
             </motion.div>
 
-            {/* Mobile Side Menu - Moved outside transformed container to fix truncation */}
+            {/* Mobile Side Menu - Using Portal to render outside sticky container */}
+            {typeof document !== 'undefined' && createPortal(
             <AnimatePresence>
                 {showMobileMenu && (
                     <>
@@ -203,45 +205,49 @@ export default function TopBar({ onSearch, placeholder = '搜尋...', isAuthenti
                             animate={{ opacity: 1 }}
                             exit={{ opacity: 0 }}
                             onClick={() => setShowMobileMenu(false)}
-                            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[45] md:hidden"
+                            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-45"
                         />
                         <motion.div
                             initial={{ x: '-100%' }}
                             animate={{ x: 0 }}
                             exit={{ x: '-100%' }}
                             transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-                            className="fixed inset-y-0 left-0 w-[280px] bg-white dark:bg-[#0f0f1a] z-50 md:hidden flex flex-col shadow-2xl overflow-y-auto"
+                            className="fixed inset-0 left-0 right-auto w-70 max-w-[85vw] bg-white dark:bg-[#0f0f1a] z-50 flex flex-col shadow-2xl overflow-hidden"
+                            style={{ paddingTop: 'env(safe-area-inset-top)', paddingBottom: 'env(safe-area-inset-bottom)' }}
                         >
-                            <div className="p-6 border-b border-zinc-200 dark:border-white/5 flex items-center justify-between">
+                            <div className="p-4 pt-6 border-b border-zinc-200 dark:border-white/5 flex items-center justify-between shrink-0">
                                 <div className="flex items-center gap-3">
-                                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 to-blue-600 flex items-center justify-center text-white font-bold">
+                                    <div className="w-10 h-10 rounded-xl bg-linear-to-br from-purple-500 to-blue-600 flex items-center justify-center text-white font-bold">
                                         {isAdmin ? 'B' : 'P'}
                                     </div>
                                     <span className="font-bold text-xl text-zinc-900 dark:text-white">
                                         {isAdmin ? t('Backend', '後台') : 'PMS'}
                                     </span>
                                 </div>
-                                <button onClick={() => setShowMobileMenu(false)} className="p-2 rounded-lg hover:bg-zinc-100 dark:hover:bg-white/5 text-zinc-500">
+                                <button 
+                                    onClick={() => setShowMobileMenu(false)} 
+                                    className="p-2 rounded-lg hover:bg-zinc-100 dark:hover:bg-white/5 text-zinc-500 dark:text-white/70 cursor-pointer"
+                                >
                                     <X className="w-6 h-6" />
                                 </button>
                             </div>
 
-                            <nav className="flex-1 p-4 space-y-1">
+                            <nav className="flex-1 overflow-y-auto p-4 space-y-1">
                                 {isAdmin ? (
                                     <>
-                                        <p className="px-4 text-xs font-medium text-zinc-400 dark:text-white/40 uppercase tracking-widest mb-2 mt-4">管理</p>
-                                        <MobileNavItem href="/dashboard" icon={<LayoutDashboard className="w-6 h-6" />} label="總覽" onClick={() => setShowMobileMenu(false)} />
-                                        <MobileNavItem href="/dashboard/properties" icon={<Building2 className="w-6 h-6" />} label="管理物業" onClick={() => setShowMobileMenu(false)} />
-                                        <MobileNavItem href="/dashboard/tenants" icon={<Users className="w-6 h-6" />} label="管理業主" onClick={() => setShowMobileMenu(false)} />
-                                        <MobileNavItem href="/dashboard/contracts" icon={<FileText className="w-6 h-6" />} label="管理合約" onClick={() => setShowMobileMenu(false)} />
-                                        <MobileNavItem href="/dashboard/rent-out" icon={<ArrowUpFromLine className="w-6 h-6" />} label="管理收租" onClick={() => setShowMobileMenu(false)} />
-                                        <MobileNavItem href="/dashboard/renting" icon={<ArrowDownToLine className="w-6 h-6" />} label="管理交租" onClick={() => setShowMobileMenu(false)} />
-                                        <MobileNavItem href="/dashboard/relations" icon={<Network className="w-6 h-6" />} label="管理關聯" onClick={() => setShowMobileMenu(false)} />
-                                        <MobileNavItem href="/dashboard/management-flow" icon={<TrendingUp className="w-6 h-6" />} label="管理流程" onClick={() => setShowMobileMenu(false)} />
+                                        <p className="px-4 text-xs font-medium text-zinc-400 dark:text-white/40 uppercase tracking-widest mb-2 mt-2">管理</p>
+                                        <MobileNavItem href="/dashboard" icon={<LayoutDashboard className="w-5 h-5" />} label="總覽" onClick={() => setShowMobileMenu(false)} />
+                                        <MobileNavItem href="/dashboard/properties" icon={<Building2 className="w-5 h-5" />} label="管理物業" onClick={() => setShowMobileMenu(false)} />
+                                        <MobileNavItem href="/dashboard/tenants" icon={<Users className="w-5 h-5" />} label="管理業主" onClick={() => setShowMobileMenu(false)} />
+                                        <MobileNavItem href="/dashboard/contracts" icon={<FileText className="w-5 h-5" />} label="管理合約" onClick={() => setShowMobileMenu(false)} />
+                                        <MobileNavItem href="/dashboard/rent-out" icon={<ArrowUpFromLine className="w-5 h-5" />} label="管理收租" onClick={() => setShowMobileMenu(false)} />
+                                        <MobileNavItem href="/dashboard/renting" icon={<ArrowDownToLine className="w-5 h-5" />} label="管理交租" onClick={() => setShowMobileMenu(false)} />
+                                        <MobileNavItem href="/dashboard/relations" icon={<Network className="w-5 h-5" />} label="管理關聯" onClick={() => setShowMobileMenu(false)} />
+                                        <MobileNavItem href="/dashboard/management-flow" icon={<TrendingUp className="w-5 h-5" />} label="管理流程" onClick={() => setShowMobileMenu(false)} />
 
-                                        <p className="px-4 text-xs font-medium text-zinc-400 dark:text-white/40 uppercase tracking-widest mb-2 mt-6">系統</p>
-                                        <MobileNavItem href="/dashboard/users" icon={<Users className="w-6 h-6" />} label="帳號管理" onClick={() => setShowMobileMenu(false)} />
-                                        <MobileNavItem href="/dashboard/settings" icon={<Settings className="w-6 h-6" />} label="系統設定" onClick={() => setShowMobileMenu(false)} />
+                                        <p className="px-4 text-xs font-medium text-zinc-400 dark:text-white/40 uppercase tracking-widest mb-2 mt-4">系統</p>
+                                        <MobileNavItem href="/dashboard/users" icon={<Users className="w-5 h-5" />} label="帳號管理" onClick={() => setShowMobileMenu(false)} />
+                                        <MobileNavItem href="/dashboard/settings" icon={<Settings className="w-5 h-5" />} label="系統設定" onClick={() => setShowMobileMenu(false)} />
                                     </>
                                 ) : (
                                     <>
@@ -260,7 +266,7 @@ export default function TopBar({ onSearch, placeholder = '搜尋...', isAuthenti
                                 )}
                             </nav>
 
-                            <div className="p-4 border-t border-zinc-200 dark:border-white/5 space-y-3">
+                            <div className="p-4 border-t border-zinc-200 dark:border-white/5 space-y-3 shrink-0">
                                 <ThemeToggle className="w-full justify-start px-4 h-11" showLabel />
                                 {isAuthenticated && (
                                     <button
@@ -275,9 +281,12 @@ export default function TopBar({ onSearch, placeholder = '搜尋...', isAuthenti
                         </motion.div>
                     </>
                 )}
-            </AnimatePresence>
+            </AnimatePresence>,
+            document.body
+            )}
 
             {/* 登出確認對話框 */}
+            {typeof document !== 'undefined' && createPortal(
             <AnimatePresence>
                 {showLogoutConfirm && (
                     <>
@@ -286,14 +295,14 @@ export default function TopBar({ onSearch, placeholder = '搜尋...', isAuthenti
                             animate={{ opacity: 1 }}
                             exit={{ opacity: 0 }}
                             onClick={() => setShowLogoutConfirm(false)}
-                            className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[100]"
+                            className="fixed inset-0 bg-black/50 backdrop-blur-sm z-100"
                         />
                         <motion.div
                             initial={{ opacity: 0, scale: 0.92, y: 10 }}
                             animate={{ opacity: 1, scale: 1, y: 0 }}
                             exit={{ opacity: 0, scale: 0.92, y: 10 }}
                             transition={{ type: 'spring', stiffness: 400, damping: 30 }}
-                            className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[min(420px,calc(100vw-32px))] z-[101] bg-white dark:bg-zinc-900 rounded-2xl shadow-2xl border border-zinc-200 dark:border-white/10 overflow-hidden"
+                            className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[min(420px,calc(100vw-32px))] z-101 bg-white dark:bg-zinc-900 rounded-2xl shadow-2xl border border-zinc-200 dark:border-white/10 overflow-hidden"
                         >
                             <div className="p-6 text-center">
                                 <div className="w-16 h-16 rounded-full bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center mx-auto mb-4">
@@ -327,7 +336,9 @@ export default function TopBar({ onSearch, placeholder = '搜尋...', isAuthenti
                         </motion.div>
                     </>
                 )}
-            </AnimatePresence>
+            </AnimatePresence>,
+            document.body
+            )}
         </>
     );
 }
