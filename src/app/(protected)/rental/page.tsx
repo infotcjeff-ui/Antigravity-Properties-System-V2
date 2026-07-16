@@ -200,7 +200,7 @@ export default function RentalPage() {
             </div>
 
             {/* Content */}
-            <div className="flex-1 min-h-0" style={{ minHeight: '600px' }}>
+            <div className="flex-1 min-h-0">
             {qLoading ? (
                 <div className="flex items-center justify-center" style={{ height: '100%' }}>
                     <motion.div
@@ -283,9 +283,9 @@ export default function RentalPage() {
                     )}
                 </div>
             ) : viewMode === 'list' ? (
-                    <div className="flex flex-col lg:flex-row gap-0 bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-white/10 overflow-hidden min-h-150 lg:h-[calc(100dvh-12rem)] lg:min-h-0">
+                    <div className="flex flex-col lg:flex-row gap-0 bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-white/10 overflow-hidden">
                     {/* Left: scrollable property list */}
-                    <div className="w-full lg:w-2/5 xl:w-2/5 shrink-0 border-b lg:border-b-0 lg:border-r border-zinc-200 dark:border-white/10 overflow-y-auto lg:h-full">
+                    <div className="w-full lg:w-2/5 xl:w-2/5 shrink-0 border-b lg:border-b-0 lg:border-r border-zinc-200 dark:border-white/10 overflow-y-auto" style={{ maxHeight: '35vh', lg: { maxHeight: 'none' } }}>
                         <div className="px-3 py-2 bg-zinc-50 dark:bg-white/5">
                             <div className="flex items-center justify-between">
                                 <p className="text-sm font-semibold text-zinc-600 dark:text-white/60">
@@ -360,7 +360,7 @@ export default function RentalPage() {
                     </div>
 
                     {/* Right: property detail panel */}
-                    <div className="flex-1 flex flex-col">
+                    <div className="flex-1 flex flex-col overflow-hidden">
                         {selectedPropertyId ? (
                             (() => {
                                 const selected = filteredProperties.find(p => p.id === selectedPropertyId) ?? filteredProperties[0] ?? null;
@@ -373,8 +373,8 @@ export default function RentalPage() {
                                     <>
                                         {/* Image Gallery */}
                                         {hasImages ? (
-                                            <div className="p-6 pt-4">
-                                                <div className="flex gap-2" style={{ height: '360px' }}>
+                                            <div className="p-3 shrink-0">
+                                                <div className="flex gap-2 h-48 sm:h-56 md:h-64">
                                                     {/* Main image */}
                                                     <div
                                                         className="flex-1 relative rounded-xl overflow-hidden cursor-pointer group"
@@ -389,7 +389,7 @@ export default function RentalPage() {
                                                     </div>
                                                     {/* Side thumbnails */}
                                                     {selected.images.length > 1 && (
-                                                        <div className="flex flex-col gap-2 w-28">
+                                                        <div className="flex flex-col gap-2 w-20 sm:w-24">
                                                             {selected.images.slice(1, 4).map((img, i) => {
                                                                 const isLast = i === Math.min(selected.images!.length - 2, 2);
                                                                 const remaining = selected.images!.length - 4;
@@ -419,22 +419,21 @@ export default function RentalPage() {
                                                 </div>
                                             </div>
                                         ) : (
-                                            <div className="p-6">
-                                                <div className="w-full bg-zinc-100 dark:bg-white/5 flex items-center justify-center rounded-xl" style={{ height: '360px' }}>
+                                            <div className="p-3 shrink-0">
+                                                <div className="w-full bg-zinc-100 dark:bg-white/5 flex items-center justify-center rounded-xl h-48 sm:h-56 md:h-64">
                                                     <Building2 className="w-12 h-12 text-zinc-300 dark:text-white/10" />
                                                 </div>
                                             </div>
                                         )}
 
-                                        {/* Property Details */}
-                                        <div className="p-6 space-y-4 overflow-y-auto max-md:overflow-y-visible" style={{ maxHeight: 'calc(100vh - 520px)' }}>
-
+                                        {/* Property Details - Scrollable */}
+                                        <div className="flex-1 overflow-y-auto p-3 space-y-3">
                                             {/* Title + Address */}
                                             <div>
-                                                <h2 className="text-xl font-bold text-zinc-900 dark:text-white">
+                                                <h2 className="text-lg font-bold text-zinc-900 dark:text-white">
                                                     {selected.name}
                                                 </h2>
-                                                <div className="flex items-start gap-2 mt-2">
+                                                <div className="flex items-start gap-2 mt-1">
                                                     <MapPin className="w-4 h-4 text-purple-500 mt-0.5 shrink-0" />
                                                     <p className="text-sm text-zinc-600 dark:text-white/70">
                                                         {selected.address || '未設定'}
@@ -453,34 +452,34 @@ export default function RentalPage() {
                                             )}
 
                                             {/* Attributes row: Land Use | Area | Type */}
-                                            <div className="flex gap-3">
-                                                <div className="flex items-center gap-2 px-3 py-2 bg-zinc-50 dark:bg-white/5 rounded-xl flex-1">
-                                                    <Tag className="w-4 h-4 text-emerald-500 shrink-0" />
+                                            <div className="grid grid-cols-3 gap-2">
+                                                <div className="flex items-center gap-1.5 px-2 py-2 bg-zinc-50 dark:bg-white/5 rounded-xl">
+                                                    <Tag className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
                                                     <div className="min-w-0">
-                                                        <p className="text-xs text-zinc-400 dark:text-white/40">土地用途</p>
-                                                        <p className="text-sm font-medium text-zinc-700 dark:text-white/80 truncate">
+                                                        <p className="text-[10px] text-zinc-400 dark:text-white/40">土地用途</p>
+                                                        <p className="text-xs font-medium text-zinc-700 dark:text-white/80 truncate">
                                                             {getLandUseDisplay(selected.landUse)}
                                                         </p>
                                                     </div>
                                                 </div>
-                                                <div className="flex items-center gap-2 px-3 py-2 bg-zinc-50 dark:bg-white/5 rounded-xl flex-1">
-                                                    <Maximize2 className="w-4 h-4 text-amber-500 shrink-0" />
+                                                <div className="flex items-center gap-1.5 px-2 py-2 bg-zinc-50 dark:bg-white/5 rounded-xl">
+                                                    <Maximize2 className="w-3.5 h-3.5 text-amber-500 shrink-0" />
                                                     <div className="min-w-0">
-                                                        <p className="text-xs text-zinc-400 dark:text-white/40">總面積</p>
-                                                        <p className="text-sm font-medium text-zinc-700 dark:text-white/80 truncate">
-                                                            {selected.lotArea ? `${selected.lotArea} 平方呎` : '未設定'}
+                                                        <p className="text-[10px] text-zinc-400 dark:text-white/40">面積</p>
+                                                        <p className="text-xs font-medium text-zinc-700 dark:text-white/80 truncate">
+                                                            {selected.lotArea ? `${selected.lotArea}呎` : '未設定'}
                                                         </p>
                                                     </div>
                                                 </div>
-                                                <div className="flex items-center gap-2 px-3 py-2 bg-zinc-50 dark:bg-white/5 rounded-xl flex-1">
-                                                    <Building2 className="w-4 h-4 text-cyan-500 shrink-0" />
+                                                <div className="flex items-center gap-1.5 px-2 py-2 bg-zinc-50 dark:bg-white/5 rounded-xl">
+                                                    <Building2 className="w-3.5 h-3.5 text-cyan-500 shrink-0" />
                                                     <div className="min-w-0">
-                                                        <p className="text-xs text-zinc-400 dark:text-white/40">類型</p>
-                                                        <p className="text-sm font-medium text-zinc-700 dark:text-white/80 truncate">
+                                                        <p className="text-[10px] text-zinc-400 dark:text-white/40">類型</p>
+                                                        <p className="text-xs font-medium text-zinc-700 dark:text-white/80 truncate">
                                                             {selected.type === 'group_asset' ? '集團資產'
-                                                                : selected.type === 'co_investment' ? '合資投資'
-                                                                : selected.type === 'external_lease' ? '外部租賃'
-                                                                : selected.type === 'managed_asset' ? '管理資產'
+                                                                : selected.type === 'co_investment' ? '合資'
+                                                                : selected.type === 'external_lease' ? '外部'
+                                                                : selected.type === 'managed_asset' ? '管理'
                                                                 : selected.type || '未設定'}
                                                         </p>
                                                     </div>
@@ -489,12 +488,12 @@ export default function RentalPage() {
 
                                             {/* Notes */}
                                             {selected.notes && (
-                                                <div className="px-3 py-2 bg-amber-50 dark:bg-amber-500/10 rounded-xl">
+                                                <div className="px-2 py-2 bg-amber-50 dark:bg-amber-500/10 rounded-xl">
                                                     <div className="flex items-start gap-2">
                                                         <ArrowUpFromLine className="w-4 h-4 text-amber-500 mt-0.5 shrink-0" />
                                                         <div className="min-w-0">
                                                             <p className="text-xs text-amber-600 dark:text-amber-400 font-medium">備註</p>
-                                                            <p className="text-sm text-amber-700 dark:text-amber-300/80 whitespace-pre-wrap wrap-break-word mt-0.5">
+                                                            <p className="text-xs text-amber-700 dark:text-amber-300/80 whitespace-pre-wrap wrap-break-word mt-0.5">
                                                                 {selected.notes.replace(/<[^>]*>/g, '')}
                                                             </p>
                                                         </div>
@@ -505,7 +504,7 @@ export default function RentalPage() {
                                             {/* View Detail Button */}
                                             <Link
                                                 href={`/rental/${selected.id}`}
-                                                className="flex items-center justify-center gap-2 w-full py-3 bg-purple-500 hover:bg-purple-600 text-white text-sm font-semibold rounded-xl transition-colors"
+                                                className="flex items-center justify-center gap-2 w-full py-2.5 bg-purple-500 hover:bg-purple-600 text-white text-sm font-semibold rounded-xl transition-colors"
                                             >
                                                 查看詳情
                                                 <ArrowRight className="w-4 h-4" />
@@ -513,11 +512,11 @@ export default function RentalPage() {
                                         </div>
 
                                         {/* Navigation Footer */}
-                                        <div className="p-4 border-t border-zinc-100 dark:border-white/5 flex items-center justify-between">
+                                        <div className="p-3 border-t border-zinc-100 dark:border-white/5 bg-white dark:bg-zinc-900 shrink-0 flex items-center justify-between">
                                             <button
                                                 onClick={() => prevProperty?.id && setSelectedPropertyId(prevProperty.id)}
                                                 disabled={nextIndex === 0}
-                                                className="flex items-center gap-1.5 px-3 py-2 text-sm text-zinc-500 dark:text-white/40 hover:text-zinc-700 dark:hover:text-white disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer transition-colors"
+                                                className="flex items-center gap-1 px-2 py-1.5 text-sm text-zinc-500 dark:text-white/40 hover:text-zinc-700 dark:hover:text-white disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer transition-colors"
                                             >
                                                 <ChevronLeft className="w-4 h-4" />
                                                 上一項
@@ -528,7 +527,7 @@ export default function RentalPage() {
                                             <button
                                                 onClick={() => nextProperty?.id && setSelectedPropertyId(nextProperty.id)}
                                                 disabled={nextIndex === filteredProperties.length - 1}
-                                                className="flex items-center gap-1.5 px-3 py-2 text-sm text-zinc-500 dark:text-white/40 hover:text-zinc-700 dark:hover:text-white disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer transition-colors"
+                                                className="flex items-center gap-1 px-2 py-1.5 text-sm text-zinc-500 dark:text-white/40 hover:text-zinc-700 dark:hover:text-white disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer transition-colors"
                                             >
                                                 下一項
                                                 <ChevronRight className="w-4 h-4" />
@@ -538,7 +537,7 @@ export default function RentalPage() {
                                 );
                             })()
                         ) : (
-                            <div className="flex-1 flex flex-col items-center justify-center p-12 text-zinc-400 dark:text-white/20">
+                            <div className="flex-1 flex flex-col items-center justify-center p-8 text-zinc-400 dark:text-white/20">
                                 <Building2 className="w-16 h-16 mb-4 opacity-30" />
                                 <p className="text-lg font-medium">選擇左側物业查看詳情</p>
                                 <p className="text-sm mt-2 opacity-60">點擊列表中的項目以預覽詳情</p>

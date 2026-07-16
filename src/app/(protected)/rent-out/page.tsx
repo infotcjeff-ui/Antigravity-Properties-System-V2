@@ -123,18 +123,18 @@ export default function RentOutPage() {
     return (
         <div className="space-y-6">
             {/* Page header */}
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                 <div>
                     <h1 className="text-2xl font-bold text-zinc-900 dark:text-white">收租管理</h1>
                     <p className="text-zinc-500 dark:text-white/50 mt-1">管理物业的租金收入与合约记录</p>
                 </div>
-                <div className="flex items-center gap-3">
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3 w-full sm:w-auto">
                     {/* Contract Button - Amber/Orange */}
                     <motion.button
                         whileHover={{ scale: 1.02 }}
                         whileTap={{ scale: 0.98 }}
                         onClick={() => setShowContractModal(true)}
-                        className="px-4 py-2.5 bg-gradient-to-r from-amber-500 to-orange-500 rounded-xl text-white font-medium shadow-lg shadow-amber-500/20 flex items-center gap-2"
+                        className="px-4 py-2.5 bg-linear-to-r from-amber-500 to-orange-500 rounded-xl text-white font-medium shadow-lg shadow-amber-500/20 flex items-center gap-2"
                     >
                         <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -309,7 +309,8 @@ export default function RentOutPage() {
                                 <p className="text-sm mt-1">請調整上方篩選條件</p>
                             </div>
                         ) : (
-                    <table className="w-full">
+                            <div className="overflow-x-auto -mx-4 px-4">
+                            <table className="w-full min-w-175">
                         <thead>
                             <tr className="text-left text-zinc-500 dark:text-white/50 text-sm border-b border-zinc-100 dark:border-white/5">
                                 <th className="p-4 font-medium">物業</th>
@@ -389,6 +390,7 @@ export default function RentOutPage() {
                             })}
                         </tbody>
                     </table>
+                            </div>
                         )}
                     </>
                 )}
@@ -414,7 +416,8 @@ export default function RentOutPage() {
                         <p className="text-sm mt-1">點擊上方「新增合約記錄」按鈕以開始管理</p>
                     </div>
                 ) : (
-                    <table className="w-full">
+                    <div className="overflow-x-auto -mx-4 px-4">
+                    <table className="w-full min-w-175">
                         <thead>
                             <tr className="text-left text-zinc-500 dark:text-white/50 text-sm border-b border-amber-200 dark:border-amber-500/20">
                                 <th className="p-4 font-medium">物業</th>
@@ -477,6 +480,7 @@ export default function RentOutPage() {
                             })}
                         </tbody>
                     </table>
+                    </div>
                 )}
             </div>
 

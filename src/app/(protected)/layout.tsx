@@ -129,29 +129,49 @@ export default function ProtectedLayout({
                         scrollbar-width: thin;
                         scrollbar-color: #a855f7 transparent;
                     }
+                    
+                    /* 隱藏全域 scrollbar - 只在內容區域顯示 */
+                    .app-scroll-container::-webkit-scrollbar {
+                        width: 6px;
+                    }
+                    .app-scroll-container::-webkit-scrollbar-track {
+                        background: transparent;
+                    }
+                    .app-scroll-container::-webkit-scrollbar-thumb {
+                        background: rgba(0,0,0,0.15);
+                        border-radius: 3px;
+                    }
+                    .app-scroll-container::-webkit-scrollbar-thumb:hover {
+                        background: rgba(0,0,0,0.25);
+                    }
                 `}</style>
-                <div className="h-screen overflow-hidden bg-background text-foreground transition-colors duration-300 flex flex-col md:flex-row">
+                <div className="min-h-screen bg-background text-foreground transition-colors duration-300 flex flex-col md:flex-row">
                     {/* Sidebar - Hidden on mobile, fixed on desktop */}
                     <div className="hidden md:block shrink-0">
                         <Sidebar isAuthenticated={isAuthenticated} />
                     </div>
 
-                    <div className="flex-1 md:ml-70 flex flex-col overflow-hidden transition-all duration-300">
-                        <TopBar
-                            isAuthenticated={isAuthenticated}
-                            placeholder="搜尋物業..."
-                        />
+                    <div className="flex-1 md:ml-70 flex flex-col transition-all duration-300">
                         <AnimatePresence mode="wait">
-                            <motion.main
+                            <motion.div
                                 key={pathname}
                                 initial={{ opacity: 0, y: 10 }}
                                 animate={{ opacity: 1, y: 0 }}
                                 exit={{ opacity: 0, y: -10 }}
                                 transition={{ duration: 0.2 }}
-                                className="flex-1 overflow-y-auto px-6 pt-6 pb-6"
+                                className="flex-1"
                             >
-                                {children}
-                            </motion.main>
+                                {/* TopBar - Sticky on mobile */}
+                                <div className="sticky top-0 z-30 bg-background/95 backdrop-blur-sm">
+                                    <TopBar
+                                        isAuthenticated={isAuthenticated}
+                                        placeholder="搜尋物業..."
+                                    />
+                                </div>
+                                <div className="px-4 md:px-6 pt-4 md:pt-6 pb-8 md:pb-6">
+                                    {children}
+                                </div>
+                            </motion.div>
                         </AnimatePresence>
                     </div>
                 </div>
