@@ -2573,6 +2573,8 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                                                                 electricMeterMedia: entry.electricMeterMedia || [],
                                                                 waterMeterNote: entry.waterMeterNote || '',
                                                                 electricMeterNote: entry.electricMeterNote || '',
+                                                                startDate: entry.startDate || '',
+                                                                endDate: entry.endDate || '',
                                                             });
                                                             setLotHistoryAlbumFormOpen(true);
                                                         }}
