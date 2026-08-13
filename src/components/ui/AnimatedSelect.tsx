@@ -18,6 +18,7 @@ interface AnimatedSelectProps {
     className?: string;
     disabled?: boolean;
     name?: string;
+    clearable?: boolean;
 }
 
 /** 高於 RentOutFormModal 等 overlay（z-70） */
@@ -31,6 +32,7 @@ export default function AnimatedSelect({
     className = '',
     disabled = false,
     name,
+    clearable = false,
 }: AnimatedSelectProps) {
     const [isOpen, setIsOpen] = useState(false);
     const [mounted, setMounted] = useState(false);
@@ -152,9 +154,24 @@ export default function AnimatedSelect({
                 <span className={selectedOption ? '' : 'text-zinc-400 dark:text-white/40'}>
                     {selectedOption ? selectedOption.label : placeholder}
                 </span>
-                <motion.div animate={{ rotate: isOpen ? 180 : 0 }} transition={{ duration: 0.2 }}>
-                    <ChevronDown className="w-4 h-4 text-zinc-400 dark:text-white/40" />
-                </motion.div>
+                <div className="flex items-center gap-2">
+                    {clearable && value && (
+                        <div
+                            role="button"
+                            tabIndex={0}
+                            onClick={(e) => { e.stopPropagation(); onChange(''); }}
+                            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.stopPropagation(); onChange(''); } }}
+                            className="p-0.5 rounded hover:bg-zinc-200 dark:hover:bg-white/10 text-zinc-400 hover:text-zinc-600 dark:hover:text-white/70 cursor-pointer"
+                        >
+                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                        </div>
+                    )}
+                    <motion.div animate={{ rotate: isOpen ? 180 : 0 }} transition={{ duration: 0.2 }}>
+                        <ChevronDown className="w-4 h-4 text-zinc-400 dark:text-white/40" />
+                    </motion.div>
+                </div>
             </motion.button>
 
             {mounted && menuContent ? createPortal(menuContent, document.body) : null}

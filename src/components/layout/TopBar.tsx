@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { createPortal } from 'react-dom';
-import { Search, Bell, Check, Trash2, LayoutDashboard, LogIn, LogOut, Database, Cloud, Menu, X, Building2, Users, ArrowUpFromLine, ArrowDownToLine, Network, Settings, FileText, User, TrendingUp } from 'lucide-react';
+import { Search, Bell, Check, Trash2, LayoutDashboard, LogIn, LogOut, Database, Cloud, Menu, X, Building2, Users, ArrowUpFromLine, ArrowDownToLine, Network, Settings, FileText, User, TrendingUp, ChevronDown, ScrollText } from 'lucide-react';
 import { useNotifications } from '@/contexts/NotificationContext';
 import ThemeToggle from './ThemeToggle';
 import { useLanguage } from '@/components/common/LanguageSwitcher';
@@ -238,10 +238,13 @@ export default function TopBar({ onSearch, placeholder = '搜尋...', isAuthenti
                                         <p className="px-4 text-xs font-medium text-zinc-400 dark:text-white/40 uppercase tracking-widest mb-2 mt-2">管理</p>
                                         <MobileNavItem href="/dashboard" icon={<LayoutDashboard className="w-5 h-5" />} label="總覽" onClick={() => setShowMobileMenu(false)} />
                                         <MobileNavItem href="/dashboard/properties" icon={<Building2 className="w-5 h-5" />} label="管理物業" onClick={() => setShowMobileMenu(false)} />
-                                        <MobileNavItem href="/dashboard/tenants" icon={<Users className="w-5 h-5" />} label="管理業主" onClick={() => setShowMobileMenu(false)} />
-                                        <MobileNavItem href="/dashboard/contracts" icon={<FileText className="w-5 h-5" />} label="管理合約" onClick={() => setShowMobileMenu(false)} />
-                                        <MobileNavItem href="/dashboard/rent-out" icon={<ArrowUpFromLine className="w-5 h-5" />} label="管理收租" onClick={() => setShowMobileMenu(false)} />
-                                        <MobileNavItem href="/dashboard/renting" icon={<ArrowDownToLine className="w-5 h-5" />} label="管理交租" onClick={() => setShowMobileMenu(false)} />
+                                        <MobileNavItem href="/dashboard/tenants" icon={<Users className="w-5 h-5" />} label="管理客戶" onClick={() => setShowMobileMenu(false)} />
+                                        <MobileNavGroup label="管理租約" icon={<ScrollText className="w-5 h-5" />} defaultOpen>
+                                            <MobileNavItem href="/dashboard/leases" icon={<ScrollText className="w-4 h-4" />} label="租約總覽" onClick={() => setShowMobileMenu(false)} indent />
+                                            <MobileNavItem href="/dashboard/contracts" icon={<FileText className="w-4 h-4" />} label="管理合約" onClick={() => setShowMobileMenu(false)} indent />
+                                            <MobileNavItem href="/dashboard/rent-out" icon={<ArrowUpFromLine className="w-4 h-4" />} label="管理收租" onClick={() => setShowMobileMenu(false)} indent />
+                                            <MobileNavItem href="/dashboard/renting" icon={<ArrowDownToLine className="w-4 h-4" />} label="管理交租" onClick={() => setShowMobileMenu(false)} indent />
+                                        </MobileNavGroup>
                                         <MobileNavItem href="/dashboard/relations" icon={<Network className="w-5 h-5" />} label="管理關聯" onClick={() => setShowMobileMenu(false)} />
                                         <MobileNavItem href="/dashboard/management-flow" icon={<TrendingUp className="w-5 h-5" />} label="管理流程" onClick={() => setShowMobileMenu(false)} />
 
@@ -343,17 +346,48 @@ export default function TopBar({ onSearch, placeholder = '搜尋...', isAuthenti
     );
 }
 
-function MobileNavItem({ href, icon, label, onClick }: { href: string; icon: React.ReactNode; label: string; onClick: () => void }) {
+function MobileNavItem({ href, icon, label, onClick, indent }: { href: string; icon: React.ReactNode; label: string; onClick: () => void; indent?: boolean }) {
     return (
         <Link
             href={href}
             onClick={onClick}
-            className="flex items-center gap-4 px-4 py-3.5 rounded-2xl text-zinc-600 dark:text-white/70 hover:bg-zinc-100 dark:hover:bg-white/5 transition-all active:scale-[0.98]"
+            className={`flex items-center gap-4 px-4 py-3.5 rounded-2xl transition-all active:scale-[0.98] ${indent ? 'pl-12 text-base' : 'text-zinc-600 dark:text-white/70 hover:bg-zinc-100 dark:hover:bg-white/5'}`}
         >
             <div className="p-2 rounded-xl bg-zinc-100 dark:bg-white/5 border border-zinc-200 dark:border-white/10 text-zinc-500 dark:text-white/40 group-hover:text-purple-500 transition-colors">
                 {icon}
             </div>
             <span className="font-semibold text-lg tracking-tight leading-snug">{label}</span>
         </Link>
+    );
+}
+
+function MobileNavGroup({ label, icon, children, defaultOpen }: { label: string; icon: React.ReactNode; children: React.ReactNode; defaultOpen?: boolean }) {
+    const [isOpen, setIsOpen] = useState(defaultOpen ?? false);
+    return (
+        <div>
+            <button
+                onClick={() => setIsOpen(!isOpen)}
+                className="w-full flex items-center gap-4 px-4 py-3.5 rounded-2xl text-zinc-600 dark:text-white/70 hover:bg-zinc-100 dark:hover:bg-white/5 transition-all cursor-pointer"
+            >
+                <div className="p-2 rounded-xl bg-zinc-100 dark:bg-white/5 border border-zinc-200 dark:border-white/10 text-zinc-500 dark:text-white/40">
+                    {icon}
+                </div>
+                <span className="flex-1 font-semibold text-lg tracking-tight leading-snug text-left">{label}</span>
+                <ChevronDown className={`w-5 h-5 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+            </button>
+            <AnimatePresence>
+                {isOpen && (
+                    <motion.div
+                        initial={{ height: 0, opacity: 0 }}
+                        animate={{ height: 'auto', opacity: 1 }}
+                        exit={{ height: 0, opacity: 0 }}
+                        transition={{ duration: 0.2 }}
+                        className="overflow-hidden"
+                    >
+                        <div className="mt-1 space-y-0.5">{children}</div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+        </div>
     );
 }

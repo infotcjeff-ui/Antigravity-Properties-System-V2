@@ -188,6 +188,9 @@ export interface MediaItem {
 
 export type LotStatus = 'renting' | 'rented';
 
+/** 合約狀態 */
+export type LotContractStatus = 'ongoing' | 'expiring' | 'not_renewing';
+
 export interface LotEntry {
     type: 'new' | 'old';
     value: string;
@@ -195,6 +198,14 @@ export interface LotEntry {
     note?: string;
     lotStatus?: LotStatus;
     lotArea?: string;
+    waterMeter?: boolean;
+    electricMeter?: boolean;
+    waterMeterMedia?: MediaItem[];
+    electricMeterMedia?: MediaItem[];
+    waterMeterNote?: string;
+    electricMeterNote?: string;
+    lotTenantId?: string;
+    contractStatus?: LotContractStatus;
 }
 
 /** Parse lotIndex string into LotEntry array. Handles legacy format. */
@@ -205,13 +216,26 @@ export function parseLotEntries(lotIndex: string | null | undefined): LotEntry[]
         // 新格式：JSON
         if (t.startsWith('{')) {
             try {
-                const obj = JSON.parse(t) as { t?: string; v?: string; m?: MediaItem[] | string[]; n?: string; s?: string; a?: string };
+                const obj = JSON.parse(t) as {
+                    t?: string; v?: string; m?: MediaItem[] | string[]; n?: string;
+                    s?: string; a?: string; w?: boolean; e?: boolean;
+                    wm?: MediaItem[]; em?: MediaItem[]; wn?: string; en?: string;
+                    ti?: string; cs?: string;
+                };
                 // 兼容舊格式 m: ["url1", "url2"] → 轉成 [{u, s:0}]
                 const media: MediaItem[] | undefined = obj.m ? (
                     typeof obj.m[0] === 'string'
                         ? (obj.m as string[]).map(u => ({ u, s: 0 }))
                         : obj.m as MediaItem[]
                 ) : undefined;
+                // 兼容 wm/em 的舊格式
+                const parseMedia = (arr: MediaItem[] | string[] | undefined): MediaItem[] | undefined => {
+                    if (!arr) return undefined;
+                    if (typeof arr[0] === 'string') {
+                        return (arr as string[]).map(u => ({ u, s: 0 }));
+                    }
+                    return arr as MediaItem[];
+                };
                 return {
                     type: (obj.t === '舊' ? 'old' : 'new') as 'new' | 'old',
                     value: obj.v || '',
@@ -219,6 +243,14 @@ export function parseLotEntries(lotIndex: string | null | undefined): LotEntry[]
                     note: obj.n,
                     lotStatus: (obj.s === '已出租' ? 'rented' : obj.s === '出租中' ? 'renting' : undefined) as LotStatus | undefined,
                     lotArea: obj.a,
+                    waterMeter: obj.w,
+                    electricMeter: obj.e,
+                    waterMeterMedia: parseMedia(obj.wm),
+                    electricMeterMedia: parseMedia(obj.em),
+                    waterMeterNote: obj.wn,
+                    electricMeterNote: obj.en,
+                    lotTenantId: obj.ti,
+                    contractStatus: (obj.cs as LotContractStatus) || undefined,
                 };
             } catch {
                 // fall through to legacy
@@ -241,6 +273,14 @@ export function serializeLotEntries(entries: LotEntry[]): string {
             n: e.note || undefined,
             s: e.lotStatus === 'rented' ? '已出租' : e.lotStatus === 'renting' ? '出租中' : undefined,
             a: e.lotArea || undefined,
+            w: e.waterMeter || undefined,
+            e: e.electricMeter || undefined,
+            wm: (e.waterMeterMedia?.length ?? 0) > 0 ? e.waterMeterMedia : undefined,
+            em: (e.electricMeterMedia?.length ?? 0) > 0 ? e.electricMeterMedia : undefined,
+            wn: e.waterMeterNote || undefined,
+            en: e.electricMeterNote || undefined,
+            ti: e.lotTenantId || undefined,
+            cs: e.contractStatus || undefined,
         })
     ).join('\n');
 }

@@ -14,8 +14,11 @@ const spaceGrotesk = Space_Grotesk({
 });
 
 export const metadata: Metadata = {
-  title: "Property Management System | 物業管理系統",
+  title: "EasyParking 泊車易 | 物業管理系統",
   description: "A modern property management SaaS system for managing properties, rents, and proprietors.",
+  icons: {
+    icon: "/sitelogo/EasyParking - 512x512-01.png",
+  },
 };
 
 export default function RootLayout({

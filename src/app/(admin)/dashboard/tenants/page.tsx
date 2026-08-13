@@ -237,6 +237,19 @@ export default function TenantsPage() {
         }
     };
 
+    const getPageTitle = () => {
+        switch (activeTab) {
+            case 'owners':
+                return '管理業主';
+            case 'lessees':
+                return '管理承租人';
+            case 'sub_landlords':
+                return '管理二房東';
+            case 'current_tenants':
+                return '管理現時租客';
+        }
+    };
+
     const stats = getStats();
 
     return (
@@ -245,7 +258,7 @@ export default function TenantsPage() {
             <div>
                 <h1 className="text-2xl font-bold text-zinc-900 dark:text-white flex items-center gap-2 tracking-tight">
                     <Users className="w-6 h-6 text-purple-500 shrink-0" />
-                    管理業主
+                    {getPageTitle()}
                 </h1>
                 <p className="text-sm text-zinc-500 dark:text-white/55 mt-1">管理業主、承租人、二房東與現時租客</p>
             </div>

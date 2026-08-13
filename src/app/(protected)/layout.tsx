@@ -151,16 +151,16 @@ export default function ProtectedLayout({
                         <Sidebar isAuthenticated={isAuthenticated} />
                     </div>
 
-                    <div className="flex-1 md:ml-70 flex flex-col transition-all duration-300">
-                        <AnimatePresence mode="wait">
-                            <motion.div
-                                key={pathname}
-                                initial={{ opacity: 0, y: 10 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                exit={{ opacity: 0, y: -10 }}
-                                transition={{ duration: 0.2 }}
-                                className="flex-1"
-                            >
+                <div className="flex-1 md:ml-70 flex flex-col transition-all duration-300 min-h-screen">
+                    <AnimatePresence mode="wait">
+                        <motion.div
+                            key={pathname}
+                            initial={{ opacity: 0, y: 10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: -10 }}
+                            transition={{ duration: 0.2 }}
+                            className="flex-1 flex flex-col"
+                        >
                                 {/* TopBar - Sticky on mobile */}
                                 <div className="sticky top-0 z-30 bg-background/95 backdrop-blur-sm">
                                     <TopBar

@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
-import { Eye, EyeOff, Building2 } from 'lucide-react';
+import { Eye, EyeOff } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 
 export default function LoginPage() {
@@ -83,11 +83,14 @@ export default function LoginPage() {
                 <div className="backdrop-blur-xl bg-white/70 dark:bg-white/10 border border-zinc-200 dark:border-white/20 rounded-3xl p-8 shadow-2xl">
                     {/* Logo */}
                     <div className="flex flex-col items-center mb-8">
-                        <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-purple-500 to-blue-600 flex items-center justify-center shadow-lg shadow-purple-500/30 mb-4">
-                            <Building2 className="w-8 h-8 text-white" />
-                        </div>
-                        <h1 className="text-2xl font-bold text-zinc-900 dark:text-white">物業管理系統</h1>
-                        <p className="text-zinc-500 dark:text-white/50 text-sm mt-1">Property Management System</p>
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                            src="/sitelogo/EasyParking - 橫.png"
+                            alt="EasyParking"
+                            className="w-48 object-contain mb-4"
+                        />
+                        <h1 className="text-2xl font-bold text-zinc-900 dark:text-white">泊車易管理系統</h1>
+                        <p className="text-zinc-500 dark:text-white/50 text-sm mt-1">EasyParking Management System</p>
                     </div>
 
                     <form onSubmit={handleSubmit} className="space-y-5">

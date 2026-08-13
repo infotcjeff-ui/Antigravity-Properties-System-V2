@@ -133,9 +133,9 @@ export default function RentalPage() {
     };
 
     return (
-        <div className="flex flex-col min-h-full space-y-6 pb-6">
+        <div className="flex flex-col h-[calc(100dvh-7rem)] space-y-3 pb-1">
             {/* Page header */}
-            <div className="flex flex-wrap items-center justify-between gap-4">
+            <div className="flex flex-wrap items-center justify-between gap-4 shrink-0">
                 <div>
                     <h1 className="text-3xl font-bold text-zinc-900 dark:text-white flex items-center gap-3">
                         <ArrowUpFromLine className="w-8 h-8" />
@@ -283,7 +283,7 @@ export default function RentalPage() {
                     )}
                 </div>
             ) : viewMode === 'list' ? (
-                    <div className="flex flex-col lg:flex-row gap-0 bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-white/10 overflow-hidden">
+                    <div className="flex flex-col lg:flex-row flex-1 min-h-0 gap-0 bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-white/10 overflow-hidden">
                     {/* Left: scrollable property list */}
                     <div className="w-full lg:w-2/5 xl:w-2/5 shrink-0 border-b lg:border-b-0 lg:border-r border-zinc-200 dark:border-white/10 overflow-y-auto max-h-[35vh] lg:max-h-none" style={{ maxHeight: '35vh' }}>
                         <div className="px-3 py-2 bg-zinc-50 dark:bg-white/5">
@@ -360,7 +360,7 @@ export default function RentalPage() {
                     </div>
 
                     {/* Right: property detail panel */}
-                    <div className="flex-1 flex flex-col overflow-hidden">
+                    <div className="flex-1 flex flex-col overflow-hidden min-h-0">
                         {selectedPropertyId ? (
                             (() => {
                                 const selected = filteredProperties.find(p => p.id === selectedPropertyId) ?? filteredProperties[0] ?? null;
@@ -371,10 +371,10 @@ export default function RentalPage() {
                                 const prevProperty = filteredProperties[nextIndex - 1];
                                 return (
                                     <>
-                                        {/* Image Gallery */}
+                                        {/* Image Gallery - fixed height */}
                                         {hasImages ? (
-                                            <div className="p-3 shrink-0">
-                                                <div className="flex gap-2 h-48 sm:h-56 md:h-64">
+                                            <div className="px-4 pt-4 shrink-0">
+                                                <div className="flex gap-2 h-[36vh] lg:h-[38vh]">
                                                     {/* Main image */}
                                                     <div
                                                         className="flex-1 relative rounded-xl overflow-hidden cursor-pointer group"
@@ -389,7 +389,7 @@ export default function RentalPage() {
                                                     </div>
                                                     {/* Side thumbnails */}
                                                     {selected.images.length > 1 && (
-                                                        <div className="flex flex-col gap-2 w-20 sm:w-24">
+                                                        <div className="flex flex-col gap-2 w-24 sm:w-28 md:w-32">
                                                             {selected.images.slice(1, 4).map((img, i) => {
                                                                 const isLast = i === Math.min(selected.images!.length - 2, 2);
                                                                 const remaining = selected.images!.length - 4;
@@ -406,8 +406,8 @@ export default function RentalPage() {
                                                                         />
                                                                         {isLast && remaining > 0 && (
                                                                             <div className="absolute inset-0 bg-black/50 flex flex-col items-center justify-center gap-1">
-                                                                                <div className="text-white font-semibold text-sm">+{remaining}</div>
-                                                                                <div className="text-white/90 text-xs font-medium">查看所有</div>
+                                                                                <div className="text-white font-semibold text-base">+{remaining}</div>
+                                                                                <div className="text-white/90 text-sm font-medium">查看所有</div>
                                                                             </div>
                                                                         )}
                                                                         <div className="absolute inset-0 group-hover:bg-black/10 transition-colors" />
@@ -419,118 +419,110 @@ export default function RentalPage() {
                                                 </div>
                                             </div>
                                         ) : (
-                                            <div className="p-3 shrink-0">
-                                                <div className="w-full bg-zinc-100 dark:bg-white/5 flex items-center justify-center rounded-xl h-48 sm:h-56 md:h-64">
-                                                    <Building2 className="w-12 h-12 text-zinc-300 dark:text-white/10" />
+                                            <div className="px-4 pt-4 shrink-0">
+                                                <div className="w-full bg-zinc-100 dark:bg-white/5 flex items-center justify-center rounded-xl h-[36vh] lg:h-[38vh]">
+                                                    <Building2 className="w-16 h-16 text-zinc-300 dark:text-white/10" />
                                                 </div>
                                             </div>
                                         )}
 
-                                        {/* Property Details - Scrollable */}
-                                        <div className="flex-1 overflow-y-auto p-3 space-y-3">
-                                            {/* Title + Address */}
-                                            <div>
-                                                <h2 className="text-lg font-bold text-zinc-900 dark:text-white">
-                                                    {selected.name}
-                                                </h2>
-                                                <div className="flex items-start gap-2 mt-1">
-                                                    <MapPin className="w-4 h-4 text-purple-500 mt-0.5 shrink-0" />
-                                                    <p className="text-sm text-zinc-600 dark:text-white/70">
-                                                        {selected.address || '未設定'}
-                                                    </p>
-                                                </div>
+                                        {/* Property Details - flex fills remaining space, NO scroll */}
+                                        <div className="flex-1 min-h-0 overflow-hidden p-4 flex flex-col gap-2.5">
+                                            {/* Address */}
+                                            <div className="shrink-0">
+                                                <p className="text-base text-zinc-600 dark:text-white/80 leading-snug">
+                                                    地址 :{' '}
+                                                    {selected.address ? (
+                                                        <a
+                                                            href={`https://www.google.com/maps/search/${encodeURIComponent(selected.address)}`}
+                                                            target="_blank"
+                                                            rel="noopener noreferrer"
+                                                            className="text-purple-600 dark:text-purple-400 hover:underline"
+                                                        >
+                                                            {selected.address}
+                                                        </a>
+                                                    ) : (
+                                                        '未設定'
+                                                    )}
+                                                </p>
                                             </div>
 
-                                            {/* Lot Index */}
+                                            {/* Lot Index - Rental Area Count */}
                                             {selected.lotIndex && (
-                                                <div className="flex items-start gap-2">
-                                                    <Ruler className="w-4 h-4 text-rose-400 mt-0.5 shrink-0" />
-                                                    <p className="text-sm text-zinc-600 dark:text-white/70 leading-relaxed">
-                                                        {parseLotValues(selected.lotIndex)}
+                                                <div className="shrink-0">
+                                                    <p className="text-base text-zinc-600 dark:text-white/80 leading-snug">
+                                                        出租地段 : {parseLotValues(selected.lotIndex).split('、').filter(Boolean).length} 個
                                                     </p>
                                                 </div>
                                             )}
 
-                                            {/* Attributes row: Land Use | Area | Type */}
-                                            <div className="grid grid-cols-3 gap-2">
-                                                <div className="flex items-center gap-1.5 px-2 py-2 bg-zinc-50 dark:bg-white/5 rounded-xl">
-                                                    <Tag className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
-                                                    <div className="min-w-0">
-                                                        <p className="text-[10px] text-zinc-400 dark:text-white/40">土地用途</p>
-                                                        <p className="text-xs font-medium text-zinc-700 dark:text-white/80 truncate">
+                                            {/* Attributes row: Land Use | Area */}
+                                            <div className="grid grid-cols-2 gap-2 shrink-0">
+                                                <div className="flex items-center gap-2 px-3 py-3 bg-zinc-50 dark:bg-white/5 rounded-xl">
+                                                    <Tag className="w-5 h-5 text-emerald-500 shrink-0" />
+                                                    <div className="min-w-0 flex-1">
+                                                        <p className="text-sm text-zinc-400 dark:text-white/40">土地用途</p>
+                                                        <p className="text-base font-semibold text-zinc-700 dark:text-white/85 truncate">
                                                             {getLandUseDisplay(selected.landUse)}
                                                         </p>
                                                     </div>
                                                 </div>
-                                                <div className="flex items-center gap-1.5 px-2 py-2 bg-zinc-50 dark:bg-white/5 rounded-xl">
-                                                    <Maximize2 className="w-3.5 h-3.5 text-amber-500 shrink-0" />
-                                                    <div className="min-w-0">
-                                                        <p className="text-[10px] text-zinc-400 dark:text-white/40">面積</p>
-                                                        <p className="text-xs font-medium text-zinc-700 dark:text-white/80 truncate">
+                                                <div className="flex items-center gap-2 px-3 py-3 bg-zinc-50 dark:bg-white/5 rounded-xl">
+                                                    <Maximize2 className="w-5 h-5 text-amber-500 shrink-0" />
+                                                    <div className="min-w-0 flex-1">
+                                                        <p className="text-sm text-zinc-400 dark:text-white/40">場地總面積</p>
+                                                        <p className="text-base font-semibold text-zinc-700 dark:text-white/85 truncate">
                                                             {selected.lotArea ? `${selected.lotArea}呎` : '未設定'}
-                                                        </p>
-                                                    </div>
-                                                </div>
-                                                <div className="flex items-center gap-1.5 px-2 py-2 bg-zinc-50 dark:bg-white/5 rounded-xl">
-                                                    <Building2 className="w-3.5 h-3.5 text-cyan-500 shrink-0" />
-                                                    <div className="min-w-0">
-                                                        <p className="text-[10px] text-zinc-400 dark:text-white/40">類型</p>
-                                                        <p className="text-xs font-medium text-zinc-700 dark:text-white/80 truncate">
-                                                            {selected.type === 'group_asset' ? '集團資產'
-                                                                : selected.type === 'co_investment' ? '合資'
-                                                                : selected.type === 'external_lease' ? '外部'
-                                                                : selected.type === 'managed_asset' ? '管理'
-                                                                : selected.type || '未設定'}
                                                         </p>
                                                     </div>
                                                 </div>
                                             </div>
 
-                                            {/* Notes */}
+                                            {/* Notes - constrained to remaining space */}
                                             {selected.notes && (
-                                                <div className="px-2 py-2 bg-amber-50 dark:bg-amber-500/10 rounded-xl">
-                                                    <div className="flex items-start gap-2">
-                                                        <ArrowUpFromLine className="w-4 h-4 text-amber-500 mt-0.5 shrink-0" />
-                                                        <div className="min-w-0">
-                                                            <p className="text-xs text-amber-600 dark:text-amber-400 font-medium">備註</p>
-                                                            <p className="text-xs text-amber-700 dark:text-amber-300/80 whitespace-pre-wrap wrap-break-word mt-0.5">
-                                                                {selected.notes.replace(/<[^>]*>/g, '')}
-                                                            </p>
-                                                        </div>
+                                                <div className="flex-1 min-h-0 px-3 py-3 bg-amber-50 dark:bg-amber-500/10 rounded-xl overflow-hidden">
+                                                    <div className="min-w-0 flex-1 h-full">
+                                                        <p className="text-sm font-semibold text-amber-600 dark:text-amber-400">備註</p>
+                                                        <p className="text-base text-amber-700 dark:text-amber-300/85 wrap-break-word mt-1 leading-relaxed overflow-hidden line-clamp-2">
+                                                            {selected.notes.replace(/<[^>]*>/g, '')}
+                                                        </p>
                                                     </div>
                                                 </div>
                                             )}
 
+                                            {/* If no notes, push button to bottom */}
+                                            {!selected.notes && <div className="flex-1 min-h-0" />}
+
                                             {/* View Detail Button */}
                                             <Link
                                                 href={`/rental/${selected.id}`}
-                                                className="flex items-center justify-center gap-2 w-full py-2.5 bg-purple-500 hover:bg-purple-600 text-white text-sm font-semibold rounded-xl transition-colors"
+                                                className="flex items-center justify-center gap-2 w-full py-3.5 bg-purple-500 hover:bg-purple-600 text-white text-base font-semibold rounded-xl transition-colors shrink-0"
                                             >
                                                 查看詳情
-                                                <ArrowRight className="w-4 h-4" />
+                                                <ArrowRight className="w-5 h-5" />
                                             </Link>
                                         </div>
 
                                         {/* Navigation Footer */}
-                                        <div className="p-3 border-t border-zinc-100 dark:border-white/5 bg-white dark:bg-zinc-900 shrink-0 flex items-center justify-between">
+                                        <div className="px-3 py-2.5 border-t border-zinc-100 dark:border-white/5 bg-white dark:bg-zinc-900 shrink-0 flex items-center justify-between">
                                             <button
                                                 onClick={() => prevProperty?.id && setSelectedPropertyId(prevProperty.id)}
                                                 disabled={nextIndex === 0}
-                                                className="flex items-center gap-1 px-2 py-1.5 text-sm text-zinc-500 dark:text-white/40 hover:text-zinc-700 dark:hover:text-white disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer transition-colors"
+                                                className="flex items-center gap-1 px-3 py-2 text-base text-zinc-500 dark:text-white/40 hover:text-zinc-700 dark:hover:text-white disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer transition-colors"
                                             >
-                                                <ChevronLeft className="w-4 h-4" />
+                                                <ChevronLeft className="w-5 h-5" />
                                                 上一項
                                             </button>
-                                            <span className="text-xs text-zinc-400 dark:text-white/30">
+                                            <span className="text-base text-zinc-400 dark:text-white/30">
                                                 {nextIndex + 1} / {filteredProperties.length}
                                             </span>
                                             <button
                                                 onClick={() => nextProperty?.id && setSelectedPropertyId(nextProperty.id)}
                                                 disabled={nextIndex === filteredProperties.length - 1}
-                                                className="flex items-center gap-1 px-2 py-1.5 text-sm text-zinc-500 dark:text-white/40 hover:text-zinc-700 dark:hover:text-white disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer transition-colors"
+                                                className="flex items-center gap-1 px-3 py-2 text-base text-zinc-500 dark:text-white/40 hover:text-zinc-700 dark:hover:text-white disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer transition-colors"
                                             >
                                                 下一項
-                                                <ChevronRight className="w-4 h-4" />
+                                                <ChevronRight className="w-5 h-5" />
                                             </button>
                                         </div>
                                     </>
@@ -538,9 +530,9 @@ export default function RentalPage() {
                             })()
                         ) : (
                             <div className="flex-1 flex flex-col items-center justify-center p-8 text-zinc-400 dark:text-white/20">
-                                <Building2 className="w-16 h-16 mb-4 opacity-30" />
-                                <p className="text-lg font-medium">選擇左側物业查看詳情</p>
-                                <p className="text-sm mt-2 opacity-60">點擊列表中的項目以預覽詳情</p>
+                                <Building2 className="w-20 h-20 mb-4 opacity-30" />
+                                <p className="text-xl font-medium">選擇左側物业查看詳情</p>
+                                <p className="text-base mt-2 opacity-60">點擊列表中的項目以預覽詳情</p>
                             </div>
                         )}
                     </div>

@@ -85,171 +85,273 @@ function StatusBadge({ status }: { status?: string | null }) {
     );
 }
 
-function ImageLightbox({ src, onClose }: { src: string; onClose: () => void }) {
-    return (
-        <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-                        className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-4"
-            onClick={onClose}
-        >
-            <button
-                onClick={onClose}
-                className="absolute top-4 right-4 p-2 bg-white/10 hover:bg-white/20 rounded-full text-white transition-colors cursor-pointer"
-            >
-                <X className="w-6 h-6" />
-            </button>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={src} alt="" className="max-w-full max-h-full object-contain rounded-xl" onClick={e => e.stopPropagation()} />
-        </motion.div>
-    );
-}
-
 function LotDetailModal({
     entry,
     onClose,
-    onImageClick,
+    parentLocation,
+    parentAddress,
 }: {
     entry: { type: 'new' | 'old'; value: string; media?: { u: string; s: number }[]; note?: string; lotStatus?: LotStatus; lotArea?: string };
     onClose: () => void;
-    onImageClick: (src: string) => void;
+    parentLocation?: { lat: number; lng: number } | null;
+    parentAddress?: string | null;
 }) {
     const [currentIdx, setCurrentIdx] = useState(0);
+    const [activeTab, setActiveTab] = useState<'photo' | 'video' | 'plan' | 'map' | 'note'>('photo');
+    const [mapLoaded, setMapLoaded] = useState(false);
+
+    const photoCount = entry.media?.length ?? 0;
+    const videoCount = 0; // 預留：視頻功能
+    const planCount = 0;   // 預留：規劃圖功能
+
+    const tabs = [
+        { key: 'photo' as const, label: '相片', count: photoCount },
+        { key: 'video' as const, label: '影片', count: videoCount },
+        { key: 'plan' as const, label: '規劃圖', count: planCount },
+        { key: 'map' as const, label: '地圖', count: null },
+        { key: 'note' as const, label: '備註', count: null },
+    ];
+
+    const hasAnyMedia = photoCount > 0 || videoCount > 0 || planCount > 0;
+
+    // 當切換 tab 時重置 currentIdx
+    const handleTabChange = (tab: typeof activeTab) => {
+        setActiveTab(tab);
+        setCurrentIdx(0);
+    };
+
     return (
-        <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-200 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4"
-            onClick={onClose}
-        >
+        <>
+            <style jsx global>{`
+                .lot-modal-scroll::-webkit-scrollbar {
+                    display: none;
+                }
+                .lot-modal-scroll {
+                    -ms-overflow-style: none;
+                    scrollbar-width: none;
+                }
+            `}</style>
+
             <motion.div
-                initial={{ opacity: 0, scale: 0.95, y: 10 }}
-                animate={{ opacity: 1, scale: 1, y: 0 }}
-                exit={{ opacity: 0, scale: 0.95, y: 10 }}
-                transition={{ duration: 0.2 }}
-                className="bg-white dark:bg-[#1a1a2e] rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden"
-                onClick={(e) => e.stopPropagation()}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex flex-col"
+                onClick={onClose}
             >
-                <div className="flex items-center justify-between p-5 border-b border-zinc-100 dark:border-white/10">
-                    <div className="flex items-center gap-3">
-                        <span className={`shrink-0 px-3 py-1 rounded-lg text-base font-semibold ${
-                            entry.lotStatus === 'rented'
-                                ? 'bg-amber-500/20 text-amber-600 dark:text-amber-400'
-                                : entry.lotStatus === 'renting'
-                                ? 'bg-green-500/20 text-green-600 dark:text-green-400'
-                                : 'bg-zinc-200 dark:bg-white/10 text-zinc-600 dark:text-white/70'
-                        }`}>
-                            {entry.lotStatus === 'rented' ? '已出租' : entry.lotStatus === 'renting' ? '出租中' : '未出租'}
-                        </span>
-                        <h3 className="text-xl font-bold text-zinc-900 dark:text-white">{entry.value}</h3>
+            {/* 關閉按鈕 - 右上角 */}
+            <div className="absolute top-3 right-[70px] z-20">
+                <button
+                    onClick={onClose}
+                    className="p-2 bg-white/10 hover:bg-white/20 rounded-full text-white transition-all cursor-pointer backdrop-blur-sm"
+                >
+                    <X className="w-5 h-5 sm:w-6 sm:h-6" />
+                </button>
+            </div>
+
+            {/* 頂部狀態欄 */}
+            <div className="shrink-0 px-[70px] py-3 sm:py-4 flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 bg-black/60 backdrop-blur-sm border-b border-white/10">
+                <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
+                    <span className={`shrink-0 px-2 py-0.5 sm:px-3 sm:py-1 rounded-lg text-xs sm:text-base font-semibold ${
+                        entry.lotStatus === 'rented'
+                            ? 'bg-amber-500/20 text-amber-400'
+                            : entry.lotStatus === 'renting'
+                            ? 'bg-green-500/20 text-green-400'
+                            : 'bg-white/10 text-white/70'
+                    }`}>
+                        {entry.lotStatus === 'rented' ? '已出租' : entry.lotStatus === 'renting' ? '出租中' : '未出租'}
+                    </span>
+                    <h3 className="text-lg sm:text-xl font-bold text-white">{entry.value}</h3>
+                </div>
+            </div>
+
+            {/* 主要內容區域 */}
+            <div className="flex-1 flex flex-col overflow-hidden" onClick={e => e.stopPropagation()}>
+                {/* Tab 導航 - 橫向滾動 */}
+                <div className="shrink-0 px-[70px] py-2 bg-black/40 backdrop-blur-sm border-b border-white/10">
+                    <div className="flex gap-1 overflow-x-auto scrollbar-hide">
+                        {tabs.map(tab => (
+                            <button
+                                key={tab.key}
+                                onClick={() => handleTabChange(tab.key)}
+                                className={`shrink-0 px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-medium transition-all whitespace-nowrap cursor-pointer ${
+                                    activeTab === tab.key
+                                        ? 'bg-white/20 text-white'
+                                        : 'text-white/60 hover:text-white hover:bg-white/10'
+                                }`}
+                            >
+                                {tab.label}
+                                {tab.count !== null && (
+                                    <span className={`ml-1 px-1.5 py-0.5 rounded text-[10px] sm:text-xs ${
+                                        activeTab === tab.key ? 'bg-white/20' : 'bg-white/10'
+                                    }`}>
+                                        {tab.count}
+                                    </span>
+                                )}
+                            </button>
+                        ))}
                     </div>
-                    <button onClick={onClose} className="p-1.5 hover:bg-zinc-100 dark:hover:bg-white/10 rounded-lg transition-colors cursor-pointer">
-                        <X className="w-5 h-5 text-zinc-500" />
-                    </button>
                 </div>
 
-                <div className="p-5 space-y-4 max-h-[70vh] overflow-y-auto notes-scroll">
-                    {entry.media && entry.media.length > 0 ? (
-                        <div>
-                            {entry.media.length === 1 ? (
-                                <div className="relative w-full rounded-xl overflow-hidden bg-zinc-50 dark:bg-white/5 border border-zinc-200 dark:border-white/10" style={{ maxHeight: '45vh' }}>
-                                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                                    <img
-                                        src={entry.media![0].u}
-                                        alt={entry.value}
-                                        className="w-full object-contain bg-zinc-50 dark:bg-white/5"
-                                        style={{ maxHeight: '45vh' }}
-                                        onError={(e) => { e.currentTarget.style.display = 'none'; }}
-                                    />
-                                    {entry.lotStatus === 'rented' && (
-                                        <div className="absolute inset-0 flex items-center justify-center">
-                                            <div className="backdrop-blur-sm bg-black/40 rounded-xl w-full h-full flex items-center justify-center">
-                                                <span className="px-6 py-3 bg-amber-500 text-white text-xl font-bold rounded-xl shadow-lg">已出租</span>
+                {/* Tab 內容區 */}
+                <div className="flex-1 overflow-hidden relative">
+                    {/* 相片 Tab */}
+                    {activeTab === 'photo' && (
+                        <div className="absolute inset-0 flex flex-col items-center justify-center px-[70px]">
+                            {entry.media && entry.media.length > 0 ? (
+                                <div className="relative flex flex-col items-center justify-center w-full h-full">
+                                {entry.media.length === 1 ? (
+                                        <div className="relative flex items-center justify-center w-full h-full">
+                                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                                            <img
+                                                src={entry.media![0].u}
+                                                alt={entry.value}
+                                                className="w-full h-full max-w-[57vw] max-h-[68vh] object-cover rounded-lg sm:rounded-xl"
+                                                onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                                            />
+                                        </div>
+                                    ) : (
+                                        <>
+                                            {/* 左箭頭 - 圖外左側置中 */}
+                                            <button
+                                                onClick={() => setCurrentIdx(i => (i - 1 + entry.media!.length) % entry.media!.length)}
+                                                className="absolute left-1 sm:left-2 md:left-4 top-1/2 -translate-y-1/2 p-2 sm:p-3 bg-white/10 hover:bg-white/20 rounded-full text-white transition-colors cursor-pointer backdrop-blur-sm z-10"
+                                            >
+                                                <ChevronLeft className="w-5 h-5 sm:w-6 sm:h-6 md:w-8 md:h-8" />
+                                            </button>
+
+                                            {/* 中央圖片 - 固定尺寸 */}
+                                            <div className="relative w-full max-w-[57vw] h-[68vh] flex items-center justify-center px-10 sm:px-12 md:px-16 lg:px-20">
+                                                {entry.media.map((m, idx) => (
+                                                    // eslint-disable-next-line @next/next/no-img-element
+                                                    <img
+                                                        key={idx}
+                                                        src={m.u}
+                                                        alt={`圖片 ${idx + 1}`}
+                                                        className="absolute w-full h-full object-cover transition-opacity duration-300 rounded-lg sm:rounded-xl"
+                                                        style={{ opacity: idx === currentIdx ? 1 : 0, pointerEvents: idx === currentIdx ? 'auto' : 'none' }}
+                                                        onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                                                    />
+                                                ))}
                                             </div>
+
+                                            {/* 右箭頭 - 圖外右側置中 */}
+                                            <button
+                                                onClick={() => setCurrentIdx(i => (i + 1) % entry.media!.length)}
+                                                className="absolute right-1 sm:right-2 md:right-4 top-1/2 -translate-y-1/2 p-2 sm:p-3 bg-white/10 hover:bg-white/20 rounded-full text-white transition-colors cursor-pointer backdrop-blur-sm z-10"
+                                            >
+                                                <ChevronRight className="w-5 h-5 sm:w-6 sm:h-6 md:w-8 md:h-8" />
+                                            </button>
+
+                                            {/* 數字顯示 (1/12) */}
+                                            <div className="absolute bottom-2 sm:bottom-4 left-1/2 -translate-x-1/2 px-3 sm:px-4 py-1.5 sm:py-2 bg-black/60 backdrop-blur-sm rounded-full text-white text-xs sm:text-sm font-medium">
+                                                {currentIdx + 1} / {entry.media.length}
+                                            </div>
+                                        </>
+                                    )}
+
+                                    {/* 地段面積 - 底部背景區塊 */}
+                                    {entry.lotArea && (
+                                        <div className="shrink-0 w-full max-w-[57vw] mt-4 p-3 bg-black/60 backdrop-blur-sm rounded-xl border border-white/10">
+                                            <p className="text-sm sm:text-base text-white/90 text-center font-medium">
+                                                地段面積：{entry.lotArea}
+                                            </p>
                                         </div>
                                     )}
                                 </div>
                             ) : (
-                                <div className="relative select-none">
-                                    <div className="relative overflow-hidden rounded-xl bg-zinc-50 dark:bg-white/5" style={{ height: '45vh' }}>
-                                        {entry.media.map((m, idx) => (
-                                            <img
-                                                key={idx}
-                                                src={m.u}
-                                                alt={`圖片 ${idx + 1}`}
-                                                className="absolute inset-0 w-full h-full object-contain transition-opacity duration-300"
-                                                style={{ opacity: idx === currentIdx ? 1 : 0, pointerEvents: idx === currentIdx ? 'auto' : 'none' }}
-                                                onError={(e) => { e.currentTarget.style.display = 'none'; }}
-                                            />
-                                        ))}
-                                        {entry.lotStatus === 'rented' && (
-                                            <div className="absolute inset-0 flex items-center justify-center">
-                                                <div className="backdrop-blur-sm bg-black/40 rounded-xl w-full h-full flex items-center justify-center">
-                                                    <span className="px-6 py-3 bg-amber-500 text-white text-xl font-bold rounded-xl shadow-lg">已出租</span>
-                                                </div>
-                                            </div>
-                                        )}
-                                    </div>
-                                    <button
-                                        onClick={() => setCurrentIdx(i => (i - 1 + entry.media!.length) % entry.media!.length)}
-                                        className="absolute left-2 top-1/2 -translate-y-1/2 p-1.5 bg-black/50 hover:bg-black/70 rounded-full text-white transition-colors cursor-pointer"
-                                    >
-                                        <ChevronLeft className="w-4 h-4" />
-                                    </button>
-                                    <button
-                                        onClick={() => setCurrentIdx(i => (i + 1) % entry.media!.length)}
-                                        className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 bg-black/50 hover:bg-black/70 rounded-full text-white transition-colors cursor-pointer"
-                                    >
-                                        <ChevronRight className="w-4 h-4" />
-                                    </button>
-                                    <div className="flex justify-center gap-1.5 mt-2">
-                                        {entry.media.map((_, idx) => (
-                                            <button
-                                                key={idx}
-                                                onClick={() => setCurrentIdx(idx)}
-                                                className={`rounded-full transition-all cursor-pointer ${idx === currentIdx ? 'w-4 h-2 bg-purple-500' : 'w-2 h-2 bg-zinc-300 dark:bg-white/30 hover:bg-zinc-400 dark:hover:bg-white/50'}`}
-                                                style={{ padding: 0, border: 'none' }}
-                                            />
-                                        ))}
-                                    </div>
-                                    <p className="text-center text-sm text-zinc-400 dark:text-white/40 mt-1">{currentIdx + 1} / {entry.media.length}</p>
+                                <div className="flex flex-col items-center justify-center gap-2 sm:gap-3 text-white/40">
+                                    <Map className="w-10 h-10 sm:w-14 sm:h-14 md:w-16 md:h-16" />
+                                    <p className="text-base sm:text-lg">暫無相片</p>
                                 </div>
                             )}
-                        </div>
-                    ) : (
-                        <div className="flex items-center justify-center gap-2 py-4 text-zinc-400 dark:text-white/40">
-                            <Map className="w-5 h-5" />
-                            <p className="text-base">暫無圖片</p>
                         </div>
                     )}
 
-                    {(entry.lotArea || entry.note) && (
-                        <div className="bg-zinc-50 dark:bg-white/5 rounded-xl divide-y divide-zinc-200 dark:divide-white/10">
-                            {entry.lotArea && (
-                                <div className="flex items-start gap-3 px-4 py-3">
-                                    <Ruler className="w-4 h-4 text-blue-500 mt-0.5 shrink-0" />
-                                    <div className="min-w-0">
-                                        <p className="text-sm font-medium text-zinc-500 dark:text-white/40 mb-0.5">地段面積</p>
-                                        <p className="text-base text-zinc-700 dark:text-white/80 whitespace-pre-wrap">{entry.lotArea}</p>
+                    {/* 影片 Tab */}
+                    {activeTab === 'video' && (
+                        <div className="absolute inset-0 flex items-center justify-center px-[70px]">
+                            <div className="flex flex-col items-center justify-center gap-2 sm:gap-3 text-white/40">
+                                <svg className="w-10 h-10 sm:w-14 sm:h-14 md:w-16 md:h-16" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                                </svg>
+                                <p className="text-base sm:text-lg">暫無影片</p>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* 規劃圖 Tab */}
+                    {activeTab === 'plan' && (
+                        <div className="absolute inset-0 flex items-center justify-center px-[70px]">
+                            <div className="flex flex-col items-center justify-center gap-2 sm:gap-3 text-white/40">
+                                <FileText className="w-10 h-10 sm:w-14 sm:h-14 md:w-16 md:h-16" />
+                                <p className="text-base sm:text-lg">暫無規劃圖</p>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* 地圖 Tab */}
+                    {activeTab === 'map' && (
+                        <div className="absolute inset-0 flex flex-col items-center justify-center px-[70px] py-4 gap-4">
+                            {parentLocation ? (
+                                <>
+                                    <div className="flex-1 w-full max-w-[57vw] rounded-lg sm:rounded-xl overflow-hidden bg-zinc-800">
+                                        <iframe
+                                            src={`https://www.google.com/maps?q=${parentLocation.lat},${parentLocation.lng}&z=17&output=embed`}
+                                            className="w-full h-full border-0"
+                                            allowFullScreen
+                                            loading="lazy"
+                                            referrerPolicy="no-referrer-when-downgrade"
+                                            title="地段位置"
+                                            onLoad={() => setMapLoaded(true)}
+                                        />
                                     </div>
-                                </div>
-                            )}
-                            {entry.note && (
-                                <div className="flex items-start gap-3 px-4 py-3">
-                                    <StickyNote className="w-4 h-4 text-purple-500 mt-0.5 shrink-0" />
-                                    <div className="min-w-0">
-                                        <p className="text-sm font-medium text-zinc-500 dark:text-white/40 mb-0.5">備註</p>
-                                        <p className="text-base text-zinc-700 dark:text-white/80 whitespace-pre-wrap">{entry.note}</p>
-                                    </div>
+                                    {parentAddress && (
+                                        <div className="shrink-0 w-full max-w-[57vw] p-3 bg-black/60 backdrop-blur-sm rounded-xl border border-white/10">
+                                            <p className="text-sm sm:text-base text-white/90 text-center font-medium flex items-center justify-center gap-2">
+                                                <MapPin className="w-4 h-4 shrink-0" />
+                                                <span className="truncate">{parentAddress}</span>
+                                            </p>
+                                        </div>
+                                    )}
+                                </>
+                            ) : (
+                                <div className="w-full max-w-[57vw] h-[68vh] flex flex-col items-center justify-center gap-2 sm:gap-3 text-white/40 rounded-lg sm:rounded-xl bg-white/5 border border-white/10">
+                                    <Map className="w-10 h-10 sm:w-14 sm:h-14 md:w-16 md:h-16" />
+                                    <p className="text-base sm:text-lg">暫無地段位置</p>
+                                    <p className="text-xs sm:text-sm text-white/30">使用父物業位置顯示</p>
                                 </div>
                             )}
                         </div>
                     )}
+
+                    {/* 備註 Tab */}
+                    {activeTab === 'note' && (
+                        <div className="absolute inset-0 px-[70px] py-3 sm:py-4 overflow-y-auto">
+                            <div className="max-w-xl sm:max-w-2xl mx-auto space-y-3 sm:space-y-4">
+                                {/* 備註內容 */}
+                                {entry.note ? (
+                                    <div className="p-3 sm:p-4 bg-white/5 rounded-lg sm:rounded-xl border border-white/10">
+                                        <div className="flex items-start gap-2 sm:gap-3">
+                                            <StickyNote className="w-4 h-4 sm:w-5 sm:h-5 text-purple-400 mt-0.5 shrink-0" />
+                                            <div>
+                                                <p className="text-xs sm:text-sm font-medium text-white/50 mb-0.5 sm:mb-1">備註</p>
+                                                <p className="text-sm sm:text-base text-white whitespace-pre-wrap">{entry.note}</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <div className="p-3 sm:p-4 bg-white/5 rounded-lg sm:rounded-xl border border-white/10 text-center text-white/40">
+                                        暫無備註
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    )}
                 </div>
-            </motion.div>
+            </div>
         </motion.div>
+        </>
     );
 }
 
@@ -267,11 +369,11 @@ export default function RentalPropertyPage() {
     const propertyId = params.id as string;
     const { data: property, isLoading: loading } = usePropertyWithRelationsQuery(propertyId);
     const [currentImageIndex, setCurrentImageIndex] = useState(0);
-    const [lightboxImage, setLightboxImage] = useState<string | null>(null);
     const [imageError, setImageError] = useState(false);
     const [galleryOffset, setGalleryOffset] = useState(0);
     const [showGeoMaps, setShowGeoMaps] = useState(false);
     const [detailTab, setDetailTab] = useState<'overview' | 'location' | 'geo'>('overview');
+    const [lightboxOpen, setLightboxOpen] = useState(false);
     const galleryRef = useRef<HTMLDivElement>(null);
     const GALLERY_VISIBLE = 5;
 
@@ -329,6 +431,25 @@ export default function RentalPropertyPage() {
             }).catch(() => {});
         };
     }, [propertyId, fetchViewCounts]);
+
+    // Lightbox 鍵盤控制：Esc 關閉、左右方向鍵切換
+    useEffect(() => {
+        if (!lightboxOpen || !property?.images?.length) return;
+        const total = property.images.length;
+        const onKey = (e: KeyboardEvent) => {
+            if (e.key === 'Escape') {
+                setLightboxOpen(false);
+            } else if (e.key === 'ArrowLeft' && total > 1) {
+                setCurrentImageIndex(i => (i - 1 + total) % total);
+                setImageError(false);
+            } else if (e.key === 'ArrowRight' && total > 1) {
+                setCurrentImageIndex(i => (i + 1) % total);
+                setImageError(false);
+            }
+        };
+        window.addEventListener('keydown', onKey);
+        return () => window.removeEventListener('keydown', onKey);
+    }, [lightboxOpen, property?.images?.length]);
 
     const isRenting = useMemo(() => {
         if (!property) return false;
@@ -400,8 +521,79 @@ export default function RentalPropertyPage() {
     const proprietor = property.proprietor || null;
 
     return (
-        <div className="space-y-6">
+        <>
+            <style jsx global>{`
+                body {
+                    overflow: hidden;
+                }
+                .rental-page-container {
+                    height: calc(100vh - 4rem - 1rem);
+                    overflow: hidden;
+                    padding: 0;
+                }
+                .rental-page-scroll::-webkit-scrollbar {
+                    display: none;
+                }
+                .rental-page-scroll {
+                    -ms-overflow-style: none;
+                    scrollbar-width: none;
+                }
+                .notes-scroll::-webkit-scrollbar {
+                    display: none;
+                }
+                .notes-scroll {
+                    -ms-overflow-style: none;
+                    scrollbar-width: none;
+                }
+                .shimmer-overlay {
+                    background: linear-gradient(
+                        110deg,
+                        transparent 20%,
+                        rgba(255, 255, 255, 0.5) 45%,
+                        rgba(255, 255, 255, 0.8) 50%,
+                        rgba(255, 255, 255, 0.5) 55%,
+                        transparent 80%
+                    );
+                    background-size: 200% 100%;
+                    animation: shimmer-slide 3s ease-in-out infinite;
+                }
+                @keyframes shimmer-slide {
+                    0% { background-position: 200% 0; }
+                    100% { background-position: -200% 0; }
+                }
+                .rich-text-content ul {
+                    list-style-type: disc;
+                    margin-left: 1.5rem;
+                    margin-top: 0.25rem;
+                    margin-bottom: 0.25rem;
+                }
+                .rich-text-content ol {
+                    list-style-type: decimal;
+                    margin-left: 1.5rem;
+                    margin-top: 0.25rem;
+                    margin-bottom: 0.25rem;
+                }
+                .rich-text-content p {
+                    margin-bottom: 0.25rem;
+                }
+                .rich-text-content a {
+                    color: #a855f7;
+                    text-decoration: underline;
+                }
+                .rich-text-content h1, .rich-text-content h2, .rich-text-content h3 {
+                    font-weight: bold;
+                    margin-top: 0.5rem;
+                    margin-bottom: 0.25rem;
+                }
+                .rich-text-content h1 { font-size: 1.125rem; }
+                .rich-text-content h2 { font-size: 1rem; }
+                .rich-text-content h3 { font-size: 0.875rem; }
+            `}</style>
+
+            <div className="rental-page-container">
+            <div className="h-full flex flex-col gap-4 lg:gap-6">
             <motion.div initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }}>
+
                 <Link
                     href="/rental"
                     className="inline-flex items-center gap-2 text-zinc-500 dark:text-white/60 hover:text-zinc-900 dark:hover:text-white transition-colors"
@@ -412,25 +604,32 @@ export default function RentalPropertyPage() {
             </motion.div>
 
             {/* 主版型：左側（圖片）| 右側（資訊） */}
-            <div className="grid grid-cols-1 lg:grid-cols-[35%_1fr] gap-6 lg:gap-10 lg:items-stretch">
+            <div className="grid grid-cols-1 lg:grid-cols-[35%_1fr] gap-6 lg:gap-8 h-full min-h-0 pb-8">
                 {/* 左欄：圖片 */}
                 <motion.div
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
-                    className="flex flex-col gap-4 w-full min-h-96 lg:h-[calc(100dvh-10rem)] lg:min-h-0 lg:max-h-[calc(100dvh-10rem)] rounded-2xl overflow-hidden border border-zinc-200 dark:border-white/10 bg-zinc-100 dark:bg-white/5"
+                    className="flex flex-col gap-3 w-full h-full min-h-0 rounded-2xl overflow-hidden border border-zinc-200 dark:border-white/10 bg-zinc-100 dark:bg-white/5"
                 >
                     {property.images && property.images.length > 0 && !imageError ? (
                         <>
-                            {/* 主圖 */}
-                            <div className="relative w-full flex-1 min-h-80 lg:min-h-0 overflow-hidden">
+                            {/* 主圖 - 點擊開啟 lightbox */}
+                            <button
+                                type="button"
+                                onClick={() => setLightboxOpen(true)}
+                                className="relative w-full flex-1 min-h-80 lg:min-h-0 overflow-hidden group cursor-zoom-in"
+                                aria-label="放大圖片"
+                            >
                                 <img
                                     src={property.images[currentImageIndex]}
                                     alt={`${property.name} - ${currentImageIndex + 1}`}
-                                    className="absolute inset-0 w-full h-full object-cover cursor-pointer"
-                                    onClick={() => setLightboxImage(property.images[currentImageIndex])}
+                                    className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
                                     onError={() => setImageError(true)}
                                 />
-                            </div>
+                                <span className="absolute top-2 right-2 px-2 py-1 rounded-md bg-black/50 backdrop-blur-sm text-white/90 text-[10px] font-medium opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+                                    {currentImageIndex + 1} / {property.images.length}
+                                </span>
+                            </button>
                             {/* 縮圖 gallery */}
                             <div className="relative shrink-0">
                                 {property.images.length > GALLERY_VISIBLE && (
@@ -461,7 +660,13 @@ export default function RentalPropertyPage() {
                                                         setGalleryOffset(idx);
                                                     }
                                                 }}
-                                                className={`relative shrink-0 w-[calc(20%-0.4rem)] aspect-square rounded-lg overflow-hidden border-2 transition-all ${idx === currentImageIndex ? 'border-zinc-900 dark:border-white ring-2 ring-zinc-900/20 dark:ring-white/20' : 'border-zinc-200 dark:border-white/15 opacity-70 hover:opacity-100'}`}
+                                                onDoubleClick={() => {
+                                                    setCurrentImageIndex(idx);
+                                                    setImageError(false);
+                                                    setLightboxOpen(true);
+                                                }}
+                                                className={`relative shrink-0 w-[calc(20%-0.4rem)] aspect-square rounded-lg overflow-hidden border-2 transition-all cursor-pointer ${idx === currentImageIndex ? 'border-zinc-900 dark:border-white ring-2 ring-zinc-900/20 dark:ring-white/20' : 'border-zinc-200 dark:border-white/15 opacity-70 hover:opacity-100'}`}
+                                                aria-label={`第 ${idx + 1} 張圖，雙擊放大檢視`}
                                             >
                                                 <img src={url} alt="" className="w-full h-full object-cover" />
                                             </button>
@@ -481,51 +686,6 @@ export default function RentalPropertyPage() {
                                     <p className="text-zinc-400 dark:text-white/30 text-xs">暫無。</p>
                                 )}
                             </div>
-                            <style jsx global>{`
-                                .shimmer-overlay {
-                                    background: linear-gradient(
-                                        110deg,
-                                        transparent 20%,
-                                        rgba(255, 255, 255, 0.5) 45%,
-                                        rgba(255, 255, 255, 0.8) 50%,
-                                        rgba(255, 255, 255, 0.5) 55%,
-                                        transparent 80%
-                                    );
-                                    background-size: 200% 100%;
-                                    animation: shimmer-slide 3s ease-in-out infinite;
-                                }
-                                @keyframes shimmer-slide {
-                                    0% { background-position: 200% 0; }
-                                    100% { background-position: -200% 0; }
-                                }
-                                .rich-text-content ul {
-                                    list-style-type: disc;
-                                    margin-left: 1.5rem;
-                                    margin-top: 0.25rem;
-                                    margin-bottom: 0.25rem;
-                                }
-                                .rich-text-content ol {
-                                    list-style-type: decimal;
-                                    margin-left: 1.5rem;
-                                    margin-top: 0.25rem;
-                                    margin-bottom: 0.25rem;
-                                }
-                                .rich-text-content p {
-                                    margin-bottom: 0.25rem;
-                                }
-                                .rich-text-content a {
-                                    color: #a855f7;
-                                    text-decoration: underline;
-                                }
-                                .rich-text-content h1, .rich-text-content h2, .rich-text-content h3 {
-                                    font-weight: bold;
-                                    margin-top: 0.5rem;
-                                    margin-bottom: 0.25rem;
-                                }
-                                .rich-text-content h1 { font-size: 1.125rem; }
-                                .rich-text-content h2 { font-size: 1rem; }
-                                .rich-text-content h3 { font-size: 0.875rem; }
-                            `}</style>
                         </>
                     ) : (
                         <>
@@ -545,51 +705,6 @@ export default function RentalPropertyPage() {
                                     <p className="text-zinc-400 dark:text-white/30 text-xs">暫無。</p>
                                 )}
                             </div>
-                            <style jsx global>{`
-                                .shimmer-overlay {
-                                    background: linear-gradient(
-                                        110deg,
-                                        transparent 20%,
-                                        rgba(255, 255, 255, 0.5) 45%,
-                                        rgba(255, 255, 255, 0.8) 50%,
-                                        rgba(255, 255, 255, 0.5) 55%,
-                                        transparent 80%
-                                    );
-                                    background-size: 200% 100%;
-                                    animation: shimmer-slide 3s ease-in-out infinite;
-                                }
-                                @keyframes shimmer-slide {
-                                    0% { background-position: 200% 0; }
-                                    100% { background-position: -200% 0; }
-                                }
-                                .rich-text-content ul {
-                                    list-style-type: disc;
-                                    margin-left: 1.5rem;
-                                    margin-top: 0.25rem;
-                                    margin-bottom: 0.25rem;
-                                }
-                                .rich-text-content ol {
-                                    list-style-type: decimal;
-                                    margin-left: 1.5rem;
-                                    margin-top: 0.25rem;
-                                    margin-bottom: 0.25rem;
-                                }
-                                .rich-text-content p {
-                                    margin-bottom: 0.25rem;
-                                }
-                                .rich-text-content a {
-                                    color: #a855f7;
-                                    text-decoration: underline;
-                                }
-                                .rich-text-content h1, .rich-text-content h2, .rich-text-content h3 {
-                                    font-weight: bold;
-                                    margin-top: 0.5rem;
-                                    margin-bottom: 0.25rem;
-                                }
-                                .rich-text-content h1 { font-size: 1.125rem; }
-                                .rich-text-content h2 { font-size: 1rem; }
-                                .rich-text-content h3 { font-size: 0.875rem; }
-                            `}</style>
                         </>
                     )}
                 </motion.div>
@@ -599,19 +714,14 @@ export default function RentalPropertyPage() {
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: 0.1 }}
-                    className="space-y-5"
+                    className="flex flex-col min-h-0 h-full gap-4 p-4 lg:p-6 rounded-2xl border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/5"
                 >
                     {/* 名稱與狀態 */}
-                    <div>
+                    <div className="shrink-0">
                         <h1 className="text-2xl lg:text-3xl font-bold text-zinc-900 dark:text-white leading-tight">
                             {property.name || t('Unnamed Property', '未命名物業')}
                             <StatusBadge status={property.status} />
                         </h1>
-                        {property.type && (
-                            <p className="text-sm text-zinc-500 dark:text-white/50 mt-2">
-                                {typeLabels[property.type] || property.type}
-                            </p>
-                        )}
                     </div>
 
                     {/* 瀏覽次數 */}
@@ -655,20 +765,20 @@ export default function RentalPropertyPage() {
                         ))}
                     </div>
 
-                    <div className="min-h-0 flex-1">
+                    <div className="min-h-0 flex-1 overflow-y-auto rental-page-scroll p-1 -m-1">
                         {detailTab === 'overview' && (
                             <div className="space-y-4">
                                 {/* 業主 */}
                                 {proprietor && (
                                     <div className="p-4 bg-zinc-50 dark:bg-white/5 rounded-xl border border-zinc-200 dark:border-white/10">
-                                        <p className="text-sm font-medium text-zinc-700 dark:text-white/80 mb-2">{t('Proprietor', '業主')}</p>
+                                        <p className="text-base font-medium text-zinc-700 dark:text-white/80 mb-3">{t('Proprietor', '業主')}</p>
                                         <div className="flex items-center gap-3">
-                                            <div className="w-10 h-10 rounded-full bg-linear-to-br from-purple-500 to-blue-600 flex items-center justify-center text-white font-semibold">
+                                            <div className="w-12 h-12 rounded-full bg-linear-to-br from-purple-500 to-blue-600 flex items-center justify-center text-white font-semibold text-lg">
                                                 {proprietor.name?.charAt(0)}
                                             </div>
                                             <div>
-                                                <p className="text-sm font-medium text-zinc-900 dark:text-white">{proprietor.name}</p>
-                                                <p className="text-xs text-zinc-500">{proprietorCategoryLabelZh(proprietor.category, 'card')}</p>
+                                                <p className="text-base font-medium text-zinc-900 dark:text-white">{proprietor.name}</p>
+                                                <p className="text-sm text-zinc-500">{proprietorCategoryLabelZh(proprietor.category, 'card')}</p>
                                             </div>
                                         </div>
                                     </div>
@@ -679,16 +789,16 @@ export default function RentalPropertyPage() {
                                     <div className="p-4 bg-zinc-50 dark:bg-white/5 rounded-xl border border-zinc-200 dark:border-white/10 flex flex-wrap gap-6">
                                         {property.lotArea && (
                                             <div className="flex-1 min-w-32">
-                                                <p className="text-sm font-medium text-zinc-700 dark:text-white/80">{t('Area', '總面積')}</p>
-                                                <p className="text-lg font-bold text-zinc-900 dark:text-white mt-0.5">{formatLotArea(property.lotArea)}</p>
+                                                <p className="text-base font-medium text-zinc-700 dark:text-white/80">{t('Area', '總面積')}</p>
+                                                <p className="text-xl font-bold text-zinc-900 dark:text-white mt-0.5">{formatLotArea(property.lotArea)}</p>
                                             </div>
                                         )}
                                         {landUseList.length > 0 && (
                                             <div className="flex-1 min-w-32">
-                                                <p className="text-sm font-medium text-zinc-700 dark:text-white/80 mb-1">{t('Land Use', '土地用途')}</p>
-                                                <div className="flex flex-wrap gap-1.5">
+                                                <p className="text-base font-medium text-zinc-700 dark:text-white/80 mb-2">{t('Land Use', '土地用途')}</p>
+                                                <div className="flex flex-wrap gap-2">
                                                     {landUseList.map((use, idx) => (
-                                                        <span key={idx} className="px-3 py-1 bg-purple-500/10 text-purple-600 dark:text-purple-400 rounded-full text-sm border border-purple-500/20">
+                                                        <span key={idx} className="px-3 py-1.5 bg-purple-500/10 text-purple-600 dark:text-purple-400 rounded-full text-base border border-purple-500/20">
                                                             {use}
                                                         </span>
                                                     ))}
@@ -701,7 +811,7 @@ export default function RentalPropertyPage() {
                                 {/* 地段（listing 顯示：圖片 + 名稱 + 備註） */}
                                 {lotEntries.length > 0 && (
                                     <div className="p-4 bg-zinc-50 dark:bg-white/5 rounded-xl border border-zinc-200 dark:border-white/10">
-                                        <p className="text-sm font-medium text-zinc-700 dark:text-white/80 mb-3">{t('Lot Index', '所有地段')}</p>
+                                        <p className="text-base font-medium text-zinc-700 dark:text-white/80 mb-3">{t('Lot Index', '所有地段')}</p>
                                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                                             {lotEntries.map((entry, idx) => (
                                                 <div
@@ -724,7 +834,7 @@ export default function RentalPropertyPage() {
                                                         </div>
                                                     )}
                                                     <div className="flex-1 min-w-0">
-                                                        <span className={`inline-block px-1.5 py-0.5 rounded text-[11px] font-semibold mb-1 ${
+                                                        <span className={`inline-block px-2 py-1 rounded text-xs font-semibold mb-1.5 ${
                                                             entry.lotStatus === 'rented'
                                                                 ? 'bg-amber-500/20 text-amber-600 dark:text-amber-400'
                                                                 : entry.lotStatus === 'renting'
@@ -733,7 +843,7 @@ export default function RentalPropertyPage() {
                                                         }`}>
                                                             {entry.lotStatus === 'rented' ? '已出租' : entry.lotStatus === 'renting' ? '出租中' : '未出租'}
                                                         </span>
-                                                        <p className="text-sm font-semibold text-zinc-900 dark:text-white truncate">{entry.value}</p>
+                                                        <p className="text-base font-semibold text-zinc-900 dark:text-white truncate">{entry.value}</p>
                                                     </div>
                                                     {entry.media && entry.media.length > 0 && (
                                                         <div className="shrink-0 flex items-center gap-1 text-zinc-400 dark:text-white/30 group-hover:text-purple-500 transition-colors">
@@ -836,8 +946,7 @@ export default function RentalPropertyPage() {
                                                         key={idx}
                                                         src={map}
                                                         alt={`Geo Map ${idx + 1}`}
-                                                        className="w-full h-full object-cover rounded-lg cursor-pointer hover:opacity-80 transition-opacity"
-                                                        onClick={() => setLightboxImage(map)}
+                                                        className="w-full h-full object-cover rounded-lg hover:opacity-80 transition-opacity"
                                                         onError={(e) => { e.currentTarget.style.display = 'none'; }}
                                                     />
                                                 ))}
@@ -877,29 +986,119 @@ export default function RentalPropertyPage() {
                 </motion.div>
             </div>
 
-            {/* 地圖（全寬，在版型外） */}
-            {property.location?.lat && property.location?.lng && (
-                    <SinglePropertyMapDynamic
-                        property={property}
-                    />
-            )}
-
-            {/* 燈箱 */}
-            <AnimatePresence>
-                {lightboxImage && (
-                    <ImageLightbox src={lightboxImage} onClose={() => setLightboxImage(null)} />
-                )}
-            </AnimatePresence>
-
             <AnimatePresence>
                 {viewLotEntry && (
                     <LotDetailModal
                         entry={viewLotEntry}
                         onClose={() => setViewLotEntry(null)}
-                        onImageClick={(src) => setLightboxImage(src)}
+                        parentLocation={property.location}
+                        parentAddress={property.address}
                     />
                 )}
             </AnimatePresence>
-        </div>
+
+            {/* 圖片 Lightbox */}
+            <AnimatePresence>
+                {lightboxOpen && property.images && property.images.length > 0 && (
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        transition={{ duration: 0.2 }}
+                        className="fixed inset-0 z-50 bg-black/90 backdrop-blur-md flex flex-col"
+                        onClick={() => setLightboxOpen(false)}
+                    >
+                        {/* 頂部列：名稱、計數、關閉 */}
+                        <div className="shrink-0 flex items-center justify-between px-4 sm:px-6 py-3 sm:py-4 bg-black/40 backdrop-blur-sm border-b border-white/10">
+                            <div className="flex items-center gap-3 min-w-0">
+                                <ImageIcon className="w-4 h-4 sm:w-5 sm:h-5 text-white/60 shrink-0" />
+                                <h3 className="text-sm sm:text-base font-medium text-white truncate">
+                                    {property.name || t('Unnamed Property', '未命名物業')}
+                                </h3>
+                                <span className="shrink-0 px-2 py-0.5 rounded-full bg-white/10 text-white/80 text-xs font-medium">
+                                    {currentImageIndex + 1} / {property.images.length}
+                                </span>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => setLightboxOpen(false)}
+                                className="p-2 bg-white/10 hover:bg-white/20 rounded-full text-white transition-colors cursor-pointer backdrop-blur-sm"
+                                aria-label="關閉"
+                            >
+                                <X className="w-5 h-5 sm:w-6 sm:h-6" />
+                            </button>
+                        </div>
+
+                        {/* 主圖區 */}
+                        <div className="flex-1 flex items-center justify-center px-2 sm:px-4 py-2 sm:py-4 overflow-hidden relative" onClick={e => e.stopPropagation()}>
+                            {property.images.length > 1 && (
+                                <>
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setCurrentImageIndex(i => (i - 1 + property.images.length) % property.images.length);
+                                            setImageError(false);
+                                        }}
+                                        className="absolute left-2 sm:left-4 top-1/2 -translate-y-1/2 p-2 sm:p-3 bg-white/10 hover:bg-white/20 rounded-full text-white transition-colors cursor-pointer backdrop-blur-sm z-10"
+                                        aria-label="上一張"
+                                    >
+                                        <ChevronLeft className="w-5 h-5 sm:w-6 sm:h-6 md:w-8 md:h-8" />
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setCurrentImageIndex(i => (i + 1) % property.images.length);
+                                            setImageError(false);
+                                        }}
+                                        className="absolute right-2 sm:right-4 top-1/2 -translate-y-1/2 p-2 sm:p-3 bg-white/10 hover:bg-white/20 rounded-full text-white transition-colors cursor-pointer backdrop-blur-sm z-10"
+                                        aria-label="下一張"
+                                    >
+                                        <ChevronRight className="w-5 h-5 sm:w-6 sm:h-6 md:w-8 md:h-8" />
+                                    </button>
+                                </>
+                            )}
+                            <motion.img
+                                key={currentImageIndex}
+                                src={property.images[currentImageIndex]}
+                                alt={`${property.name} - ${currentImageIndex + 1}`}
+                                initial={{ opacity: 0, scale: 0.96 }}
+                                animate={{ opacity: 1, scale: 1 }}
+                                transition={{ duration: 0.25 }}
+                                className="max-w-full max-h-full w-auto h-auto object-contain rounded-lg select-none"
+                                onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                            />
+                        </div>
+
+                        {/* 底部縮圖列 */}
+                        {property.images.length > 1 && (
+                            <div className="shrink-0 px-3 sm:px-6 py-2 sm:py-3 bg-black/40 backdrop-blur-sm border-t border-white/10" onClick={e => e.stopPropagation()}>
+                                <div className="flex gap-1.5 sm:gap-2 overflow-x-auto scrollbar-hide justify-start sm:justify-center">
+                                    {property.images.map((url, idx) => (
+                                        <button
+                                            key={idx}
+                                            type="button"
+                                            onClick={() => {
+                                                setCurrentImageIndex(idx);
+                                                setImageError(false);
+                                            }}
+                                            className={`relative shrink-0 w-12 h-12 sm:w-14 sm:h-14 md:w-16 md:h-16 rounded-md sm:rounded-lg overflow-hidden border-2 transition-all cursor-pointer ${
+                                                idx === currentImageIndex
+                                                    ? 'border-white ring-2 ring-white/40 scale-105'
+                                                    : 'border-white/10 opacity-60 hover:opacity-100 hover:border-white/30'
+                                            }`}
+                                            aria-label={`跳到第 ${idx + 1} 張圖`}
+                                        >
+                                            <img src={url} alt="" className="w-full h-full object-cover" />
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+                    </motion.div>
+                )}
+            </AnimatePresence>
+            </div>
+            </div>
+        </>
     );
 }

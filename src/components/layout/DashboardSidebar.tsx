@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import {
     LayoutDashboard,
     Users,
@@ -21,6 +21,8 @@ import {
     Download,
     Archive,
     TrendingUp,
+    ChevronDown,
+    ScrollText,
 } from 'lucide-react';
 import ThemeToggle from './ThemeToggle';
 import { useLanguage } from '@/components/common/LanguageSwitcher';
@@ -32,7 +34,15 @@ interface DashboardNavItem {
     icon: React.ReactNode;
 }
 
-const dashboardNavItems: DashboardNavItem[] = [
+interface NavGroup {
+    label: string;
+    labelZh: string;
+    href?: string;
+    icon?: React.ReactNode;
+    children?: DashboardNavItem[];
+}
+
+const dashboardNavItems: NavGroup[] = [
     {
         label: 'Overview',
         labelZh: '總覽',
@@ -47,27 +57,34 @@ const dashboardNavItems: DashboardNavItem[] = [
     },
     {
         label: 'Manage Proprietors',
-        labelZh: '管理業主',
+        labelZh: '管理客戶',
         href: '/dashboard/tenants',
         icon: <Users className="w-5 h-5" />,
     },
     {
-        label: 'Manage Contracts',
-        labelZh: '管理合約',
-        href: '/dashboard/contracts',
-        icon: <FileText className="w-5 h-5" />,
-    },
-    {
-        label: 'Manage Rent Out',
-        labelZh: '管理收租',
-        href: '/dashboard/rent-out',
-        icon: <ArrowUpFromLine className="w-5 h-5" />,
-    },
-    {
-        label: 'Manage Renting',
-        labelZh: '管理交租',
-        href: '/dashboard/renting',
-        icon: <ArrowDownToLine className="w-5 h-5" />,
+        label: 'Manage Leases',
+        labelZh: '管理租約',
+        icon: <ScrollText className="w-5 h-5" />,
+        children: [
+            {
+                label: 'Manage Contracts',
+                labelZh: '管理合約',
+                href: '/dashboard/contracts',
+                icon: <FileText className="w-4 h-4" />,
+            },
+            {
+                label: 'Manage Rent Out',
+                labelZh: '管理收租',
+                href: '/dashboard/rent-out',
+                icon: <ArrowUpFromLine className="w-4 h-4" />,
+            },
+            {
+                label: 'Manage Renting',
+                labelZh: '管理交租',
+                href: '/dashboard/renting',
+                icon: <ArrowDownToLine className="w-4 h-4" />,
+            },
+        ],
     },
     {
         label: 'Manage Relations',
@@ -94,6 +111,8 @@ export default function DashboardSidebar({ userRole = 'client' }: DashboardSideb
     const isZh = lang === 'zh-TW';
     const t = (en: string, zh: string) => (isZh ? zh : en);
 
+    const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
+
     const isActive = (href: string) => {
         if (href === '/dashboard/tenants') {
             return (
@@ -103,6 +122,15 @@ export default function DashboardSidebar({ userRole = 'client' }: DashboardSideb
             );
         }
         return pathname === href || pathname.startsWith(href + '/');
+    };
+
+    const isGroupActive = (group: NavGroup) => {
+        if (group.href) return isActive(group.href);
+        return group.children?.some((child) => isActive(child.href)) ?? false;
+    };
+
+    const toggleGroup = (label: string) => {
+        setOpenGroups((prev) => ({ ...prev, [label]: !prev[label] }));
     };
 
     const handleLogout = () => {
@@ -184,20 +212,72 @@ export default function DashboardSidebar({ userRole = 'client' }: DashboardSideb
                                 管理
                             </p>
                             <ul className="space-y-1">
-                                {dashboardNavItems.map((item) => (
-                                    <li key={item.label}>
-                                        <Link
-                                            href={item.href}
-                                            className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${isActive(item.href)
-                                                ? 'bg-purple-500/20 text-purple-700 dark:text-white'
-                                                : 'text-zinc-600 dark:text-white/60 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-white/5'
+                                {dashboardNavItems.map((item) => {
+                                    if (item.children) {
+                                        const isOpen = openGroups[item.label] ?? isGroupActive(item);
+                                        const hasActiveChild = item.children.some((child) => isActive(child.href));
+                                        return (
+                                            <li key={item.label}>
+                                                <button
+                                                    onClick={() => toggleGroup(item.label)}
+                                                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all cursor-pointer ${
+                                                        hasActiveChild
+                                                            ? 'bg-purple-500/20 text-purple-700 dark:text-white'
+                                                            : 'text-zinc-600 dark:text-white/60 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-white/5'
+                                                    }`}
+                                                >
+                                                    {item.icon}
+                                                    <span className="flex-1 font-medium text-base text-left">{item.labelZh}</span>
+                                                    <ChevronDown className={`w-4 h-4 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+                                                </button>
+                                                <AnimatePresence>
+                                                    {isOpen && (
+                                                        <motion.div
+                                                            initial={{ height: 0, opacity: 0 }}
+                                                            animate={{ height: 'auto', opacity: 1 }}
+                                                            exit={{ height: 0, opacity: 0 }}
+                                                            transition={{ duration: 0.2 }}
+                                                            className="overflow-hidden"
+                                                        >
+                                                            <ul className="mt-1 ml-4 pl-4 border-l border-zinc-200 dark:border-white/10 space-y-0.5">
+                                                                {item.children.map((child) => (
+                                                                    <li key={child.label}>
+                                                                        <Link
+                                                                            href={child.href}
+                                                                            className={`flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all ${
+                                                                                isActive(child.href)
+                                                                                    ? 'bg-purple-500/20 text-purple-700 dark:text-white'
+                                                                                    : 'text-zinc-500 dark:text-white/50 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-white/5'
+                                                                            }`}
+                                                                        >
+                                                                            {child.icon}
+                                                                            <span className="font-medium text-sm">{child.labelZh}</span>
+                                                                        </Link>
+                                                                    </li>
+                                                                ))}
+                                                            </ul>
+                                                        </motion.div>
+                                                    )}
+                                                </AnimatePresence>
+                                            </li>
+                                        );
+                                    }
+                                    return (
+                                        <li key={item.label}>
+                                            <Link
+                                                href={item.href!}
+                                                className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${
+                                                    isActive(item.href!)
+                                                        ? 'bg-purple-500/20 text-purple-700 dark:text-white'
+                                                        : 'text-zinc-600 dark:text-white/60 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-white/5'
                                                 }`}
-                                        >
-                                            {item.icon}
-                                            <span className="font-medium text-base">{item.labelZh}</span>
-                                        </Link>
-                                    </li>
-                                ))}
+                                            >
+                                                {item.icon}
+                                                <span className="font-medium text-base">{item.labelZh}</span>
+                                            </Link>
+                                        </li>
+                                    );
+                                })}
                             </ul>
 
                             {/* Settings Section */}

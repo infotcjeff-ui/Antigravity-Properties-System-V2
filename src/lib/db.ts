@@ -256,19 +256,50 @@ export interface CurrentTenant {
   deletedAt?: Date;
 }
 
+/** 過往相簿 (Lot History Album) - 保存地段歷史記錄 */
+export interface LotHistoryAlbum {
+  id?: string;
+  /** 關聯的物业 ID */
+  propertyId: string;
+  type: 'new' | 'old';
+  value: string;
+  lotArea?: string;
+  lotStatus?: 'renting' | 'rented';
+  waterMeter?: boolean;
+  electricMeter?: boolean;
+  contractStatus?: 'ongoing' | 'expiring' | 'not_renewing';
+  lotTenantId?: string;
+  note?: string;
+  /** JSON 陣列，儲存圖片 URL 或 base64 */
+  media?: string[];
+  waterMeterMedia?: string[];
+  electricMeterMedia?: string[];
+  waterMeterNote?: string;
+  electricMeterNote?: string;
+  startDate?: string;
+  endDate?: string;
+  createdAt: Date;
+  updatedAt: Date;
+  isDeleted?: boolean;
+  /** 軟刪除時間 */
+  deletedAt?: Date;
+}
+
 // Dexie Database Class
 class PropertyManagementDB extends Dexie {
   properties!: EntityTable<Property, 'id'>;
   proprietors!: EntityTable<Proprietor, 'id'>;
   rents!: EntityTable<Rent, 'id'>;
+  lotHistoryAlbums!: EntityTable<LotHistoryAlbum, 'id'>;
 
   constructor() {
     super('PropertyManagementDB');
 
-    this.version(3).stores({
+    this.version(4).stores({
       properties: 'id, proprietorId, tenantId, name, code, type, status, landUse, createdBy, createdAt',
       proprietors: 'id, name, code, category, createdBy, createdAt',
-      rents: 'id, propertyId, proprietorId, tenantId, type, status, startDate, endDate, createdBy, createdAt'
+      rents: 'id, propertyId, proprietorId, tenantId, type, status, startDate, endDate, createdBy, createdAt',
+      lotHistoryAlbums: 'id, propertyId, createdAt'
     });
 
     this.on('ready', () => {

@@ -105,8 +105,8 @@ export default function Sidebar({ isAuthenticated = false }: SidebarProps) {
                 <Link href="/" className="flex items-center justify-center">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
-                        src="/sitelogo/貨車城集團 橫 black.png"
-                        alt="貨車城集團"
+                        src="/sitelogo/EasyParking - 橫.png"
+                        alt="EasyParking"
                         className="w-[80%] object-contain"
                     />
                 </Link>
