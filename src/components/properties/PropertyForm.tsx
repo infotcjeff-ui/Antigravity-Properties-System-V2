@@ -1497,8 +1497,8 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
     const removeLotMediaItem = (index: number, target: 'temp' | 'edit' | 'history') => {
         if (target === 'history') {
             setLotHistoryAlbumForm(prev => {
-                const item = prev.media[index];
-                if (item && 'preview' in item) URL.revokeObjectURL(item.preview);
+                const item = prev.media[index] as { preview?: string } | undefined;
+                if (item?.preview) URL.revokeObjectURL(item.preview);
                 return { ...prev, media: prev.media.filter((_, i) => i !== index) };
             });
             return;
