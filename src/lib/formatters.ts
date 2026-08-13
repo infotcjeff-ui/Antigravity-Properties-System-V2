@@ -206,6 +206,8 @@ export interface LotEntry {
     electricMeterNote?: string;
     lotTenantId?: string;
     contractStatus?: LotContractStatus;
+    startDate?: string;
+    endDate?: string;
 }
 
 /** Parse lotIndex string into LotEntry array. Handles legacy format. */
@@ -220,7 +222,7 @@ export function parseLotEntries(lotIndex: string | null | undefined): LotEntry[]
                     t?: string; v?: string; m?: MediaItem[] | string[]; n?: string;
                     s?: string; a?: string; w?: boolean; e?: boolean;
                     wm?: MediaItem[]; em?: MediaItem[]; wn?: string; en?: string;
-                    ti?: string; cs?: string;
+                    ti?: string; cs?: string; sd?: string; ed?: string;
                 };
                 // 兼容舊格式 m: ["url1", "url2"] → 轉成 [{u, s:0}]
                 const media: MediaItem[] | undefined = obj.m ? (
@@ -251,6 +253,8 @@ export function parseLotEntries(lotIndex: string | null | undefined): LotEntry[]
                     electricMeterNote: obj.en,
                     lotTenantId: obj.ti,
                     contractStatus: (obj.cs as LotContractStatus) || undefined,
+                    startDate: obj.sd,
+                    endDate: obj.ed,
                 };
             } catch {
                 // fall through to legacy
@@ -281,6 +285,8 @@ export function serializeLotEntries(entries: LotEntry[]): string {
             en: e.electricMeterNote || undefined,
             ti: e.lotTenantId || undefined,
             cs: e.contractStatus || undefined,
+            sd: e.startDate || undefined,
+            ed: e.endDate || undefined,
         })
     ).join('\n');
 }
