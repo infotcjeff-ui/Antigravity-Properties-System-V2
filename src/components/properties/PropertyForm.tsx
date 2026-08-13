@@ -2710,7 +2710,7 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                                                                 <SearchableSelect
                                                                     value={editingLotTenantId || ''}
                                                                     onChange={(val) => setEditingLotTenantId(val || null)}
-                                                                    options={(currentTenants || []).map(t => ({ value: t.id, label: t.name || '' }))}
+                                                                    options={(currentTenants || []).filter(t => t.id).map(t => ({ value: t.id!, label: t.name || '' }))}
                                                                     placeholder="搜尋現時租客..."
                                                                     className="w-full"
                                                                 />
@@ -2896,7 +2896,7 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                                                                 <SearchableSelect
                                                                     value={tempLotTenantId || ''}
                                                                     onChange={(val) => setTempLotTenantId(val || null)}
-                                                                    options={(currentTenants || []).map(t => ({ value: t.id, label: t.name || '' }))}
+                                                                    options={(currentTenants || []).filter(t => t.id).map(t => ({ value: t.id!, label: t.name || '' }))}
                                                                     placeholder="搜尋現時租客..."
                                                                     className="w-full"
                                                                 />
@@ -3155,7 +3155,7 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                                                 <SearchableSelect
                                                     value={lotHistoryAlbumForm.tenantId}
                                                     onChange={(val) => setLotHistoryAlbumForm(prev => ({ ...prev, tenantId: val }))}
-                                                    options={(currentTenants || []).map(t => ({ value: t.id, label: t.name || '' }))}
+                                                    options={(currentTenants || []).filter(t => t.id).map(t => ({ value: t.id!, label: t.name || '' }))}
                                                     placeholder="搜尋現時租客..."
                                                     className="w-full text-sm"
                                                 />
