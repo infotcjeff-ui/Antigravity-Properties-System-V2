@@ -1482,7 +1482,7 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
         if (target === 'history') {
             const remaining = 10 - lotHistoryAlbumForm.media.length;
             if (remaining <= 0) return;
-            const toUpload = files.slice(0, remaining).map(file => ({ file, s: file.size, preview: URL.createObjectURL(file) })) as MediaItem[];
+            const toUpload = files.slice(0, remaining).map(file => ({ file, s: file.size, preview: URL.createObjectURL(file) })) as unknown as MediaItem[];
             setLotHistoryAlbumForm(prev => ({ ...prev, media: [...prev.media, ...toUpload] }));
             return;
         }
