@@ -270,10 +270,10 @@ export interface LotHistoryAlbum {
   contractStatus?: 'ongoing' | 'expiring' | 'not_renewing';
   lotTenantId?: string;
   note?: string;
-  /** JSON 陣列，儲存圖片 URL 或 base64 */
-  media?: string[];
-  waterMeterMedia?: string[];
-  electricMeterMedia?: string[];
+  /** 圖片陣列 */
+  media?: { u: string; s: number }[];
+  waterMeterMedia?: { u: string; s: number }[];
+  electricMeterMedia?: { u: string; s: number }[];
   waterMeterNote?: string;
   electricMeterNote?: string;
   startDate?: string;

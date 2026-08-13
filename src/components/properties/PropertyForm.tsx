@@ -368,13 +368,13 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
     const [lotDetailTab, setLotDetailTab] = useState<'info' | 'images'>('info');
     const [lotAddMode, setLotAddMode] = useState<'new' | 'old' | null>(null);
     const [tempLotInput, setTempLotInput] = useState('');
-    const [tempLotMedia, setTempLotMedia] = useState<Array<{ u: string; s: number } | { file: File; preview: string }>>([]);
+    const [tempLotMedia, setTempLotMedia] = useState<Array<{ u: string; s: number } | { file: File; s: number; preview: string }>>([]);
     const [tempLotNote, setTempLotNote] = useState('');
     const [tempLotStatus, setTempLotStatus] = useState<LotStatus | null>(null);
     const [tempLotWaterMeter, setTempLotWaterMeter] = useState(false);
     const [tempLotElectricMeter, setTempLotElectricMeter] = useState(false);
-    const [tempLotWaterMeterMedia, setTempLotWaterMeterMedia] = useState<Array<{ u: string; s: number } | { file: File; preview: string }>>([]);
-    const [tempLotElectricMeterMedia, setTempLotElectricMeterMedia] = useState<Array<{ u: string; s: number } | { file: File; preview: string }>>([]);
+    const [tempLotWaterMeterMedia, setTempLotWaterMeterMedia] = useState<Array<{ u: string; s: number } | { file: File; s: number; preview: string }>>([]);
+    const [tempLotElectricMeterMedia, setTempLotElectricMeterMedia] = useState<Array<{ u: string; s: number } | { file: File; s: number; preview: string }>>([]);
     const [tempLotWaterMeterNote, setTempLotWaterMeterNote] = useState('');
     const [tempLotElectricMeterNote, setTempLotElectricMeterNote] = useState('');
     const [tempLotTenantId, setTempLotTenantId] = useState<string | null>(null);
@@ -384,14 +384,14 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
     const [editingLotIndex, setEditingLotIndex] = useState<number | null>(null);
     const [editingLotValue, setEditingLotValue] = useState('');
     const [editingLotType, setEditingLotType] = useState<'new' | 'old'>('new');
-    const [editingLotMedia, setEditingLotMedia] = useState<Array<{ u: string; s: number } | { file: File; preview: string }>>([]);
+    const [editingLotMedia, setEditingLotMedia] = useState<Array<{ u: string; s: number } | { file: File; s: number; preview: string }>>([]);
     const [editingLotNote, setEditingLotNote] = useState('');
     const [editingLotStatus, setEditingLotStatus] = useState<LotStatus | undefined>(undefined);
     const [editingLotArea, setEditingLotArea] = useState('');
     const [editingLotWaterMeter, setEditingLotWaterMeter] = useState(false);
     const [editingLotElectricMeter, setEditingLotElectricMeter] = useState(false);
-    const [editingLotWaterMeterMedia, setEditingLotWaterMeterMedia] = useState<Array<{ u: string; s: number } | { file: File; preview: string }>>([]);
-    const [editingLotElectricMeterMedia, setEditingLotElectricMeterMedia] = useState<Array<{ u: string; s: number } | { file: File; preview: string }>>([]);
+    const [editingLotWaterMeterMedia, setEditingLotWaterMeterMedia] = useState<Array<{ u: string; s: number } | { file: File; s: number; preview: string }>>([]);
+    const [editingLotElectricMeterMedia, setEditingLotElectricMeterMedia] = useState<Array<{ u: string; s: number } | { file: File; s: number; preview: string }>>([]);
     const [editingLotWaterMeterNote, setEditingLotWaterMeterNote] = useState('');
     const [editingLotElectricMeterNote, setEditingLotElectricMeterNote] = useState('');
     const [editingLotTenantId, setEditingLotTenantId] = useState<string | null>(null);
@@ -417,9 +417,9 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                 .toArray();
             return albums.map(a => ({
                 ...a,
-                media: a.media?.map(u => ({ u, s: 0 })) || [],
-                waterMeterMedia: a.waterMeterMedia?.map(u => ({ u, s: 0 })) || [],
-                electricMeterMedia: a.electricMeterMedia?.map(u => ({ u, s: 0 })) || [],
+                media: a.media || [],
+                waterMeterMedia: a.waterMeterMedia || [],
+                electricMeterMedia: a.electricMeterMedia || [],
             }));
         } catch { return []; }
     };
@@ -429,11 +429,20 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
     const [lotHistoryAlbumPreview, setLotHistoryAlbumPreview] = useState<{ url: string; type: 'main' | 'water' | 'electric' } | null>(null);
     /** 圖片 tab - 新增過往相簿表單 */
     const [lotHistoryAlbumFormOpen, setLotHistoryAlbumFormOpen] = useState(false);
-    const [lotHistoryAlbumForm, setLotHistoryAlbumForm] = useState({
+    const [lotHistoryAlbumForm, setLotHistoryAlbumForm] = useState<{
+        value: string; lotArea: string; waterMeter: boolean; electricMeter: boolean;
+        lotStatus: LotStatus | ''; contractStatus: LotContractStatus | '';
+        tenantId: string; note: string;
+        media: (MediaItem | { file: File; s: number; preview: string })[];
+        waterMeterMedia: (MediaItem | { file: File; s: number; preview: string })[];
+        electricMeterMedia: (MediaItem | { file: File; s: number; preview: string })[];
+        waterMeterNote: string; electricMeterNote: string;
+        startDate: string; endDate: string;
+    }>({
         value: '', lotArea: '', waterMeter: false, electricMeter: false,
-        lotStatus: '' as LotStatus | '', contractStatus: '' as LotContractStatus | '',
-        tenantId: '' as string, note: '',
-        media: [] as MediaItem[], waterMeterMedia: [] as MediaItem[], electricMeterMedia: [] as MediaItem[],
+        lotStatus: '', contractStatus: '',
+        tenantId: '', note: '',
+        media: [], waterMeterMedia: [], electricMeterMedia: [],
         waterMeterNote: '', electricMeterNote: '',
         startDate: '', endDate: '',
     });
@@ -505,16 +514,16 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
         if (!trimmed) return;
         setLotSaving(true);
         try {
-        const pendingFiles = tempLotMedia.filter((x): x is { file: File; preview: string } => 'file' in x && 'preview' in x);
+        const pendingFiles = tempLotMedia.filter((x): x is { file: File; s: number; preview: string } => 'file' in x && 'preview' in x);
         const existingMedia = tempLotMedia.filter((x): x is { u: string; s: number } => 'u' in x && 's' in x);
         const uploadedNew = pendingFiles.length > 0 ? await processAndUploadFiles(pendingFiles, 'lots') : [];
 
         // 水錶電錶圖片上傳
-        const wmPending = tempLotWaterMeterMedia.filter((x): x is { file: File; preview: string } => 'file' in x && 'preview' in x);
+        const wmPending = tempLotWaterMeterMedia.filter((x): x is { file: File; s: number; preview: string } => 'file' in x && 'preview' in x);
         const wmExisting = tempLotWaterMeterMedia.filter((x): x is { u: string; s: number } => 'u' in x && 's' in x);
         const wmUploaded = wmPending.length > 0 ? await processAndUploadFiles(wmPending, 'lots') : [];
 
-        const emPending = tempLotElectricMeterMedia.filter((x): x is { file: File; preview: string } => 'file' in x && 'preview' in x);
+        const emPending = tempLotElectricMeterMedia.filter((x): x is { file: File; s: number; preview: string } => 'file' in x && 'preview' in x);
         const emExisting = tempLotElectricMeterMedia.filter((x): x is { u: string; s: number } => 'u' in x && 's' in x);
         const emUploaded = emPending.length > 0 ? await processAndUploadFiles(emPending, 'lots') : [];
 
@@ -562,15 +571,15 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
         if (!trimmed) return;
         setLotSaving(true);
         try {
-        const pendingFiles = tempLotMedia.filter((x): x is { file: File; preview: string } => 'file' in x && 'preview' in x);
+        const pendingFiles = tempLotMedia.filter((x): x is { file: File; s: number; preview: string } => 'file' in x && 'preview' in x);
         const existingMedia = tempLotMedia.filter((x): x is { u: string; s: number } => 'u' in x && 's' in x);
         const uploadedNew = pendingFiles.length > 0 ? await processAndUploadFiles(pendingFiles, 'lots') : [];
 
-        const wmPending = tempLotWaterMeterMedia.filter((x): x is { file: File; preview: string } => 'file' in x && 'preview' in x);
+        const wmPending = tempLotWaterMeterMedia.filter((x): x is { file: File; s: number; preview: string } => 'file' in x && 'preview' in x);
         const wmExisting = tempLotWaterMeterMedia.filter((x): x is { u: string; s: number } => 'u' in x && 's' in x);
         const wmUploaded = wmPending.length > 0 ? await processAndUploadFiles(wmPending, 'lots') : [];
 
-        const emPending = tempLotElectricMeterMedia.filter((x): x is { file: File; preview: string } => 'file' in x && 'preview' in x);
+        const emPending = tempLotElectricMeterMedia.filter((x): x is { file: File; s: number; preview: string } => 'file' in x && 'preview' in x);
         const emExisting = tempLotElectricMeterMedia.filter((x): x is { u: string; s: number } => 'u' in x && 's' in x);
         const emUploaded = emPending.length > 0 ? await processAndUploadFiles(emPending, 'lots') : [];
 
@@ -618,15 +627,15 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
         if (!trimmed) return;
         setLotSaving(true);
         try {
-        const pendingFiles = tempLotMedia.filter((x): x is { file: File; preview: string } => 'file' in x && 'preview' in x);
+        const pendingFiles = tempLotMedia.filter((x): x is { file: File; s: number; preview: string } => 'file' in x && 'preview' in x);
         const existingMedia = tempLotMedia.filter((x): x is { u: string; s: number } => 'u' in x && 's' in x);
         const uploadedNew = pendingFiles.length > 0 ? await processAndUploadFiles(pendingFiles, 'lots') : [];
 
-        const wmPending = tempLotWaterMeterMedia.filter((x): x is { file: File; preview: string } => 'file' in x && 'preview' in x);
+        const wmPending = tempLotWaterMeterMedia.filter((x): x is { file: File; s: number; preview: string } => 'file' in x && 'preview' in x);
         const wmExisting = tempLotWaterMeterMedia.filter((x): x is { u: string; s: number } => 'u' in x && 's' in x);
         const wmUploaded = wmPending.length > 0 ? await processAndUploadFiles(wmPending, 'lots') : [];
 
-        const emPending = tempLotElectricMeterMedia.filter((x): x is { file: File; preview: string } => 'file' in x && 'preview' in x);
+        const emPending = tempLotElectricMeterMedia.filter((x): x is { file: File; s: number; preview: string } => 'file' in x && 'preview' in x);
         const emExisting = tempLotElectricMeterMedia.filter((x): x is { u: string; s: number } => 'u' in x && 's' in x);
         const emUploaded = emPending.length > 0 ? await processAndUploadFiles(emPending, 'lots') : [];
 
@@ -728,16 +737,16 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
         const entry = next[editingLotIndex];
         const wasLease = entry.value.endsWith('(租賃地段)');
         const wasGov = entry.value.endsWith('(政府短期租約)');
-        const pendingFiles = editingLotMedia.filter((x): x is { file: File; preview: string } => typeof x === 'object');
+        const pendingFiles = editingLotMedia.filter((x): x is { file: File; s: number; preview: string } => typeof x === 'object');
         const existingMedia = editingLotMedia.filter((x): x is { u: string; s: number } => typeof x === 'object' && 'u' in x && 's' in x);
         const uploadedNew = pendingFiles.length > 0 ? await processAndUploadFiles(pendingFiles, 'lots') : [];
 
         // 水錶電錶圖片上傳
-        const waterMeterPendingFiles = editingLotWaterMeterMedia.filter((x): x is { file: File; preview: string } => typeof x === 'object');
+        const waterMeterPendingFiles = editingLotWaterMeterMedia.filter((x): x is { file: File; s: number; preview: string } => typeof x === 'object');
         const waterMeterExisting = editingLotWaterMeterMedia.filter((x): x is { u: string; s: number } => typeof x === 'object' && 'u' in x && 's' in x);
         const waterMeterUploaded = waterMeterPendingFiles.length > 0 ? await processAndUploadFiles(waterMeterPendingFiles, 'lots') : [];
 
-        const electricMeterPendingFiles = editingLotElectricMeterMedia.filter((x): x is { file: File; preview: string } => typeof x === 'object');
+        const electricMeterPendingFiles = editingLotElectricMeterMedia.filter((x): x is { file: File; s: number; preview: string } => typeof x === 'object');
         const electricMeterExisting = editingLotElectricMeterMedia.filter((x): x is { u: string; s: number } => typeof x === 'object' && 'u' in x && 's' in x);
         const electricMeterUploaded = electricMeterPendingFiles.length > 0 ? await processAndUploadFiles(electricMeterPendingFiles, 'lots') : [];
 
@@ -1482,7 +1491,7 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
         if (target === 'history') {
             const remaining = 10 - lotHistoryAlbumForm.media.length;
             if (remaining <= 0) return;
-            const toUpload = files.slice(0, remaining).map(file => ({ file, s: file.size, preview: URL.createObjectURL(file) })) as unknown as MediaItem[];
+            const toUpload = files.slice(0, remaining).map(file => ({ file, s: file.size, preview: URL.createObjectURL(file) })) as unknown as (MediaItem | { file: File; s: number; preview: string })[];
             setLotHistoryAlbumForm(prev => ({ ...prev, media: [...prev.media, ...toUpload] }));
             return;
         }
@@ -1491,14 +1500,14 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
         const remaining = 10 - existing.length;
         if (remaining <= 0) return;
         const toUpload = files.slice(0, remaining).map(file => ({ file, s: file.size, preview: URL.createObjectURL(file) }));
-        setter(prev => [...prev, ...toUpload]);
+        setter((prev: typeof tempLotMedia) => [...prev, ...toUpload]);
     };
 
     const removeLotMediaItem = (index: number, target: 'temp' | 'edit' | 'history') => {
         if (target === 'history') {
             setLotHistoryAlbumForm(prev => {
-                const item = prev.media[index] as { preview?: string } | undefined;
-                if (item?.preview) URL.revokeObjectURL(item.preview);
+                const item = prev.media[index];
+                if (item && 'preview' in item) URL.revokeObjectURL((item as { preview: string }).preview);
                 return { ...prev, media: prev.media.filter((_, i) => i !== index) };
             });
             return;
@@ -1573,8 +1582,8 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
 
         try {
             // Extract pending (object) items for upload, preserve order
-            const imagePending = orderedImages.filter((x): x is { file: File; preview: string } => typeof x === 'object');
-            const geoPending = orderedGeoMaps.filter((x): x is { file: File; preview: string } => typeof x === 'object');
+            const imagePending = orderedImages.filter((x): x is { file: File; s: number; preview: string } => typeof x === 'object');
+            const geoPending = orderedGeoMaps.filter((x): x is { file: File; s: number; preview: string } => typeof x === 'object');
 
             const [uploadedImages, uploadedGeoMaps] = await Promise.all([
                 processAndUploadFiles(imagePending, 'properties'),
@@ -2760,7 +2769,7 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                                                             <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2">
                                                                 {editingLotMedia.map((item, idx) => (
                                                                     <div key={idx} className="relative group aspect-square rounded-xl overflow-hidden border border-zinc-200 dark:border-white/10">
-                                                                        <img src={'u' in item ? item.u : item.preview} alt="" className="w-full h-full object-cover" />
+                                                                    <img src={('u' in item) ? item.u : item.preview} alt="" className="w-full h-full object-cover" />
                                                                         <button
                                                                             type="button"
                                                                             onClick={() => removeLotMediaItem(idx, 'edit')}
@@ -2784,7 +2793,7 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                                                                 <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2">
                                                                     {editingLotWaterMeterMedia.map((item, idx) => (
                                                                         <div key={idx} className="relative group aspect-square rounded-xl overflow-hidden border border-cyan-200 dark:border-cyan-500/30">
-                                                                            <img src={'u' in item ? item.u : item.preview} alt="" className="w-full h-full object-cover" />
+                                                                        <img src={('u' in item) ? item.u : item.preview} alt="" className="w-full h-full object-cover" />
                                                                             <button
                                                                                 type="button"
                                                                                 onClick={() => { const next = [...editingLotWaterMeterMedia]; next.splice(idx, 1); setEditingLotWaterMeterMedia(next); }}
@@ -2797,7 +2806,7 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                                                                     {editingLotWaterMeterMedia.length < 10 && (
                                                                         <div className="aspect-square">
                                                                             <FileUpload onChange={(files) => {
-                                                                                const newItems = files.map(f => ({ file: f, preview: URL.createObjectURL(f) }));
+                                                                                const newItems = files.map(f => ({ file: f, s: f.size, preview: URL.createObjectURL(f) }));
                                                                                 setEditingLotWaterMeterMedia(prev => [...prev, ...newItems]);
                                                                             }} />
                                                                         </div>
@@ -2816,7 +2825,7 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                                                                 <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2">
                                                                     {editingLotElectricMeterMedia.map((item, idx) => (
                                                                         <div key={idx} className="relative group aspect-square rounded-xl overflow-hidden border border-amber-200 dark:border-amber-500/30">
-                                                                            <img src={'u' in item ? item.u : item.preview} alt="" className="w-full h-full object-cover" />
+                                                                        <img src={('u' in item) ? item.u : item.preview} alt="" className="w-full h-full object-cover" />
                                                                             <button
                                                                                 type="button"
                                                                                 onClick={() => { const next = [...editingLotElectricMeterMedia]; next.splice(idx, 1); setEditingLotElectricMeterMedia(next); }}
@@ -2829,7 +2838,7 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                                                                     {editingLotElectricMeterMedia.length < 10 && (
                                                                         <div className="aspect-square">
                                                                             <FileUpload onChange={(files) => {
-                                                                                const newItems = files.map(f => ({ file: f, preview: URL.createObjectURL(f) }));
+                                                                                const newItems = files.map(f => ({ file: f, s: f.size, preview: URL.createObjectURL(f) }));
                                                                                 setEditingLotElectricMeterMedia(prev => [...prev, ...newItems]);
                                                                             }} />
                                                                         </div>
@@ -2964,7 +2973,7 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                                                             <div className="flex gap-2 flex-wrap">
                                                                 {tempLotMedia.map((item, idx) => (
                                                                     <div key={idx} className="relative group w-24 h-24 rounded-xl overflow-hidden border border-zinc-200 dark:border-white/10">
-                                                                        <img src={'u' in item ? item.u : item.preview} alt="" className="w-full h-full object-cover" />
+                                                                    <img src={('u' in item) ? item.u : item.preview} alt="" className="w-full h-full object-cover" />
                                                                         <button
                                                                             type="button"
                                                                             onClick={() => removeLotMediaItem(idx, 'temp')}
@@ -2988,7 +2997,7 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                                                                 <div className="flex gap-2 flex-wrap">
                                                                     {tempLotWaterMeterMedia.map((item, idx) => (
                                                                         <div key={idx} className="relative group w-24 h-24 rounded-xl overflow-hidden border border-cyan-200 dark:border-cyan-500/30">
-                                                                            <img src={'u' in item ? item.u : item.preview} alt="" className="w-full h-full object-cover" />
+                                                                        <img src={('u' in item) ? item.u : item.preview} alt="" className="w-full h-full object-cover" />
                                                                             <button
                                                                                 type="button"
                                                                                 onClick={() => { const next = [...tempLotWaterMeterMedia]; next.splice(idx, 1); setTempLotWaterMeterMedia(next); }}
@@ -3001,7 +3010,7 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                                                                     {tempLotWaterMeterMedia.length < 10 && (
                                                                         <div className="w-24 h-24">
                                                                             <FileUpload onChange={(files) => {
-                                                                                const newItems = files.map(f => ({ file: f, preview: URL.createObjectURL(f) }));
+                                                                                const newItems = files.map(f => ({ file: f, s: f.size, preview: URL.createObjectURL(f) }));
                                                                                 setTempLotWaterMeterMedia(prev => [...prev, ...newItems]);
                                                                             }} />
                                                                         </div>
@@ -3020,7 +3029,7 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                                                                 <div className="flex gap-2 flex-wrap">
                                                                     {tempLotElectricMeterMedia.map((item, idx) => (
                                                                         <div key={idx} className="relative group w-24 h-24 rounded-xl overflow-hidden border border-amber-200 dark:border-amber-500/30">
-                                                                            <img src={'u' in item ? item.u : item.preview} alt="" className="w-full h-full object-cover" />
+                                                                        <img src={('u' in item) ? item.u : item.preview} alt="" className="w-full h-full object-cover" />
                                                                             <button
                                                                                 type="button"
                                                                                 onClick={() => { const next = [...tempLotElectricMeterMedia]; next.splice(idx, 1); setTempLotElectricMeterMedia(next); }}
@@ -3033,7 +3042,7 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                                                                     {tempLotElectricMeterMedia.length < 10 && (
                                                                         <div className="w-24 h-24">
                                                                             <FileUpload onChange={(files) => {
-                                                                                const newItems = files.map(f => ({ file: f, preview: URL.createObjectURL(f) }));
+                                                                                const newItems = files.map(f => ({ file: f, s: f.size, preview: URL.createObjectURL(f) }));
                                                                                 setTempLotElectricMeterMedia(prev => [...prev, ...newItems]);
                                                                             }} />
                                                                         </div>
@@ -3177,7 +3186,7 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                                             <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2">
                                                 {lotHistoryAlbumForm.media.map((item, idx) => (
                                                     <div key={idx} className="relative group aspect-square rounded-xl overflow-hidden border border-zinc-200 dark:border-white/10">
-                                                        <img src={'u' in item ? item.u : item.preview} alt="" className="w-full h-full object-cover" />
+                                                        <img src={'u' in item ? item.u : (item as { preview: string }).preview} alt="" className="w-full h-full object-cover" />
                                                         <button type="button"
                                                             onClick={() => removeLotMediaItem(idx, 'history')}
                                                             className="absolute top-0 right-0 w-5 h-5 bg-red-500 text-white rounded-bl-lg flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-xs">
@@ -3198,7 +3207,7 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                                                 <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2">
                                                     {lotHistoryAlbumForm.waterMeterMedia.map((item, idx) => (
                                                         <div key={idx} className="relative group aspect-square rounded-xl overflow-hidden border border-cyan-200 dark:border-cyan-500/30">
-                                                            <img src={'u' in item ? item.u : item.preview} alt="" className="w-full h-full object-cover" />
+                                                            <img src={'u' in item ? item.u : (item as { preview: string }).preview} alt="" className="w-full h-full object-cover" />
                                                             <button type="button"
                                                                 onClick={() => setLotHistoryAlbumForm(prev => ({ ...prev, waterMeterMedia: prev.waterMeterMedia.filter((_, i) => i !== idx) }))}
                                                                 className="absolute top-0 right-0 w-5 h-5 bg-red-500 text-white rounded-bl-lg flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-xs">
@@ -3209,7 +3218,7 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                                                     {lotHistoryAlbumForm.waterMeterMedia.length < 10 && (
                                                         <div className="aspect-square">
                                                             <FileUpload onChange={(files) => {
-                                                                const newItems = files.map(f => ({ file: f, preview: URL.createObjectURL(f) }));
+                                                                const newItems = files.map(f => ({ file: f, s: f.size, preview: URL.createObjectURL(f) }));
                                                                 setLotHistoryAlbumForm(prev => ({ ...prev, waterMeterMedia: [...prev.waterMeterMedia, ...newItems] }));
                                                             }} />
                                                         </div>
@@ -3227,7 +3236,7 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                                                 <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2">
                                                     {lotHistoryAlbumForm.electricMeterMedia.map((item, idx) => (
                                                         <div key={idx} className="relative group aspect-square rounded-xl overflow-hidden border border-amber-200 dark:border-amber-500/30">
-                                                            <img src={'u' in item ? item.u : item.preview} alt="" className="w-full h-full object-cover" />
+                                                            <img src={'u' in item ? item.u : (item as { preview: string }).preview} alt="" className="w-full h-full object-cover" />
                                                             <button type="button"
                                                                 onClick={() => setLotHistoryAlbumForm(prev => ({ ...prev, electricMeterMedia: prev.electricMeterMedia.filter((_, i) => i !== idx) }))}
                                                                 className="absolute top-0 right-0 w-5 h-5 bg-red-500 text-white rounded-bl-lg flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-xs">
@@ -3238,7 +3247,7 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                                                     {lotHistoryAlbumForm.electricMeterMedia.length < 10 && (
                                                         <div className="aspect-square">
                                                             <FileUpload onChange={(files) => {
-                                                                const newItems = files.map(f => ({ file: f, preview: URL.createObjectURL(f) }));
+                                                                const newItems = files.map(f => ({ file: f, s: f.size, preview: URL.createObjectURL(f) }));
                                                                 setLotHistoryAlbumForm(prev => ({ ...prev, electricMeterMedia: [...prev.electricMeterMedia, ...newItems] }));
                                                             }} />
                                                         </div>
@@ -3267,9 +3276,9 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                                             onClick={async () => {
                                                 if (!property?.id) return;
                                                 const albumId = `hist-${Date.now()}`;
-                                                const mediaUrls = lotHistoryAlbumForm.media.map(m => 'u' in m ? m.u : m.preview);
-                                                const wmUrls = lotHistoryAlbumForm.waterMeterMedia.map(m => 'u' in m ? m.u : m.preview);
-                                                const emUrls = lotHistoryAlbumForm.electricMeterMedia.map(m => 'u' in m ? m.u : m.preview);
+                                                const mediaUrls = lotHistoryAlbumForm.media.map(m => ({ u: 'u' in m ? m.u : m.preview, s: 's' in m ? m.s : 0 }));
+                                                const wmUrls = lotHistoryAlbumForm.waterMeterMedia.map(m => ({ u: 'u' in m ? m.u : m.preview, s: 's' in m ? m.s : 0 }));
+                                                const emUrls = lotHistoryAlbumForm.electricMeterMedia.map(m => ({ u: 'u' in m ? m.u : m.preview, s: 's' in m ? m.s : 0 }));
                                                 const newAlbum = {
                                                     id: albumId,
                                                     type: 'old' as const,
@@ -3281,9 +3290,9 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                                                     contractStatus: lotHistoryAlbumForm.contractStatus as LotContractStatus | undefined,
                                                     lotTenantId: lotHistoryAlbumForm.tenantId || undefined,
                                                     note: lotHistoryAlbumForm.note,
-                                                    media: lotHistoryAlbumForm.media,
-                                                    waterMeterMedia: lotHistoryAlbumForm.waterMeterMedia,
-                                                    electricMeterMedia: lotHistoryAlbumForm.electricMeterMedia,
+                                                    media: mediaUrls,
+                                                    waterMeterMedia: wmUrls,
+                                                    electricMeterMedia: emUrls,
                                                     waterMeterNote: lotHistoryAlbumForm.waterMeterNote,
                                                     electricMeterNote: lotHistoryAlbumForm.electricMeterNote,
                                                     startDate: lotHistoryAlbumForm.startDate || undefined,
@@ -3394,9 +3403,9 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                                                                 <div className="grid grid-cols-3 gap-2">
                                                                     {album.media.map((m, idx) => (
                                                                         <button type="button" key={idx}
-                                                                            onClick={() => setLotHistoryAlbumPreview({ url: 'u' in m ? m.u : m.preview, type: 'main' })}
+                                                                            onClick={() => setLotHistoryAlbumPreview({ url: m.u, type: 'main' })}
                                                                             className="relative aspect-square rounded-lg overflow-hidden border border-zinc-200 dark:border-white/10 hover:ring-2 hover:ring-purple-500/50 transition-all cursor-pointer">
-                                                                            <img src={'u' in m ? m.u : m.preview} alt="" className="w-full h-full object-cover" />
+                                                                            <img src={m.u} alt="" className="w-full h-full object-cover" />
                                                                             <div className="absolute inset-0 bg-black/0 hover:bg-black/20 transition-colors flex items-center justify-center opacity-0 hover:opacity-100">
                                                                                 <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v3m0 0v3m0-3h3m-3 0H7" /></svg>
                                                                             </div>
@@ -3411,9 +3420,9 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                                                                 <div className="grid grid-cols-3 gap-2">
                                                                     {album.waterMeterMedia.map((m, idx) => (
                                                                         <button type="button" key={idx}
-                                                                            onClick={() => setLotHistoryAlbumPreview({ url: 'u' in m ? m.u : m.preview, type: 'water' })}
+                                                                            onClick={() => setLotHistoryAlbumPreview({ url: m.u, type: 'water' })}
                                                                             className="relative aspect-square rounded-lg overflow-hidden border border-cyan-200 dark:border-cyan-500/30 hover:ring-2 hover:ring-cyan-500/50 transition-all cursor-pointer">
-                                                                            <img src={'u' in m ? m.u : m.preview} alt="" className="w-full h-full object-cover" />
+                                                                            <img src={m.u} alt="" className="w-full h-full object-cover" />
                                                                             <div className="absolute inset-0 bg-black/0 hover:bg-black/20 transition-colors flex items-center justify-center opacity-0 hover:opacity-100">
                                                                                 <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v3m0 0v3m0-3h3m-3 0H7" /></svg>
                                                                             </div>
@@ -3429,9 +3438,9 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                                                                 <div className="grid grid-cols-3 gap-2">
                                                                     {album.electricMeterMedia.map((m, idx) => (
                                                                         <button type="button" key={idx}
-                                                                            onClick={() => setLotHistoryAlbumPreview({ url: 'u' in m ? m.u : m.preview, type: 'electric' })}
+                                                                            onClick={() => setLotHistoryAlbumPreview({ url: m.u, type: 'electric' })}
                                                                             className="relative aspect-square rounded-lg overflow-hidden border border-amber-200 dark:border-amber-500/30 hover:ring-2 hover:ring-amber-500/50 transition-all cursor-pointer">
-                                                                            <img src={'u' in m ? m.u : m.preview} alt="" className="w-full h-full object-cover" />
+                                                                            <img src={m.u} alt="" className="w-full h-full object-cover" />
                                                                             <div className="absolute inset-0 bg-black/0 hover:bg-black/20 transition-colors flex items-center justify-center opacity-0 hover:opacity-100">
                                                                                 <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v3m0 0v3m0-3h3m-3 0H7" /></svg>
                                                                             </div>
@@ -3487,7 +3496,7 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                                                             <div className="flex gap-3 items-stretch">
                                                                 {album.media && album.media.length > 0 ? (
                                                                     <div className="w-20 h-20 rounded-lg overflow-hidden shrink-0 border border-zinc-200 dark:border-white/10">
-                                                                        <img src={'u' in album.media[0] ? album.media[0].u : album.media[0].preview} alt="" className="w-full h-full object-cover" />
+                                                                    <img src={album.media[0].u} alt="" className="w-full h-full object-cover" />
                                                                     </div>
                                                                 ) : (
                                                                     <div className="w-20 h-20 rounded-lg bg-zinc-100 dark:bg-white/10 flex items-center justify-center shrink-0">
