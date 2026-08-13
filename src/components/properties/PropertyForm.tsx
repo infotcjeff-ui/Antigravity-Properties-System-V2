@@ -1416,7 +1416,7 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
         setFormData(formStateFromProperty(property));
         setOrderedImages(property.images || []);
         setOrderedGeoMaps(property.geoMaps || []);
-        loadLotHistoryAlbumsFromDB(property.id).then(setLotHistoryAlbums);
+        loadLotHistoryAlbumsFromDB(property.id).then((albums) => setLotHistoryAlbums(albums as typeof lotHistoryAlbums));
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [property?.id, property?.images, property.geoMaps]);
 
