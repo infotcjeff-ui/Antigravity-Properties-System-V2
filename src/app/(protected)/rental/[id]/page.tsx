@@ -590,8 +590,8 @@ export default function RentalPropertyPage() {
                 .rich-text-content h3 { font-size: 0.875rem; }
             `}</style>
 
-            <div className="rental-page-container">
-            <div className="h-full flex flex-col gap-4 lg:gap-6">
+            <div className="rental-page-container overflow-hidden">
+            <div className="h-full flex flex-col gap-4 lg:gap-6 overflow-y-auto rental-page-scroll p-2 sm:p-4 lg:p-0 lg:overflow-hidden">
             <motion.div initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }}>
 
                 <Link
@@ -603,13 +603,13 @@ export default function RentalPropertyPage() {
                 </Link>
             </motion.div>
 
-            {/* 主版型：左側（圖片）| 右側（資訊） */}
-            <div className="grid grid-cols-1 lg:grid-cols-[35%_1fr] gap-6 lg:gap-8 h-full min-h-0 pb-8">
+            {/* 主版型：響應式佈局 - 移動端垂直，桌面端左右 */}
+            <div className="grid grid-cols-1 xl:grid-cols-[38%_1fr] gap-4 lg:gap-6 flex-1 min-h-0">
                 {/* 左欄：圖片 */}
                 <motion.div
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
-                    className="flex flex-col gap-3 w-full h-full min-h-0 rounded-2xl overflow-hidden border border-zinc-200 dark:border-white/10 bg-zinc-100 dark:bg-white/5"
+                    className="flex flex-col gap-2 sm:gap-3 w-full min-h-0 rounded-2xl overflow-hidden border border-zinc-200 dark:border-white/10 bg-zinc-100 dark:bg-white/5"
                 >
                     {property.images && property.images.length > 0 && !imageError ? (
                         <>
@@ -714,7 +714,7 @@ export default function RentalPropertyPage() {
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: 0.1 }}
-                    className="flex flex-col min-h-0 h-full gap-4 p-4 lg:p-6 rounded-2xl border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/5"
+                    className="flex flex-col min-h-0 h-full gap-3 sm:gap-4 p-3 sm:p-4 lg:p-5 rounded-2xl border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/5 overflow-y-auto rental-page-scroll"
                 >
                     {/* 名稱與狀態 */}
                     <div className="shrink-0">
@@ -754,7 +754,7 @@ export default function RentalPropertyPage() {
                                 key={tab}
                                 type="button"
                                 onClick={() => setDetailTab(tab)}
-                                className={`px-3 sm:px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                                className={`px-2 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-medium transition-all cursor-pointer ${
                                     detailTab === tab
                                         ? 'bg-white dark:bg-white/15 text-zinc-900 dark:text-white shadow-sm border border-zinc-200/80 dark:border-white/10'
                                         : 'text-zinc-500 dark:text-white/55 hover:text-zinc-800 dark:hover:text-white'
@@ -765,7 +765,7 @@ export default function RentalPropertyPage() {
                         ))}
                     </div>
 
-                    <div className="min-h-0 flex-1 overflow-y-auto rental-page-scroll p-1 -m-1">
+                    <div className="min-h-0 flex-1 overflow-y-auto rental-page-scroll">
                         {detailTab === 'overview' && (
                             <div className="space-y-4">
                                 {/* 業主 */}
