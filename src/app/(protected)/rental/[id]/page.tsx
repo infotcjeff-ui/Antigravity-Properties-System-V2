@@ -10,6 +10,7 @@ import {
     parseLotEntries,
     proprietorCategoryLabelZh,
     LotStatus,
+    LotEntry,
 } from '@/lib/formatters';
 import {
     ArrowLeft,
@@ -94,7 +95,7 @@ function LotDetailModal({
     parentLocation,
     parentAddress,
 }: {
-    entry: { type: 'new' | 'old'; value: string; media?: { u: string; s: number }[]; note?: string; lotStatus?: LotStatus; lotArea?: string };
+    entry: LotEntry;
     onClose: () => void;
     parentLocation?: { lat: number; lng: number } | null;
     parentAddress?: string | null;
@@ -485,8 +486,8 @@ export default function RentalPropertyPage() {
     const galleryRef = useRef<HTMLDivElement>(null);
     const GALLERY_VISIBLE = 5;
 
-    const lotEntries = useMemo(() => parseLotEntries(property?.lotIndex ?? null), [property?.lotIndex]);
-    const [viewLotEntry, setViewLotEntry] = useState<{ type: 'new' | 'old'; value: string; media?: { u: string; s: number }[]; note?: string; lotStatus?: LotStatus; lotArea?: string } | null>(null);
+    const lotEntries = useMemo(() => parseLotEntries(property?.lotIndex ?? null) as LotEntry[], [property?.lotIndex]);
+    const [viewLotEntry, setViewLotEntry] = useState<LotEntry | null>(null);
 
     // 瀏覽次數
     const [viewCounts, setViewCounts] = useState<ViewCounts>({ viewCount: 0, liveCount: 0 });
