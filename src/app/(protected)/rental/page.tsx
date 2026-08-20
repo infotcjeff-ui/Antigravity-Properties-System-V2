@@ -133,7 +133,7 @@ export default function RentalPage() {
     };
 
     return (
-        <div className="flex flex-col h-[calc(100dvh-7rem)] space-y-3 pb-1">
+        <div className="flex flex-col h-[calc(100dvh-7rem)] space-y-3 pb-1 safe-area-bottom">
             <style jsx global>{`
                 .rental-page-scroll::-webkit-scrollbar {
                     display: none;
@@ -141,6 +141,9 @@ export default function RentalPage() {
                 .rental-page-scroll {
                     -ms-overflow-style: none;
                     scrollbar-width: none;
+                }
+                .safe-area-bottom {
+                    padding-bottom: env(safe-area-inset-bottom, 0px);
                 }
             `}</style>
 
@@ -210,7 +213,7 @@ export default function RentalPage() {
             </div>
 
             {/* Content */}
-            <div className="flex-1 min-h-0 overflow-hidden">
+            <div className="flex-1 min-h-0 lg:overflow-hidden">
             {qLoading ? (
                 <div className="flex items-center justify-center" style={{ height: '100%' }}>
                     <motion.div
@@ -243,7 +246,7 @@ export default function RentalPage() {
 
                     {/* Pagination UI */}
                     {totalPages > 1 && (
-                        <div className="flex items-center justify-center gap-2 pt-4 pb-2 border-t border-zinc-100 dark:border-white/5 sticky bottom-0 bg-white dark:bg-zinc-900">
+                        <div className="flex items-center justify-center gap-2 pt-4 pb-6 border-t border-zinc-100 dark:border-white/5 sticky bottom-0 bg-white dark:bg-zinc-900 z-10">
                             <button
                                 onClick={() => handlePageChange(Math.max(1, currentPage - 1))}
                                 disabled={currentPage === 1}
@@ -294,10 +297,10 @@ export default function RentalPage() {
                     )}
                 </div>
             ) : viewMode === 'list' ? (
-                    <div className="flex flex-col lg:flex-row flex-1 min-h-0 gap-0 bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-white/10 overflow-hidden h-full">
+                    <div className="flex flex-col lg:flex-row flex-1 min-h-0 lg:overflow-hidden lg:h-[837.6px] bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-white/10 overflow-hidden">
                     {/* Left: scrollable property list */}
-                    <div className="w-full lg:w-2/5 xl:w-2/5 shrink-0 border-b lg:border-b-0 lg:border-r border-zinc-200 dark:border-white/10 overflow-y-auto lg:h-auto max-h-[35vh] lg:max-h-none">
-                        <div className="px-3 py-2 bg-zinc-50 dark:bg-white/5">
+                    <div className="w-full lg:w-2/5 xl:w-2/5 shrink-0 border-b lg:border-b-0 lg:border-r border-zinc-200 dark:border-white/10 overflow-y-auto max-h-[35vh] lg:max-h-none" style={{ maxHeight: 'clamp(200px, 35vh, 300px)' }}>
+                        <div className="px-3 py-2 bg-zinc-50 dark:bg-white/5 sticky top-0 z-10">
                             <div className="flex items-center justify-between">
                                 <p className="text-sm font-semibold text-zinc-600 dark:text-white/60">
                                     {filteredProperties.length} 項出租
@@ -371,7 +374,7 @@ export default function RentalPage() {
                     </div>
 
                     {/* Right: property detail panel */}
-                    <div className="flex-1 flex flex-col overflow-hidden min-h-0">
+                    <div className="flex-1 flex flex-col min-h-0 overflow-y-auto rental-page-scroll">
                         {selectedPropertyId ? (
                             (() => {
                                 const selected = filteredProperties.find(p => p.id === selectedPropertyId) ?? filteredProperties[0] ?? null;
@@ -381,11 +384,11 @@ export default function RentalPage() {
                                 const nextProperty = filteredProperties[nextIndex + 1];
                                 const prevProperty = filteredProperties[nextIndex - 1];
                                 return (
-                                    <>
-                                        {/* Image Gallery - responsive height */}
+                                    <div className="flex flex-col h-full">
+                                        {/* Image Gallery - compact height for mobile */}
                                         {hasImages ? (
-                                            <div className="px-3 sm:px-4 pt-3 sm:pt-4 shrink-0">
-                                                <div className="flex flex-col sm:flex-row gap-2 h-auto sm:h-[28vh] lg:h-[32vh]">
+                                            <div className="px-3 sm:px-4 pt-3 shrink-0">
+                                                <div className="flex flex-col sm:flex-row gap-2 h-auto sm:h-[28vh] lg:h-[38vh]">
                                                     {/* Main image */}
                                                     <div
                                                         className="flex-1 relative rounded-xl overflow-hidden cursor-pointer group"
@@ -400,7 +403,7 @@ export default function RentalPage() {
                                                     </div>
                                                     {/* Side thumbnails */}
                                                     {selected.images.length > 1 && (
-                                                        <div className="hidden sm:flex flex-col gap-2 w-20 sm:w-24 md:w-28 lg:w-32">
+                                                        <div className="flex flex-col gap-2 w-20 sm:w-24 md:w-28 lg:w-32">
                                                             {selected.images.slice(1, 4).map((img, i) => {
                                                                 const isLast = i === Math.min(selected.images!.length - 2, 2);
                                                                 const remaining = selected.images!.length - 4;
@@ -430,18 +433,18 @@ export default function RentalPage() {
                                                 </div>
                                             </div>
                                         ) : (
-                                            <div className="px-3 sm:px-4 pt-3 sm:pt-4 shrink-0">
-                                                <div className="w-full bg-zinc-100 dark:bg-white/5 flex items-center justify-center rounded-xl h-32 sm:h-40 lg:h-[32vh]">
-                                                    <Building2 className="w-12 h-12 sm:w-16 sm:h-16 text-zinc-300 dark:text-white/10" />
+                                            <div className="px-3 sm:px-4 pt-3 shrink-0">
+                                                <div className="w-full bg-zinc-100 dark:bg-white/5 flex items-center justify-center rounded-xl" style={{ height: 'clamp(100px, 15vh, 150px)' }}>
+                                                    <Building2 className="w-10 h-10 sm:w-14 sm:h-14 text-zinc-300 dark:text-white/10" />
                                                 </div>
                                             </div>
                                         )}
 
-                                        {/* Property Details - scrollable */}
+                                        {/* Property Details */}
                                         <div className="flex-1 min-h-0 overflow-y-auto p-3 sm:p-4 flex flex-col gap-2.5 rental-page-scroll">
                                             {/* Address */}
                                             <div className="shrink-0">
-                                                <p className="text-base text-zinc-600 dark:text-white/80 leading-snug">
+                                                <p className="text-sm sm:text-base text-zinc-600 dark:text-white/80 leading-snug">
                                                     地址 :{' '}
                                                     {selected.address ? (
                                                         <a
@@ -461,14 +464,15 @@ export default function RentalPage() {
                                             {/* Lot Index - Rental Area Count */}
                                             {selected.lotIndex && (
                                                 <div className="shrink-0">
-                                                    <p className="text-base text-zinc-600 dark:text-white/80 leading-snug">
+                                                    <p className="text-sm sm:text-base text-zinc-600 dark:text-white/80 leading-snug">
                                                         出租地段 : {parseLotValues(selected.lotIndex).split('、').filter(Boolean).length} 個
                                                     </p>
                                                 </div>
                                             )}
 
-                                            {/* Attributes row: Land Use | Area */}
+                                            {/* Land Use & Area Cards */}
                                             <div className="grid grid-cols-2 gap-2 shrink-0">
+                                                {/* Land Use */}
                                                 <div className="flex items-center gap-2 px-3 py-3 bg-zinc-50 dark:bg-white/5 rounded-xl">
                                                     <Tag className="w-5 h-5 text-emerald-500 shrink-0" />
                                                     <div className="min-w-0 flex-1">
@@ -478,6 +482,7 @@ export default function RentalPage() {
                                                         </p>
                                                     </div>
                                                 </div>
+                                                {/* Area */}
                                                 <div className="flex items-center gap-2 px-3 py-3 bg-zinc-50 dark:bg-white/5 rounded-xl">
                                                     <Maximize2 className="w-5 h-5 text-amber-500 shrink-0" />
                                                     <div className="min-w-0 flex-1">
@@ -489,28 +494,25 @@ export default function RentalPage() {
                                                 </div>
                                             </div>
 
-                                            {/* Notes - constrained to remaining space */}
+                                            {/* Notes */}
                                             {selected.notes && (
-                                                <div className="flex-1 min-h-0 px-3 py-3 bg-amber-50 dark:bg-amber-500/10 rounded-xl overflow-hidden">
-                                                    <div className="min-w-0 flex-1 h-full">
+                                                <div className="shrink-0 px-3 py-3 bg-amber-50 dark:bg-amber-500/10 rounded-xl overflow-hidden max-h-24 lg:max-h-20 overflow-y-auto">
+                                                    <div className="min-w-0">
                                                         <p className="text-sm font-semibold text-amber-600 dark:text-amber-400">備註</p>
-                                                        <p className="text-base text-amber-700 dark:text-amber-300/85 wrap-break-word mt-1 leading-relaxed overflow-hidden line-clamp-2">
-                                                            {selected.notes.replace(/<[^>]*>/g, '')}
+                                                        <p className="text-sm text-amber-700 dark:text-amber-300/85 wrap-break-word mt-1 leading-relaxed line-clamp-2">
+                                                            {selected.notes}
                                                         </p>
                                                     </div>
                                                 </div>
                                             )}
 
-                                            {/* If no notes, push button to bottom */}
-                                            {!selected.notes && <div className="flex-1 min-h-0" />}
-
                                             {/* View Detail Button */}
                                             <Link
                                                 href={`/rental/${selected.id}`}
-                                                className="flex items-center justify-center gap-2 w-full py-3.5 bg-purple-500 hover:bg-purple-600 text-white text-base font-semibold rounded-xl transition-colors shrink-0"
+                                                className="flex items-center justify-center gap-2 w-full py-3 sm:py-3.5 bg-purple-500 hover:bg-purple-600 text-white text-sm sm:text-base font-semibold rounded-xl transition-colors shrink-0"
                                             >
                                                 查看詳情
-                                                <ArrowRight className="w-5 h-5" />
+                                                <ArrowRight className="w-4 h-4 sm:w-5 sm:h-5" />
                                             </Link>
                                         </div>
 
@@ -536,7 +538,7 @@ export default function RentalPage() {
                                                 <ChevronRight className="w-5 h-5" />
                                             </button>
                                         </div>
-                                    </>
+                                    </div>
                                 );
                             })()
                         ) : (

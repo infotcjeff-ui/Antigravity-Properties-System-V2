@@ -26,7 +26,10 @@ import {
     Users,
     User as UserIcon,
     Ruler,
-    StickyNote,
+    Home,
+    CheckCircle,
+    Droplets,
+    Zap,
 } from 'lucide-react';
 import DOMPurify from 'dompurify';
 import { useLanguage } from '@/components/common/LanguageSwitcher';
@@ -97,19 +100,20 @@ function LotDetailModal({
     parentAddress?: string | null;
 }) {
     const [currentIdx, setCurrentIdx] = useState(0);
-    const [activeTab, setActiveTab] = useState<'photo' | 'video' | 'plan' | 'map' | 'note'>('photo');
+    const [activeTab, setActiveTab] = useState<'info' | 'video' | 'plan' | 'map'>('info');
     const [mapLoaded, setMapLoaded] = useState(false);
+    const [thumbOffset, setThumbOffset] = useState(0);
+    const THUMB_VISIBLE = 5;
 
     const photoCount = entry.media?.length ?? 0;
     const videoCount = 0; // 預留：視頻功能
     const planCount = 0;   // 預留：規劃圖功能
 
     const tabs = [
-        { key: 'photo' as const, label: '相片', count: photoCount },
+        { key: 'info' as const, label: '地段資料', count: photoCount },
         { key: 'video' as const, label: '影片', count: videoCount },
         { key: 'plan' as const, label: '規劃圖', count: planCount },
         { key: 'map' as const, label: '地圖', count: null },
-        { key: 'note' as const, label: '備註', count: null },
     ];
 
     const hasAnyMedia = photoCount > 0 || videoCount > 0 || planCount > 0;
@@ -118,6 +122,26 @@ function LotDetailModal({
     const handleTabChange = (tab: typeof activeTab) => {
         setActiveTab(tab);
         setCurrentIdx(0);
+    };
+
+    const prevThumb = () => {
+        if (!entry.media?.length) return;
+        if (currentIdx === 0) {
+            setThumbOffset(Math.max(0, entry.media.length - THUMB_VISIBLE));
+        } else if (currentIdx <= thumbOffset) {
+            setThumbOffset(i => Math.max(0, i - 1));
+        }
+        setCurrentIdx(i => (i - 1 + entry.media!.length) % entry.media!.length);
+    };
+
+    const nextThumb = () => {
+        if (!entry.media?.length) return;
+        if (currentIdx === entry.media.length - 1) {
+            setThumbOffset(0);
+        } else if (currentIdx >= thumbOffset + THUMB_VISIBLE - 1) {
+            setThumbOffset(i => Math.min(entry.media!.length - THUMB_VISIBLE, i + 1));
+        }
+        setCurrentIdx(i => (i + 1) % entry.media!.length);
     };
 
     return (
@@ -195,76 +219,184 @@ function LotDetailModal({
 
                 {/* Tab 內容區 */}
                 <div className="flex-1 overflow-hidden relative">
-                    {/* 相片 Tab */}
-                    {activeTab === 'photo' && (
-                        <div className="absolute inset-0 flex flex-col items-center justify-center px-[70px]">
-                            {entry.media && entry.media.length > 0 ? (
-                                <div className="relative flex flex-col items-center justify-center w-full h-full">
-                                {entry.media.length === 1 ? (
-                                        <div className="relative flex items-center justify-center w-full h-full">
-                                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                    {/* 地段資料 Tab */}
+                    {activeTab === 'info' && (
+                        <div className="absolute inset-0 flex flex-col lg:flex-row">
+                            {/* 左側：圖片區 */}
+                            <div className="w-full lg:w-1/2 flex flex-col p-4 border-b lg:border-b-0 lg:border-r border-white/10">
+                                {entry.media && entry.media.length > 0 ? (
+                                    <>
+                                        {/* 主圖 */}
+                                        <div className="relative rounded-xl overflow-hidden bg-white/5" style={{ height: 'clamp(200px, 35vw, 350px)' }}>
                                             <img
-                                                src={entry.media![0].u}
+                                                src={entry.media[currentIdx].u}
                                                 alt={entry.value}
-                                                className="w-full h-full max-w-[57vw] max-h-[68vh] object-cover rounded-lg sm:rounded-xl"
+                                                className="w-full h-full object-contain"
                                                 onError={(e) => { e.currentTarget.style.display = 'none'; }}
                                             />
-                                        </div>
-                                    ) : (
-                                        <>
-                                            {/* 左箭頭 - 圖外左側置中 */}
-                                            <button
-                                                onClick={() => setCurrentIdx(i => (i - 1 + entry.media!.length) % entry.media!.length)}
-                                                className="absolute left-1 sm:left-2 md:left-4 top-1/2 -translate-y-1/2 p-2 sm:p-3 bg-white/10 hover:bg-white/20 rounded-full text-white transition-colors cursor-pointer backdrop-blur-sm z-10"
-                                            >
-                                                <ChevronLeft className="w-5 h-5 sm:w-6 sm:h-6 md:w-8 md:h-8" />
-                                            </button>
-
-                                            {/* 中央圖片 - 固定尺寸 */}
-                                            <div className="relative w-full max-w-[57vw] h-[68vh] flex items-center justify-center px-10 sm:px-12 md:px-16 lg:px-20">
-                                                {entry.media.map((m, idx) => (
-                                                    // eslint-disable-next-line @next/next/no-img-element
-                                                    <img
-                                                        key={idx}
-                                                        src={m.u}
-                                                        alt={`圖片 ${idx + 1}`}
-                                                        className="absolute w-full h-full object-cover transition-opacity duration-300 rounded-lg sm:rounded-xl"
-                                                        style={{ opacity: idx === currentIdx ? 1 : 0, pointerEvents: idx === currentIdx ? 'auto' : 'none' }}
-                                                        onError={(e) => { e.currentTarget.style.display = 'none'; }}
-                                                    />
-                                                ))}
-                                            </div>
-
-                                            {/* 右箭頭 - 圖外右側置中 */}
-                                            <button
-                                                onClick={() => setCurrentIdx(i => (i + 1) % entry.media!.length)}
-                                                className="absolute right-1 sm:right-2 md:right-4 top-1/2 -translate-y-1/2 p-2 sm:p-3 bg-white/10 hover:bg-white/20 rounded-full text-white transition-colors cursor-pointer backdrop-blur-sm z-10"
-                                            >
-                                                <ChevronRight className="w-5 h-5 sm:w-6 sm:h-6 md:w-8 md:h-8" />
-                                            </button>
-
-                                            {/* 數字顯示 (1/12) */}
-                                            <div className="absolute bottom-2 sm:bottom-4 left-1/2 -translate-x-1/2 px-3 sm:px-4 py-1.5 sm:py-2 bg-black/60 backdrop-blur-sm rounded-full text-white text-xs sm:text-sm font-medium">
+                                            {/* 左右箭頭 */}
+                                            {entry.media.length > 1 && (
+                                                <>
+                                                    <button
+                                                        onClick={prevThumb}
+                                                        className="absolute left-2 top-1/2 -translate-y-1/2 p-2 bg-white/10 hover:bg-white/20 rounded-full text-white transition-colors cursor-pointer backdrop-blur-sm z-10"
+                                                    >
+                                                        <ChevronLeft className="w-5 h-5" />
+                                                    </button>
+                                                    <button
+                                                        onClick={nextThumb}
+                                                        className="absolute right-2 top-1/2 -translate-y-1/2 p-2 bg-white/10 hover:bg-white/20 rounded-full text-white transition-colors cursor-pointer backdrop-blur-sm z-10"
+                                                    >
+                                                        <ChevronRight className="w-5 h-5" />
+                                                    </button>
+                                                </>
+                                            )}
+                                            {/* 計數 */}
+                                            <div className="absolute bottom-2 left-1/2 -translate-x-1/2 px-3 py-1 bg-black/60 backdrop-blur-sm rounded-full text-white text-xs font-medium">
                                                 {currentIdx + 1} / {entry.media.length}
                                             </div>
-                                        </>
+                                        </div>
+                                        {/* 縮圖列 */}
+                                        {entry.media.length > 1 && (
+                                            <div className="shrink-0 mt-3 relative">
+                                                <button
+                                                    onClick={prevThumb}
+                                                    className="absolute left-0 top-1/2 -translate-y-1/2 p-1 bg-white/10 hover:bg-white/20 rounded-full text-white transition-colors cursor-pointer z-10"
+                                                    disabled={currentIdx === 0}
+                                                >
+                                                    <ChevronLeft className="w-4 h-4" />
+                                                </button>
+                                                <button
+                                                    onClick={nextThumb}
+                                                    className="absolute right-0 top-1/2 -translate-y-1/2 p-1 bg-white/10 hover:bg-white/20 rounded-full text-white transition-colors cursor-pointer z-10"
+                                                    disabled={currentIdx === entry.media.length - 1}
+                                                >
+                                                    <ChevronRight className="w-4 h-4" />
+                                                </button>
+                                                <div className="overflow-hidden mx-6">
+                                                    <div
+                                                        className="flex gap-2 transition-transform duration-300 ease-out"
+                                                        style={{ transform: `translateX(-${thumbOffset * (100 / THUMB_VISIBLE + 0.5)}%)` }}
+                                                    >
+                                                        {entry.media.map((m, idx) => (
+                                                            <button
+                                                                key={idx}
+                                                                onClick={() => setCurrentIdx(idx)}
+                                                                className={`shrink-0 w-[calc(20%-0.4rem)] aspect-square rounded-lg overflow-hidden border-2 transition-all cursor-pointer ${
+                                                                    idx === currentIdx ? 'border-white ring-2 ring-white/40' : 'border-white/20 opacity-60 hover:opacity-100'
+                                                                }`}
+                                                            >
+                                                                <img src={m.u} alt="" className="w-full h-full object-cover" />
+                                                            </button>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </>
+                                ) : (
+                                    <div className="flex-1 flex flex-col items-center justify-center gap-2 text-white/40 rounded-xl bg-white/5 min-h-48">
+                                        <Map className="w-16 h-16" />
+                                        <p className="text-lg">暫無相片</p>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* 右側：地段資料區 */}
+                            <div className="w-full lg:w-1/2 p-4 overflow-y-auto lot-modal-scroll">
+                                <div className="space-y-4">
+                                    {/* 名稱 */}
+                                    <div className="p-4 bg-white/5 rounded-xl border border-white/10">
+                                        <div className="flex items-center gap-2 mb-1">
+                                            <Home className="w-4 h-4 text-purple-400" />
+                                            <span className="text-xs text-white/50 uppercase tracking-wider">地段名稱</span>
+                                        </div>
+                                        <p className="text-lg font-bold text-white">{entry.value}</p>
+                                    </div>
+
+                                    {/* 地址 */}
+                                    {parentAddress && (
+                                        <div className="p-4 bg-white/5 rounded-xl border border-white/10">
+                                            <div className="flex items-center gap-2 mb-1">
+                                                <MapPin className="w-4 h-4 text-purple-400" />
+                                                <span className="text-xs text-white/50 uppercase tracking-wider">地址</span>
+                                            </div>
+                                            <p className="text-sm text-white/80">{parentAddress}</p>
+                                        </div>
                                     )}
 
-                                    {/* 地段面積 - 底部背景區塊 */}
+                                    {/* 地段面積 */}
                                     {entry.lotArea && (
-                                        <div className="shrink-0 w-full max-w-[57vw] mt-4 p-3 bg-black/60 backdrop-blur-sm rounded-xl border border-white/10">
-                                            <p className="text-sm sm:text-base text-white/90 text-center font-medium">
-                                                地段面積：{entry.lotArea}
-                                            </p>
+                                        <div className="p-4 bg-white/5 rounded-xl border border-white/10">
+                                            <div className="flex items-center gap-2 mb-1">
+                                                <Ruler className="w-4 h-4 text-purple-400" />
+                                                <span className="text-xs text-white/50 uppercase tracking-wider">地段面積</span>
+                                            </div>
+                                            <p className="text-lg font-semibold text-white">{entry.lotArea}</p>
+                                        </div>
+                                    )}
+
+                                    {/* 出租狀態 */}
+                                    <div className="p-4 bg-white/5 rounded-xl border border-white/10">
+                                        <div className="flex items-center gap-2 mb-1">
+                                            <CheckCircle className="w-4 h-4 text-purple-400" />
+                                            <span className="text-xs text-white/50 uppercase tracking-wider">出租狀態</span>
+                                        </div>
+                                        <span className={`inline-block px-3 py-1 rounded-lg text-sm font-semibold ${
+                                            entry.lotStatus === 'rented'
+                                                ? 'bg-amber-500/20 text-amber-400'
+                                                : entry.lotStatus === 'renting'
+                                                ? 'bg-green-500/20 text-green-400'
+                                                : 'bg-white/10 text-white/70'
+                                        }`}>
+                                            {entry.lotStatus === 'rented' ? '已出租' : entry.lotStatus === 'renting' ? '出租中' : '未出租'}
+                                        </span>
+                                    </div>
+
+                                    {/* 設施 */}
+                                    {(entry.waterMeter || entry.electricMeter) ? (
+                                        <div className="p-4 bg-white/5 rounded-xl border border-white/10">
+                                            <div className="flex items-center gap-2 mb-3">
+                                                <Building2 className="w-4 h-4 text-purple-400" />
+                                                <span className="text-xs text-white/50 uppercase tracking-wider">設施</span>
+                                            </div>
+                                            <div className="flex flex-wrap gap-3">
+                                                {entry.waterMeter && (
+                                                    <div className="flex items-center gap-2 px-3 py-2 bg-blue-500/10 rounded-lg border border-blue-500/20">
+                                                        <Droplets className="w-4 h-4 text-blue-400" />
+                                                        <span className="text-sm font-medium text-blue-300">水錶</span>
+                                                    </div>
+                                                )}
+                                                {entry.electricMeter && (
+                                                    <div className="flex items-center gap-2 px-3 py-2 bg-yellow-500/10 rounded-lg border border-yellow-500/20">
+                                                        <Zap className="w-4 h-4 text-yellow-400" />
+                                                        <span className="text-sm font-medium text-yellow-300">電錶</span>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <div className="p-4 bg-white/5 rounded-xl border border-white/10">
+                                            <div className="flex items-center gap-2 mb-1">
+                                                <Building2 className="w-4 h-4 text-purple-400" />
+                                                <span className="text-xs text-white/50 uppercase tracking-wider">設施</span>
+                                            </div>
+                                            <p className="text-sm text-white/40 italic">暫無設施資料</p>
+                                        </div>
+                                    )}
+
+                                    {/* 備註 */}
+                                    {entry.note && (
+                                        <div className="p-4 bg-white/5 rounded-xl border border-white/10">
+                                            <div className="flex items-center gap-2 mb-1">
+                                                <FileText className="w-4 h-4 text-purple-400" />
+                                                <span className="text-xs text-white/50 uppercase tracking-wider">備註</span>
+                                            </div>
+                                            <p className="text-sm text-white/80 whitespace-pre-wrap">{entry.note}</p>
                                         </div>
                                     )}
                                 </div>
-                            ) : (
-                                <div className="flex flex-col items-center justify-center gap-2 sm:gap-3 text-white/40">
-                                    <Map className="w-10 h-10 sm:w-14 sm:h-14 md:w-16 md:h-16" />
-                                    <p className="text-base sm:text-lg">暫無相片</p>
-                                </div>
-                            )}
+                            </div>
                         </div>
                     )}
 
@@ -322,30 +454,6 @@ function LotDetailModal({
                                     <p className="text-xs sm:text-sm text-white/30">使用父物業位置顯示</p>
                                 </div>
                             )}
-                        </div>
-                    )}
-
-                    {/* 備註 Tab */}
-                    {activeTab === 'note' && (
-                        <div className="absolute inset-0 px-[70px] py-3 sm:py-4 overflow-y-auto">
-                            <div className="max-w-xl sm:max-w-2xl mx-auto space-y-3 sm:space-y-4">
-                                {/* 備註內容 */}
-                                {entry.note ? (
-                                    <div className="p-3 sm:p-4 bg-white/5 rounded-lg sm:rounded-xl border border-white/10">
-                                        <div className="flex items-start gap-2 sm:gap-3">
-                                            <StickyNote className="w-4 h-4 sm:w-5 sm:h-5 text-purple-400 mt-0.5 shrink-0" />
-                                            <div>
-                                                <p className="text-xs sm:text-sm font-medium text-white/50 mb-0.5 sm:mb-1">備註</p>
-                                                <p className="text-sm sm:text-base text-white whitespace-pre-wrap">{entry.note}</p>
-                                            </div>
-                                        </div>
-                                    </div>
-                                ) : (
-                                    <div className="p-3 sm:p-4 bg-white/5 rounded-lg sm:rounded-xl border border-white/10 text-center text-white/40">
-                                        暫無備註
-                                    </div>
-                                )}
-                            </div>
                         </div>
                     )}
                 </div>
@@ -531,6 +639,11 @@ export default function RentalPropertyPage() {
                     overflow: hidden;
                     padding: 0;
                 }
+                @media (min-width: 1024px) {
+                    .rental-page-container {
+                        height: 90vh;
+                    }
+                }
                 .rental-page-scroll::-webkit-scrollbar {
                     display: none;
                 }
@@ -544,6 +657,12 @@ export default function RentalPropertyPage() {
                 .notes-scroll {
                     -ms-overflow-style: none;
                     scrollbar-width: none;
+                }
+                .safe-area-bottom {
+                    padding-bottom: env(safe-area-inset-bottom, 0px);
+                }
+                .safe-area-top {
+                    padding-top: env(safe-area-inset-top, 0px);
                 }
                 .shimmer-overlay {
                     background: linear-gradient(
@@ -591,7 +710,7 @@ export default function RentalPropertyPage() {
             `}</style>
 
             <div className="rental-page-container overflow-hidden">
-            <div className="h-full flex flex-col gap-4 lg:gap-6 overflow-y-auto rental-page-scroll p-2 sm:p-4 lg:p-0 lg:overflow-hidden">
+            <div className="h-full flex flex-col overflow-y-auto rental-page-scroll safe-area-bottom pt-20 sm:pt-0">
             <motion.div initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }}>
 
                 <Link
@@ -604,12 +723,12 @@ export default function RentalPropertyPage() {
             </motion.div>
 
             {/* 主版型：響應式佈局 - 移動端垂直，桌面端左右 */}
-            <div className="grid grid-cols-1 xl:grid-cols-[38%_1fr] gap-4 lg:gap-6 flex-1 min-h-0">
+            <div className="grid grid-cols-1 xl:grid-cols-[38%_1fr] gap-4 lg:gap-6 mt-4 sm:mt-6 pb-8 sm:pb-4 px-2 sm:px-0 pt-2 sm:pt-0 lg:min-h-0 lg:h-full">
                 {/* 左欄：圖片 */}
                 <motion.div
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
-                    className="flex flex-col gap-2 sm:gap-3 w-full min-h-0 rounded-2xl overflow-hidden border border-zinc-200 dark:border-white/10 bg-zinc-100 dark:bg-white/5"
+                    className="flex flex-col gap-2 sm:gap-3 w-full rounded-2xl overflow-hidden border border-zinc-200 dark:border-white/10 bg-zinc-100 dark:bg-white/5"
                 >
                     {property.images && property.images.length > 0 && !imageError ? (
                         <>
@@ -617,7 +736,8 @@ export default function RentalPropertyPage() {
                             <button
                                 type="button"
                                 onClick={() => setLightboxOpen(true)}
-                                className="relative w-full flex-1 min-h-80 lg:min-h-0 overflow-hidden group cursor-zoom-in"
+                                className="relative w-full overflow-hidden group cursor-zoom-in lg:!h-[550px]"
+                                style={{ height: 'clamp(200px, 35vh, 350px)' }}
                                 aria-label="放大圖片"
                             >
                                 <img
@@ -675,7 +795,7 @@ export default function RentalPropertyPage() {
                                 </div>
                             </div>
                             {/* 備註 */}
-                            <div className="shrink-0 mx-2 mb-2 p-3 border-l-[3px] border-purple-500 bg-purple-500/5 rounded-r-xl max-h-40 overflow-y-auto notes-scroll">
+                            <div className="shrink-0 mx-2 mb-2 p-3 border-l-[3px] border-purple-500 bg-purple-500/5 rounded-r-xl max-h-40 lg:max-h-32 overflow-y-auto notes-scroll">
                                 <p className="text-xs font-semibold text-purple-500 uppercase tracking-wider mb-1.5">備註</p>
                                 {property.notes ? (
                                     <div
@@ -694,7 +814,7 @@ export default function RentalPropertyPage() {
                                 <p className="text-zinc-400 dark:text-white/30 text-sm">暫無。</p>
                             </div>
                             {/* 備註 */}
-                            <div className="shrink-0 mx-2 mb-2 p-3 border-l-[3px] border-purple-500 bg-purple-500/5 rounded-r-xl max-h-40 overflow-y-auto notes-scroll">
+                            <div className="shrink-0 mx-2 mb-2 p-3 border-l-[3px] border-purple-500 bg-purple-500/5 rounded-r-xl max-h-40 lg:max-h-32 overflow-y-auto notes-scroll">
                                 <p className="text-xs font-semibold text-purple-500 uppercase tracking-wider mb-1.5">備註</p>
                                 {property.notes ? (
                                     <div
@@ -714,7 +834,7 @@ export default function RentalPropertyPage() {
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: 0.1 }}
-                    className="flex flex-col min-h-0 h-full gap-3 sm:gap-4 p-3 sm:p-4 lg:p-5 rounded-2xl border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/5 overflow-y-auto rental-page-scroll"
+                    className="flex flex-col min-h-0 h-full gap-3 sm:gap-4 p-3 sm:p-4 lg:p-5 rounded-2xl border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/5"
                 >
                     {/* 名稱與狀態 */}
                     <div className="shrink-0">
