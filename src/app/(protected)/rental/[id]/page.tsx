@@ -228,7 +228,7 @@ function LotDetailModal({
                                 {entry.media && entry.media.length > 0 ? (
                                     <>
                                         {/* 主圖 */}
-                                        <div className="relative rounded-xl overflow-hidden bg-white/5" style={{ height: 'clamp(200px, 35vw, 350px)' }}>
+                                        <div className="relative rounded-xl overflow-hidden bg-white/5" style={{ height: 'clamp(200px, 35vw, 700px)' }}>
                                             <img
                                                 src={entry.media[currentIdx].u}
                                                 alt={entry.value}

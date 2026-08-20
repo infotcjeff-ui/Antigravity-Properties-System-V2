@@ -297,9 +297,9 @@ export default function RentalPage() {
                     )}
                 </div>
             ) : viewMode === 'list' ? (
-                    <div className="flex flex-col lg:flex-row flex-1 min-h-0 lg:overflow-hidden lg:h-[837.6px] bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-white/10 overflow-hidden">
+                    <div className="flex flex-col lg:flex-row flex-1 min-h-0 lg:overflow-hidden bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-white/10 overflow-hidden">
                     {/* Left: scrollable property list */}
-                    <div className="w-full lg:w-2/5 xl:w-2/5 shrink-0 border-b lg:border-b-0 lg:border-r border-zinc-200 dark:border-white/10 overflow-y-auto max-h-[35vh] lg:max-h-none" style={{ maxHeight: 'clamp(200px, 35vh, 300px)' }}>
+                    <div className="w-full lg:w-2/5 xl:w-2/5 shrink-0 border-b lg:border-b-0 lg:border-r border-zinc-200 dark:border-white/10 overflow-y-auto max-h-[35vh] lg:max-h-none">
                         <div className="px-3 py-2 bg-zinc-50 dark:bg-white/5 sticky top-0 z-10">
                             <div className="flex items-center justify-between">
                                 <p className="text-sm font-semibold text-zinc-600 dark:text-white/60">
