@@ -236,15 +236,23 @@ export function parseLotEntries(lotIndex: string | null | undefined): LotEntry[]
                 const media: MediaItem[] | undefined = obj.m ? (
                     typeof obj.m[0] === 'string'
                         ? (obj.m as string[]).map(u => ({ u, s: 0 }))
-                        : (obj.m as MediaItem[]).map(m => ({ u: m.u, s: m.s, tag: m.tag }))
+                        : (obj.m as Array<{ u: string; s: number; tag?: string; tg?: string }>).map(m => ({
+                            u: m.u,
+                            s: m.s,
+                            tag: (m.tag ?? m.tg) as MediaItem['tag'],
+                        }))
                 ) : undefined;
                 // 兼容 wm/em 的舊格式
-                const parseMedia = (arr: MediaItem[] | string[] | undefined): MediaItem[] | undefined => {
+                const parseMedia = (arr: Array<{ u: string; s: number; tag?: string; tg?: string }> | string[] | undefined): MediaItem[] | undefined => {
                     if (!arr) return undefined;
                     if (typeof arr[0] === 'string') {
                         return (arr as string[]).map(u => ({ u, s: 0 }));
                     }
-                    return (arr as MediaItem[]).map(m => ({ u: m.u, s: m.s, tag: m.tag }));
+                    return (arr as Array<{ u: string; s: number; tag?: string; tg?: string }>).map(m => ({
+                        u: m.u,
+                        s: m.s,
+                        tag: (m.tag ?? m.tg) as MediaItem['tag'],
+                    }));
                 };
                 return {
                     type: (obj.t === '舊' ? 'old' : 'new') as 'new' | 'old',

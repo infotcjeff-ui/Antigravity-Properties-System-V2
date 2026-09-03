@@ -237,6 +237,26 @@ function LotDetailModal({
                                                 className="w-full h-full object-contain"
                                                 onError={(e) => { e.currentTarget.style.display = 'none'; }}
                                             />
+                                            {/* 圖片標籤 - 左上方 */}
+                                            {entry.media[currentIdx].tag && (
+                                                <div className={`absolute top-4 left-4 px-5 py-2.5 rounded-xl text-base font-bold shadow-xl backdrop-blur-sm ring-1 ring-white/40 ${
+                                                    entry.media[currentIdx].tag === 'water' ? 'bg-blue-500/90 text-white' :
+                                                    entry.media[currentIdx].tag === 'electric' ? 'bg-amber-500/90 text-white' :
+                                                    entry.media[currentIdx].tag === 'toilet' ? 'bg-purple-500/90 text-white' :
+                                                    entry.media[currentIdx].tag === 'office' ? 'bg-indigo-500/90 text-white' :
+                                                    entry.media[currentIdx].tag === 'storage' ? 'bg-emerald-500/90 text-white' :
+                                                    entry.media[currentIdx].tag === 'room' ? 'bg-rose-500/90 text-white' :
+                                                    'bg-white/80 text-zinc-800'
+                                                }`}>
+                                                    {entry.media[currentIdx].tag === 'water' ? '水' :
+                                                     entry.media[currentIdx].tag === 'electric' ? '電' :
+                                                     entry.media[currentIdx].tag === 'toilet' ? '廁所' :
+                                                     entry.media[currentIdx].tag === 'office' ? '辦公室' :
+                                                     entry.media[currentIdx].tag === 'storage' ? '貯物櫃' :
+                                                     entry.media[currentIdx].tag === 'room' ? '房間' :
+                                                     entry.media[currentIdx].tag}
+                                                </div>
+                                            )}
                                             {/* 左右箭頭 */}
                                             {entry.media.length > 1 && (
                                                 <>
@@ -278,20 +298,46 @@ function LotDetailModal({
                                                 </button>
                                                 <div className="overflow-hidden mx-6">
                                                     <div
-                                                        className="flex gap-2 transition-transform duration-300 ease-out"
-                                                        style={{ transform: `translateX(-${thumbOffset * (100 / THUMB_VISIBLE + 0.5)}%)` }}
+                                                        className="grid gap-2 transition-transform duration-300 ease-out"
+                                                        style={{ 
+                                                            gridTemplateColumns: `repeat(${Math.min(entry.media.length, THUMB_VISIBLE)}, 1fr)`,
+                                                            transform: `translateX(-${thumbOffset * (100 / THUMB_VISIBLE + 0.5)}%)`
+                                                        }}
                                                     >
-                                                        {entry.media.map((m, idx) => (
-                                                            <button
-                                                                key={idx}
-                                                                onClick={() => setCurrentIdx(idx)}
-                                                                className={`shrink-0 w-[calc(20%-0.4rem)] aspect-square rounded-lg overflow-hidden border-2 transition-all cursor-pointer ${
-                                                                    idx === currentIdx ? 'border-white ring-2 ring-white/40' : 'border-white/20 opacity-60 hover:opacity-100'
-                                                                }`}
-                                                            >
-                                                                <img src={m.u} alt="" className="w-full h-full object-cover" />
-                                                            </button>
-                                                        ))}
+                                                        {entry.media.slice(thumbOffset, thumbOffset + THUMB_VISIBLE).map((m, idx) => {
+                                                            const actualIdx = thumbOffset + idx;
+                                                            return (
+                                                                <button
+                                                                    key={actualIdx}
+                                                                    onClick={() => setCurrentIdx(actualIdx)}
+                                                                    className={`relative aspect-square rounded-lg overflow-hidden border-2 transition-all cursor-pointer ${
+                                                                        actualIdx === currentIdx ? 'border-white ring-2 ring-white/40' : 'border-white/20 opacity-60 hover:opacity-100'
+                                                                    }`}
+                                                                >
+                                                                    <img src={m.u} alt="" className="w-full h-full object-cover" />
+                                                                    {/* 縮圖標籤 */}
+                                                                    {m.tag && (
+                                                                        <div className={`absolute top-2 left-2 px-2.5 py-1 rounded-lg text-sm font-bold shadow-xl backdrop-blur-sm ring-1 ring-white/40 ${
+                                                                            m.tag === 'water' ? 'bg-blue-500/90 text-white' :
+                                                                            m.tag === 'electric' ? 'bg-amber-500/90 text-white' :
+                                                                            m.tag === 'toilet' ? 'bg-purple-500/90 text-white' :
+                                                                            m.tag === 'office' ? 'bg-indigo-500/90 text-white' :
+                                                                            m.tag === 'storage' ? 'bg-emerald-500/90 text-white' :
+                                                                            m.tag === 'room' ? 'bg-rose-500/90 text-white' :
+                                                                            'bg-white/80 text-zinc-800'
+                                                                        }`}>
+                                                                            {m.tag === 'water' ? '水' :
+                                                                             m.tag === 'electric' ? '電' :
+                                                                             m.tag === 'toilet' ? '廁' :
+                                                                             m.tag === 'office' ? '辦' :
+                                                                             m.tag === 'storage' ? '貯' :
+                                                                             m.tag === 'room' ? '房' :
+                                                                             m.tag}
+                                                                        </div>
+                                                                    )}
+                                                                </button>
+                                                            );
+                                                        })}
                                                     </div>
                                                 </div>
                                             </div>

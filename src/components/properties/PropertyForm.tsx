@@ -3031,7 +3031,7 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                                                         {/* 地段圖片（含設施 tag） */}
                                                         <div className="space-y-3">
                                                             <label className="block text-sm font-medium text-zinc-700 dark:text-white/80">地段圖片</label>
-                                                            <div className="grid grid-cols-3 gap-2">
+                                                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                                                                 {editingLotMedia.map((item, idx) => (
                                                                     <LotImageWithTagPicker
                                                                         key={idx}
@@ -3221,18 +3221,18 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                                                         {/* 地段圖片（含設施 tag） */}
                                                         <div className="space-y-3">
                                                             <label className="block text-sm font-medium text-zinc-700 dark:text-white/80">地段圖片</label>
-                                                            <div className="grid grid-cols-3 gap-2">
+                                                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                                                                 {tempLotMedia.map((item, idx) => (
                                                                     <LotImageWithTagPicker
                                                                         key={idx}
                                                                         item={item}
-                                                                        aspectClass="w-24 h-24"
+                                                                        aspectClass="aspect-square"
                                                                         onChangeTag={(tag) => setLotMediaTag(idx, tag, 'temp')}
                                                                         onRemove={() => removeLotMediaItem(idx, 'temp')}
                                                                     />
                                                                 ))}
                                                                 {tempLotMedia.length < 10 && (
-                                                                    <div className="w-24 h-24">
+                                                                    <div className="aspect-square">
                                                                         <FileUpload onChange={(files) => { if (files.length > 0) handleLotImageUpload(files, 'temp'); }} />
                                                                     </div>
                                                                 )}
