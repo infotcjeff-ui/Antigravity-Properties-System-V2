@@ -1,12 +1,13 @@
 'use client';
 
 import { useEffect, useMemo, useState, useRef, useCallback } from 'react';
-import { useParams } from 'next/navigation';
+import { useParams, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
 import { usePropertyWithRelationsQuery } from '@/hooks/useStorage';
 import {
     formatLotArea,
+    formatNumberWithCommas,
     parseLotEntries,
     proprietorCategoryLabelZh,
     LotStatus,
@@ -31,6 +32,7 @@ import {
     CheckCircle,
     Droplets,
     Zap,
+    DollarSign,
 } from 'lucide-react';
 import DOMPurify from 'dompurify';
 import { useLanguage } from '@/components/common/LanguageSwitcher';
@@ -304,98 +306,129 @@ function LotDetailModal({
                             </div>
 
                             {/* 右側：地段資料區 */}
-                            <div className="w-full lg:w-1/2 p-4 overflow-y-auto lot-modal-scroll">
-                                <div className="space-y-4">
-                                    {/* 名稱 */}
-                                    <div className="p-4 bg-white/5 rounded-xl border border-white/10">
-                                        <div className="flex items-center gap-2 mb-1">
-                                            <Home className="w-4 h-4 text-purple-400" />
-                                            <span className="text-xs text-white/50 uppercase tracking-wider">地段名稱</span>
+                            <div className="w-full lg:w-1/2 p-4 sm:p-6 overflow-y-auto lot-modal-scroll">
+                                <div className="space-y-5">
+                                    {/* 標題區 - 地段名稱 + 地址 */}
+                                    <div className="pb-4 border-b border-white/10">
+                                        <div className="flex items-center gap-2 mb-2">
+                                            <Home className="w-4 h-4 text-white/50" />
+                                            <span className="text-sm text-white/60 font-semibold">地段名稱</span>
                                         </div>
-                                        <p className="text-lg font-bold text-white">{entry.value}</p>
+                                        <h2 className="text-xl sm:text-2xl font-bold text-white tracking-tight">{entry.value}</h2>
+                                        {parentAddress && (
+                                            <div className="flex items-center gap-1.5 mt-2 text-white/50">
+                                                <MapPin className="w-3.5 h-3.5" />
+                                                <span className="text-sm">{parentAddress}</span>
+                                            </div>
+                                        )}
                                     </div>
 
-                                    {/* 地址 */}
-                                    {parentAddress && (
-                                        <div className="p-4 bg-white/5 rounded-xl border border-white/10">
-                                            <div className="flex items-center gap-2 mb-1">
-                                                <MapPin className="w-4 h-4 text-purple-400" />
-                                                <span className="text-xs text-white/50 uppercase tracking-wider">地址</span>
+                                    {/* 數據摘要 - 狀態 / 面積 */}
+                                    <div className="grid grid-cols-2 gap-2 sm:gap-3">
+                                        {/* 出租狀態 */}
+                                        <div className="px-3 py-3 bg-white/[0.03] border border-white/10 rounded-lg">
+                                            <div className="flex items-center gap-1.5 mb-2">
+                                                <CheckCircle className="w-3.5 h-3.5 text-white/50" />
+                                                <span className="text-sm text-white/60 font-semibold">狀態</span>
                                             </div>
-                                            <p className="text-sm text-white/80">{parentAddress}</p>
+                                            <span className={`inline-block text-base font-bold px-2.5 py-1 rounded ${
+                                                entry.lotStatus === 'rented'
+                                                    ? 'bg-red-500/20 text-red-300 border border-red-500/30'
+                                                    : entry.lotStatus === 'renting'
+                                                    ? 'bg-green-500/20 text-green-300 border border-green-500/30'
+                                                    : 'bg-white/10 text-white/60 border border-white/10'
+                                            }`}>
+                                                {entry.lotStatus === 'rented' ? '已出租' : entry.lotStatus === 'renting' ? '出租中' : '未出租'}
+                                            </span>
                                         </div>
-                                    )}
 
-                                    {/* 地段面積 */}
-                                    {entry.lotArea && (
-                                        <div className="p-4 bg-white/5 rounded-xl border border-white/10">
-                                            <div className="flex items-center gap-2 mb-1">
-                                                <Ruler className="w-4 h-4 text-purple-400" />
-                                                <span className="text-xs text-white/50 uppercase tracking-wider">地段面積</span>
+                                        {/* 面積 */}
+                                        {entry.lotArea && (
+                                            <div className="px-3 py-3 bg-white/[0.03] border border-white/10 rounded-lg">
+                                                <div className="flex items-center gap-1.5 mb-2">
+                                                    <Ruler className="w-3.5 h-3.5 text-white/50" />
+                                                    <span className="text-sm text-white/60 font-semibold">面積</span>
+                                                </div>
+                                                <p className="text-base font-bold text-white truncate">{entry.lotArea}</p>
                                             </div>
-                                            <p className="text-lg font-semibold text-white">{entry.lotArea}</p>
-                                        </div>
-                                    )}
-
-                                    {/* 出租狀態 */}
-                                    <div className="p-4 bg-white/5 rounded-xl border border-white/10">
-                                        <div className="flex items-center gap-2 mb-1">
-                                            <CheckCircle className="w-4 h-4 text-purple-400" />
-                                            <span className="text-xs text-white/50 uppercase tracking-wider">出租狀態</span>
-                                        </div>
-                                        <span className={`inline-block px-3 py-1 rounded-lg text-sm font-semibold ${
-                                            entry.lotStatus === 'rented'
-                                                ? 'bg-amber-500/20 text-amber-400'
-                                                : entry.lotStatus === 'renting'
-                                                ? 'bg-green-500/20 text-green-400'
-                                                : 'bg-white/10 text-white/70'
-                                        }`}>
-                                            {entry.lotStatus === 'rented' ? '已出租' : entry.lotStatus === 'renting' ? '出租中' : '未出租'}
-                                        </span>
+                                        )}
                                     </div>
 
                                     {/* 設施 */}
-                                    {(entry.waterMeter || entry.electricMeter) ? (
-                                        <div className="p-4 bg-white/5 rounded-xl border border-white/10">
-                                            <div className="flex items-center gap-2 mb-3">
-                                                <Building2 className="w-4 h-4 text-purple-400" />
-                                                <span className="text-xs text-white/50 uppercase tracking-wider">設施</span>
-                                            </div>
-                                            <div className="flex flex-wrap gap-3">
+                                    <div className="p-4 bg-white/[0.03] border border-white/10 rounded-lg">
+                                        <div className="flex items-center gap-2 mb-3">
+                                            <Building2 className="w-4 h-4 text-white/50" />
+                                            <span className="text-sm text-white/60 font-semibold">設施</span>
+                                        </div>
+                                        {(entry.waterMeter || entry.electricMeter || entry.toilet || entry.office || entry.storage || entry.room) ? (
+                                            <div className="flex flex-wrap gap-2 sm:gap-3">
                                                 {entry.waterMeter && (
-                                                    <div className="flex items-center gap-2 px-3 py-2 bg-blue-500/10 rounded-lg border border-blue-500/20">
-                                                        <Droplets className="w-4 h-4 text-blue-400" />
-                                                        <span className="text-sm font-medium text-blue-300">水錶</span>
+                                                    <div className="px-2.5 py-1.5 bg-white/10 rounded-lg border border-white/10">
+                                                        <span className="text-sm font-medium text-white/80">水</span>
                                                     </div>
                                                 )}
                                                 {entry.electricMeter && (
-                                                    <div className="flex items-center gap-2 px-3 py-2 bg-yellow-500/10 rounded-lg border border-yellow-500/20">
-                                                        <Zap className="w-4 h-4 text-yellow-400" />
-                                                        <span className="text-sm font-medium text-yellow-300">電錶</span>
+                                                    <div className="px-2.5 py-1.5 bg-white/10 rounded-lg border border-white/10">
+                                                        <span className="text-sm font-medium text-white/80">電</span>
+                                                    </div>
+                                                )}
+                                                {entry.toilet && (
+                                                    <div className="px-2.5 py-1.5 bg-white/10 rounded-lg border border-white/10">
+                                                        <span className="text-sm font-medium text-white/80">廁所</span>
+                                                    </div>
+                                                )}
+                                                {entry.office && (
+                                                    <div className="px-2.5 py-1.5 bg-white/10 rounded-lg border border-white/10">
+                                                        <span className="text-sm font-medium text-white/80">寫字樓</span>
+                                                    </div>
+                                                )}
+                                                {entry.storage && (
+                                                    <div className="px-2.5 py-1.5 bg-white/10 rounded-lg border border-white/10">
+                                                        <span className="text-sm font-medium text-white/80">貨倉</span>
+                                                    </div>
+                                                )}
+                                                {entry.room && (
+                                                    <div className="px-2.5 py-1.5 bg-white/10 rounded-lg border border-white/10">
+                                                        <span className="text-sm font-medium text-white/80">房間</span>
                                                     </div>
                                                 )}
                                             </div>
-                                        </div>
-                                    ) : (
-                                        <div className="p-4 bg-white/5 rounded-xl border border-white/10">
-                                            <div className="flex items-center gap-2 mb-1">
-                                                <Building2 className="w-4 h-4 text-purple-400" />
-                                                <span className="text-xs text-white/50 uppercase tracking-wider">設施</span>
-                                            </div>
+                                        ) : (
                                             <p className="text-sm text-white/40 italic">暫無設施資料</p>
-                                        </div>
-                                    )}
+                                        )}
+                                    </div>
 
                                     {/* 備註 */}
                                     {entry.note && (
-                                        <div className="p-4 bg-white/5 rounded-xl border border-white/10">
-                                            <div className="flex items-center gap-2 mb-1">
-                                                <FileText className="w-4 h-4 text-purple-400" />
-                                                <span className="text-xs text-white/50 uppercase tracking-wider">備註</span>
+                                        <div className="pt-4 border-t border-white/10">
+                                            <div className="flex items-center gap-2 mb-2">
+                                                <FileText className="w-4 h-4 text-white/50" />
+                                                <span className="text-sm text-white/60 font-semibold">備註</span>
                                             </div>
-                                            <p className="text-sm text-white/80 whitespace-pre-wrap">{entry.note}</p>
+                                            <p className="text-sm text-white/80 whitespace-pre-wrap leading-relaxed">{entry.note}</p>
                                         </div>
                                     )}
+
+                                    {/* 租金 — 琥珀金重點卡片，置於底部（無資料也顯示） */}
+                                    <div className="relative overflow-hidden p-5 bg-gradient-to-br from-amber-500/15 via-amber-500/10 to-amber-600/5 border border-amber-500/30 rounded-xl">
+                                        <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/[0.08] rounded-full blur-3xl -mr-12 -mt-12"></div>
+                                        <div className="relative">
+                                            <div className="flex items-center gap-2 mb-2">
+                                                <DollarSign className="w-4 h-4 text-amber-400" />
+                                                <span className="text-sm text-amber-200/80 font-semibold">租金</span>
+                                            </div>
+                                            {entry.rentPrice ? (
+                                                <div className="flex items-baseline gap-1.5">
+                                                    <span className="text-3xl sm:text-4xl font-bold text-amber-400 tracking-tight">
+                                                        {formatNumberWithCommas(entry.rentPrice)}
+                                                    </span>
+                                                    <span className="text-base font-medium text-amber-200/70">/ 月</span>
+                                                </div>
+                                            ) : (
+                                                <p className="text-3xl sm:text-4xl font-bold text-amber-400/40 tracking-tight">—</p>
+                                            )}
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -441,10 +474,16 @@ function LotDetailModal({
                                     </div>
                                     {parentAddress && (
                                         <div className="shrink-0 w-full max-w-[57vw] p-3 bg-black/60 backdrop-blur-sm rounded-xl border border-white/10">
-                                            <p className="text-sm sm:text-base text-white/90 text-center font-medium flex items-center justify-center gap-2">
+                                            <a
+                                                href={`https://www.google.com/maps?hl=zh-TW&q=${encodeURIComponent(parentAddress)}`}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="text-sm sm:text-base text-white/90 text-center font-medium flex items-center justify-center gap-2 hover:text-white/100 transition-colors"
+                                            >
                                                 <MapPin className="w-4 h-4 shrink-0" />
                                                 <span className="truncate">{parentAddress}</span>
-                                            </p>
+                                                <ExternalLink className="w-3.5 h-3.5 shrink-0 opacity-60" />
+                                            </a>
                                         </div>
                                     )}
                                 </>
@@ -472,6 +511,7 @@ interface ViewCounts {
 export default function RentalPropertyPage() {
     const { user } = useAuth();
     const params = useParams();
+    const searchParams = useSearchParams();
     const lang = useLanguage();
     const isZh = lang === 'zh-TW';
     const t = (en: string, zh: string) => isZh ? zh : en;
@@ -488,6 +528,21 @@ export default function RentalPropertyPage() {
 
     const lotEntries = useMemo(() => parseLotEntries(property?.lotIndex ?? null) as LotEntry[], [property?.lotIndex]);
     const [viewLotEntry, setViewLotEntry] = useState<LotEntry | null>(null);
+
+    // 從 query 自動開啟對應的 lot 詳情（?lotIdx=<i>）— 供 PropertyForm 的「查看」按鈕在新分頁開啟使用
+    useEffect(() => {
+        const raw = searchParams?.get('lotIdx');
+        if (raw === null || raw === undefined) return;
+        const idx = Number.parseInt(raw, 10);
+        if (!Number.isFinite(idx) || idx < 0) return;
+        if (lotEntries.length === 0) return;
+        const target = lotEntries[Math.min(idx, lotEntries.length - 1)];
+        if (target) setViewLotEntry(target);
+        // 自動開啟後清掉 query，避免重新整理再次觸發
+        const url = new URL(window.location.href);
+        url.searchParams.delete('lotIdx');
+        window.history.replaceState({}, '', url.toString());
+    }, [searchParams, lotEntries]);
 
     // 瀏覽次數
     const [viewCounts, setViewCounts] = useState<ViewCounts>({ viewCount: 0, liveCount: 0 });
@@ -890,20 +945,18 @@ export default function RentalPropertyPage() {
                         {detailTab === 'overview' && (
                             <div className="space-y-4">
                                 {/* 業主 */}
-                                {proprietor && (
-                                    <div className="p-4 bg-zinc-50 dark:bg-white/5 rounded-xl border border-zinc-200 dark:border-white/10">
-                                        <p className="text-base font-medium text-zinc-700 dark:text-white/80 mb-3">{t('Proprietor', '業主')}</p>
-                                        <div className="flex items-center gap-3">
-                                            <div className="w-12 h-12 rounded-full bg-linear-to-br from-purple-500 to-blue-600 flex items-center justify-center text-white font-semibold text-lg">
-                                                {proprietor.name?.charAt(0)}
-                                            </div>
-                                            <div>
-                                                <p className="text-base font-medium text-zinc-900 dark:text-white">{proprietor.name}</p>
-                                                <p className="text-sm text-zinc-500">{proprietorCategoryLabelZh(proprietor.category, 'card')}</p>
-                                            </div>
+                                <div className="p-4 bg-zinc-50 dark:bg-white/5 rounded-xl border border-zinc-200 dark:border-white/10">
+                                    <p className="text-base font-medium text-zinc-700 dark:text-white/80 mb-3">{t('Proprietor', '業主')}</p>
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-12 h-12 rounded-full bg-linear-to-br from-purple-500 to-blue-600 flex items-center justify-center text-white font-semibold text-lg">
+                                            泊
+                                        </div>
+                                        <div>
+                                            <p className="text-base font-medium text-zinc-900 dark:text-white">泊車易管理有限公司</p>
+                                            <p className="text-sm text-zinc-500">管理公司</p>
                                         </div>
                                     </div>
-                                )}
+                                </div>
 
                                 {/* 面積 + 土地用途（同一行） */}
                                 {(property.lotArea || landUseList.length > 0) && (

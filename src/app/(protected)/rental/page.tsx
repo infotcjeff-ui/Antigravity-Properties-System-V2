@@ -4,6 +4,7 @@ import { useEffect, useState, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { usePropertiesQuery } from '@/hooks/useStorage';
 import type { Property } from '@/lib/db';
+import { parsePropertyLotSegments, parseLotEntries } from '@/lib/formatters';
 import PropertyCard from '@/components/properties/PropertyCard';
 import PropertyMapDynamic from '@/components/properties/PropertyMapDynamic';
 import Link from 'next/link';
@@ -13,46 +14,53 @@ import { useAuth } from '@/contexts/AuthContext';
 type ViewMode = 'grid' | 'list' | 'map';
 
 const landUseLabels: Record<string, string> = {
-    agr: '農業',
-    ca: '自然保育區',
-    os: '露天貯物',
-    v: '鄉村式發展',
-    ou: '其他指定用途',
-    unknown: '未知',
-    open_storage: '露天倉儲',
-    residential_a: '住宅(甲)',
-    open_space: '開放空間',
-    village_dev: '鄉村式發展',
-    conservation_area: '保育區',
-    residential_c: '住宅(丙類)',
-    recreation_use: '休憩用地',
+    agr: 'AGR 農業',
+    ca: 'CA 自然保育區',
+    os: 'OS 露天貯物',
+    v: 'V 鄉村式發展',
+    ou: 'OU 其他指定用途',
+    r_d: 'R(D) 住宅(丁類)',
+    r_a5: 'R(A)5 住宅(甲類)5',
+    // 注意: 與 PropertyForm 中的 landUseTypes 保持一致, 沒有「露天倉儲」之類的歷史值
 };
 
 function getLandUseDisplay(landUse?: string | null) {
     if (!landUse) return '未設定';
     const parts = landUse.split(',').map(s => s.trim()).filter(Boolean);
     if (parts.length === 0) return '未設定';
-    return parts.map(p => landUseLabels[p] || p).join('、');
+    const validParts = parts
+        .map(p => landUseLabels[p])
+        .filter(Boolean);
+    if (validParts.length === 0) return '未設定';
+    return validParts.join('、');
 }
 
-function parseLotValues(lotIndex: string | null | undefined): string {
-    if (!lotIndex?.trim()) return '';
-    return lotIndex
-        .split(/\n/)
-        .map(part => {
-            const t = part.trim();
-            if (t.startsWith('{')) {
-                try {
-                    const obj = JSON.parse(t) as { v?: string };
-                    return obj.v || '';
-                } catch {
-                    return t;
-                }
-            }
-            return t;
-        })
-        .filter(value => value.startsWith('DD'))
-        .join('、');
+/**
+ * 取得物業的所有地段清單（與其他頁面地段顯示邏輯一致）。
+ */
+function getPropertyLots(property: Property): string[] {
+    return parsePropertyLotSegments(property.lotIndex);
+}
+
+/**
+ * 計算單一物業的「已出租地段數」。
+ * 直接從 lotIndex 的 lotStatus 欄位計算：
+ *   - lotStatus === 'rented' → 已出租（計入）
+ *   - lotStatus === 'renting' / 'available' → 不計入
+ * 與屬性頁面地塊狀態標籤邏輯一致。
+ * 已出租地段以 set 去重。
+ */
+function countRentedLotsForProperty(property: Property): number {
+    if (!property.lotIndex) return 0;
+    const entries = parseLotEntries(property.lotIndex);
+    const rentedLotSet = new Set<string>();
+    for (const entry of entries) {
+        if (entry.lotStatus === 'rented') {
+            const stripped = entry.value.replace(/^(?:A01-|B01-|C01-|C04-|C21-|C33-|A02-|A01-P|B01-P|C01-E|C04-E|C21-E|C33-E|A02-P)-/i, '').trim();
+            rentedLotSet.add(stripped);
+        }
+    }
+    return rentedLotSet.size;
 }
 
 export default function RentalPage() {
@@ -462,13 +470,18 @@ export default function RentalPage() {
                                             </div>
 
                                             {/* Lot Index - Rental Area Count */}
-                                            {selected.lotIndex && (
-                                                <div className="shrink-0">
-                                                    <p className="text-sm sm:text-base text-zinc-600 dark:text-white/80 leading-snug">
-                                                        出租地段 : {parseLotValues(selected.lotIndex).split('、').filter(Boolean).length} 個
-                                                    </p>
-                                                </div>
-                                            )}
+                                            {(() => {
+                                                const allLots = getPropertyLots(selected);
+                                                const totalCount = allLots.length;
+                                                const rentedCount = countRentedLotsForProperty(selected);
+                                                return (
+                                                    <div className="shrink-0">
+                                                        <p className="text-sm sm:text-base text-zinc-600 dark:text-white/80 leading-snug">
+                                                            出租地段 : {totalCount} 個 ({rentedCount}個已出租)
+                                                        </p>
+                                                    </div>
+                                                );
+                                            })()}
 
                                             {/* Land Use & Area Cards */}
                                             <div className="grid grid-cols-2 gap-2 shrink-0">
@@ -500,7 +513,8 @@ export default function RentalPage() {
                                                     <div className="min-w-0">
                                                         <p className="text-sm font-semibold text-amber-600 dark:text-amber-400">備註</p>
                                                         <p className="text-sm text-amber-700 dark:text-amber-300/85 wrap-break-word mt-1 leading-relaxed line-clamp-2">
-                                                            {selected.notes}
+                                                            {/* 去除 HTML 標籤，只顯示純文字內容 */}
+                                                            {selected.notes.replace(/<[^>]*>/g, '').trim()}
                                                         </p>
                                                     </div>
                                                 </div>

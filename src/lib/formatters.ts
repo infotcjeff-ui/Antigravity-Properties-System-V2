@@ -184,9 +184,11 @@ export function formatRentHistoryLotCellText(
 export interface MediaItem {
     u: string; // url
     s: number; // size in bytes
+    /** 設施 tag：標示此圖片屬於哪個設施（與地段資料的設施一致） */
+    tag?: 'water' | 'electric' | 'toilet' | 'office' | 'storage' | 'room';
 }
 
-export type LotStatus = 'renting' | 'rented';
+export type LotStatus = 'renting' | 'rented' | 'available';
 
 /** 合約狀態 */
 export type LotContractStatus = 'ongoing' | 'expiring' | 'not_renewing';
@@ -198,8 +200,13 @@ export interface LotEntry {
     note?: string;
     lotStatus?: LotStatus;
     lotArea?: string;
+    rentPrice?: string;
     waterMeter?: boolean;
     electricMeter?: boolean;
+    toilet?: boolean;
+    office?: boolean;
+    storage?: boolean;
+    room?: boolean;
     waterMeterMedia?: MediaItem[];
     electricMeterMedia?: MediaItem[];
     waterMeterNote?: string;
@@ -220,7 +227,8 @@ export function parseLotEntries(lotIndex: string | null | undefined): LotEntry[]
             try {
                 const obj = JSON.parse(t) as {
                     t?: string; v?: string; m?: MediaItem[] | string[]; n?: string;
-                    s?: string; a?: string; w?: boolean; e?: boolean;
+                    s?: string; a?: string; p?: string; w?: boolean; e?: boolean;
+                    tl?: boolean; of?: boolean; st?: boolean; rm?: boolean;
                     wm?: MediaItem[]; em?: MediaItem[]; wn?: string; en?: string;
                     ti?: string; cs?: string; sd?: string; ed?: string;
                 };
@@ -228,7 +236,7 @@ export function parseLotEntries(lotIndex: string | null | undefined): LotEntry[]
                 const media: MediaItem[] | undefined = obj.m ? (
                     typeof obj.m[0] === 'string'
                         ? (obj.m as string[]).map(u => ({ u, s: 0 }))
-                        : obj.m as MediaItem[]
+                        : (obj.m as MediaItem[]).map(m => ({ u: m.u, s: m.s, tag: m.tag }))
                 ) : undefined;
                 // 兼容 wm/em 的舊格式
                 const parseMedia = (arr: MediaItem[] | string[] | undefined): MediaItem[] | undefined => {
@@ -236,17 +244,22 @@ export function parseLotEntries(lotIndex: string | null | undefined): LotEntry[]
                     if (typeof arr[0] === 'string') {
                         return (arr as string[]).map(u => ({ u, s: 0 }));
                     }
-                    return arr as MediaItem[];
+                    return (arr as MediaItem[]).map(m => ({ u: m.u, s: m.s, tag: m.tag }));
                 };
                 return {
                     type: (obj.t === '舊' ? 'old' : 'new') as 'new' | 'old',
                     value: obj.v || '',
                     media,
                     note: obj.n,
-                    lotStatus: (obj.s === '已出租' ? 'rented' : obj.s === '出租中' ? 'renting' : undefined) as LotStatus | undefined,
+                    lotStatus: (obj.s === '已出租' ? 'rented' : obj.s === '出租中' ? 'renting' : obj.s === '可租用' ? 'available' : undefined) as LotStatus | undefined,
                     lotArea: obj.a,
+                    rentPrice: obj.p,
                     waterMeter: obj.w,
                     electricMeter: obj.e,
+                    toilet: obj.tl,
+                    office: obj.of,
+                    storage: obj.st,
+                    room: obj.rm,
                     waterMeterMedia: parseMedia(obj.wm),
                     electricMeterMedia: parseMedia(obj.em),
                     waterMeterNote: obj.wn,
@@ -273,14 +286,19 @@ export function serializeLotEntries(entries: LotEntry[]): string {
         JSON.stringify({
             t: e.type === 'new' ? '新' : '舊',
             v: e.value,
-            m: (e.media?.length ?? 0) > 0 ? e.media : undefined,
+            m: (e.media?.length ?? 0) > 0 ? e.media?.map(m => ({ u: m.u, s: m.s, ...(m.tag ? { tg: m.tag } : {}) })) : undefined,
             n: e.note || undefined,
-            s: e.lotStatus === 'rented' ? '已出租' : e.lotStatus === 'renting' ? '出租中' : undefined,
+            s: e.lotStatus === 'rented' ? '已出租' : e.lotStatus === 'renting' ? '出租中' : e.lotStatus === 'available' ? '可租用' : undefined,
             a: e.lotArea || undefined,
+            p: e.rentPrice || undefined,
             w: e.waterMeter || undefined,
             e: e.electricMeter || undefined,
-            wm: (e.waterMeterMedia?.length ?? 0) > 0 ? e.waterMeterMedia : undefined,
-            em: (e.electricMeterMedia?.length ?? 0) > 0 ? e.electricMeterMedia : undefined,
+            tl: e.toilet || undefined,
+            of: e.office || undefined,
+            st: e.storage || undefined,
+            rm: e.room || undefined,
+            wm: (e.waterMeterMedia?.length ?? 0) > 0 ? e.waterMeterMedia?.map(m => ({ u: m.u, s: m.s, ...(m.tag ? { tg: m.tag } : {}) })) : undefined,
+            em: (e.electricMeterMedia?.length ?? 0) > 0 ? e.electricMeterMedia?.map(m => ({ u: m.u, s: m.s, ...(m.tag ? { tg: m.tag } : {}) })) : undefined,
             wn: e.waterMeterNote || undefined,
             en: e.electricMeterNote || undefined,
             ti: e.lotTenantId || undefined,

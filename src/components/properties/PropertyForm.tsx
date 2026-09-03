@@ -41,6 +41,7 @@ import {
     formatLotAreaForInput,
     parseLotAreaInput,
     parseLotEntries as parseLotEntriesFromStr,
+    parsePriceInput,
     proprietorCategoryLabelZh,
     serializeLotEntries,
     type LotEntry,
@@ -61,6 +62,19 @@ import {
 } from '@/lib/rentPaymentDisplay';
 
 const RENT_LIST_PAGE_SIZE = 5;
+
+/** 地段圖片的「設施 tag」類型：與地段資料的設施對應（亦可留空表示未分類） */
+type FacilityTag = 'water' | 'electric' | 'toilet' | 'office' | 'storage' | 'room';
+
+/** 設施 tag 對應的顯示標籤與顏色（用於圖片上的徽章與選擇器） */
+const FACILITY_TAGS: Array<{ value: FacilityTag; label: string; color: string; ring: string; chip: string }> = [
+    { value: 'water', label: '水', color: 'bg-blue-500 text-white', ring: 'ring-blue-500/60', chip: 'bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-300' },
+    { value: 'electric', label: '電', color: 'bg-amber-500 text-white', ring: 'ring-amber-500/60', chip: 'bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300' },
+    { value: 'toilet', label: '廁所', color: 'bg-purple-500 text-white', ring: 'ring-purple-500/60', chip: 'bg-purple-100 text-purple-700 dark:bg-purple-500/20 dark:text-purple-300' },
+    { value: 'office', label: '辦公室', color: 'bg-indigo-500 text-white', ring: 'ring-indigo-500/60', chip: 'bg-indigo-100 text-indigo-700 dark:bg-indigo-500/20 dark:text-indigo-300' },
+    { value: 'storage', label: '貯物櫃', color: 'bg-emerald-500 text-white', ring: 'ring-emerald-500/60', chip: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300' },
+    { value: 'room', label: '房間', color: 'bg-rose-500 text-white', ring: 'ring-rose-500/60', chip: 'bg-rose-100 text-rose-700 dark:bg-rose-500/20 dark:text-rose-300' },
+];
 
 /** 列表顯示時去掉「新:」「舊:」前綴及樓盤前綴（如 A01-、B01-、C33- 等） */
 const LOT_PREFIXES = ['A01-', 'B01-', 'C01-', 'C04-', 'C21-', 'C33-', 'A02-'];
@@ -312,6 +326,78 @@ interface PropertyFormProps {
     onSuccess: () => void;
 }
 
+/**
+ * 地段圖片項目（含設施 tag 徽章 + tag 選擇器）
+ * - 圖片左上角徽章顯示當前 tag，點擊展開 tag 選擇器
+ * - 右上角保留原本的刪除按鈕
+ */
+function LotImageWithTagPicker({
+    item,
+    onChangeTag,
+    onRemove,
+    aspectClass,
+}: {
+    item: { u?: string; preview?: string; tag?: FacilityTag };
+    onChangeTag: (tag: FacilityTag | null) => void;
+    onRemove: () => void;
+    aspectClass?: string;
+}) {
+    const [open, setOpen] = useState(false);
+    const tagMeta = FACILITY_TAGS.find(f => f.value === item.tag);
+    const src = item.u ?? item.preview ?? '';
+    return (
+        <div className={`relative group ${aspectClass ?? 'aspect-square'} rounded-xl overflow-hidden border border-zinc-200 dark:border-white/10`}>
+            <img src={src} alt="" className="w-full h-full object-cover" />
+            {/* 設施 tag 徽章（左上） */}
+            <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); setOpen(v => !v); }}
+                className={`absolute top-1 left-1 px-2 py-1 rounded-md text-xs font-medium tracking-wide cursor-pointer shadow-sm ${tagMeta ? tagMeta.color : 'bg-zinc-700/70 text-white hover:bg-zinc-900/80'}`}
+                title={tagMeta ? `設施：${tagMeta.label}（點擊更改）` : '點擊選擇設施 tag'}
+            >
+                {tagMeta ? tagMeta.label : '＋標籤'}
+            </button>
+            {/* tag 選擇器（full width，兩行 × 三格） */}
+            {open && (
+                <div className="absolute top-10 left-1 right-1 z-20 bg-white dark:bg-zinc-800 rounded-lg shadow-xl border border-zinc-200 dark:border-white/10 p-2 flex flex-col gap-1.5 animate-fade-in"
+                    onMouseLeave={() => setOpen(false)}
+                >
+                    <div className="text-xs font-semibold text-zinc-400 dark:text-white/40 px-1 pb-0.5">選擇設施</div>
+                    <div className="grid grid-cols-3 gap-1.5">
+                        {FACILITY_TAGS.map(f => (
+                            <button
+                                key={f.value}
+                                type="button"
+                                onClick={(e) => { e.stopPropagation(); onChangeTag(item.tag === f.value ? null : f.value); setOpen(false); }}
+                                className={`px-2 py-1.5 rounded-md text-sm font-medium cursor-pointer transition-all whitespace-nowrap ${item.tag === f.value ? `${f.color} ring-2 ${f.ring}` : `${f.chip} hover:ring-1 hover:${f.ring}`}`}
+                            >
+                                {f.label}
+                            </button>
+                        ))}
+                    </div>
+                    {item.tag && (
+                        <button
+                            type="button"
+                            onClick={(e) => { e.stopPropagation(); onChangeTag(null); setOpen(false); }}
+                            className="mt-0.5 text-xs text-zinc-500 dark:text-white/40 hover:text-zinc-700 dark:hover:text-white/70 px-1 py-0.5 rounded cursor-pointer self-start"
+                        >
+                            清除 tag
+                        </button>
+                    )}
+                </div>
+            )}
+            {/* 刪除按鈕（右上） */}
+            <button
+                type="button"
+                onClick={onRemove}
+                className="absolute top-0 right-0 w-5 h-5 bg-red-500 text-white rounded-bl-lg flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-xs"
+            >
+                ×
+            </button>
+        </div>
+    );
+}
+
 const propertyTypes = [
     { value: 'group_asset', label: '集團資產' },
     { value: 'co_investment', label: '合作投資' },
@@ -368,11 +454,17 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
     const [lotDetailTab, setLotDetailTab] = useState<'info' | 'images'>('info');
     const [lotAddMode, setLotAddMode] = useState<'new' | 'old' | null>(null);
     const [tempLotInput, setTempLotInput] = useState('');
-    const [tempLotMedia, setTempLotMedia] = useState<Array<{ u: string; s: number } | { file: File; s: number; preview: string }>>([]);
+    const [tempLotMedia, setTempLotMedia] = useState<Array<{ u: string; s: number; tag?: FacilityTag } | { file: File; s: number; preview: string; tag?: FacilityTag }>>([]);
     const [tempLotNote, setTempLotNote] = useState('');
     const [tempLotStatus, setTempLotStatus] = useState<LotStatus | null>(null);
     const [tempLotWaterMeter, setTempLotWaterMeter] = useState(false);
     const [tempLotElectricMeter, setTempLotElectricMeter] = useState(false);
+    const [tempLotToilet, setTempLotToilet] = useState(false);
+    const [tempLotOffice, setTempLotOffice] = useState(false);
+    const [tempLotStorage, setTempLotStorage] = useState(false);
+    const [tempLotRoom, setTempLotRoom] = useState(false);
+    const [tempLotArea, setTempLotArea] = useState('');
+    const [tempLotRentPrice, setTempLotRentPrice] = useState('');
     const [tempLotWaterMeterMedia, setTempLotWaterMeterMedia] = useState<Array<{ u: string; s: number } | { file: File; s: number; preview: string }>>([]);
     const [tempLotElectricMeterMedia, setTempLotElectricMeterMedia] = useState<Array<{ u: string; s: number } | { file: File; s: number; preview: string }>>([]);
     const [tempLotWaterMeterNote, setTempLotWaterMeterNote] = useState('');
@@ -384,12 +476,17 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
     const [editingLotIndex, setEditingLotIndex] = useState<number | null>(null);
     const [editingLotValue, setEditingLotValue] = useState('');
     const [editingLotType, setEditingLotType] = useState<'new' | 'old'>('new');
-    const [editingLotMedia, setEditingLotMedia] = useState<Array<{ u: string; s: number } | { file: File; s: number; preview: string }>>([]);
+    const [editingLotMedia, setEditingLotMedia] = useState<Array<{ u: string; s: number; tag?: FacilityTag } | { file: File; s: number; preview: string; tag?: FacilityTag }>>([]);
     const [editingLotNote, setEditingLotNote] = useState('');
     const [editingLotStatus, setEditingLotStatus] = useState<LotStatus | undefined>(undefined);
     const [editingLotArea, setEditingLotArea] = useState('');
+    const [editingLotRentPrice, setEditingLotRentPrice] = useState('');
     const [editingLotWaterMeter, setEditingLotWaterMeter] = useState(false);
     const [editingLotElectricMeter, setEditingLotElectricMeter] = useState(false);
+    const [editingLotToilet, setEditingLotToilet] = useState(false);
+    const [editingLotOffice, setEditingLotOffice] = useState(false);
+    const [editingLotStorage, setEditingLotStorage] = useState(false);
+    const [editingLotRoom, setEditingLotRoom] = useState(false);
     const [editingLotWaterMeterMedia, setEditingLotWaterMeterMedia] = useState<Array<{ u: string; s: number } | { file: File; s: number; preview: string }>>([]);
     const [editingLotElectricMeterMedia, setEditingLotElectricMeterMedia] = useState<Array<{ u: string; s: number } | { file: File; s: number; preview: string }>>([]);
     const [editingLotWaterMeterNote, setEditingLotWaterMeterNote] = useState('');
@@ -403,10 +500,20 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
     const [openLotActionsKey, setOpenLotActionsKey] = useState<number | null>(null);
     /** 編輯地段的 history popup */
     const [showLotHistoryModal, setShowLotHistoryModal] = useState(false);
-    const [lotHistoryEntry, setLotHistoryEntry] = useState<{ type: 'new' | 'old'; value: string; media?: MediaItem[]; note?: string; lotStatus?: LotStatus; lotArea?: string; waterMeter?: boolean; electricMeter?: boolean } | null>(null);
+    const [lotHistoryEntry, setLotHistoryEntry] = useState<{ type: 'new' | 'old'; value: string; media?: MediaItem[]; note?: string; lotStatus?: LotStatus; lotArea?: string; rentPrice?: string; waterMeter?: boolean; electricMeter?: boolean; toilet?: boolean; office?: boolean; storage?: boolean; room?: boolean } | null>(null);
     /** 圖片 tab - 過往相簿 side panel */
     const [lotHistorySidePanelOpen, setLotHistorySidePanelOpen] = useState(false);
     const [lotHistorySidePanelClosing, setLotHistorySidePanelClosing] = useState(false);
+    /** 過往相簿表單 - 重置為預設值 */
+    const resetLotHistoryAlbumForm = () => setLotHistoryAlbumForm({
+        value: '', lotArea: '', rentPrice: '', waterMeter: false, electricMeter: false,
+        toilet: false, office: false, storage: false, room: false,
+        lotStatus: '', contractStatus: '',
+        tenantId: '', note: '',
+        media: [], waterMeterMedia: [], electricMeterMedia: [],
+        waterMeterNote: '', electricMeterNote: '',
+        startDate: '', endDate: '',
+    });
     /** 過往相簿 - 從 IndexedDB 讀取 */
     const loadLotHistoryAlbumsFromDB = async (propertyId: string) => {
         if (!propertyId) return [];
@@ -423,14 +530,15 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
             }));
         } catch { return []; }
     };
-    const [lotHistoryAlbums, setLotHistoryAlbums] = useState<Array<{ id: string; type: 'new' | 'old'; value: string; media?: MediaItem[]; note?: string; lotStatus?: LotStatus; lotArea?: string; waterMeter?: boolean; electricMeter?: boolean; waterMeterMedia?: MediaItem[]; electricMeterMedia?: MediaItem[]; waterMeterNote?: string; electricMeterNote?: string; lotTenantId?: string; contractStatus?: LotContractStatus; startDate?: string; endDate?: string }>>([]);
+    const [lotHistoryAlbums, setLotHistoryAlbums] = useState<Array<{ id: string; type: 'new' | 'old'; value: string; media?: MediaItem[]; note?: string; lotStatus?: LotStatus; lotArea?: string; rentPrice?: string; waterMeter?: boolean; electricMeter?: boolean; toilet?: boolean; office?: boolean; storage?: boolean; room?: boolean; waterMeterMedia?: MediaItem[]; electricMeterMedia?: MediaItem[]; waterMeterNote?: string; electricMeterNote?: string; lotTenantId?: string; contractStatus?: LotContractStatus; startDate?: string; endDate?: string }>>([]);
     const [selectedLotHistoryAlbum, setSelectedLotHistoryAlbum] = useState<string | null>(null);
     /** 過往相簿 - 圖片預覽 */
     const [lotHistoryAlbumPreview, setLotHistoryAlbumPreview] = useState<{ url: string; type: 'main' | 'water' | 'electric' } | null>(null);
     /** 圖片 tab - 新增過往相簿表單 */
     const [lotHistoryAlbumFormOpen, setLotHistoryAlbumFormOpen] = useState(false);
     const [lotHistoryAlbumForm, setLotHistoryAlbumForm] = useState<{
-        value: string; lotArea: string; waterMeter: boolean; electricMeter: boolean;
+        value: string; lotArea: string; rentPrice: string; waterMeter: boolean; electricMeter: boolean;
+        toilet: boolean; office: boolean; storage: boolean; room: boolean;
         lotStatus: LotStatus | ''; contractStatus: LotContractStatus | '';
         tenantId: string; note: string;
         media: (MediaItem | { file: File; s: number; preview: string })[];
@@ -439,7 +547,8 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
         waterMeterNote: string; electricMeterNote: string;
         startDate: string; endDate: string;
     }>({
-        value: '', lotArea: '', waterMeter: false, electricMeter: false,
+        value: '', lotArea: '', rentPrice: '', waterMeter: false, electricMeter: false,
+        toilet: false, office: false, storage: false, room: false,
         lotStatus: '', contractStatus: '',
         tenantId: '', note: '',
         media: [], waterMeterMedia: [], electricMeterMedia: [],
@@ -447,7 +556,7 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
         startDate: '', endDate: '',
     });
     /** 查看地段 popup */
-    const [viewLotEntry, setViewLotEntry] = useState<{ type: 'new' | 'old'; value: string; media?: MediaItem[]; note?: string; lotStatus?: LotStatus; lotArea?: string; waterMeter?: boolean; electricMeter?: boolean } | null>(null);
+    const [viewLotEntry, setViewLotEntry] = useState<{ type: 'new' | 'old'; value: string; media?: MediaItem[]; note?: string; lotStatus?: LotStatus; lotArea?: string; rentPrice?: string; waterMeter?: boolean; electricMeter?: boolean; toilet?: boolean; office?: boolean; storage?: boolean; room?: boolean } | null>(null);
     const [viewLotImageIdx, setViewLotImageIdx] = useState(0);
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState('');
@@ -514,9 +623,14 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
         if (!trimmed) return;
         setLotSaving(true);
         try {
-        const pendingFiles = tempLotMedia.filter((x): x is { file: File; s: number; preview: string } => 'file' in x && 'preview' in x);
-        const existingMedia = tempLotMedia.filter((x): x is { u: string; s: number } => 'u' in x && 's' in x);
+        const pendingFiles = tempLotMedia.filter((x): x is { file: File; s: number; preview: string; tag?: FacilityTag } => 'file' in x && 'preview' in x);
+        const existingMedia = tempLotMedia.filter((x): x is { u: string; s: number; tag?: FacilityTag } => 'u' in x && 's' in x);
         const uploadedNew = pendingFiles.length > 0 ? await processAndUploadFiles(pendingFiles, 'lots') : [];
+        // 把上傳完成的圖片與原本 pending 的 tag 配對回去
+        const uploadedWithTag: Array<{ u: string; s: number; tag?: FacilityTag }> = uploadedNew.map((m, i) => ({
+            ...m,
+            tag: pendingFiles[i]?.tag,
+        }));
 
         // 水錶電錶圖片上傳
         const wmPending = tempLotWaterMeterMedia.filter((x): x is { file: File; s: number; preview: string } => 'file' in x && 'preview' in x);
@@ -530,11 +644,17 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
         const entry: LotEntry = {
             type: mode,
             value: trimmed,
-            media: [...existingMedia, ...uploadedNew],
+            media: [...existingMedia, ...uploadedWithTag],
             note: tempLotNote || undefined,
             lotStatus: tempLotStatus || undefined,
+            lotArea: tempLotArea.trim() || undefined,
+            rentPrice: tempLotRentPrice.trim() || undefined,
             waterMeter: tempLotWaterMeter || undefined,
             electricMeter: tempLotElectricMeter || undefined,
+            toilet: tempLotToilet || undefined,
+            office: tempLotOffice || undefined,
+            storage: tempLotStorage || undefined,
+            room: tempLotRoom || undefined,
             waterMeterMedia: tempLotWaterMeter ? [...wmExisting, ...wmUploaded] : undefined,
             electricMeterMedia: tempLotElectricMeter ? [...emExisting, ...emUploaded] : undefined,
             waterMeterNote: tempLotWaterMeterNote || undefined,
@@ -551,8 +671,14 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
         setTempLotInput('');
         setTempLotMedia([]);
         setTempLotNote('');
+        setTempLotArea('');
+        setTempLotRentPrice('');
         setTempLotWaterMeter(false);
         setTempLotElectricMeter(false);
+        setTempLotToilet(false);
+        setTempLotOffice(false);
+        setTempLotStorage(false);
+        setTempLotRoom(false);
         setTempLotWaterMeterMedia([]);
         setTempLotElectricMeterMedia([]);
         setTempLotWaterMeterNote('');
@@ -571,9 +697,13 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
         if (!trimmed) return;
         setLotSaving(true);
         try {
-        const pendingFiles = tempLotMedia.filter((x): x is { file: File; s: number; preview: string } => 'file' in x && 'preview' in x);
-        const existingMedia = tempLotMedia.filter((x): x is { u: string; s: number } => 'u' in x && 's' in x);
+        const pendingFiles = tempLotMedia.filter((x): x is { file: File; s: number; preview: string; tag?: FacilityTag } => 'file' in x && 'preview' in x);
+        const existingMedia = tempLotMedia.filter((x): x is { u: string; s: number; tag?: FacilityTag } => 'u' in x && 's' in x);
         const uploadedNew = pendingFiles.length > 0 ? await processAndUploadFiles(pendingFiles, 'lots') : [];
+        const uploadedWithTag: Array<{ u: string; s: number; tag?: FacilityTag }> = uploadedNew.map((m, i) => ({
+            ...m,
+            tag: pendingFiles[i]?.tag,
+        }));
 
         const wmPending = tempLotWaterMeterMedia.filter((x): x is { file: File; s: number; preview: string } => 'file' in x && 'preview' in x);
         const wmExisting = tempLotWaterMeterMedia.filter((x): x is { u: string; s: number } => 'u' in x && 's' in x);
@@ -586,11 +716,16 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
         const entry: LotEntry = {
             type: mode,
             value: `${trimmed} (租賃地段)`,
-            media: [...existingMedia, ...uploadedNew],
+            media: [...existingMedia, ...uploadedWithTag],
             note: tempLotNote || undefined,
             lotStatus: tempLotStatus || undefined,
+            rentPrice: tempLotRentPrice.trim() || undefined,
             waterMeter: tempLotWaterMeter || undefined,
             electricMeter: tempLotElectricMeter || undefined,
+            toilet: tempLotToilet || undefined,
+            office: tempLotOffice || undefined,
+            storage: tempLotStorage || undefined,
+            room: tempLotRoom || undefined,
             waterMeterMedia: tempLotWaterMeter ? [...wmExisting, ...wmUploaded] : undefined,
             electricMeterMedia: tempLotElectricMeter ? [...emExisting, ...emUploaded] : undefined,
             waterMeterNote: tempLotWaterMeterNote || undefined,
@@ -607,8 +742,13 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
         setTempLotInput('');
         setTempLotMedia([]);
         setTempLotNote('');
+        setTempLotRentPrice('');
         setTempLotWaterMeter(false);
         setTempLotElectricMeter(false);
+        setTempLotToilet(false);
+        setTempLotOffice(false);
+        setTempLotStorage(false);
+        setTempLotRoom(false);
         setTempLotWaterMeterMedia([]);
         setTempLotElectricMeterMedia([]);
         setTempLotWaterMeterNote('');
@@ -627,9 +767,13 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
         if (!trimmed) return;
         setLotSaving(true);
         try {
-        const pendingFiles = tempLotMedia.filter((x): x is { file: File; s: number; preview: string } => 'file' in x && 'preview' in x);
-        const existingMedia = tempLotMedia.filter((x): x is { u: string; s: number } => 'u' in x && 's' in x);
+        const pendingFiles = tempLotMedia.filter((x): x is { file: File; s: number; preview: string; tag?: FacilityTag } => 'file' in x && 'preview' in x);
+        const existingMedia = tempLotMedia.filter((x): x is { u: string; s: number; tag?: FacilityTag } => 'u' in x && 's' in x);
         const uploadedNew = pendingFiles.length > 0 ? await processAndUploadFiles(pendingFiles, 'lots') : [];
+        const uploadedWithTag: Array<{ u: string; s: number; tag?: FacilityTag }> = uploadedNew.map((m, i) => ({
+            ...m,
+            tag: pendingFiles[i]?.tag,
+        }));
 
         const wmPending = tempLotWaterMeterMedia.filter((x): x is { file: File; s: number; preview: string } => 'file' in x && 'preview' in x);
         const wmExisting = tempLotWaterMeterMedia.filter((x): x is { u: string; s: number } => 'u' in x && 's' in x);
@@ -642,11 +786,16 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
         const entry: LotEntry = {
             type: mode,
             value: `${trimmed} (政府短期租約)`,
-            media: [...existingMedia, ...uploadedNew],
+            media: [...existingMedia, ...uploadedWithTag],
             note: tempLotNote || undefined,
             lotStatus: tempLotStatus || undefined,
+            rentPrice: tempLotRentPrice.trim() || undefined,
             waterMeter: tempLotWaterMeter || undefined,
             electricMeter: tempLotElectricMeter || undefined,
+            toilet: tempLotToilet || undefined,
+            office: tempLotOffice || undefined,
+            storage: tempLotStorage || undefined,
+            room: tempLotRoom || undefined,
             waterMeterMedia: tempLotWaterMeter ? [...wmExisting, ...wmUploaded] : undefined,
             electricMeterMedia: tempLotElectricMeter ? [...emExisting, ...emUploaded] : undefined,
             waterMeterNote: tempLotWaterMeterNote || undefined,
@@ -663,8 +812,13 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
         setTempLotInput('');
         setTempLotMedia([]);
         setTempLotNote('');
+        setTempLotRentPrice('');
         setTempLotWaterMeter(false);
         setTempLotElectricMeter(false);
+        setTempLotToilet(false);
+        setTempLotOffice(false);
+        setTempLotStorage(false);
+        setTempLotRoom(false);
         setTempLotWaterMeterMedia([]);
         setTempLotElectricMeterMedia([]);
         setTempLotWaterMeterNote('');
@@ -708,14 +862,19 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
             setEditingLotIndex(index);
             setEditingLotType(entry.type);
             setEditingLotValue(entry.value.replace(/\s*\(租賃地段\)$/, '').replace(/\s*\(政府短期租約\)$/, ''));
-            // 載入 DB 中的 media（{u, s}[]），並轉為混合陣列格式
-            const existingMedia: Array<string | { u: string; s: number }> = (entry.media || []).map(m => ({ u: m.u, s: m.s }));
+            // 載入 DB 中的 media（{u, s}[]），並轉為混合陣列格式（保留 tag）
+            const existingMedia: Array<string | { u: string; s: number; tag?: FacilityTag }> = (entry.media || []).map(m => ({ u: m.u, s: m.s, tag: m.tag }));
             setEditingLotMedia(existingMedia as any);
             setEditingLotNote(entry.note || '');
             setEditingLotStatus(entry.lotStatus);
             setEditingLotArea(entry.lotArea || '');
+            setEditingLotRentPrice(entry.rentPrice || '');
             setEditingLotWaterMeter(entry.waterMeter || false);
             setEditingLotElectricMeter(entry.electricMeter || false);
+            setEditingLotToilet(entry.toilet || false);
+            setEditingLotOffice(entry.office || false);
+            setEditingLotStorage(entry.storage || false);
+            setEditingLotRoom(entry.room || false);
             // 水錶電錶圖片
             const wmMedia: Array<string | { u: string; s: number }> = (entry.waterMeterMedia || []).map(m => ({ u: m.u, s: m.s }));
             setEditingLotWaterMeterMedia(wmMedia as any);
@@ -737,9 +896,13 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
         const entry = next[editingLotIndex];
         const wasLease = entry.value.endsWith('(租賃地段)');
         const wasGov = entry.value.endsWith('(政府短期租約)');
-        const pendingFiles = editingLotMedia.filter((x): x is { file: File; s: number; preview: string } => typeof x === 'object');
-        const existingMedia = editingLotMedia.filter((x): x is { u: string; s: number } => typeof x === 'object' && 'u' in x && 's' in x);
+        const pendingFiles = editingLotMedia.filter((x): x is { file: File; s: number; preview: string; tag?: FacilityTag } => typeof x === 'object');
+        const existingMedia = editingLotMedia.filter((x): x is { u: string; s: number; tag?: FacilityTag } => typeof x === 'object' && 'u' in x && 's' in x);
         const uploadedNew = pendingFiles.length > 0 ? await processAndUploadFiles(pendingFiles, 'lots') : [];
+        const uploadedWithTag: Array<{ u: string; s: number; tag?: FacilityTag }> = uploadedNew.map((m, i) => ({
+            ...m,
+            tag: pendingFiles[i]?.tag,
+        }));
 
         // 水錶電錶圖片上傳
         const waterMeterPendingFiles = editingLotWaterMeterMedia.filter((x): x is { file: File; s: number; preview: string } => typeof x === 'object');
@@ -754,12 +917,17 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
             ...entry,
             type: editingLotType,
             value: wasLease ? `${editingLotValue.trim()} (租賃地段)` : wasGov ? `${editingLotValue.trim()} (政府短期租約)` : editingLotValue.trim(),
-            media: [...existingMedia, ...uploadedNew],
+            media: [...existingMedia, ...uploadedWithTag],
             note: editingLotNote || undefined,
             lotStatus: editingLotStatus,
             lotArea: editingLotArea.trim() || undefined,
+            rentPrice: editingLotRentPrice.trim() || undefined,
             waterMeter: editingLotWaterMeter || undefined,
             electricMeter: editingLotElectricMeter || undefined,
+            toilet: editingLotToilet || undefined,
+            office: editingLotOffice || undefined,
+            storage: editingLotStorage || undefined,
+            room: editingLotRoom || undefined,
             waterMeterMedia: editingLotWaterMeter ? [...waterMeterExisting, ...waterMeterUploaded] : undefined,
             electricMeterMedia: editingLotElectricMeter ? [...electricMeterExisting, ...electricMeterUploaded] : undefined,
             waterMeterNote: editingLotWaterMeterNote || undefined,
@@ -772,8 +940,13 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
         setEditingLotValue('');
         setEditingLotStatus(undefined);
         setEditingLotArea('');
+        setEditingLotRentPrice('');
         setEditingLotWaterMeter(false);
         setEditingLotElectricMeter(false);
+        setEditingLotToilet(false);
+        setEditingLotOffice(false);
+        setEditingLotStorage(false);
+        setEditingLotRoom(false);
         setEditingLotWaterMeterMedia([]);
         setEditingLotElectricMeterMedia([]);
         setEditingLotWaterMeterNote('');
@@ -791,8 +964,13 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
         setEditingLotValue('');
         setEditingLotStatus(undefined);
         setEditingLotArea('');
+        setEditingLotRentPrice('');
         setEditingLotWaterMeter(false);
         setEditingLotElectricMeter(false);
+        setEditingLotToilet(false);
+        setEditingLotOffice(false);
+        setEditingLotStorage(false);
+        setEditingLotRoom(false);
         setEditingLotWaterMeterMedia([]);
         setEditingLotElectricMeterMedia([]);
         setEditingLotWaterMeterNote('');
@@ -1486,8 +1664,9 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
         });
     };
 
-    /** 處理地段 popup 的圖片上傳 */
-    const handleLotImageUpload = async (files: File[], target: 'temp' | 'edit' | 'history') => {
+    /** 處理地段 popup 的圖片上傳
+     * 若帶有 `defaultTag`，所有新上傳的圖片都會預設帶上此 tag（用於「批次套用」功能）。 */
+    const handleLotImageUpload = async (files: File[], target: 'temp' | 'edit' | 'history', defaultTag?: FacilityTag | null) => {
         if (target === 'history') {
             const remaining = 10 - lotHistoryAlbumForm.media.length;
             if (remaining <= 0) return;
@@ -1499,8 +1678,22 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
         const existing = target === 'temp' ? tempLotMedia : editingLotMedia;
         const remaining = 10 - existing.length;
         if (remaining <= 0) return;
-        const toUpload = files.slice(0, remaining).map(file => ({ file, s: file.size, preview: URL.createObjectURL(file) }));
+        const toUpload = files.slice(0, remaining).map(file => ({ file, s: file.size, preview: URL.createObjectURL(file), ...(defaultTag ? { tag: defaultTag } : {}) }));
         setter((prev: typeof tempLotMedia) => [...prev, ...toUpload]);
+    };
+
+    /** 設定單張地段圖片的設施 tag（null = 清除） */
+    const setLotMediaTag = (index: number, tag: FacilityTag | null, target: 'temp' | 'edit') => {
+        const setter = target === 'temp' ? setTempLotMedia : setEditingLotMedia;
+        setter(prev => prev.map((it, i) => {
+            if (i !== index) return it;
+            if (tag === null) {
+                // 移除 tag 欄位（保留其餘屬性）
+                const { tag: _drop, ...rest } = it as Record<string, unknown>;
+                return rest as typeof it;
+            }
+            return { ...it, tag } as typeof it;
+        }));
     };
 
     const removeLotMediaItem = (index: number, target: 'temp' | 'edit' | 'history') => {
@@ -1943,7 +2136,7 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                         </div>
                     )}
 
-                    {/* 地址 + 地段面積 */}
+                    {/* 地址 + 出租面積 */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="space-y-2">
                             <label className="block text-sm font-medium text-zinc-700 dark:text-white/80">地址</label>
@@ -1957,7 +2150,7 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                             />
                         </div>
                         <div className="space-y-2">
-                            <label className="block text-sm font-medium text-zinc-700 dark:text-white/80">地段面積</label>
+                            <label className="block text-sm font-medium text-zinc-700 dark:text-white/80">出租面積</label>
                             <div className="flex items-center gap-2">
                                 <input
                                     type="text"
@@ -2008,7 +2201,7 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
 
                     {/* Lot Area */}
                     <div className="space-y-2">
-                        <label className="block text-sm font-medium text-zinc-700 dark:text-white/80">地段面積</label>
+                        <label className="block text-sm font-medium text-zinc-700 dark:text-white/80">出租面積</label>
                         <div className="flex items-center gap-2">
                             <input
                                 type="text"
@@ -2251,13 +2444,13 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                                         return (
                                             <div
                                                 key={i}
-                                                className={`relative bg-white dark:bg-white/5 border rounded-xl overflow-hidden transition-all ${pendingLotRemovals.has(i)
+                                                className={`group/listing relative bg-white dark:bg-white/5 border rounded-xl overflow-hidden transition-all ${pendingLotRemovals.has(i)
                                                     ? 'border-red-300 dark:border-red-500/30 opacity-60'
                                                     : 'border-zinc-200 dark:border-white/10 hover:border-purple-300 dark:hover:border-purple-500/30'
                                                 }`}
                                             >
                                                 {/* Cover Photo */}
-                                                <div className="relative h-32 w-full bg-zinc-100 dark:bg-white/5">
+                                                <div className="relative h-[250px] w-full bg-zinc-100 dark:bg-white/5">
                                                     {coverUrl ? (
                                                         <img
                                                             src={coverUrl}
@@ -2275,32 +2468,101 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                                                     <span className={`absolute top-2 left-2 w-8 h-8 flex items-center justify-center rounded-lg text-xs font-bold shadow-sm ${entry.type === 'new' ? 'bg-emerald-100 dark:bg-emerald-500/30 text-emerald-600 dark:text-emerald-400' : 'bg-zinc-200 dark:bg-white/20 text-zinc-600 dark:text-white/80'}`}>
                                                         {entry.type === 'new' ? '新' : '舊'}
                                                     </span>
-                                                    {/* Pending removal badge */}
-                                                    {pendingLotRemovals.has(i) && (
-                                                        <span className="absolute top-2 right-2 px-2 py-0.5 bg-red-100 dark:bg-red-500/30 text-red-600 dark:text-red-400 text-xs font-medium rounded-full shadow-sm">待移除</span>
-                                                    )}
-                                                    {/* Image count badge */}
-                                                    {entry.media && entry.media.length > 1 && (
-                                                        <span className="absolute bottom-2 right-2 px-1.5 py-0.5 bg-black/60 text-white text-[10px] font-medium rounded">
-                                                            +{entry.media.length - 1}
-                                                        </span>
+                                                    {/* Top-right badges: 待移除 + 圖片計數 */}
+                                                    <div className="absolute top-2 right-2 flex items-center gap-1.5">
+                                                        {entry.media && entry.media.length > 1 && (
+                                                            <span className="px-2 py-0.5 bg-black/60 text-white text-xs font-medium rounded">
+                                                                +{entry.media.length - 1}
+                                                            </span>
+                                                        )}
+                                                        {pendingLotRemovals.has(i) && (
+                                                            <span className="px-2 py-0.5 bg-red-100 dark:bg-red-500/30 text-red-600 dark:text-red-400 text-xs font-medium rounded-full shadow-sm">待移除</span>
+                                                        )}
+                                                    </div>
+                                                    {/* Hover 操作 overlay（右下 3 格：查看 / 編輯 / 移除） */}
+                                                    {isAuthenticated && (
+                                                        <div className="absolute inset-x-0 bottom-0 flex justify-end gap-2 p-3 opacity-0 translate-y-1 group-hover/listing:opacity-100 group-hover/listing:translate-y-0 transition-all duration-200 ease-out pointer-events-none group-hover/listing:pointer-events-auto bg-gradient-to-t from-black/55 via-black/25 to-transparent">
+                                                            <button
+                                                                type="button"
+                                                                onClick={(e) => { e.stopPropagation(); window.open(`/rental/${property?.id ?? ''}?lotIdx=${i}`, '_blank', 'noopener,noreferrer'); }}
+                                                                className="inline-flex items-center gap-1.5 h-8 px-3 bg-blue-500/95 hover:bg-blue-500 text-white text-xs font-medium rounded-lg shadow-lg backdrop-blur-sm transition-colors cursor-pointer"
+                                                                title="查看（新分頁）"
+                                                                aria-label="查看"
+                                                            >
+                                                                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
+                                                                <span>查看</span>
+                                                            </button>
+                                                            <button
+                                                                type="button"
+                                                                onClick={(e) => { e.stopPropagation(); openEditLotPopup(i); }}
+                                                                className="inline-flex items-center gap-1.5 h-8 px-3 bg-purple-500/95 hover:bg-purple-500 text-white text-xs font-medium rounded-lg shadow-lg backdrop-blur-sm transition-colors cursor-pointer"
+                                                                title="編輯"
+                                                                aria-label="編輯"
+                                                            >
+                                                                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+                                                                <span>編輯</span>
+                                                            </button>
+                                                            {pendingLotRemovals.has(i) ? (
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={(e) => { e.stopPropagation(); restoreLotEntry(i); }}
+                                                                    className="inline-flex items-center gap-1.5 h-8 px-3 bg-emerald-500/95 hover:bg-emerald-500 text-white text-xs font-medium rounded-lg shadow-lg backdrop-blur-sm transition-colors cursor-pointer"
+                                                                    title="恢復"
+                                                                    aria-label="恢復"
+                                                                >
+                                                                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+                                                                    <span>恢復</span>
+                                                                </button>
+                                                            ) : (
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={(e) => { e.stopPropagation(); removeLotEntry(i); }}
+                                                                    className="inline-flex items-center gap-1.5 h-8 px-3 bg-red-500/95 hover:bg-red-500 text-white text-xs font-medium rounded-lg shadow-lg backdrop-blur-sm transition-colors cursor-pointer"
+                                                                    title="移除"
+                                                                    aria-label="移除"
+                                                                >
+                                                                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                                                                    <span>移除</span>
+                                                                </button>
+                                                            )}
+                                                        </div>
                                                     )}
                                                 </div>
                                                 <div className="p-4">
-                                                    <div className="flex items-center gap-2 flex-wrap mb-2 min-h-6">
+                                                    <div className="flex items-center gap-1.5 flex-wrap mb-2 min-h-6">
                                                         {entry.waterMeter && (
                                                             <span className="shrink-0 px-2 py-0.5 rounded text-xs font-medium bg-cyan-100 text-cyan-700 dark:bg-cyan-500/20 dark:text-cyan-400">
-                                                                水錶
+                                                                水
                                                             </span>
                                                         )}
                                                         {entry.electricMeter && (
                                                             <span className="shrink-0 px-2 py-0.5 rounded text-xs font-medium bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-400">
-                                                                電錶
+                                                                電
+                                                            </span>
+                                                        )}
+                                                        {entry.toilet && (
+                                                            <span className="shrink-0 px-2 py-0.5 rounded text-xs font-medium bg-purple-100 text-purple-700 dark:bg-purple-500/20 dark:text-purple-400">
+                                                                廁所
+                                                            </span>
+                                                        )}
+                                                        {entry.office && (
+                                                            <span className="shrink-0 px-2 py-0.5 rounded text-xs font-medium bg-indigo-100 text-indigo-700 dark:bg-indigo-500/20 dark:text-indigo-400">
+                                                                辨公室
+                                                            </span>
+                                                        )}
+                                                        {entry.storage && (
+                                                            <span className="shrink-0 px-2 py-0.5 rounded text-xs font-medium bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-400">
+                                                                貯物櫃
+                                                            </span>
+                                                        )}
+                                                        {entry.room && (
+                                                            <span className="shrink-0 px-2 py-0.5 rounded text-xs font-medium bg-rose-100 text-rose-700 dark:bg-rose-500/20 dark:text-rose-400">
+                                                                房間
                                                             </span>
                                                         )}
                                                         {entry.lotStatus && (
-                                                            <span className={`shrink-0 px-2 py-0.5 rounded text-xs font-medium ${entry.lotStatus === 'renting' ? 'bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-400' : 'bg-zinc-300 text-zinc-700 dark:bg-zinc-600 dark:text-zinc-300'}`}>
-                                                                {entry.lotStatus === 'renting' ? '出租中' : '已出租'}
+                                                            <span className={`shrink-0 px-2 py-0.5 rounded text-xs font-medium ${entry.lotStatus === 'renting' ? 'bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-400' : entry.lotStatus === 'available' ? 'bg-sky-100 text-sky-700 dark:bg-sky-500/20 dark:text-sky-400' : 'bg-zinc-300 text-zinc-700 dark:bg-zinc-600 dark:text-zinc-300'}`}>
+                                                                {entry.lotStatus === 'renting' ? '出租中' : entry.lotStatus === 'available' ? '可租用' : '已出租'}
                                                             </span>
                                                         )}
                                                     </div>
@@ -2318,84 +2580,6 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                                                         <p className="text-sm text-zinc-900 dark:text-white break-all">{entry.value}</p>
                                                     )}
                                                 </div>
-                                                {isAuthenticated && (
-                                                    <div className="border-t border-zinc-100 dark:border-white/10">
-                                                        {/* ... trigger button */}
-                                                        <div className="flex items-center justify-end px-2 py-1">
-                                                            <button
-                                                                type="button"
-                                                                onClick={(e) => { e.stopPropagation(); setOpenLotActionsKey(isActionsOpen ? null : i); }}
-                                                                className={`p-2 rounded-lg transition-colors cursor-pointer ${isActionsOpen ? 'bg-zinc-100 dark:bg-white/10 text-zinc-900 dark:text-white' : 'text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-white/10'}`}
-                                                                title="操作"
-                                                                aria-label="操作"
-                                                                aria-expanded={isActionsOpen}
-                                                            >
-                                                                <MoreVertical className="w-4 h-4" />
-                                                            </button>
-                                                        </div>
-                                                        {/* Expanded actions list */}
-                                                        {isActionsOpen && (
-                                                            <motion.div
-                                                                initial={{ opacity: 0, height: 0 }}
-                                                                animate={{ opacity: 1, height: 'auto' }}
-                                                                exit={{ opacity: 0, height: 0 }}
-                                                                transition={{ duration: 0.18, ease: 'easeOut' }}
-                                                                className="border-t border-zinc-100 dark:border-white/10 bg-zinc-50/60 dark:bg-white/3 overflow-hidden"
-                                                            >
-                                                                <div className="flex flex-col py-1">
-                                                                    <button
-                                                                        type="button"
-                                                                        onClick={() => {
-                                                                            setOpenLotActionsKey(null);
-                                                                            setViewLotImageIdx(0);
-                                                                            setViewLotEntry({ ...entry, lotStatus: entry.lotStatus, lotArea: entry.lotArea, waterMeter: entry.waterMeter, electricMeter: entry.electricMeter });
-                                                                        }}
-                                                                        className="flex items-center gap-2.5 px-4 py-2 text-sm text-zinc-700 dark:text-white/80 hover:bg-blue-50 dark:hover:bg-blue-500/10 hover:text-blue-600 dark:hover:text-blue-400 transition-colors cursor-pointer text-left"
-                                                                    >
-                                                                        <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
-                                                                        <span>查看</span>
-                                                                    </button>
-                                                                    <button
-                                                                        type="button"
-                                                                        onClick={() => {
-                                                                            setOpenLotActionsKey(null);
-                                                                            openEditLotPopup(i);
-                                                                        }}
-                                                                        className="flex items-center gap-2.5 px-4 py-2 text-sm text-zinc-700 dark:text-white/80 hover:bg-purple-50 dark:hover:bg-purple-500/10 hover:text-purple-600 dark:hover:text-purple-400 transition-colors cursor-pointer text-left"
-                                                                    >
-                                                                        <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
-                                                                        <span>編輯</span>
-                                                                    </button>
-                                                                    {pendingLotRemovals.has(i) ? (
-                                                                        <button
-                                                                            type="button"
-                                                                            onClick={() => {
-                                                                                setOpenLotActionsKey(null);
-                                                                                restoreLotEntry(i);
-                                                                            }}
-                                                                            className="flex items-center gap-2.5 px-4 py-2 text-sm text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-500/10 transition-colors cursor-pointer text-left"
-                                                                        >
-                                                                            <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
-                                                                            <span>恢復</span>
-                                                                        </button>
-                                                                    ) : (
-                                                                        <button
-                                                                            type="button"
-                                                                            onClick={() => {
-                                                                                setOpenLotActionsKey(null);
-                                                                                removeLotEntry(i);
-                                                                            }}
-                                                                            className="flex items-center gap-2.5 px-4 py-2 text-sm text-zinc-700 dark:text-white/80 hover:bg-red-50 dark:hover:bg-red-500/10 hover:text-red-600 dark:hover:text-red-400 transition-colors cursor-pointer text-left"
-                                                                        >
-                                                                            <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                                                                            <span>移除</span>
-                                                                        </button>
-                                                                    )}
-                                                                </div>
-                                                            </motion.div>
-                                                        )}
-                                                    </div>
-                                                )}
                                             </div>
                                         );
                                     })}
@@ -2437,14 +2621,44 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                                                 <span className={`shrink-0 px-2 py-1 rounded text-xs font-medium ${entry.type === 'new' ? 'bg-emerald-100 dark:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400' : 'bg-zinc-200 dark:bg-white/10 text-zinc-600 dark:text-white/70'}`}>
                                                     {entry.type === 'new' ? '新' : '舊'}
                                                 </span>
+                                                {entry.waterMeter && (
+                                                    <span className="shrink-0 px-2 py-0.5 rounded text-xs font-medium bg-cyan-100 text-cyan-700 dark:bg-cyan-500/20 dark:text-cyan-400">
+                                                        水
+                                                    </span>
+                                                )}
+                                                {entry.electricMeter && (
+                                                    <span className="shrink-0 px-2 py-0.5 rounded text-xs font-medium bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-400">
+                                                        電
+                                                    </span>
+                                                )}
+                                                {entry.toilet && (
+                                                    <span className="shrink-0 px-2 py-0.5 rounded text-xs font-medium bg-purple-100 text-purple-700 dark:bg-purple-500/20 dark:text-purple-400">
+                                                        廁所
+                                                    </span>
+                                                )}
+                                                {entry.office && (
+                                                    <span className="shrink-0 px-2 py-0.5 rounded text-xs font-medium bg-indigo-100 text-indigo-700 dark:bg-indigo-500/20 dark:text-indigo-400">
+                                                        辨公室
+                                                    </span>
+                                                )}
+                                                {entry.storage && (
+                                                    <span className="shrink-0 px-2 py-0.5 rounded text-xs font-medium bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-400">
+                                                        貯物櫃
+                                                    </span>
+                                                )}
+                                                {entry.room && (
+                                                    <span className="shrink-0 px-2 py-0.5 rounded text-xs font-medium bg-rose-100 text-rose-700 dark:bg-rose-500/20 dark:text-rose-400">
+                                                        房間
+                                                    </span>
+                                                )}
                                                 {entry.lotStatus && (
-                                                    <span className={`shrink-0 px-2 py-0.5 rounded text-xs font-medium ${entry.lotStatus === 'renting' ? 'bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-400' : 'bg-zinc-300 text-zinc-700 dark:bg-zinc-600 dark:text-zinc-300'}`}>
-                                                        {entry.lotStatus === 'renting' ? '出租中' : '已出租'}
+                                                    <span className={`shrink-0 px-2 py-0.5 rounded text-xs font-medium ${entry.lotStatus === 'renting' ? 'bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-400' : entry.lotStatus === 'available' ? 'bg-sky-100 text-sky-700 dark:bg-sky-500/20 dark:text-sky-400' : 'bg-zinc-300 text-zinc-700 dark:bg-zinc-600 dark:text-zinc-300'}`}>
+                                                        {entry.lotStatus === 'renting' ? '出租中' : entry.lotStatus === 'available' ? '可租用' : '已出租'}
                                                     </span>
                                                 )}
                                                 {entry.lotArea && (
                                                     <span className="shrink-0 px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-400">
-                                                        {entry.lotArea}
+                                                        {entry.lotArea} 平方英呎
                                                     </span>
                                                 )}
                                                 {entry.value.endsWith('(租賃地段)') ? (
@@ -2553,7 +2767,7 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                         {/* Lot Add/Edit Popup Modal */}
                         {(showLotAddModal || editingLotIndex !== null) && (
                             <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm" onClick={(e) => { if (e.target === e.currentTarget) { setShowLotAddModal(false); setLotAddTab('base'); setLotAddMode(null); setTempLotInput(''); setEditingLotIndex(null); setEditingLotStatus(undefined); setEditingLotArea(''); setTempLotWaterMeter(false); setTempLotElectricMeter(false); setTempLotWaterMeterMedia([]); setTempLotElectricMeterMedia([]); setTempLotWaterMeterNote(''); setTempLotElectricMeterNote(''); setTempLotTenantId(null); setTempLotContractStatus(null); setEditingLotWaterMeterMedia([]); setEditingLotElectricMeterMedia([]); setEditingLotWaterMeterNote(''); setEditingLotElectricMeterNote(''); setEditingLotTenantId(null); setEditingLotContractStatus(undefined); setLotDetailTab('info'); } }}>
-                                <div className="bg-white dark:bg-[#1a1a2e] rounded-2xl shadow-2xl w-full max-w-2xl md:max-w-3xl max-h-[90vh] md:max-h-[85vh] overflow-hidden flex flex-col mx-2 md:mx-4">
+                                <div className="bg-white dark:bg-[#1a1a2e] rounded-2xl shadow-2xl w-full max-w-[1080px] max-h-[90vh] md:max-h-[85vh] overflow-hidden flex flex-col mx-2 md:mx-4">
                                     {/* Header */}
                                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 md:p-5 border-b border-zinc-100 dark:border-white/10">
                                         <div className="flex items-center justify-between">
@@ -2571,8 +2785,13 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                                                             setLotHistoryAlbumForm({
                                                                 value: entry.value,
                                                                 lotArea: entry.lotArea || '',
+                                                                rentPrice: entry.rentPrice || '',
                                                                 waterMeter: entry.waterMeter || false,
                                                                 electricMeter: entry.electricMeter || false,
+                                                                toilet: entry.toilet || false,
+                                                                office: entry.office || false,
+                                                                storage: entry.storage || false,
+                                                                room: entry.room || false,
                                                                 lotStatus: entry.lotStatus || '',
                                                                 contractStatus: entry.contractStatus || '',
                                                                 tenantId: entry.lotTenantId || '',
@@ -2683,11 +2902,20 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                                                                 className="w-full px-3 md:px-4 py-2.5 md:py-3 bg-zinc-50 dark:bg-white/5 border border-zinc-200 dark:border-white/10 rounded-xl text-zinc-900 dark:text-white placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-purple-500/50 text-sm md:text-base"
                                                                 autoFocus />
                                                         </div>
-                                                        {/* 地段面積 */}
+                                                        {/* 出租面積 */}
                                                         <div className="space-y-2">
-                                                            <label className="block text-sm font-medium text-zinc-700 dark:text-white/80">地段面積</label>
-                                                            <input type="text" value={editingLotArea} onChange={(e) => setEditingLotArea(e.target.value)}
-                                                                placeholder="例如: 5,000" className="w-full px-3 md:px-4 py-2.5 md:py-3 bg-zinc-50 dark:bg-white/5 border border-zinc-200 dark:border-white/10 rounded-xl text-zinc-900 dark:text-white placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-purple-500/50 text-sm md:text-base" />
+                                                            <label className="block text-sm font-medium text-zinc-700 dark:text-white/80">出租面積</label>
+                                                            <div className="flex items-center gap-2">
+                                                                <input type="text" value={formatLotAreaForInput(editingLotArea)} onChange={(e) => setEditingLotArea(parseLotAreaInput(e.target.value))}
+                                                                    placeholder="例如: 5,000" className="flex-1 px-3 md:px-4 py-2.5 md:py-3 bg-zinc-50 dark:bg-white/5 border border-zinc-200 dark:border-white/10 rounded-xl text-zinc-900 dark:text-white placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-purple-500/50 text-sm md:text-base" />
+                                                                <span className="text-sm text-zinc-500 dark:text-white/50 shrink-0">平方英呎</span>
+                                                            </div>
+                                                        </div>
+                                                        {/* 租價 */}
+                                                        <div className="space-y-2">
+                                                            <label className="block text-sm font-medium text-zinc-700 dark:text-white/80">租價</label>
+                                                            <input type="text" value={editingLotRentPrice ? Number(editingLotRentPrice).toLocaleString() : ''} onChange={(e) => setEditingLotRentPrice(parsePriceInput(e.target.value))}
+                                                                placeholder="$ /月 / 例如: 50,000" className="w-full px-3 md:px-4 py-2.5 md:py-3 bg-zinc-50 dark:bg-white/5 border border-zinc-200 dark:border-white/10 rounded-xl text-zinc-900 dark:text-white placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-purple-500/50 text-sm md:text-base" />
                                                         </div>
                                                         {/* 設施 & 租客 */}
                                                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4">
@@ -2701,7 +2929,7 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                                                                             onChange={(e) => setEditingLotWaterMeter(e.target.checked)}
                                                                             className="w-4 h-4 rounded border-zinc-300 dark:border-white/30 text-blue-500 focus:ring-blue-500/50 cursor-pointer"
                                                                         />
-                                                                        <span className="text-sm text-zinc-700 dark:text-white/80">水錶</span>
+                                                                        <span className="text-sm text-zinc-700 dark:text-white/80">水</span>
                                                                     </label>
                                                                     <label className="flex items-center gap-2 cursor-pointer">
                                                                         <input
@@ -2710,7 +2938,43 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                                                                             onChange={(e) => setEditingLotElectricMeter(e.target.checked)}
                                                                             className="w-4 h-4 rounded border-zinc-300 dark:border-white/30 text-amber-500 focus:ring-amber-500/50 cursor-pointer"
                                                                         />
-                                                                        <span className="text-sm text-zinc-700 dark:text-white/80">電錶</span>
+                                                                        <span className="text-sm text-zinc-700 dark:text-white/80">電</span>
+                                                                    </label>
+                                                                    <label className="flex items-center gap-2 cursor-pointer">
+                                                                        <input
+                                                                            type="checkbox"
+                                                                            checked={editingLotToilet}
+                                                                            onChange={(e) => setEditingLotToilet(e.target.checked)}
+                                                                            className="w-4 h-4 rounded border-zinc-300 dark:border-white/30 text-purple-500 focus:ring-purple-500/50 cursor-pointer"
+                                                                        />
+                                                                        <span className="text-sm text-zinc-700 dark:text-white/80">廁所</span>
+                                                                    </label>
+                                                                    <label className="flex items-center gap-2 cursor-pointer">
+                                                                        <input
+                                                                            type="checkbox"
+                                                                            checked={editingLotOffice}
+                                                                            onChange={(e) => setEditingLotOffice(e.target.checked)}
+                                                                            className="w-4 h-4 rounded border-zinc-300 dark:border-white/30 text-indigo-500 focus:ring-indigo-500/50 cursor-pointer"
+                                                                        />
+                                                                        <span className="text-sm text-zinc-700 dark:text-white/80">辨公室</span>
+                                                                    </label>
+                                                                    <label className="flex items-center gap-2 cursor-pointer">
+                                                                        <input
+                                                                            type="checkbox"
+                                                                            checked={editingLotStorage}
+                                                                            onChange={(e) => setEditingLotStorage(e.target.checked)}
+                                                                            className="w-4 h-4 rounded border-zinc-300 dark:border-white/30 text-emerald-500 focus:ring-emerald-500/50 cursor-pointer"
+                                                                        />
+                                                                        <span className="text-sm text-zinc-700 dark:text-white/80">貯物櫃</span>
+                                                                    </label>
+                                                                    <label className="flex items-center gap-2 cursor-pointer">
+                                                                        <input
+                                                                            type="checkbox"
+                                                                            checked={editingLotRoom}
+                                                                            onChange={(e) => setEditingLotRoom(e.target.checked)}
+                                                                            className="w-4 h-4 rounded border-zinc-300 dark:border-white/30 text-rose-500 focus:ring-rose-500/50 cursor-pointer"
+                                                                        />
+                                                                        <span className="text-sm text-zinc-700 dark:text-white/80">房間</span>
                                                                     </label>
                                                                 </div>
                                                             </div>
@@ -2729,8 +2993,9 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                                                             <label className="block text-sm font-medium text-zinc-700 dark:text-white/80">出租狀態</label>
                                                             <AnimatedSelect
                                                                 value={editingLotStatus || ''}
-                                                                onChange={(v) => setEditingLotStatus(v === '' ? undefined : v as 'renting' | 'rented')}
+                                                                onChange={(v) => setEditingLotStatus(v === '' ? undefined : v as 'renting' | 'rented' | 'available')}
                                                                 options={[
+                                                                    { value: 'available', label: '可租用' },
                                                                     { value: 'renting', label: '出租中' },
                                                                     { value: 'rented', label: '已出租' },
                                                                 ]}
@@ -2763,21 +3028,18 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                                                 ) : (
                                                     <div className="space-y-4">
                                                         {/* 右上角按鈕已移至 Header */}
-                                                        {/* 地段圖片 */}
-                                                        <div className="space-y-2">
+                                                        {/* 地段圖片（含設施 tag） */}
+                                                        <div className="space-y-3">
                                                             <label className="block text-sm font-medium text-zinc-700 dark:text-white/80">地段圖片</label>
-                                                            <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2">
+                                                            <div className="grid grid-cols-3 gap-2">
                                                                 {editingLotMedia.map((item, idx) => (
-                                                                    <div key={idx} className="relative group aspect-square rounded-xl overflow-hidden border border-zinc-200 dark:border-white/10">
-                                                                    <img src={('u' in item) ? item.u : item.preview} alt="" className="w-full h-full object-cover" />
-                                                                        <button
-                                                                            type="button"
-                                                                            onClick={() => removeLotMediaItem(idx, 'edit')}
-                                                                            className="absolute top-0 right-0 w-5 h-5 bg-red-500 text-white rounded-bl-lg flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-xs"
-                                                                        >
-                                                                            ×
-                                                                        </button>
-                                                                    </div>
+                                                                    <LotImageWithTagPicker
+                                                                        key={idx}
+                                                                        item={item}
+                                                                        aspectClass="aspect-square"
+                                                                        onChangeTag={(tag) => setLotMediaTag(idx, tag, 'edit')}
+                                                                        onRemove={() => removeLotMediaItem(idx, 'edit')}
+                                                                    />
                                                                 ))}
                                                                 {editingLotMedia.length < 10 && (
                                                                     <div className="aspect-square">
@@ -2785,71 +3047,8 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                                                                     </div>
                                                                 )}
                                                             </div>
+                                                            <p className="text-xs text-zinc-400 dark:text-white/40">提示：點擊圖片左上角的標籤可設定或更改該圖片所屬設施（最多 10 張）。</p>
                                                         </div>
-                                                        {/* 水錶圖片 */}
-                                                        {editingLotWaterMeter && (
-                                                            <div className="space-y-2">
-                                                                <label className="block text-sm font-medium text-cyan-600 dark:text-cyan-400">水錶圖片</label>
-                                                                <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2">
-                                                                    {editingLotWaterMeterMedia.map((item, idx) => (
-                                                                        <div key={idx} className="relative group aspect-square rounded-xl overflow-hidden border border-cyan-200 dark:border-cyan-500/30">
-                                                                        <img src={('u' in item) ? item.u : item.preview} alt="" className="w-full h-full object-cover" />
-                                                                            <button
-                                                                                type="button"
-                                                                                onClick={() => { const next = [...editingLotWaterMeterMedia]; next.splice(idx, 1); setEditingLotWaterMeterMedia(next); }}
-                                                                                className="absolute top-0 right-0 w-5 h-5 bg-red-500 text-white rounded-bl-lg flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-xs"
-                                                                            >
-                                                                                ×
-                                                                            </button>
-                                                                        </div>
-                                                                    ))}
-                                                                    {editingLotWaterMeterMedia.length < 10 && (
-                                                                        <div className="aspect-square">
-                                                                            <FileUpload onChange={(files) => {
-                                                                                const newItems = files.map(f => ({ file: f, s: f.size, preview: URL.createObjectURL(f) }));
-                                                                                setEditingLotWaterMeterMedia(prev => [...prev, ...newItems]);
-                                                                            }} />
-                                                                        </div>
-                                                                    )}
-                                                                </div>
-                                                                <input type="text" value={editingLotWaterMeterNote}
-                                                                    onChange={(e) => setEditingLotWaterMeterNote(e.target.value)}
-                                                                    placeholder="水錶備註"
-                                                                    className="w-full px-3 py-2 bg-zinc-50 dark:bg-white/5 border border-zinc-200 dark:border-white/10 rounded-lg text-sm text-zinc-900 dark:text-white placeholder-zinc-400 focus:outline-none focus:ring-1 focus:ring-cyan-500/50" />
-                                                            </div>
-                                                        )}
-                                                        {/* 電錶圖片 */}
-                                                        {editingLotElectricMeter && (
-                                                            <div className="space-y-2">
-                                                                <label className="block text-sm font-medium text-amber-600 dark:text-amber-400">電錶圖片</label>
-                                                                <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2">
-                                                                    {editingLotElectricMeterMedia.map((item, idx) => (
-                                                                        <div key={idx} className="relative group aspect-square rounded-xl overflow-hidden border border-amber-200 dark:border-amber-500/30">
-                                                                        <img src={('u' in item) ? item.u : item.preview} alt="" className="w-full h-full object-cover" />
-                                                                            <button
-                                                                                type="button"
-                                                                                onClick={() => { const next = [...editingLotElectricMeterMedia]; next.splice(idx, 1); setEditingLotElectricMeterMedia(next); }}
-                                                                                className="absolute top-0 right-0 w-5 h-5 bg-red-500 text-white rounded-bl-lg flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-xs"
-                                                                            >
-                                                                                ×
-                                                                            </button>
-                                                                        </div>
-                                                                    ))}
-                                                                    {editingLotElectricMeterMedia.length < 10 && (
-                                                                        <div className="aspect-square">
-                                                                            <FileUpload onChange={(files) => {
-                                                                                const newItems = files.map(f => ({ file: f, s: f.size, preview: URL.createObjectURL(f) }));
-                                                                                setEditingLotElectricMeterMedia(prev => [...prev, ...newItems]);
-                                                                            }} />
-                                                                        </div>
-                                                                    )}
-                                                                </div>
-                                                                <input type="text" value={editingLotElectricMeterNote}
-                                                                    onChange={(e) => setEditingLotElectricMeterNote(e.target.value)}
-                                                                    placeholder="電錶備註"
-                                                                    className="w-full px-3 py-2 bg-zinc-50 dark:bg-white/5 border border-zinc-200 dark:border-white/10 rounded-lg text-sm text-zinc-900 dark:text-white placeholder-zinc-400 focus:outline-none focus:ring-1 focus:ring-amber-500/50" />
-                                                            </div>
-                                                        )}
                                                     </div>
                                                 )}
                                             </>
@@ -2875,6 +3074,21 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                                                                 className="w-full px-4 py-3 bg-zinc-50 dark:bg-white/5 border border-zinc-200 dark:border-white/10 rounded-xl text-zinc-900 dark:text-white placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-purple-500/50 text-base" autoFocus />
                                                             <p className="text-xs text-zinc-400 dark:text-white/40">多個地段可用逗號或換行分隔</p>
                                                         </div>
+                                                        {/* 出租面積 */}
+                                                        <div className="space-y-2">
+                                                            <label className="block text-sm font-medium text-zinc-700 dark:text-white/80">出租面積</label>
+                                                            <div className="flex items-center gap-2">
+                                                                <input type="text" value={formatLotAreaForInput(tempLotArea)} onChange={(e) => setTempLotArea(parseLotAreaInput(e.target.value))}
+                                                                    placeholder="例如: 5,000" className="flex-1 px-4 py-3 bg-zinc-50 dark:bg-white/5 border border-zinc-200 dark:border-white/10 rounded-xl text-zinc-900 dark:text-white placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-purple-500/50 text-base" />
+                                                                <span className="text-sm text-zinc-500 dark:text-white/50 shrink-0">平方英呎</span>
+                                                            </div>
+                                                        </div>
+                                                        {/* 租價 */}
+                                                        <div className="space-y-2">
+                                                            <label className="block text-sm font-medium text-zinc-700 dark:text-white/80">租價</label>
+                                                            <input type="text" value={tempLotRentPrice ? Number(tempLotRentPrice).toLocaleString() : ''} onChange={(e) => setTempLotRentPrice(parsePriceInput(e.target.value))}
+                                                                placeholder="$ /月 / 例如: 50,000" className="w-full px-4 py-3 bg-zinc-50 dark:bg-white/5 border border-zinc-200 dark:border-white/10 rounded-xl text-zinc-900 dark:text-white placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-purple-500/50 text-base" />
+                                                        </div>
                                                         {/* 設施 & 租客 */}
                                                         <div className="grid grid-cols-2 gap-4">
                                                             <div className="space-y-2">
@@ -2887,7 +3101,7 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                                                                             onChange={(e) => setTempLotWaterMeter(e.target.checked)}
                                                                             className="w-4 h-4 rounded border-zinc-300 dark:border-white/30 text-blue-500 focus:ring-blue-500/50 cursor-pointer"
                                                                         />
-                                                                        <span className="text-sm text-zinc-700 dark:text-white/80">水錶</span>
+                                                                        <span className="text-sm text-zinc-700 dark:text-white/80">水</span>
                                                                     </label>
                                                                     <label className="flex items-center gap-2 cursor-pointer">
                                                                         <input
@@ -2896,7 +3110,43 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                                                                             onChange={(e) => setTempLotElectricMeter(e.target.checked)}
                                                                             className="w-4 h-4 rounded border-zinc-300 dark:border-white/30 text-amber-500 focus:ring-amber-500/50 cursor-pointer"
                                                                         />
-                                                                        <span className="text-sm text-zinc-700 dark:text-white/80">電錶</span>
+                                                                        <span className="text-sm text-zinc-700 dark:text-white/80">電</span>
+                                                                    </label>
+                                                                    <label className="flex items-center gap-2 cursor-pointer">
+                                                                        <input
+                                                                            type="checkbox"
+                                                                            checked={tempLotToilet}
+                                                                            onChange={(e) => setTempLotToilet(e.target.checked)}
+                                                                            className="w-4 h-4 rounded border-zinc-300 dark:border-white/30 text-purple-500 focus:ring-purple-500/50 cursor-pointer"
+                                                                        />
+                                                                        <span className="text-sm text-zinc-700 dark:text-white/80">廁所</span>
+                                                                    </label>
+                                                                    <label className="flex items-center gap-2 cursor-pointer">
+                                                                        <input
+                                                                            type="checkbox"
+                                                                            checked={tempLotOffice}
+                                                                            onChange={(e) => setTempLotOffice(e.target.checked)}
+                                                                            className="w-4 h-4 rounded border-zinc-300 dark:border-white/30 text-indigo-500 focus:ring-indigo-500/50 cursor-pointer"
+                                                                        />
+                                                                        <span className="text-sm text-zinc-700 dark:text-white/80">辨公室</span>
+                                                                    </label>
+                                                                    <label className="flex items-center gap-2 cursor-pointer">
+                                                                        <input
+                                                                            type="checkbox"
+                                                                            checked={tempLotStorage}
+                                                                            onChange={(e) => setTempLotStorage(e.target.checked)}
+                                                                            className="w-4 h-4 rounded border-zinc-300 dark:border-white/30 text-emerald-500 focus:ring-emerald-500/50 cursor-pointer"
+                                                                        />
+                                                                        <span className="text-sm text-zinc-700 dark:text-white/80">貯物櫃</span>
+                                                                    </label>
+                                                                    <label className="flex items-center gap-2 cursor-pointer">
+                                                                        <input
+                                                                            type="checkbox"
+                                                                            checked={tempLotRoom}
+                                                                            onChange={(e) => setTempLotRoom(e.target.checked)}
+                                                                            className="w-4 h-4 rounded border-zinc-300 dark:border-white/30 text-rose-500 focus:ring-rose-500/50 cursor-pointer"
+                                                                        />
+                                                                        <span className="text-sm text-zinc-700 dark:text-white/80">房間</span>
                                                                     </label>
                                                                 </div>
                                                             </div>
@@ -2917,8 +3167,9 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                                                                 <label className="block text-sm font-medium text-zinc-700 dark:text-white/80">出租狀態</label>
                                                                 <AnimatedSelect
                                                                     value={tempLotStatus || ''}
-                                                                    onChange={(v) => setTempLotStatus(v === '' ? null : v as 'renting' | 'rented')}
+                                                                    onChange={(v) => setTempLotStatus(v === '' ? null : v as 'renting' | 'rented' | 'available')}
                                                                     options={[
+                                                                        { value: 'available', label: '可租用' },
                                                                         { value: 'renting', label: '出租中' },
                                                                         { value: 'rented', label: '已出租' },
                                                                     ]}
@@ -2967,21 +3218,18 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                                                                 </button>
                                                             </div>
                                                         </div>
-                                                        {/* 地段圖片 */}
-                                                        <div className="space-y-2">
+                                                        {/* 地段圖片（含設施 tag） */}
+                                                        <div className="space-y-3">
                                                             <label className="block text-sm font-medium text-zinc-700 dark:text-white/80">地段圖片</label>
-                                                            <div className="flex gap-2 flex-wrap">
+                                                            <div className="grid grid-cols-3 gap-2">
                                                                 {tempLotMedia.map((item, idx) => (
-                                                                    <div key={idx} className="relative group w-24 h-24 rounded-xl overflow-hidden border border-zinc-200 dark:border-white/10">
-                                                                    <img src={('u' in item) ? item.u : item.preview} alt="" className="w-full h-full object-cover" />
-                                                                        <button
-                                                                            type="button"
-                                                                            onClick={() => removeLotMediaItem(idx, 'temp')}
-                                                                            className="absolute top-0 right-0 w-5 h-5 bg-red-500 text-white rounded-bl-lg flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-xs"
-                                                                        >
-                                                                            ×
-                                                                        </button>
-                                                                    </div>
+                                                                    <LotImageWithTagPicker
+                                                                        key={idx}
+                                                                        item={item}
+                                                                        aspectClass="w-24 h-24"
+                                                                        onChangeTag={(tag) => setLotMediaTag(idx, tag, 'temp')}
+                                                                        onRemove={() => removeLotMediaItem(idx, 'temp')}
+                                                                    />
                                                                 ))}
                                                                 {tempLotMedia.length < 10 && (
                                                                     <div className="w-24 h-24">
@@ -2989,71 +3237,8 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                                                                     </div>
                                                                 )}
                                                             </div>
+                                                            <p className="text-xs text-zinc-400 dark:text-white/40">提示：點擊圖片左上角的標籤可設定或更改該圖片所屬設施（最多 10 張）。</p>
                                                         </div>
-                                                        {/* 水錶圖片 */}
-                                                        {tempLotWaterMeter && (
-                                                            <div className="space-y-2">
-                                                                <label className="block text-sm font-medium text-cyan-600 dark:text-cyan-400">水錶圖片</label>
-                                                                <div className="flex gap-2 flex-wrap">
-                                                                    {tempLotWaterMeterMedia.map((item, idx) => (
-                                                                        <div key={idx} className="relative group w-24 h-24 rounded-xl overflow-hidden border border-cyan-200 dark:border-cyan-500/30">
-                                                                        <img src={('u' in item) ? item.u : item.preview} alt="" className="w-full h-full object-cover" />
-                                                                            <button
-                                                                                type="button"
-                                                                                onClick={() => { const next = [...tempLotWaterMeterMedia]; next.splice(idx, 1); setTempLotWaterMeterMedia(next); }}
-                                                                                className="absolute top-0 right-0 w-5 h-5 bg-red-500 text-white rounded-bl-lg flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-xs"
-                                                                            >
-                                                                                ×
-                                                                            </button>
-                                                                        </div>
-                                                                    ))}
-                                                                    {tempLotWaterMeterMedia.length < 10 && (
-                                                                        <div className="w-24 h-24">
-                                                                            <FileUpload onChange={(files) => {
-                                                                                const newItems = files.map(f => ({ file: f, s: f.size, preview: URL.createObjectURL(f) }));
-                                                                                setTempLotWaterMeterMedia(prev => [...prev, ...newItems]);
-                                                                            }} />
-                                                                        </div>
-                                                                    )}
-                                                                </div>
-                                                                <input type="text" value={tempLotWaterMeterNote}
-                                                                    onChange={(e) => setTempLotWaterMeterNote(e.target.value)}
-                                                                    placeholder="水錶備註"
-                                                                    className="w-full px-3 py-2 bg-zinc-50 dark:bg-white/5 border border-zinc-200 dark:border-white/10 rounded-lg text-sm text-zinc-900 dark:text-white placeholder-zinc-400 focus:outline-none focus:ring-1 focus:ring-cyan-500/50" />
-                                                            </div>
-                                                        )}
-                                                        {/* 電錶圖片 */}
-                                                        {tempLotElectricMeter && (
-                                                            <div className="space-y-2">
-                                                                <label className="block text-sm font-medium text-amber-600 dark:text-amber-400">電錶圖片</label>
-                                                                <div className="flex gap-2 flex-wrap">
-                                                                    {tempLotElectricMeterMedia.map((item, idx) => (
-                                                                        <div key={idx} className="relative group w-24 h-24 rounded-xl overflow-hidden border border-amber-200 dark:border-amber-500/30">
-                                                                        <img src={('u' in item) ? item.u : item.preview} alt="" className="w-full h-full object-cover" />
-                                                                            <button
-                                                                                type="button"
-                                                                                onClick={() => { const next = [...tempLotElectricMeterMedia]; next.splice(idx, 1); setTempLotElectricMeterMedia(next); }}
-                                                                                className="absolute top-0 right-0 w-5 h-5 bg-red-500 text-white rounded-bl-lg flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-xs"
-                                                                            >
-                                                                                ×
-                                                                            </button>
-                                                                        </div>
-                                                                    ))}
-                                                                    {tempLotElectricMeterMedia.length < 10 && (
-                                                                        <div className="w-24 h-24">
-                                                                            <FileUpload onChange={(files) => {
-                                                                                const newItems = files.map(f => ({ file: f, s: f.size, preview: URL.createObjectURL(f) }));
-                                                                                setTempLotElectricMeterMedia(prev => [...prev, ...newItems]);
-                                                                            }} />
-                                                                        </div>
-                                                                    )}
-                                                                </div>
-                                                                <input type="text" value={tempLotElectricMeterNote}
-                                                                    onChange={(e) => setTempLotElectricMeterNote(e.target.value)}
-                                                                    placeholder="電錶備註"
-                                                                    className="w-full px-3 py-2 bg-zinc-50 dark:bg-white/5 border border-zinc-200 dark:border-white/10 rounded-lg text-sm text-zinc-900 dark:text-white placeholder-zinc-400 focus:outline-none focus:ring-1 focus:ring-amber-500/50" />
-                                                            </div>
-                                                        )}
                                                     </div>
                                                 )}
                                             </>
@@ -3096,12 +3281,12 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                         )}
                         {/* 新增過往相簿表單 Popup */}
                         {lotHistoryAlbumFormOpen && (
-                            <div className="fixed inset-0 z-[160] flex items-center justify-center bg-black/60 backdrop-blur-sm p-2" onClick={(e) => { if (e.target === e.currentTarget) { setLotHistoryAlbumFormOpen(false); setLotHistoryAlbumForm({ value: '', lotArea: '', waterMeter: false, electricMeter: false, lotStatus: '', contractStatus: '', tenantId: '', note: '', media: [], waterMeterMedia: [], electricMeterMedia: [], waterMeterNote: '', electricMeterNote: '', startDate: '', endDate: '' }); } }}>
+                            <div className="fixed inset-0 z-[160] flex items-center justify-center bg-black/60 backdrop-blur-sm p-2" onClick={(e) => { if (e.target === e.currentTarget) { setLotHistoryAlbumFormOpen(false); resetLotHistoryAlbumForm(); } }}>
                                 <div className="bg-white dark:bg-[#1a1a2e] rounded-2xl shadow-2xl w-full max-w-lg md:max-w-xl max-h-[90vh] md:max-h-[85vh] overflow-hidden flex flex-col mx-2">
                                     <div className="flex items-center justify-between p-4 md:p-5 border-b border-zinc-100 dark:border-white/10">
                                         <h3 className="text-base md:text-lg font-bold text-zinc-900 dark:text-white">新增相簿</h3>
                                         <button type="button"
-                                            onClick={() => { setLotHistoryAlbumFormOpen(false); setLotHistoryAlbumForm({ value: '', lotArea: '', waterMeter: false, electricMeter: false, lotStatus: '', contractStatus: '', tenantId: '', note: '', media: [], waterMeterMedia: [], electricMeterMedia: [], waterMeterNote: '', electricMeterNote: '', startDate: '', endDate: '' }); }}
+                                            onClick={() => { setLotHistoryAlbumFormOpen(false); resetLotHistoryAlbumForm(); }}
                                             className="p-2 text-zinc-400 hover:text-zinc-700 dark:hover:text-white rounded-lg hover:bg-zinc-100 dark:hover:bg-white/10 transition-colors cursor-pointer">
                                             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
                                         </button>
@@ -3136,13 +3321,37 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                                                         <input type="checkbox" checked={lotHistoryAlbumForm.waterMeter}
                                                             onChange={(e) => setLotHistoryAlbumForm(prev => ({ ...prev, waterMeter: e.target.checked }))}
                                                             className="w-4 h-4 rounded border-zinc-300 dark:border-white/30 cursor-pointer" />
-                                                        <span className="text-sm text-zinc-700 dark:text-white/80">水錶</span>
+                                                        <span className="text-sm text-zinc-700 dark:text-white/80">水</span>
                                                     </label>
                                                     <label className="flex items-center gap-2 cursor-pointer">
                                                         <input type="checkbox" checked={lotHistoryAlbumForm.electricMeter}
                                                             onChange={(e) => setLotHistoryAlbumForm(prev => ({ ...prev, electricMeter: e.target.checked }))}
                                                             className="w-4 h-4 rounded border-zinc-300 dark:border-white/30 cursor-pointer" />
-                                                        <span className="text-sm text-zinc-700 dark:text-white/80">電錶</span>
+                                                        <span className="text-sm text-zinc-700 dark:text-white/80">電</span>
+                                                    </label>
+                                                    <label className="flex items-center gap-2 cursor-pointer">
+                                                        <input type="checkbox" checked={lotHistoryAlbumForm.toilet}
+                                                            onChange={(e) => setLotHistoryAlbumForm(prev => ({ ...prev, toilet: e.target.checked }))}
+                                                            className="w-4 h-4 rounded border-zinc-300 dark:border-white/30 cursor-pointer" />
+                                                        <span className="text-sm text-zinc-700 dark:text-white/80">廁所</span>
+                                                    </label>
+                                                    <label className="flex items-center gap-2 cursor-pointer">
+                                                        <input type="checkbox" checked={lotHistoryAlbumForm.office}
+                                                            onChange={(e) => setLotHistoryAlbumForm(prev => ({ ...prev, office: e.target.checked }))}
+                                                            className="w-4 h-4 rounded border-zinc-300 dark:border-white/30 cursor-pointer" />
+                                                        <span className="text-sm text-zinc-700 dark:text-white/80">辨公室</span>
+                                                    </label>
+                                                    <label className="flex items-center gap-2 cursor-pointer">
+                                                        <input type="checkbox" checked={lotHistoryAlbumForm.storage}
+                                                            onChange={(e) => setLotHistoryAlbumForm(prev => ({ ...prev, storage: e.target.checked }))}
+                                                            className="w-4 h-4 rounded border-zinc-300 dark:border-white/30 cursor-pointer" />
+                                                        <span className="text-sm text-zinc-700 dark:text-white/80">貯物櫃</span>
+                                                    </label>
+                                                    <label className="flex items-center gap-2 cursor-pointer">
+                                                        <input type="checkbox" checked={lotHistoryAlbumForm.room}
+                                                            onChange={(e) => setLotHistoryAlbumForm(prev => ({ ...prev, room: e.target.checked }))}
+                                                            className="w-4 h-4 rounded border-zinc-300 dark:border-white/30 cursor-pointer" />
+                                                        <span className="text-sm text-zinc-700 dark:text-white/80">房間</span>
                                                     </label>
                                                 </div>
                                             </div>
@@ -3151,7 +3360,7 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                                                 <AnimatedSelect
                                                     value={lotHistoryAlbumForm.lotStatus}
                                                     onChange={(v) => setLotHistoryAlbumForm(prev => ({ ...prev, lotStatus: v as LotStatus | '' }))}
-                                                    options={[{ value: 'renting', label: '出租中' }, { value: 'rented', label: '已出租' }]}
+                                                    options={[{ value: 'available', label: '可租用' }, { value: 'renting', label: '出租中' }, { value: 'rented', label: '已出租' }]}
                                                     placeholder="選擇狀態"
                                                     clearable
                                                     className="w-full text-sm"
@@ -3183,7 +3392,7 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                                         </div>
                                         <div className="space-y-2">
                                             <label className="block text-sm font-medium text-zinc-700 dark:text-white/80">地段圖片</label>
-                                            <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2">
+                                            <div className="grid grid-cols-3 gap-2">
                                                 {lotHistoryAlbumForm.media.map((item, idx) => (
                                                     <div key={idx} className="relative group aspect-square rounded-xl overflow-hidden border border-zinc-200 dark:border-white/10">
                                                         <img src={'u' in item ? item.u : (item as { preview: string }).preview} alt="" className="w-full h-full object-cover" />
@@ -3201,64 +3410,6 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                                                 )}
                                             </div>
                                         </div>
-                                        {lotHistoryAlbumForm.waterMeter && (
-                                            <div className="space-y-2">
-                                                <label className="block text-sm font-medium text-cyan-600 dark:text-cyan-400">水錶圖片</label>
-                                                <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2">
-                                                    {lotHistoryAlbumForm.waterMeterMedia.map((item, idx) => (
-                                                        <div key={idx} className="relative group aspect-square rounded-xl overflow-hidden border border-cyan-200 dark:border-cyan-500/30">
-                                                            <img src={'u' in item ? item.u : (item as { preview: string }).preview} alt="" className="w-full h-full object-cover" />
-                                                            <button type="button"
-                                                                onClick={() => setLotHistoryAlbumForm(prev => ({ ...prev, waterMeterMedia: prev.waterMeterMedia.filter((_, i) => i !== idx) }))}
-                                                                className="absolute top-0 right-0 w-5 h-5 bg-red-500 text-white rounded-bl-lg flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-xs">
-                                                                ×
-                                                            </button>
-                                                        </div>
-                                                    ))}
-                                                    {lotHistoryAlbumForm.waterMeterMedia.length < 10 && (
-                                                        <div className="aspect-square">
-                                                            <FileUpload onChange={(files) => {
-                                                                const newItems = files.map(f => ({ file: f, s: f.size, preview: URL.createObjectURL(f) }));
-                                                                setLotHistoryAlbumForm(prev => ({ ...prev, waterMeterMedia: [...prev.waterMeterMedia, ...newItems] }));
-                                                            }} />
-                                                        </div>
-                                                    )}
-                                                </div>
-                                                <input type="text" value={lotHistoryAlbumForm.waterMeterNote}
-                                                    onChange={(e) => setLotHistoryAlbumForm(prev => ({ ...prev, waterMeterNote: e.target.value }))}
-                                                    placeholder="水錶備註"
-                                                    className="w-full px-3 py-2 bg-zinc-50 dark:bg-white/5 border border-zinc-200 dark:border-white/10 rounded-lg text-sm text-zinc-900 dark:text-white placeholder-zinc-400" />
-                                            </div>
-                                        )}
-                                        {lotHistoryAlbumForm.electricMeter && (
-                                            <div className="space-y-2">
-                                                <label className="block text-sm font-medium text-amber-600 dark:text-amber-400">電錶圖片</label>
-                                                <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2">
-                                                    {lotHistoryAlbumForm.electricMeterMedia.map((item, idx) => (
-                                                        <div key={idx} className="relative group aspect-square rounded-xl overflow-hidden border border-amber-200 dark:border-amber-500/30">
-                                                            <img src={'u' in item ? item.u : (item as { preview: string }).preview} alt="" className="w-full h-full object-cover" />
-                                                            <button type="button"
-                                                                onClick={() => setLotHistoryAlbumForm(prev => ({ ...prev, electricMeterMedia: prev.electricMeterMedia.filter((_, i) => i !== idx) }))}
-                                                                className="absolute top-0 right-0 w-5 h-5 bg-red-500 text-white rounded-bl-lg flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-xs">
-                                                                ×
-                                                            </button>
-                                                        </div>
-                                                    ))}
-                                                    {lotHistoryAlbumForm.electricMeterMedia.length < 10 && (
-                                                        <div className="aspect-square">
-                                                            <FileUpload onChange={(files) => {
-                                                                const newItems = files.map(f => ({ file: f, s: f.size, preview: URL.createObjectURL(f) }));
-                                                                setLotHistoryAlbumForm(prev => ({ ...prev, electricMeterMedia: [...prev.electricMeterMedia, ...newItems] }));
-                                                            }} />
-                                                        </div>
-                                                    )}
-                                                </div>
-                                                <input type="text" value={lotHistoryAlbumForm.electricMeterNote}
-                                                    onChange={(e) => setLotHistoryAlbumForm(prev => ({ ...prev, electricMeterNote: e.target.value }))}
-                                                    placeholder="電錶備註"
-                                                    className="w-full px-3 py-2 bg-zinc-50 dark:bg-white/5 border border-zinc-200 dark:border-white/10 rounded-lg text-sm text-zinc-900 dark:text-white placeholder-zinc-400" />
-                                            </div>
-                                        )}
                                         <div className="space-y-2">
                                             <label className="block text-sm font-medium text-zinc-700 dark:text-white/80">備註</label>
                                             <textarea value={lotHistoryAlbumForm.note} onChange={(e) => setLotHistoryAlbumForm(prev => ({ ...prev, note: e.target.value }))} rows={2}
@@ -3268,7 +3419,7 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                                     </div>
                                     <div className="p-4 md:p-5 border-t border-zinc-100 dark:border-white/10 flex flex-col sm:flex-row justify-end gap-2 sm:gap-3">
                                         <button type="button"
-                                            onClick={() => { setLotHistoryAlbumFormOpen(false); setLotHistoryAlbumForm({ value: '', lotArea: '', waterMeter: false, electricMeter: false, lotStatus: '', contractStatus: '', tenantId: '', note: '', media: [], waterMeterMedia: [], electricMeterMedia: [], waterMeterNote: '', electricMeterNote: '', startDate: '', endDate: '' }); }}
+                                            onClick={() => { setLotHistoryAlbumFormOpen(false); resetLotHistoryAlbumForm(); }}
                                             className="px-5 py-2.5 bg-zinc-100 dark:bg-white/10 text-zinc-600 dark:text-white/70 text-sm font-medium rounded-xl hover:bg-zinc-200 dark:hover:bg-white/20 transition-colors cursor-pointer">
                                             取消
                                         </button>
@@ -3325,7 +3476,7 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                                                 } catch (e) { console.error('保存過往相簿失敗', e); }
                                                 setLotHistoryAlbums(prev => [...prev, newAlbum]);
                                                 setLotHistoryAlbumFormOpen(false);
-                                                setLotHistoryAlbumForm({ value: '', lotArea: '', waterMeter: false, electricMeter: false, lotStatus: '', contractStatus: '', tenantId: '', note: '', media: [], waterMeterMedia: [], electricMeterMedia: [], waterMeterNote: '', electricMeterNote: '', startDate: '', endDate: '' });
+                                                resetLotHistoryAlbumForm();
                                             }}
                                             disabled={!lotHistoryAlbumForm.value.trim()}
                                             className="px-5 py-2.5 bg-purple-500 text-white text-sm font-medium rounded-xl hover:bg-purple-600 disabled:opacity-50 transition-colors cursor-pointer">
@@ -3412,42 +3563,6 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                                                                         </button>
                                                                     ))}
                                                                 </div>
-                                                            </div>
-                                                        )}
-                                                        {album.waterMeterMedia && album.waterMeterMedia.length > 0 && (
-                                                            <div className="space-y-2">
-                                                                <label className="block text-xs font-medium text-cyan-600 dark:text-cyan-400">水錶圖片</label>
-                                                                <div className="grid grid-cols-3 gap-2">
-                                                                    {album.waterMeterMedia.map((m, idx) => (
-                                                                        <button type="button" key={idx}
-                                                                            onClick={() => setLotHistoryAlbumPreview({ url: m.u, type: 'water' })}
-                                                                            className="relative aspect-square rounded-lg overflow-hidden border border-cyan-200 dark:border-cyan-500/30 hover:ring-2 hover:ring-cyan-500/50 transition-all cursor-pointer">
-                                                                            <img src={m.u} alt="" className="w-full h-full object-cover" />
-                                                                            <div className="absolute inset-0 bg-black/0 hover:bg-black/20 transition-colors flex items-center justify-center opacity-0 hover:opacity-100">
-                                                                                <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v3m0 0v3m0-3h3m-3 0H7" /></svg>
-                                                                            </div>
-                                                                        </button>
-                                                                    ))}
-                                                                </div>
-                                                                {album.waterMeterNote && <p className="text-xs text-zinc-500 dark:text-white/50">{album.waterMeterNote}</p>}
-                                                            </div>
-                                                        )}
-                                                        {album.electricMeterMedia && album.electricMeterMedia.length > 0 && (
-                                                            <div className="space-y-2">
-                                                                <label className="block text-xs font-medium text-amber-600 dark:text-amber-400">電錶圖片</label>
-                                                                <div className="grid grid-cols-3 gap-2">
-                                                                    {album.electricMeterMedia.map((m, idx) => (
-                                                                        <button type="button" key={idx}
-                                                                            onClick={() => setLotHistoryAlbumPreview({ url: m.u, type: 'electric' })}
-                                                                            className="relative aspect-square rounded-lg overflow-hidden border border-amber-200 dark:border-amber-500/30 hover:ring-2 hover:ring-amber-500/50 transition-all cursor-pointer">
-                                                                            <img src={m.u} alt="" className="w-full h-full object-cover" />
-                                                                            <div className="absolute inset-0 bg-black/0 hover:bg-black/20 transition-colors flex items-center justify-center opacity-0 hover:opacity-100">
-                                                                                <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v3m0 0v3m0-3h3m-3 0H7" /></svg>
-                                                                            </div>
-                                                                        </button>
-                                                                    ))}
-                                                                </div>
-                                                                {album.electricMeterNote && <p className="text-xs text-zinc-500 dark:text-white/50">{album.electricMeterNote}</p>}
                                                             </div>
                                                         )}
                                                         {album.note && (

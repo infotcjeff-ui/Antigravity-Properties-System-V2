@@ -296,6 +296,73 @@ html {
   }
 }
 
+/* ============================================
+   Popup 詳情面板 — 淺色主題覆蓋
+   ============================================ */
+
+/* 外層背景 */
+.popup-theme-light {
+  background-color: #ffffff !important;
+  color: #1e293b !important;
+}
+
+/* 標題區底線 */
+.popup-theme-light [class*="border-b border-white/10"] {
+  border-color: #e2e8f0 !important;
+}
+
+/* 小標題（地段名稱 / 狀態 / 面積 / 設施 / 備註） */
+.popup-theme-light [class*="text-white/50"],
+.popup-theme-light [class*="text-white/60"] {
+  color: #64748b !important;
+}
+
+/* 副標題段落 */
+.popup-theme-light [class*="text-sm"][class*="text-white/80"],
+.popup-theme-light [class*="text-sm"][class*="text-white/50"] {
+  color: #475569 !important;
+}
+
+/* 地段名稱（h2） */
+.popup-theme-light h2 {
+  color: #0f172a !important;
+}
+
+/* 卡片背景 & 邊框 */
+.popup-theme-light [class*="bg-white/\[0.03\]"] {
+  background-color: #f1f5f9 !important;
+  border-color: #e2e8f0 !important;
+}
+
+.popup-theme-light [class*="border-white/10"] {
+  border-color: #e2e8f0 !important;
+}
+
+/* 狀態徽章 */
+.popup-theme-light [class*="bg-white/15"][class*="text-white"] {
+  background-color: #1e293b !important;
+  color: #f8fafc !important;
+}
+
+/* 面積文字 */
+.popup-theme-light [class*="text-base"][class*="font-bold"] {
+  color: #1e293b !important;
+}
+
+/* 每月租金卡片 — 淺色模式下加深底色 */
+.popup-theme-light [class*="bg-gradient-to-br from-amber-500/15"] {
+  background: linear-gradient(to bottom right, #fef3c7, #fef9c3) !important;
+  border-color: #fbbf24 !important;
+}
+
+.popup-theme-light [class*="text-amber-400"] {
+  color: #b45309 !important;
+}
+
+.popup-theme-light [class*="text-amber-200"] {
+  color: #92400e !important;
+}
+
 @keyframes scale-in {
   from {
     opacity: 0;

@@ -264,9 +264,14 @@ export interface LotHistoryAlbum {
   type: 'new' | 'old';
   value: string;
   lotArea?: string;
-  lotStatus?: 'renting' | 'rented';
+  rentPrice?: string;
+  lotStatus?: 'renting' | 'rented' | 'available';
   waterMeter?: boolean;
   electricMeter?: boolean;
+  toilet?: boolean;
+  office?: boolean;
+  storage?: boolean;
+  room?: boolean;
   contractStatus?: 'ongoing' | 'expiring' | 'not_renewing';
   lotTenantId?: string;
   note?: string;
