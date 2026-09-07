@@ -91,6 +91,64 @@ function StatusBadge({ status }: { status?: string | null }) {
     );
 }
 
+/**
+ * 地段出租狀態：4 種狀態的標籤與顏色
+ * - rented: 已出租
+ * - listing: 放租中
+ * - available: 可租用
+ * - upcoming: 即將放租
+ */
+const lotStatusLabels: Record<string, string> = {
+    rented: '已出租',
+    listing: '放租中',
+    available: '可租用',
+    upcoming: '即將放租',
+};
+
+const lotStatusColorsLight: Record<string, string> = {
+    rented: 'bg-red-500/20 text-red-600 border-red-500/30',
+    listing: 'bg-green-500/20 text-green-600 border-green-500/30',
+    available: 'bg-blue-500/20 text-blue-600 border-blue-500/30',
+    upcoming: 'bg-amber-500/20 text-amber-600 border-amber-500/30',
+};
+
+const lotStatusColorsDark: Record<string, string> = {
+    rented: 'bg-red-500/20 text-red-300 border-red-500/30',
+    listing: 'bg-green-500/20 text-green-300 border-green-500/30',
+    available: 'bg-blue-500/20 text-blue-300 border-blue-500/30',
+    upcoming: 'bg-amber-500/20 text-amber-300 border-amber-500/30',
+};
+
+/** 地段 listing 卡片（淺/深色通用）的狀態顏色 */
+const lotStatusColorsListing: Record<string, string> = {
+    rented: 'bg-red-500/15 text-red-600 dark:text-red-400 border-red-500/30',
+    listing: 'bg-green-500/15 text-green-600 dark:text-green-400 border-green-500/30',
+    available: 'bg-blue-500/15 text-blue-600 dark:text-blue-400 border-blue-500/30',
+    upcoming: 'bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/30',
+};
+
+function LotStatusBadge({ status, variant = 'light' }: { status?: string | null; variant?: 'light' | 'dark' | 'listing' }) {
+    if (!status) return null;
+    const label = lotStatusLabels[status] ?? status;
+    const colors =
+        variant === 'dark'
+            ? lotStatusColorsDark[status]
+            : variant === 'listing'
+              ? lotStatusColorsListing[status]
+              : lotStatusColorsLight[status];
+    const base =
+        variant === 'listing'
+            ? 'inline-block px-2 py-1 rounded text-xs font-semibold mb-1.5 border'
+            : variant === 'dark'
+              ? 'inline-block text-base font-bold px-2.5 py-1 rounded border'
+              : 'inline-block text-base font-bold px-2.5 py-1 rounded';
+    return (
+        <span className={`${base} ${colors ?? 'bg-zinc-200 dark:bg-white/10 text-zinc-600 dark:text-white/60 border-zinc-300 dark:border-white/10'}`}>
+            {label}
+        </span>
+    );
+}
+
 function LotDetailModal({
     entry,
     onClose,
@@ -179,15 +237,7 @@ function LotDetailModal({
             {/* 頂部狀態欄 */}
             <div className="shrink-0 px-[70px] py-3 sm:py-4 flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 bg-black/60 backdrop-blur-sm border-b border-white/10">
                 <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
-                    <span className={`shrink-0 px-2 py-0.5 sm:px-3 sm:py-1 rounded-lg text-xs sm:text-base font-semibold ${
-                        entry.lotStatus === 'rented'
-                            ? 'bg-amber-500/20 text-amber-400'
-                            : entry.lotStatus === 'renting'
-                            ? 'bg-green-500/20 text-green-400'
-                            : 'bg-white/10 text-white/70'
-                    }`}>
-                        {entry.lotStatus === 'rented' ? '已出租' : entry.lotStatus === 'renting' ? '出租中' : '未出租'}
-                    </span>
+                    <LotStatusBadge status={entry.lotStatus} variant="dark" />
                     <h3 className="text-lg sm:text-xl font-bold text-white">{entry.value}</h3>
                 </div>
             </div>
@@ -356,10 +406,6 @@ function LotDetailModal({
                                 <div className="space-y-5">
                                     {/* 標題區 - 地段名稱 + 地址 */}
                                     <div className="pb-4 border-b border-white/10">
-                                        <div className="flex items-center gap-2 mb-2">
-                                            <Home className="w-4 h-4 text-white/50" />
-                                            <span className="text-sm text-white/60 font-semibold">地段名稱</span>
-                                        </div>
                                         <h2 className="text-xl sm:text-2xl font-bold text-white tracking-tight">{entry.value}</h2>
                                         {parentAddress && (
                                             <div className="flex items-center gap-1.5 mt-2 text-white/50">
@@ -377,15 +423,7 @@ function LotDetailModal({
                                                 <CheckCircle className="w-3.5 h-3.5 text-white/50" />
                                                 <span className="text-sm text-white/60 font-semibold">狀態</span>
                                             </div>
-                                            <span className={`inline-block text-base font-bold px-2.5 py-1 rounded ${
-                                                entry.lotStatus === 'rented'
-                                                    ? 'bg-red-500/20 text-red-300 border border-red-500/30'
-                                                    : entry.lotStatus === 'renting'
-                                                    ? 'bg-green-500/20 text-green-300 border border-green-500/30'
-                                                    : 'bg-white/10 text-white/60 border border-white/10'
-                                            }`}>
-                                                {entry.lotStatus === 'rented' ? '已出租' : entry.lotStatus === 'renting' ? '出租中' : '未出租'}
-                                            </span>
+                                            <LotStatusBadge status={entry.lotStatus} variant="dark" />
                                         </div>
 
                                         {/* 面積 */}
@@ -573,6 +611,25 @@ export default function RentalPropertyPage() {
     const GALLERY_VISIBLE = 5;
 
     const lotEntries = useMemo(() => parseLotEntries(property?.lotIndex ?? null) as LotEntry[], [property?.lotIndex]);
+
+    /**
+     * 所有地段排序：以「Section X」標題分組，由 Section A 開始排，
+     * 沒有 Section 字眼的地段統一放到最後。
+     */
+    const sortedLotEntries = useMemo(() => {
+        const sectionRegex = /section\s*([a-z0-9]+)/i;
+        const hasSection = (text: string) => sectionRegex.test(text);
+        const sectionKey = (text: string) => {
+            const match = text.match(sectionRegex);
+            return match ? (match[1] || '').toLowerCase() : '';
+        };
+        const collator = new Intl.Collator('en', { numeric: true, sensitivity: 'base' });
+        const noSection = lotEntries.filter(e => !hasSection(e.value));
+        const withSection = lotEntries.filter(e => hasSection(e.value));
+        withSection.sort((a, b) => collator.compare(sectionKey(a.value), sectionKey(b.value)));
+        return [...withSection, ...noSection];
+    }, [lotEntries]);
+
     const [viewLotEntry, setViewLotEntry] = useState<LotEntry | null>(null);
 
     // 從 query 自動開啟對應的 lot 詳情（?lotIdx=<i>）— 供 PropertyForm 的「查看」按鈕在新分頁開啟使用
@@ -896,16 +953,16 @@ export default function RentalPropertyPage() {
                                     </div>
                                 </div>
                             </div>
-                            {/* 備註 */}
-                            <div className="shrink-0 mx-2 mb-2 p-3 border-l-[3px] border-purple-500 bg-purple-500/5 rounded-r-xl max-h-40 lg:max-h-32 overflow-y-auto notes-scroll">
-                                <p className="text-xs font-semibold text-purple-500 uppercase tracking-wider mb-1.5">備註</p>
+                            {/* 備註 - 填滿左欄剩餘空間 */}
+                            <div className="flex-1 min-h-0 mx-2 mb-2 p-4 border-l-[3px] border-purple-500 bg-purple-500/5 rounded-r-xl overflow-y-auto notes-scroll">
+                                <p className="text-sm font-semibold text-purple-500 uppercase tracking-wider mb-2">備註</p>
                                 {property.notes ? (
                                     <div
-                                        className="text-zinc-700 dark:text-white/80 text-sm rich-text-content"
+                                        className="text-zinc-700 dark:text-white/80 text-base rich-text-content"
                                         dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(property.notes) }}
                                     />
                                 ) : (
-                                    <p className="text-zinc-400 dark:text-white/30 text-xs">暫無。</p>
+                                    <p className="text-zinc-400 dark:text-white/30 text-sm">暫無。</p>
                                 )}
                             </div>
                         </>
@@ -915,16 +972,16 @@ export default function RentalPropertyPage() {
                                 <ImageIcon className="w-16 h-16 text-zinc-300 dark:text-white/15" />
                                 <p className="text-zinc-400 dark:text-white/30 text-sm">暫無。</p>
                             </div>
-                            {/* 備註 */}
-                            <div className="shrink-0 mx-2 mb-2 p-3 border-l-[3px] border-purple-500 bg-purple-500/5 rounded-r-xl max-h-40 lg:max-h-32 overflow-y-auto notes-scroll">
-                                <p className="text-xs font-semibold text-purple-500 uppercase tracking-wider mb-1.5">備註</p>
+                            {/* 備註 - 填滿左欄剩餘空間 */}
+                            <div className="flex-1 min-h-0 mx-2 mb-2 p-4 border-l-[3px] border-purple-500 bg-purple-500/5 rounded-r-xl overflow-y-auto notes-scroll">
+                                <p className="text-sm font-semibold text-purple-500 uppercase tracking-wider mb-2">備註</p>
                                 {property.notes ? (
                                     <div
-                                        className="text-zinc-700 dark:text-white/80 text-sm rich-text-content"
+                                        className="text-zinc-700 dark:text-white/80 text-base rich-text-content"
                                         dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(property.notes) }}
                                     />
                                 ) : (
-                                    <p className="text-zinc-400 dark:text-white/30 text-xs">暫無。</p>
+                                    <p className="text-zinc-400 dark:text-white/30 text-sm">暫無。</p>
                                 )}
                             </div>
                         </>
@@ -963,44 +1020,60 @@ export default function RentalPropertyPage() {
                         </div>
                     </div>
 
-                    {/* Button Tabs：概覽 | 位置 | 地理資訊圖 */}
-                    <div className="rounded-xl border border-zinc-200 dark:border-white/15 p-1 flex flex-wrap justify-center sm:justify-start gap-1 bg-zinc-50/80 dark:bg-white/4">
-                        {(
-                            [
-                                ['overview', t('Overview', '概覽')] as const,
-                                ['location', t('Location', '位置')] as const,
-                                ['geo', t('Geographic map', '地理資訊圖')] as const,
-                            ]
-                        ).map(([tab, label]) => (
-                            <button
-                                key={tab}
-                                type="button"
-                                onClick={() => setDetailTab(tab)}
-                                className={`px-2 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-medium transition-all cursor-pointer ${
-                                    detailTab === tab
-                                        ? 'bg-white dark:bg-white/15 text-zinc-900 dark:text-white shadow-sm border border-zinc-200/80 dark:border-white/10'
-                                        : 'text-zinc-500 dark:text-white/55 hover:text-zinc-800 dark:hover:text-white'
-                                }`}
-                            >
-                                {label}
-                            </button>
-                        ))}
+                    {/* Tab 導航：底線式 + 編號（科技感） */}
+                    <div className="border-b border-zinc-200 dark:border-white/10">
+                        <div className="flex items-stretch gap-6 sm:gap-8">
+                            {(
+                                [
+                                    { key: 'overview', label: t('Overview', '概覽') },
+                                    { key: 'location', label: t('Location', '位置') },
+                                    { key: 'geo', label: t('Geographic map', '地理資訊圖') },
+                                ] as const
+                            ).map(({ key, label }, idx) => {
+                                const active = detailTab === key;
+                                const num = `0${idx + 1}`;
+                                return (
+                                    <button
+                                        key={key}
+                                        type="button"
+                                        onClick={() => setDetailTab(key)}
+                                        className={`shrink-0 pt-1 pb-2.5 flex items-baseline gap-2 cursor-pointer transition-colors duration-150 border-b-[3px] -mb-px ${
+                                            active
+                                                ? 'text-zinc-900 dark:text-white border-zinc-900 dark:border-white'
+                                                : 'text-zinc-400 dark:text-white/40 border-transparent hover:text-zinc-600 dark:hover:text-white/70'
+                                        }`}
+                                    >
+                                        <span className="text-[10px] font-mono tracking-wider tabular-nums">{num}</span>
+                                        <span className="text-xs sm:text-sm font-medium">{label}</span>
+                                    </button>
+                                );
+                            })}
+                        </div>
                     </div>
 
                     <div className="min-h-0 flex-1 overflow-y-auto rental-page-scroll">
                         {detailTab === 'overview' && (
                             <div className="space-y-4">
-                                {/* 業主 */}
+                                {/* 業主 - WhatsApp 聯絡按鈕 */}
                                 <div className="p-4 bg-zinc-50 dark:bg-white/5 rounded-xl border border-zinc-200 dark:border-white/10">
-                                    <p className="text-base font-medium text-zinc-700 dark:text-white/80 mb-3">{t('Proprietor', '業主')}</p>
                                     <div className="flex items-center gap-3">
                                         <div className="w-12 h-12 rounded-full bg-linear-to-br from-purple-500 to-blue-600 flex items-center justify-center text-white font-semibold text-lg">
                                             泊
                                         </div>
-                                        <div>
+                                        <div className="flex-1">
                                             <p className="text-base font-medium text-zinc-900 dark:text-white">泊車易管理有限公司</p>
                                             <p className="text-sm text-zinc-500">管理公司</p>
                                         </div>
+                                        <a
+                                            href={`https://wa.me/85200000000?text=${encodeURIComponent(`您好，我想查詢泊車易(${property.name})的出租資料。`)}`}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            aria-label="WhatsApp 聯絡我們"
+                                            className="shrink-0 flex items-center gap-2 px-3 py-2 bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-semibold rounded-lg transition-colors shadow-sm hover:shadow"
+                                        >
+                                            <img src="/sitelogo/whatsapp-svgrepo-com.svg" alt="" className="w-5 h-5 shrink-0" />
+                                            <span>聯絡我們</span>
+                                        </a>
                                     </div>
                                 </div>
 
@@ -1009,18 +1082,18 @@ export default function RentalPropertyPage() {
                                     <div className="p-4 bg-zinc-50 dark:bg-white/5 rounded-xl border border-zinc-200 dark:border-white/10 flex flex-wrap gap-6">
                                         {property.lotArea && (
                                             <div className="flex-1 min-w-32">
-                                                <p className="text-base font-medium text-zinc-700 dark:text-white/80">{t('Area', '總面積')}</p>
-                                                <p className="text-xl font-bold text-zinc-900 dark:text-white mt-0.5">{formatLotArea(property.lotArea)}</p>
+                                                <p className="text-base font-medium text-zinc-700 dark:text-white/80 mb-2">{t('Area', '總面積')}</p>
+                                                <p className="text-base font-normal text-zinc-900 dark:text-white">{formatLotArea(property.lotArea)}</p>
                                             </div>
                                         )}
                                         {landUseList.length > 0 && (
                                             <div className="flex-1 min-w-32">
                                                 <p className="text-base font-medium text-zinc-700 dark:text-white/80 mb-2">{t('Land Use', '土地用途')}</p>
-                                                <div className="flex flex-wrap gap-2">
+                                                <div className="space-y-2">
                                                     {landUseList.map((use, idx) => (
-                                                        <span key={idx} className="px-3 py-1.5 bg-purple-500/10 text-purple-600 dark:text-purple-400 rounded-full text-base border border-purple-500/20">
+                                                        <p key={idx} className="text-base font-normal text-zinc-900 dark:text-white">
                                                             {use}
-                                                        </span>
+                                                        </p>
                                                     ))}
                                                 </div>
                                             </div>
@@ -1028,12 +1101,33 @@ export default function RentalPropertyPage() {
                                     </div>
                                 )}
 
-                                {/* 地段（listing 顯示：圖片 + 名稱 + 備註） */}
-                                {lotEntries.length > 0 && (
+                                {/* 所有地段（地段名稱純文字列表，來自基本資料 tab） */}
+                                {property.sections && property.sections.trim() && (
                                     <div className="p-4 bg-zinc-50 dark:bg-white/5 rounded-xl border border-zinc-200 dark:border-white/10">
-                                        <p className="text-base font-medium text-zinc-700 dark:text-white/80 mb-3">{t('Lot Index', '所有地段')}</p>
+                                        <p className="text-base font-medium text-zinc-700 dark:text-white/80 mb-2">{t('Lot Index', '所有地段')}</p>
+                                        <div className="flex flex-wrap gap-2">
+                                            {property.sections.split(',').map((s, i) => {
+                                                const trimmed = s.trim();
+                                                if (!trimmed) return null;
+                                                return (
+                                                    <span
+                                                        key={i}
+                                                        className="px-3 py-1.5 bg-white dark:bg-white/5 border border-zinc-200 dark:border-white/10 rounded-lg text-sm font-medium text-zinc-700 dark:text-white/80"
+                                                    >
+                                                        {trimmed}
+                                                    </span>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* 出租地段（卡片顯示：圖片 + 名稱 + 備註） */}
+                                {sortedLotEntries.length > 0 && (
+                                    <div className="p-4 bg-zinc-50 dark:bg-white/5 rounded-xl border border-zinc-200 dark:border-white/10">
+                                        <p className="text-base font-medium text-zinc-700 dark:text-white/80 mb-3">{t('Rented Lots', '出租地段')}</p>
                                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                                            {lotEntries.map((entry, idx) => (
+                                            {sortedLotEntries.map((entry, idx) => (
                                                 <div
                                                     key={idx}
                                                     className="flex items-center gap-3 p-3 bg-white dark:bg-white/5 rounded-xl border border-zinc-200 dark:border-white/10 hover:border-purple-300 dark:hover:border-purple-500/40 transition-colors cursor-pointer group"
@@ -1054,15 +1148,7 @@ export default function RentalPropertyPage() {
                                                         </div>
                                                     )}
                                                     <div className="flex-1 min-w-0">
-                                                        <span className={`inline-block px-2 py-1 rounded text-xs font-semibold mb-1.5 ${
-                                                            entry.lotStatus === 'rented'
-                                                                ? 'bg-amber-500/20 text-amber-600 dark:text-amber-400'
-                                                                : entry.lotStatus === 'renting'
-                                                                ? 'bg-green-500/20 text-green-600 dark:text-green-400'
-                                                                : 'bg-zinc-200 dark:bg-white/10 text-zinc-600 dark:text-white/60'
-                                                        }`}>
-                                                            {entry.lotStatus === 'rented' ? '已出租' : entry.lotStatus === 'renting' ? '出租中' : '未出租'}
-                                                        </span>
+                                                        <LotStatusBadge status={entry.lotStatus} variant="listing" />
                                                         <p className="text-base font-semibold text-zinc-900 dark:text-white truncate">{entry.value}</p>
                                                     </div>
                                                     {entry.media && entry.media.length > 0 && (
@@ -1081,8 +1167,8 @@ export default function RentalPropertyPage() {
                         )}
 
                         {detailTab === 'location' && (
-                            <div className="rounded-2xl border border-zinc-200 dark:border-white/10 overflow-hidden bg-zinc-50 dark:bg-white/5">
-                                <div className="h-70 sm:h-80 lg:h-96 relative">
+                            <div className="rounded-2xl border border-zinc-200 dark:border-white/10 overflow-hidden bg-zinc-50 dark:bg-white/5 h-full flex flex-col min-h-0">
+                                <div className="flex-1 min-h-0 relative">
                                     {property.location?.lat && property.location?.lng ? (
                                         <SinglePropertyMapDynamic property={property} />
                                     ) : (

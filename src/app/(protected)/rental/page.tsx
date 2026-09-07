@@ -13,26 +13,10 @@ import { useAuth } from '@/contexts/AuthContext';
 
 type ViewMode = 'grid' | 'list' | 'map';
 
-const landUseLabels: Record<string, string> = {
-    agr: 'AGR 農業',
-    ca: 'CA 自然保育區',
-    os: 'OS 露天貯物',
-    v: 'V 鄉村式發展',
-    ou: 'OU 其他指定用途',
-    r_d: 'R(D) 住宅(丁類)',
-    r_a5: 'R(A)5 住宅(甲類)5',
-    // 注意: 與 PropertyForm 中的 landUseTypes 保持一致, 沒有「露天倉儲」之類的歷史值
-};
-
-function getLandUseDisplay(landUse?: string | null) {
-    if (!landUse) return '未設定';
-    const parts = landUse.split(',').map(s => s.trim()).filter(Boolean);
-    if (parts.length === 0) return '未設定';
-    const validParts = parts
-        .map(p => landUseLabels[p])
-        .filter(Boolean);
-    if (validParts.length === 0) return '未設定';
-    return validParts.join('、');
+function getLandUseDisplay(_landUse?: string | null) {
+    // 前端顯示需求: 無論資料庫 landUse 是何值, 統一顯示「OS 露天貯物」。
+    // 不影響 database 與原始 landUse 欄位。
+    return 'OS 露天貯物';
 }
 
 /**

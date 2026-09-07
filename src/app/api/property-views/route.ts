@@ -44,85 +44,76 @@ export async function GET(request: NextRequest) {
     }
 }
 
-/** POST: 遞增瀏覽次數（打開頁面時）；也支援遞增 live_count（實時在線） */
+/** POST: 進入 / 心跳 / 離開 動作 */
 export async function POST(request: NextRequest) {
     try {
         const body = await request.json().catch(() => ({}));
-        const { propertyId, action } = body as { propertyId?: string; action?: string };
+        const { propertyId, action, sessionToken, userId } = body as {
+            propertyId?: string;
+            action?: string;
+            sessionToken?: string;
+            userId?: string;
+        };
 
         if (!propertyId) {
             return NextResponse.json({ error: 'propertyId is required' }, { status: 400 });
+        }
+        if (!sessionToken) {
+            return NextResponse.json({ error: 'sessionToken is required' }, { status: 400 });
         }
 
         const supabase = getSupabase();
 
         if (action === 'enter') {
-            // 頁面進入：增加 view_count + live_count
-            const { error: upsertError } = await supabase.rpc('increment_property_views', {
+            // 原子化：view_count + live_count + 寫入 session（同 session 重複 enter 只算一次 live）
+            const { data, error } = await supabase.rpc('increment_property_views', {
                 p_property_id: propertyId,
+                p_session_token: sessionToken,
+                p_user_id: userId ?? null,
             });
 
-            if (upsertError) {
-                // Fallback: upsert raw
-                const { data: existing } = await supabase
-                    .from('property_views')
-                    .select('*')
-                    .eq('property_id', propertyId)
-                    .single();
-
-                if (existing) {
-                    await supabase
-                        .from('property_views')
-                        .update({
-                            view_count: (existing.view_count || 0) + 1,
-                            live_count: (existing.live_count || 0) + 1,
-                            updated_at: new Date().toISOString(),
-                        })
-                        .eq('property_id', propertyId);
-                } else {
-                    await supabase.from('property_views').insert({
-                        property_id: propertyId,
-                        view_count: 1,
-                        live_count: 1,
-                    });
-                }
+            if (error) {
+                return NextResponse.json({ error: error.message }, { status: 500 });
             }
 
-            const { data } = await supabase
-                .from('property_views')
-                .select('view_count, live_count')
-                .eq('property_id', propertyId)
-                .single();
-
+            // RPC 回傳 SETOF (view_count, live_count)，取第一列
+            const row = Array.isArray(data) ? data[0] : data;
             return NextResponse.json({
-                viewCount: data?.view_count || 0,
-                liveCount: data?.live_count || 0,
+                viewCount: row?.view_count ?? 0,
+                liveCount: row?.live_count ?? 0,
             });
+        }
+
+        if (action === 'heartbeat') {
+            // 刷新 session 的 last_seen_at，並回傳當前 live_count
+            const { data, error } = await supabase.rpc('heartbeat_property_view', {
+                p_property_id: propertyId,
+                p_session_token: sessionToken,
+            });
+
+            if (error) {
+                return NextResponse.json({ error: error.message }, { status: 500 });
+            }
+
+            return NextResponse.json({ liveCount: data ?? 0 });
         }
 
         if (action === 'leave') {
-            // 頁面離開：遞減 live_count
-            const { data: existing } = await supabase
-                .from('property_views')
-                .select('*')
-                .eq('property_id', propertyId)
-                .single();
+            // 精確遞減：依 session_token 刪除 session 後遞減 live_count
+            const { data, error } = await supabase.rpc('decrement_property_view', {
+                p_property_id: propertyId,
+                p_session_token: sessionToken,
+            });
 
-            if (existing && existing.live_count > 0) {
-                await supabase
-                    .from('property_views')
-                    .update({
-                        live_count: existing.live_count - 1,
-                        updated_at: new Date().toISOString(),
-                    })
-                    .eq('property_id', propertyId);
+            if (error) {
+                return NextResponse.json({ error: error.message }, { status: 500 });
             }
 
-            return NextResponse.json({ success: true });
+            return NextResponse.json({ success: true, liveCount: data ?? 0 });
         }
 
         return NextResponse.json(
-            { error: 'Invalid action. Use "enter" or "leave".' },
+            { error: 'Invalid action. Use "enter", "heartbeat", or "leave".' },
             { status: 400 },
         );
     } catch (err: unknown) {

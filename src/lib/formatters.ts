@@ -186,12 +186,14 @@ export interface MediaItem {
     s: number; // size in bytes
     /** 設施 tag：標示此圖片屬於哪個設施（與地段資料的設施一致） */
     tag?: 'water' | 'electric' | 'toilet' | 'office' | 'storage' | 'room';
+    /** 圖片備註 */
+    note?: string;
 }
 
-export type LotStatus = 'renting' | 'rented' | 'available';
+export type LotStatus = 'listing' | 'rented' | 'available' | 'upcoming';
 
 /** 合約狀態 */
-export type LotContractStatus = 'ongoing' | 'expiring' | 'not_renewing';
+export type LotContractStatus = 'ongoing' | 'expiring' | 'not_renewing' | 'completed';
 
 export interface LotEntry {
     type: 'new' | 'old';
@@ -236,22 +238,24 @@ export function parseLotEntries(lotIndex: string | null | undefined): LotEntry[]
                 const media: MediaItem[] | undefined = obj.m ? (
                     typeof obj.m[0] === 'string'
                         ? (obj.m as string[]).map(u => ({ u, s: 0 }))
-                        : (obj.m as Array<{ u: string; s: number; tag?: string; tg?: string }>).map(m => ({
+                        : (obj.m as Array<{ u: string; s: number; tag?: string; tg?: string; nt?: string }>).map(m => ({
                             u: m.u,
                             s: m.s,
                             tag: (m.tag ?? m.tg) as MediaItem['tag'],
+                            note: m.nt,
                         }))
                 ) : undefined;
                 // 兼容 wm/em 的舊格式
-                const parseMedia = (arr: Array<{ u: string; s: number; tag?: string; tg?: string }> | string[] | undefined): MediaItem[] | undefined => {
+                const parseMedia = (arr: Array<{ u: string; s: number; tag?: string; tg?: string; nt?: string }> | string[] | undefined): MediaItem[] | undefined => {
                     if (!arr) return undefined;
                     if (typeof arr[0] === 'string') {
                         return (arr as string[]).map(u => ({ u, s: 0 }));
                     }
-                    return (arr as Array<{ u: string; s: number; tag?: string; tg?: string }>).map(m => ({
+                    return (arr as Array<{ u: string; s: number; tag?: string; tg?: string; nt?: string }>).map(m => ({
                         u: m.u,
                         s: m.s,
                         tag: (m.tag ?? m.tg) as MediaItem['tag'],
+                        note: m.nt,
                     }));
                 };
                 return {
@@ -259,7 +263,7 @@ export function parseLotEntries(lotIndex: string | null | undefined): LotEntry[]
                     value: obj.v || '',
                     media,
                     note: obj.n,
-                    lotStatus: (obj.s === '已出租' ? 'rented' : obj.s === '出租中' ? 'renting' : obj.s === '可租用' ? 'available' : undefined) as LotStatus | undefined,
+                    lotStatus: (obj.s === '已出租' ? 'rented' : obj.s === '放租中' ? 'listing' : obj.s === '可租用' ? 'available' : obj.s === '即將放租' ? 'upcoming' : undefined) as LotStatus | undefined,
                     lotArea: obj.a,
                     rentPrice: obj.p,
                     waterMeter: obj.w,
@@ -294,9 +298,9 @@ export function serializeLotEntries(entries: LotEntry[]): string {
         JSON.stringify({
             t: e.type === 'new' ? '新' : '舊',
             v: e.value,
-            m: (e.media?.length ?? 0) > 0 ? e.media?.map(m => ({ u: m.u, s: m.s, ...(m.tag ? { tg: m.tag } : {}) })) : undefined,
+            m: (e.media?.length ?? 0) > 0 ? e.media?.map(m => ({ u: m.u, s: m.s, ...(m.tag ? { tg: m.tag } : {}), ...(m.note ? { nt: m.note } : {}) })) : undefined,
             n: e.note || undefined,
-            s: e.lotStatus === 'rented' ? '已出租' : e.lotStatus === 'renting' ? '出租中' : e.lotStatus === 'available' ? '可租用' : undefined,
+            s: e.lotStatus === 'rented' ? '已出租' : e.lotStatus === 'listing' ? '放租中' : e.lotStatus === 'available' ? '可租用' : e.lotStatus === 'upcoming' ? '即將放租' : undefined,
             a: e.lotArea || undefined,
             p: e.rentPrice || undefined,
             w: e.waterMeter || undefined,
@@ -305,8 +309,8 @@ export function serializeLotEntries(entries: LotEntry[]): string {
             of: e.office || undefined,
             st: e.storage || undefined,
             rm: e.room || undefined,
-            wm: (e.waterMeterMedia?.length ?? 0) > 0 ? e.waterMeterMedia?.map(m => ({ u: m.u, s: m.s, ...(m.tag ? { tg: m.tag } : {}) })) : undefined,
-            em: (e.electricMeterMedia?.length ?? 0) > 0 ? e.electricMeterMedia?.map(m => ({ u: m.u, s: m.s, ...(m.tag ? { tg: m.tag } : {}) })) : undefined,
+            wm: (e.waterMeterMedia?.length ?? 0) > 0 ? e.waterMeterMedia?.map(m => ({ u: m.u, s: m.s, ...(m.tag ? { tg: m.tag } : {}), ...(m.note ? { nt: m.note } : {}) })) : undefined,
+            em: (e.electricMeterMedia?.length ?? 0) > 0 ? e.electricMeterMedia?.map(m => ({ u: m.u, s: m.s, ...(m.tag ? { tg: m.tag } : {}), ...(m.note ? { nt: m.note } : {}) })) : undefined,
             wn: e.waterMeterNote || undefined,
             en: e.electricMeterNote || undefined,
             ti: e.lotTenantId || undefined,

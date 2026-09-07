@@ -59,6 +59,19 @@ const mapPropertyRow = (row: any): Property => {
     return p;
 };
 
+/**
+ * 從 PostgREST 缺少欄位的錯誤訊息中解析出欄位名稱。
+ * 例如：
+ *   "Could not find the 'sections' column of 'properties' in the schema cache"
+ *   "Could not find the 'proprietor_ids' column of 'properties' in the schema cache"
+ * 若無法解析則回傳 null。
+ */
+const extractMissingColumn = (message: string | undefined | null): string | null => {
+    if (!message || typeof message !== 'string') return null;
+    const m = message.match(/Could not find the '([^']+)' column/);
+    return m ? m[1] : null;
+};
+
 /** rents.rent_out_tenant_ids 為 jsonb 陣列，無 FK 至 current_tenants，無法用 embed 查詢 */
 const firstRentOutTenantIdFromRow = (row: { rent_out_tenant_ids?: unknown }): string | undefined => {
     const raw = row.rent_out_tenant_ids;
@@ -208,7 +221,7 @@ const withSchemaFallbackUpdate = async (
 export const fetchProperties = async (user?: any, options?: { query?: string; bypassIsolation?: boolean }): Promise<Property[]> => {
     try {
         // Select all fields needed for both list and edit views
-        const fields = 'id, name, code, address, type, status, land_use, lot_index, lot_area, location, google_drive_plan_url, has_planning_permission, proprietor_id, proprietor_ids, tenant_id, parent_property_id, created_by, created_at, updated_at, images, geo_maps, notes';
+        const fields = 'id, name, code, address, type, status, land_use, lot_index, lot_area, sections, location, google_drive_plan_url, has_planning_permission, proprietor_id, proprietor_ids, tenant_id, parent_property_id, created_by, created_at, updated_at, images, geo_maps, notes';
         let queryBuilder = supabase.from('properties').select(fields);
 
         if (options?.query) {
@@ -582,7 +595,7 @@ export const fetchCurrentTenant = async (id: string): Promise<CurrentTenant | un
 
 export const fetchPropertiesWithRelations = async (user?: any): Promise<PropertyWithRelations[]> => {
     try {
-        const fields = 'id, name, code, address, type, status, land_use, lot_index, lot_area, location, google_drive_plan_url, has_planning_permission, proprietor_id, proprietor_ids, tenant_id, created_by, created_at, updated_at, images, parent_property_id';
+        const fields = 'id, name, code, address, type, status, land_use, lot_index, lot_area, sections, location, google_drive_plan_url, has_planning_permission, proprietor_id, proprietor_ids, tenant_id, created_by, created_at, updated_at, images, parent_property_id';
         let pQuery = supabase.from('properties').select(fields);
         let oQuery = supabase.from('proprietors').select('*');
         let rQuery = supabase.from('rents').select('*');
@@ -845,6 +858,7 @@ export function useProperties() {
                 code: property.code,
                 lot_index: property.lotIndex,
                 lot_area: property.lotArea,
+                sections: property.sections,
                 land_use: property.landUse,
                 images: property.images,
                 geo_maps: property.geoMaps,
@@ -864,9 +878,23 @@ export function useProperties() {
                 Object.entries(propertyData).filter(([_, v]) => v !== undefined && v !== null)
             );
 
-            const { error: sbError } = await supabase
+            let { error: sbError } = await supabase
                 .from('properties')
                 .insert([cleanData]);
+
+            // 同 updateProperty：缺欄位時自動剔除並重試
+            if (sbError?.code === 'PGRST204') {
+                const missingCol = extractMissingColumn(sbError.message);
+                if (missingCol && cleanData[missingCol] !== undefined) {
+                    console.warn(
+                        `Column "${missingCol}" not in schema cache; retrying insert without it.`,
+                    );
+                    delete cleanData[missingCol];
+                    ({ error: sbError } = await supabase
+                        .from('properties')
+                        .insert([cleanData]));
+                }
+            }
 
             if (sbError) throw sbError;
             return id;
@@ -899,7 +927,8 @@ export function useProperties() {
             ];
             // Extended fields (may not exist in older DB schemas)
             const extendedAllowed = [
-                'proprietor_ids'
+                'proprietor_ids',
+                'sections',
             ];
             const allAllowed = [...baseAllowed, ...extendedAllowed];
             const filtered: any = {};
@@ -907,10 +936,28 @@ export function useProperties() {
                 if (allAllowed.includes(k)) filtered[k] = updateData[k];
             });
 
-            const { error: sbError } = await supabase
+            // First attempt with all allowed fields.
+            let { error: sbError } = await supabase
                 .from('properties')
                 .update(filtered)
                 .eq('id', id);
+
+            // Graceful fallback: if PostgREST complains about a missing column
+            // (e.g. the migration hasn't been applied yet), drop those
+            // extended columns and retry so the rest of the update still works.
+            if (sbError?.code === 'PGRST204') {
+                const missingCol = extractMissingColumn(sbError.message);
+                if (missingCol && filtered[missingCol] !== undefined) {
+                    console.warn(
+                        `Column "${missingCol}" not in schema cache; retrying update without it.`,
+                    );
+                    delete filtered[missingCol];
+                    ({ error: sbError } = await supabase
+                        .from('properties')
+                        .update(filtered)
+                        .eq('id', id));
+                }
+            }
 
             if (sbError) throw sbError;
             return true;
@@ -1880,7 +1927,7 @@ export function useRelations() {
         setLoading(true);
         setError(null);
         try {
-            const queryFields = 'id, name, code, address, type, status, land_use, lot_index, lot_area, location, google_drive_plan_url, has_planning_permission, proprietor_id, proprietor_ids, tenant_id, created_by, created_at, updated_at, images, geo_maps, notes';
+            const queryFields = 'id, name, code, address, type, status, land_use, lot_index, lot_area, sections, location, google_drive_plan_url, has_planning_permission, proprietor_id, proprietor_ids, tenant_id, created_by, created_at, updated_at, images, geo_maps, notes';
 
             const { data: records, error: pError } = await supabase
                 .from('properties')
@@ -1929,7 +1976,7 @@ export function useRelations() {
             const trimmedName = name.trim();
             if (!trimmedName) return null;
 
-            const queryFields = 'id, name, code, address, type, status, land_use, lot_index, lot_area, location, google_drive_plan_url, has_planning_permission, proprietor_id, tenant_id, created_by, created_at, updated_at, images, geo_maps, notes';
+            const queryFields = 'id, name, code, address, type, status, land_use, lot_index, lot_area, sections, location, google_drive_plan_url, has_planning_permission, proprietor_id, tenant_id, created_by, created_at, updated_at, images, geo_maps, notes';
 
             const { data: records, error: pError } = await supabase
                 .from('properties')

@@ -304,6 +304,7 @@ function formStateFromProperty(p: Property | null | undefined) {
         address,
         lotIndex: p?.lotIndex || '',
         lotArea: p?.lotArea || '',
+        sections: p?.sections || '',
         type: p?.type || 'group_asset',
         status: p?.status ? p.status.split(',').filter(Boolean) : ['holding'],
         landUse: p?.landUse ? p.landUse.split(',') : [],
@@ -331,20 +332,44 @@ interface PropertyFormProps {
  * - 圖片左上角徽章顯示當前 tag，點擊展開 tag 選擇器
  * - 右上角保留原本的刪除按鈕
  */
+/**
+ * 地段圖片項目（含設施 tag 徽章 + tag 選擇器 + 備註編輯面板）
+ * - 圖片左上角徽章顯示當前 tag，點擊展開 tag 選擇器
+ * - 右上角保留原本的刪除按鈕
+ * - hover 時底部浮現「備註」按鈕，點擊展開備註編輯面板（大 textarea + 確定/取消）
+ */
 function LotImageWithTagPicker({
     item,
     onChangeTag,
     onRemove,
+    onChangeNote,
     aspectClass,
 }: {
-    item: { u?: string; preview?: string; tag?: FacilityTag };
+    item: { u?: string; preview?: string; tag?: FacilityTag; note?: string };
     onChangeTag: (tag: FacilityTag | null) => void;
     onRemove: () => void;
+    onChangeNote?: (note: string) => void;
     aspectClass?: string;
 }) {
     const [open, setOpen] = useState(false);
+    const [noteOpen, setNoteOpen] = useState(false);
+    const [pendingNote, setPendingNote] = useState(item.note || '');
     const tagMeta = FACILITY_TAGS.find(f => f.value === item.tag);
     const src = item.u ?? item.preview ?? '';
+
+    const openNote = () => {
+        setPendingNote(item.note || '');
+        setNoteOpen(true);
+    };
+    const confirmNote = () => {
+        onChangeNote?.(pendingNote);
+        setNoteOpen(false);
+    };
+    const cancelNote = () => {
+        setPendingNote(item.note || '');
+        setNoteOpen(false);
+    };
+
     return (
         <div className={`relative group ${aspectClass ?? 'aspect-square'} rounded-xl overflow-hidden border border-zinc-200 dark:border-white/10`}>
             <img src={src} alt="" className="w-full h-full object-cover" />
@@ -352,14 +377,14 @@ function LotImageWithTagPicker({
             <button
                 type="button"
                 onClick={(e) => { e.stopPropagation(); setOpen(v => !v); }}
-                className={`absolute top-1 left-1 px-2 py-1 rounded-md text-xs font-medium tracking-wide cursor-pointer shadow-sm ${tagMeta ? tagMeta.color : 'bg-zinc-700/70 text-white hover:bg-zinc-900/80'}`}
+                className={`absolute top-1 left-1 px-2 py-1 rounded-md text-xs font-medium tracking-wide cursor-pointer shadow-sm z-20 ${tagMeta ? tagMeta.color : 'bg-zinc-700/70 text-white hover:bg-zinc-900/80'}`}
                 title={tagMeta ? `設施：${tagMeta.label}（點擊更改）` : '點擊選擇設施 tag'}
             >
                 {tagMeta ? tagMeta.label : '＋標籤'}
             </button>
             {/* tag 選擇器（full width，兩行 × 三格） */}
             {open && (
-                <div className="absolute top-10 left-1 right-1 z-20 bg-white dark:bg-zinc-800 rounded-lg shadow-xl border border-zinc-200 dark:border-white/10 p-2 flex flex-col gap-1.5 animate-fade-in"
+                <div className="absolute top-10 left-1 right-1 z-30 bg-white dark:bg-zinc-800 rounded-lg shadow-xl border border-zinc-200 dark:border-white/10 p-2 flex flex-col gap-1.5 animate-fade-in"
                     onMouseLeave={() => setOpen(false)}
                 >
                     <div className="text-xs font-semibold text-zinc-400 dark:text-white/40 px-1 pb-0.5">選擇設施</div>
@@ -390,10 +415,51 @@ function LotImageWithTagPicker({
             <button
                 type="button"
                 onClick={onRemove}
-                className="absolute top-0 right-0 w-5 h-5 bg-red-500 text-white rounded-bl-lg flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-xs"
+                className="absolute top-0 right-0 w-5 h-5 bg-red-500 text-white rounded-bl-lg flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-xs z-20"
             >
                 ×
             </button>
+            {/* 圖片備註：非編輯時 hover 顯示「備註」按鈕；編輯時顯示大 textarea + 確定/取消 */}
+            {onChangeNote && (
+                noteOpen ? (
+                    /* 備註編輯面板 */
+                    <div className="absolute inset-0 z-20 bg-black/80 flex flex-col gap-2 p-3">
+                        <textarea
+                            autoFocus
+                            value={pendingNote}
+                            onChange={(e) => setPendingNote(e.target.value)}
+                            placeholder="輸入圖片備註..."
+                            className="flex-1 resize-none rounded-lg bg-white/10 border border-white/20 text-white text-sm placeholder-white/40 focus:outline-none focus:ring-1 focus:ring-white/40 p-2"
+                        />
+                        <div className="flex gap-2">
+                            <button
+                                type="button"
+                                onClick={confirmNote}
+                                className="flex-1 py-1.5 bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-semibold rounded-lg transition-colors cursor-pointer"
+                            >
+                                確定
+                            </button>
+                            <button
+                                type="button"
+                                onClick={cancelNote}
+                                className="flex-1 py-1.5 bg-zinc-600 hover:bg-zinc-700 text-white text-xs font-semibold rounded-lg transition-colors cursor-pointer"
+                            >
+                                取消
+                            </button>
+                        </div>
+                    </div>
+                ) : (
+                    /* 備註按鈕（hover 時浮現） */
+                    <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); openNote(); }}
+                        className="absolute bottom-1 left-1/2 -translate-x-1/2 px-3 py-1 bg-black/60 hover:bg-black/80 text-white text-xs font-medium rounded-lg opacity-0 group-hover:opacity-100 transition-opacity z-20 whitespace-nowrap cursor-pointer flex items-center gap-1"
+                    >
+                        <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+                        {item.note ? '查看備註' : '＋備註'}
+                    </button>
+                )
+            )}
         </div>
     );
 }
@@ -417,10 +483,15 @@ const landUseTypes = [
     { value: 'agr', label: 'AGR 農業' },
     { value: 'ca', label: 'CA 自然保育區' },
     { value: 'os', label: 'OS 露天貯物' },
+    { value: 'open_storage', label: 'Open Storage 露天貯物' },
     { value: 'v', label: 'V 鄉村式發展' },
+    { value: 'village_dev', label: 'Village Dev 鄉村式發展' },
     { value: 'ou', label: 'OU 其他指定用途' },
     { value: 'r_d', label: 'R(D) 住宅(丁類)' },
     { value: 'r_a5', label: 'R(A)5 住宅(甲類)5' },
+    { value: 'residential_c', label: 'Residential (C) 住宅(丙類)' },
+    { value: 'recreation_use', label: 'Recreation Use 康樂用途' },
+    { value: 'conservation_area', label: 'Conservation Area 保育區' },
 ];
 
 export default function PropertyForm({ property, onClose, onSuccess }: PropertyFormProps) {
@@ -454,7 +525,7 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
     const [lotDetailTab, setLotDetailTab] = useState<'info' | 'images'>('info');
     const [lotAddMode, setLotAddMode] = useState<'new' | 'old' | null>(null);
     const [tempLotInput, setTempLotInput] = useState('');
-    const [tempLotMedia, setTempLotMedia] = useState<Array<{ u: string; s: number; tag?: FacilityTag } | { file: File; s: number; preview: string; tag?: FacilityTag }>>([]);
+    const [tempLotMedia, setTempLotMedia] = useState<Array<{ u: string; s: number; tag?: FacilityTag; note?: string } | { file: File; s: number; preview: string; tag?: FacilityTag; note?: string }>>([]);
     const [tempLotNote, setTempLotNote] = useState('');
     const [tempLotStatus, setTempLotStatus] = useState<LotStatus | null>(null);
     const [tempLotWaterMeter, setTempLotWaterMeter] = useState(false);
@@ -476,7 +547,7 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
     const [editingLotIndex, setEditingLotIndex] = useState<number | null>(null);
     const [editingLotValue, setEditingLotValue] = useState('');
     const [editingLotType, setEditingLotType] = useState<'new' | 'old'>('new');
-    const [editingLotMedia, setEditingLotMedia] = useState<Array<{ u: string; s: number; tag?: FacilityTag } | { file: File; s: number; preview: string; tag?: FacilityTag }>>([]);
+    const [editingLotMedia, setEditingLotMedia] = useState<Array<{ u: string; s: number; tag?: FacilityTag; note?: string } | { file: File; s: number; preview: string; tag?: FacilityTag; note?: string }>>([]);
     const [editingLotNote, setEditingLotNote] = useState('');
     const [editingLotStatus, setEditingLotStatus] = useState<LotStatus | undefined>(undefined);
     const [editingLotArea, setEditingLotArea] = useState('');
@@ -596,6 +667,39 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
 
     const lotEntries = useMemo(() => parseLotEntriesFromStr(formData.lotIndex), [formData.lotIndex]);
 
+    /** 所有地段編輯狀態：idle=正常顯示, edit=批次編輯模式 */
+    const [sectionsMode, setSectionsMode] = useState<'idle' | 'edit'>('idle');
+    /** 所有地段輸入框草稿 */
+    const [sectionsDraft, setSectionsDraft] = useState('');
+
+    /**
+     * 地段排序：以「Section X」標題分組，由 Section A 開始排，
+     * 沒有 Section 字眼的地段統一放到最後。
+     */
+    const sortedLotEntries = useMemo(() => {
+        const sectionRegex = /section\s*([a-z0-9]+)/i;
+        const hasSection = (text: string) => sectionRegex.test(text);
+        const sectionKey = (text: string) => {
+            const match = text.match(sectionRegex);
+            return match ? (match[1] || '').toLowerCase() : '';
+        };
+        const collator = new Intl.Collator('en', { numeric: true, sensitivity: 'base' });
+        const noSection = lotEntries.filter(e => !hasSection(e.value));
+        const withSection = lotEntries.filter(e => hasSection(e.value));
+        withSection.sort((a, b) => collator.compare(sectionKey(a.value), sectionKey(b.value)));
+        return [...withSection, ...noSection];
+    }, [lotEntries]);
+
+    /**
+     * 配對 (地段, 原始 index)，用於渲染時保留對應的 pendingLotRemovals / editingLotIndex / openEditLotPopup 等操作。
+     */
+    const sortedLotEntriesWithIndex = useMemo(() => {
+        return sortedLotEntries.map(entry => {
+            const originalIndex = lotEntries.indexOf(entry);
+            return { entry, originalIndex };
+        });
+    }, [sortedLotEntries, lotEntries]);
+
     // 過往相簿列表排序（依結束日期由近到遠，若無結束日期則依開始日期）
     const sortedLotHistoryAlbums = useMemo(() => {
         return [...lotHistoryAlbums].sort((a, b) => {
@@ -623,13 +727,14 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
         if (!trimmed) return;
         setLotSaving(true);
         try {
-        const pendingFiles = tempLotMedia.filter((x): x is { file: File; s: number; preview: string; tag?: FacilityTag } => 'file' in x && 'preview' in x);
-        const existingMedia = tempLotMedia.filter((x): x is { u: string; s: number; tag?: FacilityTag } => 'u' in x && 's' in x);
+        const pendingFiles = tempLotMedia.filter((x): x is { file: File; s: number; preview: string; tag?: FacilityTag; note?: string } => 'file' in x && 'preview' in x);
+        const existingMedia = tempLotMedia.filter((x): x is { u: string; s: number; tag?: FacilityTag; note?: string } => 'u' in x && 's' in x);
         const uploadedNew = pendingFiles.length > 0 ? await processAndUploadFiles(pendingFiles, 'lots') : [];
-        // 把上傳完成的圖片與原本 pending 的 tag 配對回去
-        const uploadedWithTag: Array<{ u: string; s: number; tag?: FacilityTag }> = uploadedNew.map((m, i) => ({
+        // 把上傳完成的圖片與原本 pending 的 tag/note 配對回去（note 不可在此丟失，否則圖片備註會在儲存後消失）
+        const uploadedWithTag: Array<{ u: string; s: number; tag?: FacilityTag; note?: string }> = uploadedNew.map((m, i) => ({
             ...m,
             tag: pendingFiles[i]?.tag,
+            note: pendingFiles[i]?.note,
         }));
 
         // 水錶電錶圖片上傳
@@ -697,12 +802,14 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
         if (!trimmed) return;
         setLotSaving(true);
         try {
-        const pendingFiles = tempLotMedia.filter((x): x is { file: File; s: number; preview: string; tag?: FacilityTag } => 'file' in x && 'preview' in x);
-        const existingMedia = tempLotMedia.filter((x): x is { u: string; s: number; tag?: FacilityTag } => 'u' in x && 's' in x);
+        const pendingFiles = tempLotMedia.filter((x): x is { file: File; s: number; preview: string; tag?: FacilityTag; note?: string } => 'file' in x && 'preview' in x);
+        const existingMedia = tempLotMedia.filter((x): x is { u: string; s: number; tag?: FacilityTag; note?: string } => 'u' in x && 's' in x);
         const uploadedNew = pendingFiles.length > 0 ? await processAndUploadFiles(pendingFiles, 'lots') : [];
-        const uploadedWithTag: Array<{ u: string; s: number; tag?: FacilityTag }> = uploadedNew.map((m, i) => ({
+        // 把上傳完成的圖片與原本 pending 的 tag/note 配對回去（note 不可在此丟失，否則圖片備註會在儲存後消失）
+        const uploadedWithTag: Array<{ u: string; s: number; tag?: FacilityTag; note?: string }> = uploadedNew.map((m, i) => ({
             ...m,
             tag: pendingFiles[i]?.tag,
+            note: pendingFiles[i]?.note,
         }));
 
         const wmPending = tempLotWaterMeterMedia.filter((x): x is { file: File; s: number; preview: string } => 'file' in x && 'preview' in x);
@@ -767,12 +874,14 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
         if (!trimmed) return;
         setLotSaving(true);
         try {
-        const pendingFiles = tempLotMedia.filter((x): x is { file: File; s: number; preview: string; tag?: FacilityTag } => 'file' in x && 'preview' in x);
-        const existingMedia = tempLotMedia.filter((x): x is { u: string; s: number; tag?: FacilityTag } => 'u' in x && 's' in x);
+        const pendingFiles = tempLotMedia.filter((x): x is { file: File; s: number; preview: string; tag?: FacilityTag; note?: string } => 'file' in x && 'preview' in x);
+        const existingMedia = tempLotMedia.filter((x): x is { u: string; s: number; tag?: FacilityTag; note?: string } => 'u' in x && 's' in x);
         const uploadedNew = pendingFiles.length > 0 ? await processAndUploadFiles(pendingFiles, 'lots') : [];
-        const uploadedWithTag: Array<{ u: string; s: number; tag?: FacilityTag }> = uploadedNew.map((m, i) => ({
+        // 把上傳完成的圖片與原本 pending 的 tag/note 配對回去（note 不可在此丟失，否則圖片備註會在儲存後消失）
+        const uploadedWithTag: Array<{ u: string; s: number; tag?: FacilityTag; note?: string }> = uploadedNew.map((m, i) => ({
             ...m,
             tag: pendingFiles[i]?.tag,
+            note: pendingFiles[i]?.note,
         }));
 
         const wmPending = tempLotWaterMeterMedia.filter((x): x is { file: File; s: number; preview: string } => 'file' in x && 'preview' in x);
@@ -862,8 +971,8 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
             setEditingLotIndex(index);
             setEditingLotType(entry.type);
             setEditingLotValue(entry.value.replace(/\s*\(租賃地段\)$/, '').replace(/\s*\(政府短期租約\)$/, ''));
-            // 載入 DB 中的 media（{u, s}[]），並轉為混合陣列格式（保留 tag）
-            const existingMedia: Array<string | { u: string; s: number; tag?: FacilityTag }> = (entry.media || []).map(m => ({ u: m.u, s: m.s, tag: m.tag }));
+            // 載入 DB 中的 media（{u, s, note}[]），並轉為混合陣列格式（保留 tag + note）
+            const existingMedia: Array<string | { u: string; s: number; tag?: FacilityTag; note?: string }> = (entry.media || []).map(m => ({ u: m.u, s: m.s, tag: m.tag, note: m.note }));
             setEditingLotMedia(existingMedia as any);
             setEditingLotNote(entry.note || '');
             setEditingLotStatus(entry.lotStatus);
@@ -896,12 +1005,14 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
         const entry = next[editingLotIndex];
         const wasLease = entry.value.endsWith('(租賃地段)');
         const wasGov = entry.value.endsWith('(政府短期租約)');
-        const pendingFiles = editingLotMedia.filter((x): x is { file: File; s: number; preview: string; tag?: FacilityTag } => typeof x === 'object');
-        const existingMedia = editingLotMedia.filter((x): x is { u: string; s: number; tag?: FacilityTag } => typeof x === 'object' && 'u' in x && 's' in x);
+        const pendingFiles = editingLotMedia.filter((x): x is { file: File; s: number; preview: string; tag?: FacilityTag; note?: string } => typeof x === 'object');
+        const existingMedia = editingLotMedia.filter((x): x is { u: string; s: number; tag?: FacilityTag; note?: string } => typeof x === 'object' && 'u' in x && 's' in x);
         const uploadedNew = pendingFiles.length > 0 ? await processAndUploadFiles(pendingFiles, 'lots') : [];
-        const uploadedWithTag: Array<{ u: string; s: number; tag?: FacilityTag }> = uploadedNew.map((m, i) => ({
+        // 把上傳完成的圖片與原本 pending 的 tag/note 配對回去（note 不可在此丟失，否則圖片備註會在儲存後消失）
+        const uploadedWithTag: Array<{ u: string; s: number; tag?: FacilityTag; note?: string }> = uploadedNew.map((m, i) => ({
             ...m,
             tag: pendingFiles[i]?.tag,
+            note: pendingFiles[i]?.note,
         }));
 
         // 水錶電錶圖片上傳
@@ -1696,6 +1807,19 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
         }));
     };
 
+    /** 設定單張地段圖片的備註 */
+    const setLotMediaNote = (index: number, note: string, target: 'temp' | 'edit') => {
+        const setter = target === 'temp' ? setTempLotMedia : setEditingLotMedia;
+        setter(prev => prev.map((it, i) => {
+            if (i !== index) return it;
+            if (!note.trim()) {
+                const { note: _drop, ...rest } = it as Record<string, unknown>;
+                return rest as unknown as typeof it;
+            }
+            return { ...it, note } as typeof it;
+        }));
+    };
+
     const removeLotMediaItem = (index: number, target: 'temp' | 'edit' | 'history') => {
         if (target === 'history') {
             setLotHistoryAlbumForm(prev => {
@@ -1798,6 +1922,7 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                 address: formData.address.trim(),
                 lotIndex: finalLotIndex,
                 lotArea: formData.lotArea,
+                sections: formData.sections.trim() || undefined,
                 type: formData.type as Property['type'],
                 status: formData.status.join(','),
                 landUse: formData.landUse.join(',') as Property['landUse'],
@@ -2010,7 +2135,7 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                         </button>
                         <button type="button" onClick={() => setMainTab('lot')}
                             className={`px-5 py-2.5 text-sm font-medium transition-colors border-b-2 -mb-px cursor-pointer ${mainTab === 'lot' ? 'border-purple-500 text-purple-600 dark:text-purple-400' : 'border-transparent text-zinc-500 dark:text-white/50 hover:text-zinc-700 dark:hover:text-white'}`}>
-                            2. 地段
+                            2. 出租地段
                         </button>
                         <button type="button" onClick={() => setMainTab('proprietor')}
                             className={`px-5 py-2.5 text-sm font-medium transition-colors border-b-2 -mb-px cursor-pointer ${mainTab === 'proprietor' ? 'border-purple-500 text-purple-600 dark:text-purple-400' : 'border-transparent text-zinc-500 dark:text-white/50 hover:text-zinc-700 dark:hover:text-white'}`}>
@@ -2150,7 +2275,7 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                             />
                         </div>
                         <div className="space-y-2">
-                            <label className="block text-sm font-medium text-zinc-700 dark:text-white/80">出租面積</label>
+                            <label className="block text-sm font-medium text-zinc-700 dark:text-white/80">場地面積</label>
                             <div className="flex items-center gap-2">
                                 <input
                                     type="text"
@@ -2201,7 +2326,7 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
 
                     {/* Lot Area */}
                     <div className="space-y-2">
-                        <label className="block text-sm font-medium text-zinc-700 dark:text-white/80">出租面積</label>
+                        <label className="block text-sm font-medium text-zinc-700 dark:text-white/80">場地面積</label>
                         <div className="flex items-center gap-2">
                             <input
                                 type="text"
@@ -2216,6 +2341,144 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                             />
                             <span className="text-sm text-zinc-500 dark:text-white/50 shrink-0">平方英呎</span>
                         </div>
+                    </div>
+
+                    {/* 所有地段：chip 列表 + 新增 / 更改 */}
+                    <div id="property-sections-field" className="space-y-2 property-form-section">
+                        <label htmlFor="property-sections-input" className="block text-sm font-medium text-zinc-700 dark:text-white/80">所有地段</label>
+
+                        {/* 已儲存的地段 chips（含個別刪除按鈕） */}
+                        <div className="property-sections-chips min-h-[42px] px-3 py-2 bg-zinc-50 dark:bg-white/5 border border-zinc-200 dark:border-white/10 rounded-xl flex flex-wrap gap-2 items-center">
+                            {(formData.sections
+                                ? formData.sections.split(',').map(s => s.trim()).filter(Boolean)
+                                : []
+                            ).map((s, i) => (
+                                <span
+                                    key={`${s}-${i}`}
+                                    data-section-chip={s}
+                                    className="property-section-chip inline-flex items-center gap-1 px-2 py-1 bg-purple-100 dark:bg-purple-500/20 text-purple-700 dark:text-purple-300 rounded-lg text-sm font-medium"
+                                >
+                                    {s}
+                                    <button
+                                        type="button"
+                                        data-action="remove-section-chip"
+                                        data-section={s}
+                                        onClick={() => {
+                                            const next = formData.sections
+                                                .split(',')
+                                                .map(x => x.trim())
+                                                .filter((x, idx) => !(idx === i));
+                                            setFormData(prev => ({ ...prev, sections: next.join(', ') }));
+                                        }}
+                                        className="text-purple-500 dark:text-purple-300 hover:text-purple-700 dark:hover:text-white cursor-pointer leading-none"
+                                        title="刪除此地段"
+                                    >
+                                        ×
+                                    </button>
+                                </span>
+                            ))}
+                            {(!formData.sections || !formData.sections.trim()) && (
+                                <span className="text-zinc-400 dark:text-white/30 italic text-sm">尚未新增地段</span>
+                            )}
+                        </div>
+
+                        {sectionsMode === 'idle' ? (
+                            /* 待新增輸入欄 + 新增按鈕 */
+                            <div className="flex gap-2">
+                                <input
+                                    type="text"
+                                    value={sectionsDraft}
+                                    onChange={(e) => setSectionsDraft(e.target.value)}
+                                    onKeyDown={(e) => {
+                                        if (e.key === 'Enter') {
+                                            e.preventDefault();
+                                            const val = sectionsDraft.trim();
+                                            if (!val) return;
+                                            const next = formData.sections
+                                                ? `${formData.sections}, ${val}`
+                                                : val;
+                                            setFormData(prev => ({ ...prev, sections: next }));
+                                            setSectionsDraft('');
+                                        }
+                                    }}
+                                    placeholder="輸入地段名稱，按 Enter 或點「新增」加入"
+                                    id="property-sections-input"
+                                    name="propertySectionsInput"
+                                    data-field="property-sections"
+                                    className="property-sections-input flex-1 min-w-0 px-4 py-2.5 bg-zinc-50 dark:bg-white/5 border border-zinc-200 dark:border-white/10 rounded-xl text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-purple-500/50 transition-all text-sm"
+                                />
+                                <button
+                                    type="button"
+                                    id="property-sections-add-btn"
+                                    data-action="add-section"
+                                    onClick={() => {
+                                        const val = sectionsDraft.trim();
+                                        if (!val) return;
+                                        const next = formData.sections
+                                            ? `${formData.sections}, ${val}`
+                                            : val;
+                                        setFormData(prev => ({ ...prev, sections: next }));
+                                        setSectionsDraft('');
+                                    }}
+                                    className="shrink-0 px-4 py-2.5 bg-purple-500 hover:bg-purple-600 text-white text-sm font-medium rounded-xl transition-colors cursor-pointer"
+                                >
+                                    新增
+                                </button>
+                            </div>
+                        ) : (
+                            /* 更改/批次編輯模式 */
+                            <div className="flex gap-2">
+                                <input
+                                    autoFocus
+                                    type="text"
+                                    value={sectionsDraft}
+                                    onChange={(e) => setSectionsDraft(e.target.value)}
+                                    onKeyDown={(e) => {
+                                        if (e.key === 'Enter') {
+                                            e.preventDefault();
+                                            setFormData(prev => ({ ...prev, sections: sectionsDraft.trim() }));
+                                            setSectionsMode('idle');
+                                        }
+                                    }}
+                                    placeholder="完整輸入所有地段，以逗號分隔，例如：Section A, Section B, Section C"
+                                    id="property-sections-edit-input"
+                                    name="propertySectionsEditInput"
+                                    data-field="property-sections-edit"
+                                    className="property-sections-edit-input flex-1 min-w-0 px-4 py-2.5 bg-zinc-50 dark:bg-white/5 border border-zinc-200 dark:border-white/10 rounded-xl text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-purple-500/50 transition-all text-sm"
+                                />
+                                <button
+                                    type="button"
+                                    id="property-sections-confirm-btn"
+                                    data-action="confirm-sections"
+                                    onClick={() => {
+                                        setFormData(prev => ({ ...prev, sections: sectionsDraft.trim() }));
+                                        setSectionsMode('idle');
+                                    }}
+                                    className="shrink-0 px-4 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-semibold rounded-xl transition-colors cursor-pointer"
+                                >
+                                    確定
+                                </button>
+                                <button
+                                    type="button"
+                                    id="property-sections-cancel-btn"
+                                    data-action="cancel-sections"
+                                    onClick={() => { setSectionsMode('idle'); setSectionsDraft(''); }}
+                                    className="shrink-0 px-4 py-2.5 bg-zinc-100 dark:bg-white/10 hover:bg-zinc-200 dark:hover:bg-white/20 text-zinc-600 dark:text-white/70 text-sm font-medium rounded-xl transition-colors cursor-pointer"
+                                >
+                                    取消
+                                </button>
+                            </div>
+                        )}
+
+                        <button
+                            type="button"
+                            id="property-sections-edit-link"
+                            data-action="open-edit-sections"
+                            onClick={() => { setSectionsDraft(formData.sections || ''); setSectionsMode('edit'); }}
+                            className="property-sections-edit-link text-xs text-purple-600 dark:text-purple-400 hover:text-purple-700 dark:hover:text-purple-300 cursor-pointer"
+                        >
+                            更改所有地段
+                        </button>
                     </div>
 
                     {/* Notes Field (Rich Text) */}
@@ -2438,12 +2701,12 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                             /* Card View */
                             <>
                                 <div className={`grid gap-4 ${isExpanded ? 'grid-cols-1 md:grid-cols-3 lg:grid-cols-5' : 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3'}`}>
-                                    {lotEntries.slice(0, isExpanded ? 15 : 9).map((entry, i) => {
+                                    {sortedLotEntriesWithIndex.slice(0, isExpanded ? 15 : 9).map(({ entry, originalIndex: i }, displayIdx) => {
                                         const coverUrl = entry.media && entry.media.length > 0 ? entry.media[0].u : '';
-                                        const isActionsOpen = openLotActionsKey === i;
+                                        const isActionsOpen = openLotActionsKey === displayIdx;
                                         return (
                                             <div
-                                                key={i}
+                                                key={`${i}-${entry.value}`}
                                                 className={`group/listing relative bg-white dark:bg-white/5 border rounded-xl overflow-hidden transition-all ${pendingLotRemovals.has(i)
                                                     ? 'border-red-300 dark:border-red-500/30 opacity-60'
                                                     : 'border-zinc-200 dark:border-white/10 hover:border-purple-300 dark:hover:border-purple-500/30'
@@ -2561,8 +2824,8 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                                                             </span>
                                                         )}
                                                         {entry.lotStatus && (
-                                                            <span className={`shrink-0 px-2 py-0.5 rounded text-xs font-medium ${entry.lotStatus === 'renting' ? 'bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-400' : entry.lotStatus === 'available' ? 'bg-sky-100 text-sky-700 dark:bg-sky-500/20 dark:text-sky-400' : 'bg-zinc-300 text-zinc-700 dark:bg-zinc-600 dark:text-zinc-300'}`}>
-                                                                {entry.lotStatus === 'renting' ? '出租中' : entry.lotStatus === 'available' ? '可租用' : '已出租'}
+                                                            <span className={`shrink-0 px-2 py-0.5 rounded text-xs font-medium ${entry.lotStatus === 'listing' ? 'bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-400' : entry.lotStatus === 'available' ? 'bg-sky-100 text-sky-700 dark:bg-sky-500/20 dark:text-sky-400' : entry.lotStatus === 'upcoming' ? 'bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-400' : 'bg-zinc-300 text-zinc-700 dark:bg-zinc-600 dark:text-zinc-300'}`}>
+                                                                {entry.lotStatus === 'listing' ? '放租中' : entry.lotStatus === 'available' ? '可租用' : entry.lotStatus === 'upcoming' ? '即將放租' : '已出租'}
                                                             </span>
                                                         )}
                                                     </div>
@@ -2585,14 +2848,14 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                                     })}
                                 </div>
                                 {/* Show More Button */}
-                                {lotEntries.length > (isExpanded ? 15 : 9) && (
+                                {sortedLotEntries.length > (isExpanded ? 15 : 9) && (
                                     <div className="flex justify-center pt-2">
                                         <button
                                             type="button"
                                             onClick={() => setIsExpanded(!isExpanded)}
                                             className="px-4 py-2 text-sm text-purple-600 dark:text-purple-400 hover:text-purple-700 dark:hover:text-purple-300 font-medium transition-colors cursor-pointer"
                                         >
-                                            {isExpanded ? '收起一部分' : `顯示全部 ${lotEntries.length} 個地段`}
+                                            {isExpanded ? '收起一部分' : `顯示全部 ${sortedLotEntries.length} 個地段`}
                                         </button>
                                     </div>
                                 )}
@@ -2600,11 +2863,11 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                         ) : (
                             /* List View */
                             <div className="bg-zinc-50 dark:bg-white/5 border border-zinc-200 dark:border-white/10 rounded-xl divide-y divide-zinc-200 dark:divide-white/10 overflow-hidden">
-                                {lotEntries.map((entry, i) => {
+                                {sortedLotEntriesWithIndex.slice(0, isExpanded ? 15 : 9).map(({ entry, originalIndex: i }, displayIdx) => {
                                     const coverUrl = entry.media && entry.media.length > 0 ? entry.media[0].u : '';
-                                    const isActionsOpen = openLotActionsKey === i;
+                                    const isActionsOpen = openLotActionsKey === displayIdx;
                                     return (
-                                        <div key={i} className={`${pendingLotRemovals.has(i) ? 'opacity-60' : ''}`}>
+                                        <div key={`${i}-${entry.value}`} className={`${pendingLotRemovals.has(i) ? 'opacity-60' : ''}`}>
                                             <div className={`flex items-center gap-3 p-4 ${pendingLotRemovals.has(i) ? 'opacity-60' : ''}`}>
                                                 {/* Cover thumbnail */}
                                                 <div className="shrink-0 w-14 h-14 rounded-lg overflow-hidden bg-zinc-200 dark:bg-white/10 border border-zinc-200 dark:border-white/10">
@@ -2652,8 +2915,8 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                                                     </span>
                                                 )}
                                                 {entry.lotStatus && (
-                                                    <span className={`shrink-0 px-2 py-0.5 rounded text-xs font-medium ${entry.lotStatus === 'renting' ? 'bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-400' : entry.lotStatus === 'available' ? 'bg-sky-100 text-sky-700 dark:bg-sky-500/20 dark:text-sky-400' : 'bg-zinc-300 text-zinc-700 dark:bg-zinc-600 dark:text-zinc-300'}`}>
-                                                        {entry.lotStatus === 'renting' ? '出租中' : entry.lotStatus === 'available' ? '可租用' : '已出租'}
+                                                    <span className={`shrink-0 px-2 py-0.5 rounded text-xs font-medium ${entry.lotStatus === 'listing' ? 'bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-400' : entry.lotStatus === 'available' ? 'bg-sky-100 text-sky-700 dark:bg-sky-500/20 dark:text-sky-400' : entry.lotStatus === 'upcoming' ? 'bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-400' : 'bg-zinc-300 text-zinc-700 dark:bg-zinc-600 dark:text-zinc-300'}`}>
+                                                        {entry.lotStatus === 'listing' ? '放租中' : entry.lotStatus === 'available' ? '可租用' : entry.lotStatus === 'upcoming' ? '即將放租' : '已出租'}
                                                     </span>
                                                 )}
                                                 {entry.lotArea && (
@@ -2904,7 +3167,7 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                                                         </div>
                                                         {/* 出租面積 */}
                                                         <div className="space-y-2">
-                                                            <label className="block text-sm font-medium text-zinc-700 dark:text-white/80">出租面積</label>
+                                                            <label className="block text-sm font-medium text-zinc-700 dark:text-white/80">場地面積</label>
                                                             <div className="flex items-center gap-2">
                                                                 <input type="text" value={formatLotAreaForInput(editingLotArea)} onChange={(e) => setEditingLotArea(parseLotAreaInput(e.target.value))}
                                                                     placeholder="例如: 5,000" className="flex-1 px-3 md:px-4 py-2.5 md:py-3 bg-zinc-50 dark:bg-white/5 border border-zinc-200 dark:border-white/10 rounded-xl text-zinc-900 dark:text-white placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-purple-500/50 text-sm md:text-base" />
@@ -2993,10 +3256,11 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                                                             <label className="block text-sm font-medium text-zinc-700 dark:text-white/80">出租狀態</label>
                                                             <AnimatedSelect
                                                                 value={editingLotStatus || ''}
-                                                                onChange={(v) => setEditingLotStatus(v === '' ? undefined : v as 'renting' | 'rented' | 'available')}
+                                                                onChange={(v) => setEditingLotStatus(v === '' ? undefined : v as 'listing' | 'rented' | 'available' | 'upcoming')}
                                                                 options={[
                                                                     { value: 'available', label: '可租用' },
-                                                                    { value: 'renting', label: '出租中' },
+                                                                    { value: 'listing', label: '放租中' },
+                                                                    { value: 'upcoming', label: '即將放租' },
                                                                     { value: 'rented', label: '已出租' },
                                                                 ]}
                                                                 placeholder="選擇狀態"
@@ -3008,11 +3272,12 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                                                             <label className="block text-sm font-medium text-zinc-700 dark:text-white/80">合約狀態</label>
                                                             <AnimatedSelect
                                                                 value={editingLotContractStatus || ''}
-                                                                onChange={(v) => setEditingLotContractStatus(v === '' ? undefined : v as 'ongoing' | 'expiring' | 'not_renewing')}
+                                                                onChange={(v) => setEditingLotContractStatus(v === '' ? undefined : v as 'ongoing' | 'expiring' | 'not_renewing' | 'completed')}
                                                                 options={[
                                                                     { value: 'ongoing', label: '未完約' },
                                                                     { value: 'expiring', label: '即將到期' },
                                                                     { value: 'not_renewing', label: '不續約' },
+                                                                    { value: 'completed', label: '已完約' },
                                                                 ]}
                                                                 placeholder="選擇狀態"
                                                                 clearable
@@ -3039,6 +3304,7 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                                                                         aspectClass="aspect-square"
                                                                         onChangeTag={(tag) => setLotMediaTag(idx, tag, 'edit')}
                                                                         onRemove={() => removeLotMediaItem(idx, 'edit')}
+                                                                        onChangeNote={(note) => setLotMediaNote(idx, note, 'edit')}
                                                                     />
                                                                 ))}
                                                                 {editingLotMedia.length < 10 && (
@@ -3076,7 +3342,7 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                                                         </div>
                                                         {/* 出租面積 */}
                                                         <div className="space-y-2">
-                                                            <label className="block text-sm font-medium text-zinc-700 dark:text-white/80">出租面積</label>
+                                                            <label className="block text-sm font-medium text-zinc-700 dark:text-white/80">場地面積</label>
                                                             <div className="flex items-center gap-2">
                                                                 <input type="text" value={formatLotAreaForInput(tempLotArea)} onChange={(e) => setTempLotArea(parseLotAreaInput(e.target.value))}
                                                                     placeholder="例如: 5,000" className="flex-1 px-4 py-3 bg-zinc-50 dark:bg-white/5 border border-zinc-200 dark:border-white/10 rounded-xl text-zinc-900 dark:text-white placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-purple-500/50 text-base" />
@@ -3167,10 +3433,11 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                                                                 <label className="block text-sm font-medium text-zinc-700 dark:text-white/80">出租狀態</label>
                                                                 <AnimatedSelect
                                                                     value={tempLotStatus || ''}
-                                                                    onChange={(v) => setTempLotStatus(v === '' ? null : v as 'renting' | 'rented' | 'available')}
+                                                                    onChange={(v) => setTempLotStatus(v === '' ? null : v as LotStatus)}
                                                                     options={[
                                                                         { value: 'available', label: '可租用' },
-                                                                        { value: 'renting', label: '出租中' },
+                                                                        { value: 'listing', label: '放租中' },
+                                                                        { value: 'upcoming', label: '即將放租' },
                                                                         { value: 'rented', label: '已出租' },
                                                                     ]}
                                                                     placeholder="選擇狀態"
@@ -3182,11 +3449,12 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                                                                 <label className="block text-sm font-medium text-zinc-700 dark:text-white/80">合約狀態</label>
                                                                 <AnimatedSelect
                                                                     value={tempLotContractStatus || ''}
-                                                                    onChange={(v) => setTempLotContractStatus(v === '' ? null : v as 'ongoing' | 'expiring' | 'not_renewing')}
+                                                                    onChange={(v) => setTempLotContractStatus(v === '' ? null : v as 'ongoing' | 'expiring' | 'not_renewing' | 'completed')}
                                                                     options={[
                                                                         { value: 'ongoing', label: '未完約' },
                                                                         { value: 'expiring', label: '即將到期' },
                                                                         { value: 'not_renewing', label: '不續約' },
+                                                                        { value: 'completed', label: '已完約' },
                                                                     ]}
                                                                     placeholder="選擇狀態"
                                                                     clearable
@@ -3229,6 +3497,7 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                                                                         aspectClass="aspect-square"
                                                                         onChangeTag={(tag) => setLotMediaTag(idx, tag, 'temp')}
                                                                         onRemove={() => removeLotMediaItem(idx, 'temp')}
+                                                                        onChangeNote={(note) => setLotMediaNote(idx, note, 'temp')}
                                                                     />
                                                                 ))}
                                                                 {tempLotMedia.length < 10 && (
@@ -3360,7 +3629,7 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                                                 <AnimatedSelect
                                                     value={lotHistoryAlbumForm.lotStatus}
                                                     onChange={(v) => setLotHistoryAlbumForm(prev => ({ ...prev, lotStatus: v as LotStatus | '' }))}
-                                                    options={[{ value: 'available', label: '可租用' }, { value: 'renting', label: '出租中' }, { value: 'rented', label: '已出租' }]}
+                                                    options={[{ value: 'available', label: '可租用' }, { value: 'listing', label: '放租中' }, { value: 'upcoming', label: '即將放租' }, { value: 'rented', label: '已出租' }]}
                                                     placeholder="選擇狀態"
                                                     clearable
                                                     className="w-full text-sm"
@@ -3383,7 +3652,7 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                                                 <AnimatedSelect
                                                     value={lotHistoryAlbumForm.contractStatus}
                                                     onChange={(v) => setLotHistoryAlbumForm(prev => ({ ...prev, contractStatus: v as LotContractStatus | '' }))}
-                                                    options={[{ value: 'ongoing', label: '未完約' }, { value: 'expiring', label: '即將到期' }, { value: 'not_renewing', label: '不續約' }]}
+                                                    options={[{ value: 'ongoing', label: '未完約' }, { value: 'expiring', label: '即將到期' }, { value: 'not_renewing', label: '不續約' }, { value: 'completed', label: '已完約' }]}
                                                     placeholder="選擇狀態"
                                                     clearable
                                                     className="w-full text-sm"
@@ -3459,8 +3728,8 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                                                         lotArea: lotHistoryAlbumForm.lotArea || undefined,
                                                         waterMeter: lotHistoryAlbumForm.waterMeter || undefined,
                                                         electricMeter: lotHistoryAlbumForm.electricMeter || undefined,
-                                                        lotStatus: lotHistoryAlbumForm.lotStatus as 'renting' | 'rented' | undefined,
-                                                        contractStatus: lotHistoryAlbumForm.contractStatus as 'ongoing' | 'expiring' | 'not_renewing' | undefined,
+                                                        lotStatus: lotHistoryAlbumForm.lotStatus ? lotHistoryAlbumForm.lotStatus as LotStatus : undefined,
+                                                        contractStatus: lotHistoryAlbumForm.contractStatus ? lotHistoryAlbumForm.contractStatus as LotContractStatus : undefined,
                                                         lotTenantId: lotHistoryAlbumForm.tenantId || undefined,
                                                         note: lotHistoryAlbumForm.note || undefined,
                                                         media: mediaUrls,
@@ -3516,8 +3785,8 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                                                         <div className="flex flex-wrap gap-2">
                                                             <span className="shrink-0 px-2 py-0.5 rounded text-xs font-medium bg-zinc-200 dark:bg-white/10 text-zinc-600 dark:text-white/70">舊</span>
                                                             {album.lotStatus && (
-                                                                <span className={`shrink-0 px-2 py-0.5 rounded text-xs font-medium ${album.lotStatus === 'renting' ? 'bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-400' : 'bg-zinc-300 text-zinc-700 dark:bg-zinc-600 dark:text-zinc-300'}`}>
-                                                                    {album.lotStatus === 'renting' ? '出租中' : '已出租'}
+                                                                <span className={`shrink-0 px-2 py-0.5 rounded text-xs font-medium ${album.lotStatus === 'listing' || album.lotStatus === 'upcoming' ? 'bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-400' : album.lotStatus === 'available' ? 'bg-sky-100 text-sky-700 dark:bg-sky-500/20 dark:text-sky-400' : 'bg-zinc-300 text-zinc-700 dark:bg-zinc-600 dark:text-zinc-300'}`}>
+                                                                    {album.lotStatus === 'listing' ? '放租中' : album.lotStatus === 'upcoming' ? '即將放租' : album.lotStatus === 'available' ? '可租用' : '已出租'}
                                                                 </span>
                                                             )}
                                                         </div>
@@ -3622,8 +3891,8 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                                                                     <div className="flex items-center gap-1.5 mb-1 flex-wrap">
                                                                         <span className="text-xs px-1.5 py-0.5 rounded bg-zinc-200 dark:bg-white/10 text-zinc-600 dark:text-white/70">舊</span>
                                                                         {album.lotStatus && (
-                                                                            <span className={`text-xs px-1.5 py-0.5 rounded ${album.lotStatus === 'renting' ? 'bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-400' : 'bg-zinc-300 text-zinc-700 dark:bg-zinc-600 dark:text-zinc-300'}`}>
-                                                                                {album.lotStatus === 'renting' ? '出租中' : '已出租'}
+                                                                            <span className={`text-xs px-1.5 py-0.5 rounded ${album.lotStatus === 'listing' || album.lotStatus === 'upcoming' ? 'bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-400' : album.lotStatus === 'available' ? 'bg-sky-100 text-sky-700 dark:bg-sky-500/20 dark:text-sky-400' : 'bg-zinc-300 text-zinc-700 dark:bg-zinc-600 dark:text-zinc-300'}`}>
+                                                                                {album.lotStatus === 'listing' ? '放租中' : album.lotStatus === 'upcoming' ? '即將放租' : album.lotStatus === 'available' ? '可租用' : '已出租'}
                                                                             </span>
                                                                         )}
                                                                     </div>
@@ -3678,8 +3947,8 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                                                 {lotHistoryEntry.type === 'new' ? '新' : '舊'}
                                             </span>
                                             {lotHistoryEntry.lotStatus && (
-                                                <span className={`shrink-0 px-2 py-0.5 rounded text-xs font-medium ${lotHistoryEntry.lotStatus === 'renting' ? 'bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-400' : 'bg-zinc-300 text-zinc-700 dark:bg-zinc-600 dark:text-zinc-300'}`}>
-                                                    {lotHistoryEntry.lotStatus === 'renting' ? '出租中' : '已出租'}
+                                                <span className={`shrink-0 px-2 py-0.5 rounded text-xs font-medium ${lotHistoryEntry.lotStatus === 'listing' || lotHistoryEntry.lotStatus === 'upcoming' ? 'bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-400' : lotHistoryEntry.lotStatus === 'available' ? 'bg-sky-100 text-sky-700 dark:bg-sky-500/20 dark:text-sky-400' : 'bg-zinc-300 text-zinc-700 dark:bg-zinc-600 dark:text-zinc-300'}`}>
+                                                    {lotHistoryEntry.lotStatus === 'listing' ? '放租中' : lotHistoryEntry.lotStatus === 'upcoming' ? '即將放租' : lotHistoryEntry.lotStatus === 'available' ? '可租用' : '已出租'}
                                                 </span>
                                             )}
                                             <span className="text-sm text-zinc-900 dark:text-white font-medium">{lotHistoryEntry.value}</span>
@@ -3738,8 +4007,8 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                                                 {viewLotEntry.type === 'new' ? '新' : '舊'}
                                             </span>
                                             {viewLotEntry.lotStatus && (
-                                                <span className={`shrink-0 px-3 py-1 rounded-lg text-sm font-medium ${viewLotEntry.lotStatus === 'renting' ? 'bg-green-500/20 text-green-600 dark:text-green-400' : 'bg-zinc-300 text-zinc-700 dark:bg-zinc-600 dark:text-zinc-300'}`}>
-                                                    {viewLotEntry.lotStatus === 'renting' ? '出租中' : '已出租'}
+                                                <span className={`shrink-0 px-3 py-1 rounded-lg text-sm font-medium ${viewLotEntry.lotStatus === 'listing' || viewLotEntry.lotStatus === 'upcoming' ? 'bg-green-500/20 text-green-600 dark:text-green-400' : viewLotEntry.lotStatus === 'available' ? 'bg-sky-500/20 text-sky-600 dark:text-sky-400' : 'bg-zinc-300 text-zinc-700 dark:bg-zinc-600 dark:text-zinc-300'}`}>
+                                                    {viewLotEntry.lotStatus === 'listing' ? '放租中' : viewLotEntry.lotStatus === 'upcoming' ? '即將放租' : viewLotEntry.lotStatus === 'available' ? '可租用' : '已出租'}
                                                 </span>
                                             )}
                                             <span className="flex-1 text-base text-zinc-900 dark:text-white font-semibold break-all">{viewLotEntry.value}</span>

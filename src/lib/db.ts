@@ -11,6 +11,7 @@ export interface Property {
   address: string;
   lotIndex: string; // 物業地段
   lotArea: string;
+  sections?: string; // 所有地段
   type: 'group_asset' | 'co_investment' | 'external_lease' | 'managed_asset';
   status: string; // comma-separated: 'holding','renting','sold','suspended'
   landUse: string;
@@ -265,20 +266,20 @@ export interface LotHistoryAlbum {
   value: string;
   lotArea?: string;
   rentPrice?: string;
-  lotStatus?: 'renting' | 'rented' | 'available';
+  lotStatus?: 'listing' | 'rented' | 'available' | 'upcoming';
   waterMeter?: boolean;
   electricMeter?: boolean;
   toilet?: boolean;
   office?: boolean;
   storage?: boolean;
   room?: boolean;
-  contractStatus?: 'ongoing' | 'expiring' | 'not_renewing';
+  contractStatus?: 'ongoing' | 'expiring' | 'not_renewing' | 'completed';
   lotTenantId?: string;
   note?: string;
   /** 圖片陣列 */
-  media?: { u: string; s: number }[];
-  waterMeterMedia?: { u: string; s: number }[];
-  electricMeterMedia?: { u: string; s: number }[];
+  media?: { u: string; s: number; tag?: string; note?: string }[];
+  waterMeterMedia?: { u: string; s: number; tag?: string; note?: string }[];
+  electricMeterMedia?: { u: string; s: number; tag?: string; note?: string }[];
   waterMeterNote?: string;
   electricMeterNote?: string;
   startDate?: string;
