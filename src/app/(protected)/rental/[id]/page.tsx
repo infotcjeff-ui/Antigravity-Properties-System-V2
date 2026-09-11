@@ -651,6 +651,41 @@ export default function RentalPropertyPage() {
 
     const [viewLotEntry, setViewLotEntry] = useState<LotEntry | null>(null);
 
+    /**
+     * 偵測是否為桌面版面（≥1024px，即 Tailwind lg 斷點），用於動態調整每頁顯示數量：
+     *   - 桌面（≥1024px）：每頁顯示 6 個
+     *   - 行動 / 平板：每頁顯示 4 個
+     */
+    const [isDesktop, setIsDesktop] = useState<boolean>(() => {
+        if (typeof window === 'undefined') return false;
+        return window.matchMedia('(min-width: 1024px)').matches;
+    });
+
+    useEffect(() => {
+        if (typeof window === 'undefined') return;
+        const mql = window.matchMedia('(min-width: 1024px)');
+        const handler = (e: MediaQueryListEvent) => setIsDesktop(e.matches);
+        mql.addEventListener('change', handler);
+        return () => mql.removeEventListener('change', handler);
+    }, []);
+
+    /** 出租地段分頁設定：響應式每頁顯示數量 */
+    const LOT_ITEMS_PER_PAGE = isDesktop ? 6 : 4;
+    const [lotCurrentPage, setLotCurrentPage] = useState(1);
+    const lotTotalPages = Math.max(1, Math.ceil(sortedLotEntries.length / LOT_ITEMS_PER_PAGE));
+
+    /**
+     * 安全頁碼：當資料變少（例如重新載入）或視窗寬度變化使 lotCurrentPage 超出範圍時，
+     * 自動夾在 [1, lotTotalPages]，無需在 effect 內呼叫 setState。
+     */
+    const safeLotCurrentPage = Math.min(lotCurrentPage, lotTotalPages);
+
+    /** 當前頁要顯示的地段（已分頁切片） */
+    const paginatedLotEntries = useMemo(() => {
+        const start = (safeLotCurrentPage - 1) * LOT_ITEMS_PER_PAGE;
+        return sortedLotEntries.slice(start, start + LOT_ITEMS_PER_PAGE);
+    }, [sortedLotEntries, safeLotCurrentPage, LOT_ITEMS_PER_PAGE]);
+
     // 從 query 自動開啟對應的 lot 詳情（?lotIdx=<i>）— 供 PropertyForm 的「查看」按鈕在新分頁開啟使用
     useEffect(() => {
         const raw = searchParams?.get('lotIdx');
@@ -1144,14 +1179,26 @@ export default function RentalPropertyPage() {
                                     </div>
                                 )}
 
-                                {/* 出租地段（卡片顯示：圖片 + 名稱 + 備註） */}
+                                {/* 出租地段（卡片顯示：圖片 + 名稱 + 備註）— 每頁顯示 4 個，分頁切換 */}
                                 {sortedLotEntries.length > 0 && (
                                     <div className="p-4 bg-zinc-50 dark:bg-white/5 rounded-xl border border-zinc-200 dark:border-white/10">
-                                        <p className="text-base font-medium text-zinc-700 dark:text-white/80 mb-3">{t('Rented Lots', '出租地段')}</p>
+                                        <div className="flex items-center justify-between mb-3 gap-2 flex-wrap">
+                                            <p className="text-base font-medium text-zinc-700 dark:text-white/80">
+                                                {t('Rented Lots', '出租地段')}
+                                                <span className="ml-2 text-xs font-normal text-zinc-500 dark:text-white/50">
+                                                    （共 {sortedLotEntries.length} 個地段）
+                                                </span>
+                                            </p>
+                                            {lotTotalPages > 1 && (
+                                                <p className="text-xs text-zinc-500 dark:text-white/40">
+                                                    第 {safeLotCurrentPage} / {lotTotalPages} 頁
+                                                </p>
+                                            )}
+                                        </div>
                                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                                            {sortedLotEntries.map((entry, idx) => (
+                                            {paginatedLotEntries.map((entry, idx) => (
                                                 <div
-                                                    key={idx}
+                                                    key={`${safeLotCurrentPage}-${idx}`}
                                                     className="flex items-center gap-3 p-3 bg-white dark:bg-white/5 rounded-xl border border-zinc-200 dark:border-white/10 hover:border-purple-300 dark:hover:border-purple-500/40 transition-colors cursor-pointer group"
                                                     onClick={() => setViewLotEntry(entry)}
                                                 >
@@ -1182,6 +1229,56 @@ export default function RentalPropertyPage() {
                                                 </div>
                                             ))}
                                         </div>
+
+                                        {/* 分頁按鈕 — 僅在多於一頁時顯示 */}
+                                        {lotTotalPages > 1 && (
+                                            <div className="flex items-center justify-center gap-1.5 sm:gap-2 mt-4 pt-3 border-t border-zinc-200 dark:border-white/10">
+                                                {/* 上一頁 */}
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setLotCurrentPage(p => Math.max(1, p - 1))}
+                                                    disabled={safeLotCurrentPage === 1}
+                                                    aria-label={t('Previous page', '上一頁')}
+                                                    className="inline-flex items-center gap-1 px-2.5 sm:px-3 py-1.5 text-xs sm:text-sm font-medium rounded-lg border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/5 text-zinc-700 dark:text-white/80 hover:bg-zinc-100 dark:hover:bg-white/10 disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer"
+                                                >
+                                                    <ChevronLeft className="w-3.5 h-3.5" />
+                                                    <span className="hidden sm:inline">{t('Prev', '上一頁')}</span>
+                                                </button>
+
+                                                {/* 頁碼按鈕 */}
+                                                {Array.from({ length: lotTotalPages }, (_, i) => i + 1).map(pageNum => {
+                                                    const isActive = pageNum === safeLotCurrentPage;
+                                                    return (
+                                                        <button
+                                                            key={pageNum}
+                                                            type="button"
+                                                            onClick={() => setLotCurrentPage(pageNum)}
+                                                            aria-label={t(`Go to page ${pageNum}`, `前往第 ${pageNum} 頁`)}
+                                                            aria-current={isActive ? 'page' : undefined}
+                                                            className={`min-w-8 sm:min-w-9 px-2 sm:px-3 py-1.5 text-xs sm:text-sm font-semibold rounded-lg border transition-colors cursor-pointer ${
+                                                                isActive
+                                                                    ? 'bg-purple-500 border-purple-500 text-white shadow-sm'
+                                                                    : 'bg-white dark:bg-white/5 border-zinc-200 dark:border-white/10 text-zinc-700 dark:text-white/80 hover:bg-zinc-100 dark:hover:bg-white/10'
+                                                            }`}
+                                                        >
+                                                            {pageNum}
+                                                        </button>
+                                                    );
+                                                })}
+
+                                                {/* 下一頁 */}
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setLotCurrentPage(p => Math.min(lotTotalPages, p + 1))}
+                                                    disabled={safeLotCurrentPage === lotTotalPages}
+                                                    aria-label={t('Next page', '下一頁')}
+                                                    className="inline-flex items-center gap-1 px-2.5 sm:px-3 py-1.5 text-xs sm:text-sm font-medium rounded-lg border border-zinc-200 dark:border-white/10 bg-white dark:bg-white/5 text-zinc-700 dark:text-white/80 hover:bg-zinc-100 dark:hover:bg-white/10 disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer"
+                                                >
+                                                    <span className="hidden sm:inline">{t('Next', '下一頁')}</span>
+                                                    <ChevronRight className="w-3.5 h-3.5" />
+                                                </button>
+                                            </div>
+                                        )}
                                     </div>
                                 )}
 
