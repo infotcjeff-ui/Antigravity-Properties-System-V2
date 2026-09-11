@@ -59,6 +59,21 @@ export default function RentalPage() {
     const [galleryIndex, setGalleryIndex] = useState(0);
     const [sortOption, setSortOption] = useState<'newest' | 'area_asc' | 'area_desc'>('newest');
     const ITEMS_PER_PAGE = 12;
+    // 偵測是否為桌面版面（≥lg, 1024px）以決定列表點擊行為：
+    //   - 桌面：點擊列表只更新右側 Property Detail Panel 選中狀態
+    //   - 行動裝置：右側 Property Detail Panel 隱藏，點擊列表直接導向 `/rental/{id}` 頁面
+    const [isDesktop, setIsDesktop] = useState<boolean>(() => {
+        if (typeof window === 'undefined') return false;
+        return window.matchMedia('(min-width: 1024px)').matches;
+    });
+
+    useEffect(() => {
+        if (typeof window === 'undefined') return;
+        const mql = window.matchMedia('(min-width: 1024px)');
+        const handler = (e: MediaQueryListEvent) => setIsDesktop(e.matches);
+        mql.addEventListener('change', handler);
+        return () => mql.removeEventListener('change', handler);
+    }, []);
 
     const getPropertyCreatedAtTime = (property: Property) => {
         const createdAt = property.createdAt;
@@ -291,7 +306,7 @@ export default function RentalPage() {
             ) : viewMode === 'list' ? (
                     <div className="flex flex-col lg:flex-row flex-1 min-h-0 lg:overflow-hidden bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-white/10 overflow-hidden">
                     {/* Left: scrollable property list */}
-                    <div className="w-full lg:w-2/5 xl:w-2/5 shrink-0 border-b lg:border-b-0 lg:border-r border-zinc-200 dark:border-white/10 overflow-y-auto max-h-[35vh] lg:max-h-none">
+                    <div className="w-full lg:w-2/5 xl:w-2/5 shrink-0 border-b lg:border-b-0 lg:border-r border-zinc-200 dark:border-white/10 overflow-y-auto lg:max-h-none max-h-[60vh]">
                         <div className="px-3 py-2 bg-zinc-50 dark:bg-white/5 sticky top-0 z-10">
                             <div className="flex items-center justify-between">
                                 <p className="text-sm font-semibold text-zinc-600 dark:text-white/60">
@@ -313,14 +328,22 @@ export default function RentalPage() {
                         </div>
                         <div>
                             {filteredProperties.map((property, index) => (
-                                <button
+                                <Link
                                     key={property.id}
-                                    onClick={() => setSelectedPropertyId(property.id ?? null)}
-                                    className={`w-full text-left px-3 py-3 transition-all cursor-pointer ${
-                                        selectedPropertyId === property.id
-                                            ? 'bg-purple-500/5 dark:bg-purple-500/10 border-l-2 border-purple-500'
-                                            : 'hover:bg-zinc-50 dark:hover:bg-white/5 border-l-2 border-transparent'
-                                    }`}
+                                    href={`/rental/${property.id}`}
+                                    onClick={(e) => {
+                                        // 桌面：攔截點擊，改為更新右側 Property Detail Panel 的選中狀態
+                                        // 行動裝置：右側 Property Detail Panel 隱藏，允許 Link 正常導向 `/rental/{id}` 頁面
+                                        if (isDesktop) {
+                                            e.preventDefault();
+                                            setSelectedPropertyId(property.id ?? null);
+                                        }
+                                    }}
+                                    className={`block w-full text-left px-3 py-3 transition-all cursor-pointer border-l-2 border-transparent ${
+                                        index % 2 === 1
+                                            ? 'bg-zinc-100/60 dark:bg-white/[0.04]'
+                                            : ''
+                                    } hover:bg-zinc-200/70 dark:hover:bg-white/10`}
                                 >
                                     <div className="flex gap-3">
                                         {/* Thumbnail */}
@@ -360,13 +383,13 @@ export default function RentalPage() {
                                             )}
                                         </div>
                                     </div>
-                                </button>
+                                </Link>
                             ))}
                         </div>
                     </div>
 
-                    {/* Right: property detail panel */}
-                    <div className="flex-1 flex flex-col min-h-0 overflow-y-auto rental-page-scroll">
+                    {/* Right: property detail panel (僅桌面 ≥lg 顯示；行動裝置點擊列表會直接導向 `/rental/{id}` 頁面) */}
+                    <div className="hidden lg:flex flex-1 flex-col min-h-0 overflow-y-auto rental-page-scroll">
                         {selectedPropertyId ? (
                             (() => {
                                 const selected = filteredProperties.find(p => p.id === selectedPropertyId) ?? filteredProperties[0] ?? null;

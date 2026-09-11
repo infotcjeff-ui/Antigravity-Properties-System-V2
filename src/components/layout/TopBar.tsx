@@ -215,18 +215,16 @@ export default function TopBar({ onSearch, placeholder = '搜尋...', isAuthenti
                             className="fixed inset-0 left-0 right-auto w-70 max-w-[85vw] bg-white dark:bg-[#0f0f1a] z-50 flex flex-col shadow-2xl overflow-hidden"
                             style={{ paddingTop: 'env(safe-area-inset-top)', paddingBottom: 'env(safe-area-inset-bottom)' }}
                         >
-                            <div className="p-4 pt-6 border-b border-zinc-200 dark:border-white/5 flex items-center justify-between shrink-0">
-                                <div className="flex items-center gap-3">
-                                    <div className="w-10 h-10 rounded-xl bg-linear-to-br from-purple-500 to-blue-600 flex items-center justify-center text-white font-bold">
-                                        {isAdmin ? 'B' : 'P'}
-                                    </div>
-                                    <span className="font-bold text-xl text-zinc-900 dark:text-white">
-                                        {isAdmin ? t('Backend', '後台') : 'PMS'}
-                                    </span>
-                                </div>
-                                <button 
-                                    onClick={() => setShowMobileMenu(false)} 
-                                    className="p-2 rounded-lg hover:bg-zinc-100 dark:hover:bg-white/5 text-zinc-500 dark:text-white/70 cursor-pointer"
+                            <div className="p-4 pt-6 border-b border-zinc-200 dark:border-white/5 flex items-center justify-center gap-3 shrink-0 relative">
+                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                <img
+                                    src="/sitelogo/EasyParking - 橫.png"
+                                    alt="EasyParking"
+                                    className="h-10 w-auto max-w-[60%] object-contain"
+                                />
+                                <button
+                                    onClick={() => setShowMobileMenu(false)}
+                                    className="absolute right-4 top-1/2 -translate-y-1/2 p-2 rounded-lg hover:bg-zinc-100 dark:hover:bg-white/5 text-zinc-500 dark:text-white/70 cursor-pointer"
                                 >
                                     <X className="w-6 h-6" />
                                 </button>
@@ -254,17 +252,8 @@ export default function TopBar({ onSearch, placeholder = '搜尋...', isAuthenti
                                     </>
                                 ) : (
                                     <>
-                                        <MobileNavItem href="/" icon={<Building2 className="w-5 h-5" />} label="物業列表" onClick={() => setShowMobileMenu(false)} />
+                                        <MobileNavItem href="/" icon={<Building2 className="w-5 h-5" />} label="物業" onClick={() => setShowMobileMenu(false)} />
                                         <MobileNavItem href="/rental" icon={<ArrowUpFromLine className="w-5 h-5" />} label="出租" onClick={() => setShowMobileMenu(false)} />
-                                        {isAuthenticated && (
-                                            <>
-                                                <MobileNavItem href="/proprietors" icon={<Users className="w-5 h-5" />} label="業主列表" onClick={() => setShowMobileMenu(false)} />
-                                                <MobileNavItem href="/tenants" icon={<Users className="w-5 h-5" />} label="承租人列表" onClick={() => setShowMobileMenu(false)} />
-                                                <MobileNavItem href="/rent-out" icon={<ArrowUpFromLine className="w-5 h-5" />} label="收租記錄" onClick={() => setShowMobileMenu(false)} />
-                                                <MobileNavItem href="/renting" icon={<ArrowDownToLine className="w-5 h-5" />} label="交租記錄" onClick={() => setShowMobileMenu(false)} />
-                                                <MobileNavItem href="/relations" icon={<Network className="w-5 h-5" />} label="關係圖譜" onClick={() => setShowMobileMenu(false)} />
-                                            </>
-                                        )}
                                     </>
                                 )}
                             </nav>

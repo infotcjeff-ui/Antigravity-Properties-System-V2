@@ -160,6 +160,7 @@ function LotDetailModal({
     parentLocation?: { lat: number; lng: number } | null;
     parentAddress?: string | null;
 }) {
+    const { user } = useAuth();
     const [currentIdx, setCurrentIdx] = useState(0);
     const [activeTab, setActiveTab] = useState<'info' | 'video' | 'plan' | 'map'>('info');
     const [mapLoaded, setMapLoaded] = useState(false);
@@ -221,11 +222,11 @@ function LotDetailModal({
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
-                className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex flex-col"
+                className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm overflow-y-auto"
                 onClick={onClose}
             >
             {/* 關閉按鈕 - 右上角 */}
-            <div className="absolute top-3 right-[70px] z-20">
+            <div className="fixed top-3 right-3 z-20">
                 <button
                     onClick={onClose}
                     className="p-2 bg-white/10 hover:bg-white/20 rounded-full text-white transition-all cursor-pointer backdrop-blur-sm"
@@ -234,18 +235,11 @@ function LotDetailModal({
                 </button>
             </div>
 
-            {/* 頂部狀態欄 */}
-            <div className="shrink-0 px-[70px] py-3 sm:py-4 flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 bg-black/60 backdrop-blur-sm border-b border-white/10">
-                <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
-                    <LotStatusBadge status={entry.lotStatus} variant="dark" />
-                    <h3 className="text-lg sm:text-xl font-bold text-white">{entry.value}</h3>
-                </div>
-            </div>
-
-            {/* 主要內容區域 */}
-            <div className="flex-1 flex flex-col overflow-hidden" onClick={e => e.stopPropagation()}>
-                {/* Tab 導航 - 橫向滾動 */}
-                <div className="shrink-0 px-[70px] py-2 bg-black/40 backdrop-blur-sm border-b border-white/10">
+            {/* 整合區塊：Tab Bar + Tab 內容，浮動置中，半透明黑底 */}
+            <div className="min-h-screen flex items-center justify-center p-4" onClick={e => e.stopPropagation()}>
+                <div className="w-full max-w-full lg:max-w-[1800px] h-[90vh] max-h-[90vh] p-[25px] bg-black/70 backdrop-blur-md rounded-xl overflow-hidden flex flex-col shadow-2xl border border-white/10">
+                {/* Tab 導航 */}
+                <div className="shrink-0 pl-4 pr-14 py-2 border-b border-white/10">
                     <div className="flex gap-1 overflow-x-auto scrollbar-hide">
                         {tabs.map(tab => (
                             <button
@@ -328,6 +322,17 @@ function LotDetailModal({
                                             <div className="absolute bottom-2 left-1/2 -translate-x-1/2 px-3 py-1 bg-black/60 backdrop-blur-sm rounded-full text-white text-xs font-medium">
                                                 {currentIdx + 1} / {entry.media.length}
                                             </div>
+                                            {/* 圖片備註 - 向上移避免擋到頁數顯示 */}
+                                            {entry.media[currentIdx].note && (
+                                                <div className="absolute bottom-14 left-4 max-w-[60%] px-4 py-2.5 bg-black/70 backdrop-blur-md rounded-xl ring-1 ring-white/30 shadow-xl">
+                                                    <div className="flex items-start gap-2">
+                                                        <FileText className="w-4 h-4 mt-0.5 shrink-0 text-white/80" />
+                                                        <p className="text-base sm:text-lg font-semibold text-white whitespace-pre-wrap leading-snug">
+                                                            {entry.media[currentIdx].note}
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                            )}
                                         </div>
                                         {/* 縮圖列 */}
                                         {entry.media.length > 1 && (
@@ -364,7 +369,7 @@ function LotDetailModal({
                                                                         actualIdx === currentIdx ? 'border-white ring-2 ring-white/40' : 'border-white/20 opacity-60 hover:opacity-100'
                                                                     }`}
                                                                 >
-                                                                    <img src={m.u} alt="" className="w-full h-full object-cover" />
+                                                                    <img src={m.u} alt="" className="w-full h-full object-contain" />
                                                                     {/* 縮圖標籤 */}
                                                                     {m.tag && (
                                                                         <div className={`absolute top-2 left-2 px-2.5 py-1 rounded-lg text-sm font-bold shadow-xl backdrop-blur-sm ring-1 ring-white/40 ${
@@ -392,7 +397,7 @@ function LotDetailModal({
                                                 </div>
                                             </div>
                                         )}
-                                    </>
+                                        </>
                                 ) : (
                                     <div className="flex-1 flex flex-col items-center justify-center gap-2 text-white/40 rounded-xl bg-white/5 min-h-48">
                                         <Map className="w-16 h-16" />
@@ -463,12 +468,12 @@ function LotDetailModal({
                                                 )}
                                                 {entry.office && (
                                                     <div className="px-2.5 py-1.5 bg-white/10 rounded-lg border border-white/10">
-                                                        <span className="text-sm font-medium text-white/80">寫字樓</span>
+                                                        <span className="text-sm font-medium text-white/80">辦公室</span>
                                                     </div>
                                                 )}
                                                 {entry.storage && (
                                                     <div className="px-2.5 py-1.5 bg-white/10 rounded-lg border border-white/10">
-                                                        <span className="text-sm font-medium text-white/80">貨倉</span>
+                                                        <span className="text-sm font-medium text-white/80">貯物櫃</span>
                                                     </div>
                                                 )}
                                                 {entry.room && (
@@ -501,7 +506,7 @@ function LotDetailModal({
                                                 <DollarSign className="w-4 h-4 text-amber-400" />
                                                 <span className="text-sm text-amber-200/80 font-semibold">租金</span>
                                             </div>
-                                            {entry.rentPrice ? (
+                                            {entry.rentPrice && user && entry.lotStatus !== 'rented' ? (
                                                 <div className="flex items-baseline gap-1.5">
                                                     <span className="text-3xl sm:text-4xl font-bold text-amber-400 tracking-tight">
                                                         {formatNumberWithCommas(entry.rentPrice)}
@@ -509,7 +514,20 @@ function LotDetailModal({
                                                     <span className="text-base font-medium text-amber-200/70">/ 月</span>
                                                 </div>
                                             ) : (
-                                                <p className="text-3xl sm:text-4xl font-bold text-amber-400/40 tracking-tight">—</p>
+                                                <div className="space-y-2">
+                                                    <p className="text-base text-amber-200/80 leading-relaxed">
+                                                        {entry.lotStatus === 'rented' ? '此地段已出租，欲知此地段詳情，歡迎聯絡我們' : '欲知租約條款詳情，歡迎聯絡我們'}
+                                                    </p>
+                                                    <a
+                                                        href={`https://wa.me/85293280283?text=${encodeURIComponent(`我對「${entry.value}」有興趣，我想了解更多此地段的資料。`)}`}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-semibold rounded-lg transition-colors shadow-sm hover:shadow w-fit"
+                                                    >
+                                                        <img src="/sitelogo/whatsapp-svgrepo-com.svg" alt="" className="w-5 h-5 shrink-0" />
+                                                        <span>WhatsApp 9328 0283</span>
+                                                    </a>
+                                                </div>
                                             )}
                                         </div>
                                     </div>
@@ -582,6 +600,7 @@ function LotDetailModal({
                     )}
                 </div>
             </div>
+                </div>
         </motion.div>
         </>
     );
@@ -794,13 +813,17 @@ export default function RentalPropertyPage() {
                     overflow: hidden;
                 }
                 .rental-page-container {
-                    height: calc(100vh - 4rem - 1rem);
+                    /* 高度 = 視窗高 - TopBar(4rem) - 版面上下內距(pt-6 + pb-6 ≈ 3rem) */
+                    height: calc(100vh - 4rem - 3rem);
+                    max-height: calc(100vh - 4rem - 3rem);
                     overflow: hidden;
                     padding: 0;
                 }
                 @media (min-width: 1024px) {
                     .rental-page-container {
-                        height: 90vh;
+                        /* 桌面：扣掉 TopBar(4rem) + 內距(3rem) = 7rem */
+                        height: calc(100vh - 7rem);
+                        max-height: calc(100vh - 7rem);
                     }
                 }
                 .rental-page-scroll::-webkit-scrollbar {
@@ -869,7 +892,7 @@ export default function RentalPropertyPage() {
             `}</style>
 
             <div className="rental-page-container overflow-hidden">
-            <div className="h-full flex flex-col overflow-y-auto rental-page-scroll safe-area-bottom pt-20 sm:pt-0">
+            <div className="h-full flex flex-col overflow-y-auto rental-page-scroll safe-area-bottom">
             <motion.div initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }}>
 
                 <Link
@@ -1056,20 +1079,24 @@ export default function RentalPropertyPage() {
                             <div className="space-y-4">
                                 {/* 業主 - WhatsApp 聯絡按鈕 */}
                                 <div className="p-4 bg-zinc-50 dark:bg-white/5 rounded-xl border border-zinc-200 dark:border-white/10">
-                                    <div className="flex items-center gap-3">
-                                        <div className="w-12 h-12 rounded-full bg-linear-to-br from-purple-500 to-blue-600 flex items-center justify-center text-white font-semibold text-lg">
-                                            泊
+                                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-3">
+                                        {/* 公司資料（行動/桌面皆為左側主內容） */}
+                                        <div className="flex items-center gap-3 flex-1 min-w-0">
+                                            <div className="w-12 h-12 rounded-full bg-linear-to-br from-purple-500 to-blue-600 flex items-center justify-center text-white font-semibold text-lg shrink-0">
+                                                泊
+                                            </div>
+                                            <div className="flex-1 min-w-0">
+                                                <p className="text-base font-medium text-zinc-900 dark:text-white truncate">泊車易管理有限公司</p>
+                                                <p className="text-sm text-zinc-500">管理公司</p>
+                                            </div>
                                         </div>
-                                        <div className="flex-1">
-                                            <p className="text-base font-medium text-zinc-900 dark:text-white">泊車易管理有限公司</p>
-                                            <p className="text-sm text-zinc-500">管理公司</p>
-                                        </div>
+                                        {/* 聯絡按鈕：行動全寬、桌面縮回原寬置右 */}
                                         <a
                                             href={`https://wa.me/85200000000?text=${encodeURIComponent(`您好，我想查詢泊車易(${property.name})的出租資料。`)}`}
                                             target="_blank"
                                             rel="noopener noreferrer"
                                             aria-label="WhatsApp 聯絡我們"
-                                            className="shrink-0 flex items-center gap-2 px-3 py-2 bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-semibold rounded-lg transition-colors shadow-sm hover:shadow"
+                                            className="flex items-center justify-center gap-2 w-full sm:w-auto sm:shrink-0 px-3 py-2.5 sm:py-2 bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-semibold rounded-lg transition-colors shadow-sm hover:shadow"
                                         >
                                             <img src="/sitelogo/whatsapp-svgrepo-com.svg" alt="" className="w-5 h-5 shrink-0" />
                                             <span>聯絡我們</span>
@@ -1086,18 +1113,13 @@ export default function RentalPropertyPage() {
                                                 <p className="text-base font-normal text-zinc-900 dark:text-white">{formatLotArea(property.lotArea)}</p>
                                             </div>
                                         )}
-                                        {landUseList.length > 0 && (
-                                            <div className="flex-1 min-w-32">
-                                                <p className="text-base font-medium text-zinc-700 dark:text-white/80 mb-2">{t('Land Use', '土地用途')}</p>
-                                                <div className="space-y-2">
-                                                    {landUseList.map((use, idx) => (
-                                                        <p key={idx} className="text-base font-normal text-zinc-900 dark:text-white">
-                                                            {use}
-                                                        </p>
-                                                    ))}
-                                                </div>
-                                            </div>
-                                        )}
+                                        {/* 土地用途（直接寫死 OS 露天貯物） */}
+                                        <div className="flex-1 min-w-32">
+                                            <p className="text-base font-medium text-zinc-700 dark:text-white/80 mb-2">{t('Land Use', '土地用途')}</p>
+                                            <p className="text-base font-normal text-zinc-900 dark:text-white">
+                                                OS 露天貯物
+                                            </p>
+                                        </div>
                                     </div>
                                 )}
 

@@ -6,13 +6,9 @@ import { usePathname, useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
     Building2,
-    Users,
-    Network,
-    ArrowDownToLine,
     ArrowUpFromLine,
     LogOut,
     ChevronDown,
-    Sun,
 } from 'lucide-react';
 import ThemeToggle from './ThemeToggle';
 
