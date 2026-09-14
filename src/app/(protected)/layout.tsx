@@ -73,11 +73,11 @@ export default function ProtectedLayout({
     }, [authChecked, isAuthenticated]);
 
     // Public routes that don't require authentication
-    const publicRoutes = ['/'];
+    const publicRoutes = ['/', '/properties'];
     const isPublicRoute = publicRoutes.includes(pathname);
 
     // Protected routes require authentication
-    const protectedRoutes = ['/proprietors', '/rent-out', '/renting', '/relations', '/rental'];
+    const protectedRoutes = ['/proprietors', '/rent-out', '/renting', '/relations'];
     const isProtectedRoute = protectedRoutes.includes(pathname);
 
     // If on a protected route and not authenticated, redirect to login

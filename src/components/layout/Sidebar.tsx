@@ -21,17 +21,20 @@ interface NavItem {
 }
 
 // All navigation items - some require auth
+// 順序: 出租(上) → 物業(下)
+// 出租 → /  (Home = 出租頁內容)
+// 物業 → /properties
 const navItems: NavItem[] = [
     {
-        label: '物業',
+        label: '出租',
         href: '/',
-        icon: <Building2 className="w-5 h-5" />,
+        icon: <ArrowUpFromLine className="w-5 h-5" />,
         requiresAuth: false,
     },
     {
-        label: '出租',
-        href: '/rental',
-        icon: <ArrowUpFromLine className="w-5 h-5" />,
+        label: '物業',
+        href: '/properties',
+        icon: <Building2 className="w-5 h-5" />,
         requiresAuth: false,
     },
 ];
@@ -55,7 +58,11 @@ export default function Sidebar({ isAuthenticated = false }: SidebarProps) {
 
     const isActive = (href: string) => {
         if (href === '/') {
-            return pathname === '/' || pathname.startsWith('/properties');
+            // 出租：home 與 /rental 路徑下都算 active
+            return pathname === '/' || pathname.startsWith('/rental');
+        }
+        if (href === '/properties') {
+            return pathname === '/properties' || pathname.startsWith('/properties/');
         }
         return pathname === href || pathname.startsWith(href + '/');
     };

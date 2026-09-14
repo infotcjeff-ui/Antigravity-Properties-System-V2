@@ -8,7 +8,7 @@ import 'leaflet/dist/leaflet.css';
 import { Building2 } from 'lucide-react';
 import type { Property } from '@/lib/db';
 import { useTheme } from '@/contexts/ThemeContext';
-import { extractRegionFromAddress, countListingLots } from '@/lib/formatters';
+import { countListingLots } from '@/lib/formatters';
 
 interface PropertyMapProps {
     properties: Property[];
@@ -18,64 +18,24 @@ interface PropertyMapProps {
 const defaultCenter = { lat: 22.3193, lng: 114.1694 };
 
 // Component to handle bounds
-function MapBounds({ clusters }: { clusters: MapRegionCluster[] }) {
+function MapBounds({ properties }: { properties: Property[] }) {
     const map = useMap();
     useEffect(() => {
-        if (clusters.length > 0) {
-            const bounds = new LatLngBounds(clusters.map(c => [c.lat, c.lng]));
+        const locations = properties.filter(p => p.location?.lat && p.location?.lng);
+        if (locations.length > 0) {
+            const bounds = new LatLngBounds(locations.map(p => [p.location!.lat, p.location!.lng]));
             map.fitBounds(bounds, { padding: [50, 50], maxZoom: 16 });
         } else {
             map.setView(defaultCenter, 12);
         }
-    }, [clusters, map]);
+    }, [properties, map]);
     return null;
 }
 
-interface MapRegionCluster {
-    key: string;
-    region: string;
-    lat: number;
-    lng: number;
-    properties: Property[];
-    lotCount: number;
-}
-
-/**
- * 將物業按「地址地區」分組：
- *   - 從 address 抽出地區（如「元朗八鄉」）
- *   - 同一地區共用一個 pin 位置（取平均值）
- *   - lotCount 為該地區所有物業的 listing 狀態地段總數
- */
-function clusterPropertiesByRegion(properties: Property[]): MapRegionCluster[] {
-    const buckets = new Map<string, Property[]>();
-    for (const p of properties) {
-        if (!p.location?.lat || !p.location?.lng) continue;
-        const region = extractRegionFromAddress(p.address) || '其他';
-        const arr = buckets.get(region) ?? [];
-        arr.push(p);
-        buckets.set(region, arr);
-    }
-    const clusters: MapRegionCluster[] = [];
-    for (const [region, props] of buckets.entries()) {
-        const lat = props.reduce((s, p) => s + (p.location?.lat ?? 0), 0) / props.length;
-        const lng = props.reduce((s, p) => s + (p.location?.lng ?? 0), 0) / props.length;
-        const lotCount = props.reduce((s, p) => s + countListingLots(p), 0);
-        clusters.push({
-            key: region,
-            region,
-            lat,
-            lng,
-            properties: props,
-            lotCount,
-        });
-    }
-    return clusters;
-}
-
-// 自訂 Pin：白色圓角 pill，左側地區名，右側紅色 count badge
-const createClusterIcon = (region: string, count: number) => {
+// 自訂 Pin：白色圓角 pill，左側物業名稱，右側紅色 count badge（該物業放租中地段數）
+const createPropertyIcon = (propertyName: string, lotCount: number) => {
     return L.divIcon({
-        className: 'custom-cluster-pin',
+        className: 'custom-property-pin',
         html: `
             <div style="
                 display: inline-flex;
@@ -93,7 +53,7 @@ const createClusterIcon = (region: string, count: number) => {
                 white-space: nowrap;
                 border: 1px solid rgba(0,0,0,0.05);
             ">
-                <span style="max-width: 140px; overflow: hidden; text-overflow: ellipsis;">${escapeHtml(region)}</span>
+                <span style="max-width: 140px; overflow: hidden; text-overflow: ellipsis;">${escapeHtml(propertyName)}</span>
                 <span style="
                     background: linear-gradient(135deg, #ef4444, #f97316);
                     color: #ffffff;
@@ -103,7 +63,7 @@ const createClusterIcon = (region: string, count: number) => {
                     font-weight: 700;
                     min-width: 24px;
                     text-align: center;
-                ">${count}</span>
+                ">${lotCount}</span>
             </div>
             <div style="
                 width: 0;
@@ -130,17 +90,11 @@ export default function PropertyMap({ properties, onPropertyClick }: PropertyMap
     const router = useRouter();
     const { theme } = useTheme();
     const isDark = theme === 'dark';
-    const [selectedCluster, setSelectedCluster] = useState<MapRegionCluster | null>(null);
+    const [selectedProperty, setSelectedProperty] = useState<Property | null>(null);
 
     const propertiesWithLocation = useMemo(() => {
         return properties.filter(p => p.location?.lat && p.location?.lng);
     }, [properties]);
-
-    // 按地區分組：一個地區一個 pin
-    const clusters = useMemo(
-        () => clusterPropertiesByRegion(propertiesWithLocation),
-        [propertiesWithLocation],
-    );
 
     // CartoDB dark matter for dark mode, OpenStreetMap standard for light mode
     const tileUrl = isDark
@@ -149,7 +103,7 @@ export default function PropertyMap({ properties, onPropertyClick }: PropertyMap
 
     return (
         <div className="overflow-hidden bg-white dark:bg-white/5 flex flex-col rounded-2xl" style={{ height: 'calc(100vh - 14rem)', minHeight: '500px' }}>
-            {clusters.length === 0 ? (
+            {propertiesWithLocation.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-16 text-zinc-400 dark:text-white/40 flex-1">
                     <svg className="w-16 h-16 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
@@ -171,69 +125,64 @@ export default function PropertyMap({ properties, onPropertyClick }: PropertyMap
                             url={tileUrl}
                         />
 
-                        <MapBounds clusters={clusters} />
+                        <MapBounds properties={propertiesWithLocation} />
 
-                        {clusters.map((cluster) => (
-                            <Marker
-                                key={cluster.key}
-                                position={[cluster.lat, cluster.lng]}
-                                icon={createClusterIcon(cluster.region, cluster.lotCount)}
-                                eventHandlers={{
-                                    click: () => {
-                                        setSelectedCluster(cluster);
-                                    },
-                                }}
-                            >
-                                <Popup>
-                                    <div className="p-2 min-w-55">
-                                        <div className="flex items-center gap-2 mb-2">
-                                            <span className="text-xs px-2 py-0.5 rounded-full bg-purple-100 text-purple-700 font-semibold">
-                                                {cluster.region}
-                                            </span>
-                                            <span className="text-xs text-zinc-500">
-                                                {cluster.lotCount} 個地段放租中
-                                            </span>
-                                        </div>
-                                        <div className="space-y-2 max-h-60 overflow-y-auto">
-                                            {cluster.properties.map((property) => (
-                                                <div
-                                                    key={property.id}
-                                                    className="rounded-lg border border-zinc-200 dark:border-white/10 overflow-hidden bg-white dark:bg-zinc-800"
-                                                >
-                                                    {property.images && property.images.length > 0 ? (
-                                                        // eslint-disable-next-line @next/next/no-img-element
-                                                        <img
-                                                            src={property.images[0]}
-                                                            alt={property.name}
-                                                            className="w-full h-24 object-cover cursor-pointer hover:opacity-90 transition-opacity"
-                                                            onClick={() => router.push(`/rental/${property.id}`)}
-                                                        />
-                                                    ) : (
-                                                        <div className="w-full h-24 bg-zinc-100 dark:bg-white/5 flex items-center justify-center">
-                                                            <Building2 className="w-6 h-6 text-zinc-300 dark:text-white/20" />
-                                                        </div>
-                                                    )}
-                                                    <div className="p-2">
-                                                        <h4 className="font-semibold text-sm text-zinc-900 dark:text-white truncate">
-                                                            {property.name}
-                                                        </h4>
-                                                        <p className="text-xs text-zinc-500 dark:text-white/40 truncate mt-0.5">
-                                                            {property.address}
-                                                        </p>
-                                                        <div
-                                                            className="mt-2 px-2 py-1 bg-purple-600 text-white text-xs text-center rounded-md font-medium cursor-pointer"
-                                                            onClick={(e) => { e.stopPropagation(); router.push(`/rental/${property.id}`); }}
-                                                        >
-                                                            前往詳情
-                                                        </div>
+                        {propertiesWithLocation.map((property) => {
+                            const lotCount = countListingLots(property);
+                            return (
+                                <Marker
+                                    key={property.id}
+                                    position={[property.location!.lat, property.location!.lng]}
+                                    icon={createPropertyIcon(property.name, lotCount)}
+                                    eventHandlers={{
+                                        click: () => {
+                                            setSelectedProperty(property);
+                                        },
+                                    }}
+                                >
+                                    <Popup>
+                                        <div className="p-2 min-w-55">
+                                            <div className="flex items-center gap-2 mb-2">
+                                                <span className="text-xs px-2 py-0.5 rounded-full bg-purple-100 text-purple-700 font-semibold truncate max-w-50">
+                                                    {property.name}
+                                                </span>
+                                                <span className="text-xs text-zinc-500 shrink-0">
+                                                    {lotCount} 個地段放租中
+                                                </span>
+                                            </div>
+                                            <div
+                                                className="rounded-lg border border-zinc-200 dark:border-white/10 overflow-hidden bg-white dark:bg-zinc-800"
+                                            >
+                                                {property.images && property.images.length > 0 ? (
+                                                    // eslint-disable-next-line @next/next/no-img-element
+                                                    <img
+                                                        src={property.images[0]}
+                                                        alt={property.name}
+                                                        className="w-full h-24 object-cover cursor-pointer hover:opacity-90 transition-opacity"
+                                                        onClick={() => router.push(`/rental/${property.id}`)}
+                                                    />
+                                                ) : (
+                                                    <div className="w-full h-24 bg-zinc-100 dark:bg-white/5 flex items-center justify-center">
+                                                        <Building2 className="w-6 h-6 text-zinc-300 dark:text-white/20" />
+                                                    </div>
+                                                )}
+                                                <div className="p-2">
+                                                    <p className="text-xs text-zinc-500 dark:text-white/40 truncate mt-0.5">
+                                                        {property.address}
+                                                    </p>
+                                                    <div
+                                                        className="mt-2 px-2 py-1 bg-purple-600 text-white text-xs text-center rounded-md font-medium cursor-pointer"
+                                                        onClick={(e) => { e.stopPropagation(); router.push(`/rental/${property.id}`); }}
+                                                    >
+                                                        前往詳情
                                                     </div>
                                                 </div>
-                                            ))}
+                                            </div>
                                         </div>
-                                    </div>
-                                </Popup>
-                            </Marker>
-                        ))}
+                                    </Popup>
+                                </Marker>
+                            );
+                        })}
                     </MapContainer>
                 </div>
             )}
@@ -256,7 +205,7 @@ export default function PropertyMap({ properties, onPropertyClick }: PropertyMap
                             border: '1px solid rgba(0,0,0,0.05)',
                         }}
                     >
-                        <span>地區</span>
+                        <span>物業名稱</span>
                         <span
                             style={{
                                 background: 'linear-gradient(135deg, #ef4444, #f97316)',
@@ -267,23 +216,23 @@ export default function PropertyMap({ properties, onPropertyClick }: PropertyMap
                                 fontWeight: 700,
                             }}
                         >
-                            數量
+                            放租地段數
                         </span>
                     </span>
                 </div>
                 <span className="text-xs text-zinc-500 dark:text-white/40 ml-auto">
-                    點擊 pin 查看該地區的物業列表
+                    點擊 pin 查看該物業詳情
                 </span>
             </div>
             <style jsx global>{`
                 .leaflet-container {
                     z-index: 0 !important;
                 }
-                .custom-cluster-pin {
+                .custom-property-pin {
                     background: none !important;
                     border: none !important;
                 }
-                .custom-cluster-pin > div {
+                .custom-property-pin > div {
                     pointer-events: auto;
                 }
             `}</style>
