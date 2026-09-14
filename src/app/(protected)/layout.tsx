@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import Sidebar from '@/components/layout/Sidebar';
 import TopBar from '@/components/layout/TopBar';
@@ -14,6 +14,7 @@ export default function ProtectedLayout({
     children: React.ReactNode;
 }) {
     const pathname = usePathname();
+    const router = useRouter();
     const [isAuthenticated, setIsAuthenticated] = useState(false);
     const [authChecked, setAuthChecked] = useState(false);
 
@@ -81,10 +82,14 @@ export default function ProtectedLayout({
 
     // If on a protected route and not authenticated, redirect to login
     useEffect(() => {
-        if (!authChecked && isProtectedRoute && !isAuthenticated) {
-            window.location.href = '/login';
+        // 只有在 auth 檢查完成後仍未通過且位於受保護路徑時，才執行跳轉。
+        // 修正：原本條件 `!authChecked && isProtectedRoute && !isAuthenticated`
+        // 在初次載入時（authChecked=false, isAuthenticated=false）會誤判為
+        // 「未登入」而立即跳轉到 /login，導致頁面重新整理並出現閃爍。
+        if (authChecked && isProtectedRoute && !isAuthenticated) {
+            router.replace('/login');
         }
-    }, [authChecked, isProtectedRoute, isAuthenticated]);
+    }, [authChecked, isProtectedRoute, isAuthenticated, router]);
 
     if (!authChecked) {
         return (

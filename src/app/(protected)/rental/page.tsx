@@ -8,7 +8,7 @@ import { parsePropertyLotSegments, parseLotEntries } from '@/lib/formatters';
 import PropertyCard from '@/components/properties/PropertyCard';
 import PropertyMapDynamic from '@/components/properties/PropertyMapDynamic';
 import Link from 'next/link';
-import { Building2, Grid3X3, Map, List, Search, ChevronLeft, ChevronRight, ArrowUpFromLine, MapPin, Maximize2, Ruler, Tag, ArrowRight, X, ChevronDown } from 'lucide-react';
+import { Building2, Grid3X3, Map, List, Search, ChevronLeft, ChevronRight, MapPin, Maximize2, Ruler, Tag, ArrowRight, X, ChevronDown, Hash } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 
 type ViewMode = 'grid' | 'list' | 'map';
@@ -47,17 +47,47 @@ function countRentedLotsForProperty(property: Property): number {
     return rentedLotSet.size;
 }
 
+/**
+ * 計算單一物業的「放租中地段數」。
+ * 直接從 lotIndex 的 lotStatus 欄位計算：
+ *   - lotStatus === 'listing' → 放租中（計入）
+ *   - 其他狀態 → 不計入
+ * 與屬性頁面地塊狀態標籤邏輯一致。
+ * 放租中地段以 set 去重。
+ */
+function countListingLotsForProperty(property: Property): number {
+    if (!property.lotIndex) return 0;
+    const entries = parseLotEntries(property.lotIndex);
+    const listingLotSet = new Set<string>();
+    for (const entry of entries) {
+        if (entry.lotStatus === 'listing') {
+            const stripped = entry.value.replace(/^(?:A01-|B01-|C01-|C04-|C21-|C33-|A02-|A01-P|B01-P|C01-E|C04-E|C21-E|C33-E|A02-P)-/i, '').trim();
+            listingLotSet.add(stripped);
+        }
+    }
+    return listingLotSet.size;
+}
+
 export default function RentalPage() {
     const { data: qProperties, isLoading: qLoading } = usePropertiesQuery({ bypassIsolation: true });
-    const { isAuthenticated, user } = useAuth();
-    const userDisplayName = user?.displayName || user?.username || '';
+    const { isAuthenticated } = useAuth();
     const [viewMode, setViewMode] = useState<ViewMode>('list');
     const [searchQuery, setSearchQuery] = useState('');
+    const [searchSelected, setSearchSelected] = useState<Property | null>(null);
+    const [searchFocused, setSearchFocused] = useState(false);
     const [currentPage, setCurrentPage] = useState(1);
     const [selectedPropertyId, setSelectedPropertyId] = useState<string | null>(null);
     const [galleryOpen, setGalleryOpen] = useState(false);
     const [galleryIndex, setGalleryIndex] = useState(0);
-    const [sortOption, setSortOption] = useState<'newest' | 'area_asc' | 'area_desc'>('newest');
+    const [sortOption, setSortOption] = useState<'default' | 'newest' | 'area_asc' | 'area_desc'>('default');
+    const [sortDropdownOpen, setSortDropdownOpen] = useState(false);
+
+    const sortOptions: { value: typeof sortOption; label: string }[] = [
+        { value: 'default', label: '預設排序' },
+        { value: 'newest', label: '最近新增' },
+        { value: 'area_asc', label: '面積 (小 > 大)' },
+        { value: 'area_desc', label: '面積 (大 > 小)' },
+    ];
     const ITEMS_PER_PAGE = 12;
     // 偵測是否為桌面版面（≥lg, 1024px）以決定列表點擊行為：
     //   - 桌面：點擊列表只更新右側 Property Detail Panel 選中狀態
@@ -95,32 +125,35 @@ export default function RentalPage() {
             return status.split(',').map(s => s.trim()).includes('renting');
         });
         switch (sortOption) {
+            case 'newest':
+                return filtered.sort((a, b) => getPropertyCreatedAtTime(a) - getPropertyCreatedAtTime(b));
             case 'area_asc':
                 return filtered.sort((a, b) => Number(a.lotArea || 0) - Number(b.lotArea || 0));
             case 'area_desc':
                 return filtered.sort((a, b) => Number(b.lotArea || 0) - Number(a.lotArea || 0));
-            default: // 'newest'
-                return filtered.sort((a, b) => getPropertyCreatedAtTime(a) - getPropertyCreatedAtTime(b));
+            default: // 'default' - 保持原始順序
+                return filtered;
         }
     }, [qProperties, sortOption]);
 
     const filteredProperties = useMemo(() => {
-        if (!searchQuery) return properties;
-        const query = searchQuery.toLowerCase();
-        return properties.filter(
-            p =>
-                p.name.toLowerCase().includes(query) ||
-                p.code.toLowerCase().includes(query) ||
-                p.address.toLowerCase().includes(query)
-        );
-    }, [properties, searchQuery]);
+        if (!searchSelected) return properties;
+        return properties.filter(p => p.id === searchSelected.id);
+    }, [properties, searchSelected]);
 
-    useEffect(() => {
-        setCurrentPage(1);
-        if (viewMode === 'list') {
-            setSelectedPropertyId(null);
-        }
-    }, [searchQuery]);
+    // 搜尋匹配（至少 2 個字才開始匹配）
+    const searchMatches = useMemo(() => {
+        if (searchQuery.length < 2) return [];
+        const query = searchQuery.toLowerCase();
+        return properties
+            .filter(
+                p =>
+                    p.name.toLowerCase().includes(query) ||
+                    p.code.toLowerCase().includes(query) ||
+                    (p.address || '').toLowerCase().includes(query)
+            )
+            .slice(0, 8);
+    }, [searchQuery, properties]);
 
     useEffect(() => {
         if (viewMode === 'list' && filteredProperties.length > 0 && !selectedPropertyId) {
@@ -156,80 +189,194 @@ export default function RentalPage() {
 
             {/* Page header */}
             <div className="flex flex-wrap items-center justify-between gap-4 shrink-0">
-                <div>
-                    <h1 className="text-3xl font-bold text-zinc-900 dark:text-white flex items-center gap-3">
-                        <ArrowUpFromLine className="w-8 h-8" />
-                        出租
-                    </h1>
-                    <p className="text-zinc-500 dark:text-white/50 mt-1">
-                        {userDisplayName ? `${userDisplayName}，` : ''}查看出租中的物業。
-                    </p>
-                </div>
-
-                {/* Search */}
-                <div className="relative" style={{ minWidth: '280px' }}>
-                    <div className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 dark:text-white/30">
-                        <Search className="w-5 h-5" />
+                <div className="flex items-center gap-4 w-[60%]">
+                    {/* 搜尋欄：輸入 ≥2 個字才顯示下拉選單，選擇後才篩選 listing（即時不過濾） */}
+                    <div className="relative flex-1">
+                        <div className="relative">
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400 dark:text-white/40 pointer-events-none" />
+                            <input
+                                type="text"
+                                value={searchQuery}
+                                onChange={(e) => {
+                                    setSearchQuery(e.target.value);
+                                    // 重新輸入時清空先前的選中狀態（避免舊篩選殘留）
+                                    if (searchSelected) setSearchSelected(null);
+                                }}
+                                onFocus={() => setSearchFocused(true)}
+                                onBlur={() => {
+                                    // 延遲關閉，讓點擊 dropdown 項目能正確觸發
+                                    setTimeout(() => setSearchFocused(false), 150);
+                                }}
+                                placeholder="搜尋物業名稱 / 編號 / 地址（至少 2 個字）"
+                                className="w-full pl-10 pr-10 py-2.5 text-base bg-zinc-100 dark:bg-white/5 border border-zinc-200 dark:border-white/10 text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-white/30 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500/30 focus:border-purple-500/40"
+                            />
+                            {searchQuery && (
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setSearchQuery('');
+                                        setSearchSelected(null);
+                                    }}
+                                    className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded-md text-zinc-400 dark:text-white/40 hover:bg-zinc-200 dark:hover:bg-white/10 hover:text-zinc-700 dark:hover:text-white cursor-pointer"
+                                    aria-label="清除搜尋"
+                                >
+                                    <X className="w-4 h-4" />
+                                </button>
+                            )}
+                        </div>
+                        {/* 下拉選單：≥2 個字且 focus 時顯示 */}
+                        {searchFocused && searchQuery.length >= 2 && (
+                            <div className="absolute top-full left-0 right-0 mt-1 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-white/10 rounded-xl shadow-lg overflow-hidden z-50">
+                                {searchMatches.length > 0 ? (
+                                    <ul className="max-h-64 overflow-y-auto py-1">
+                                        {searchMatches.map((p) => (
+                                            <li key={p.id}>
+                                                <button
+                                                    type="button"
+                                                    onMouseDown={(e) => {
+                                                        e.preventDefault();
+                                                        setSearchSelected(p);
+                                                        setSearchQuery(p.name);
+                                                        setSearchFocused(false);
+                                                    }}
+                                                    className="w-full text-left px-3 py-2 hover:bg-zinc-100 dark:hover:bg-white/10 cursor-pointer"
+                                                >
+                                                    <div className="text-sm font-medium text-zinc-900 dark:text-white truncate">
+                                                        {p.name}
+                                                    </div>
+                                                    <div className="text-xs text-zinc-500 dark:text-white/40 truncate">
+                                                        {p.code} · {p.address || '未設定地址'}
+                                                    </div>
+                                                </button>
+                                            </li>
+                                        ))}
+                                    </ul>
+                                ) : (
+                                    <div className="px-3 py-3 text-sm text-zinc-500 dark:text-white/40 text-center">
+                                        沒有符合的物業
+                                    </div>
+                                )}
+                            </div>
+                        )}
                     </div>
-                    <input
-                        type="text"
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        placeholder={isAuthenticated ? "搜尋出租物業..." : "登入以使用搜尋"}
-                        disabled={!isAuthenticated}
-                        className={`w-full pl-10 pr-4 py-2.5 bg-zinc-100 dark:bg-white/5 border border-zinc-200 dark:border-white/10 rounded-xl text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-purple-500/30 ${!isAuthenticated ? 'opacity-50 cursor-not-allowed' : ''}`}
-                    />
-                </div>
 
-                {/* View Toggle */}
-                <div className="flex items-center bg-zinc-100 dark:bg-white/5 rounded-xl p-1">
+                    {/* 以地圖搜尋按鈕 */}
                     <button
-                        onClick={() => setViewMode('grid')}
-                        className={`px-4 py-2 rounded-lg transition-all flex items-center gap-2 cursor-pointer ${viewMode === 'grid'
-                            ? 'bg-purple-500 text-white'
-                            : 'text-zinc-600 dark:text-white/60 hover:text-zinc-900 dark:hover:text-white'
-                            }`}
-                    >
-                        <Grid3X3 className="w-4 h-4" />
-                        <span className="text-sm">網格</span>
-                    </button>
-                    <button
-                        onClick={() => setViewMode('list')}
-                        className={`px-4 py-2 rounded-lg transition-all flex items-center gap-2 cursor-pointer ${viewMode === 'list'
-                            ? 'bg-purple-500 text-white'
-                            : 'text-zinc-600 dark:text-white/60 hover:text-zinc-900 dark:hover:text-white'
-                            }`}
-                    >
-                        <List className="w-4 h-4" />
-                        <span className="text-sm">列表</span>
-                    </button>
-                    <button
-                        onClick={() => isAuthenticated && setViewMode('map')}
-                        className={`px-4 py-2 rounded-lg transition-all flex items-center gap-2 ${viewMode === 'map'
-                            ? 'bg-purple-500 text-white'
-                            : isAuthenticated
-                                ? 'text-zinc-600 dark:text-white/60 hover:text-zinc-900 dark:hover:text-white cursor-pointer'
-                                : 'text-zinc-300 dark:text-white/20 cursor-not-allowed'
-                            }`}
-                        title={!isAuthenticated ? '請先登入以使用地圖模式' : ''}
+                        type="button"
+                        onClick={() => setViewMode('map')}
+                        className="shrink-0 flex items-center gap-2 px-4 py-2.5 text-base font-medium bg-purple-600 hover:bg-purple-700 text-white rounded-xl transition-colors cursor-pointer"
                     >
                         <Map className="w-4 h-4" />
-                        <span className="text-sm">地圖</span>
+                        以地圖搜尋
                     </button>
                 </div>
             </div>
 
             {/* Content */}
-            <div className="flex-1 min-h-0 lg:overflow-hidden">
-            {qLoading ? (
-                <div className="flex items-center justify-center" style={{ height: '100%' }}>
-                    <motion.div
-                        animate={{ opacity: [0.3, 1, 0.3] }}
-                        transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut" }}
-                        className="w-10 h-10 rounded-full bg-purple-500"
-                    />
+            <div className="flex-1 min-h-0 flex flex-col lg:overflow-hidden">
+                {/* Common header（所有 view 模式共用） */}
+                <div className="px-3 py-2 bg-zinc-50 dark:bg-white/5 border-b border-zinc-100 dark:border-white/5 shrink-0">
+                    <div className="flex items-center justify-between gap-3 flex-wrap">
+                        <p className="text-sm font-semibold text-zinc-600 dark:text-white/60 flex items-baseline">
+                            <span className="text-base font-bold text-purple-600 dark:text-purple-400 mr-1">{filteredProperties.length}</span>
+                            <span className="font-normal">個出租地段</span>
+                        </p>
+                        <div className="flex items-center gap-3">
+                            {/* 排序 */}
+                            <div className="flex items-center gap-1.5">
+                                <span className="text-sm text-zinc-500 dark:text-white/50">排序</span>
+                                <div className="relative">
+                                    <button
+                                        type="button"
+                                        onClick={() => setSortDropdownOpen((v) => !v)}
+                                        onBlur={() => setTimeout(() => setSortDropdownOpen(false), 150)}
+                                        className="flex items-center gap-1.5 pl-2.5 pr-2 py-1 text-sm bg-zinc-100 dark:bg-white/10 border border-zinc-200 dark:border-white/10 text-zinc-600 dark:text-white/60 rounded-lg cursor-pointer hover:bg-zinc-200 dark:hover:bg-white/15 focus:outline-none focus:ring-2 focus:ring-purple-500/30"
+                                    >
+                                        <span>{sortOptions.find((o) => o.value === sortOption)?.label}</span>
+                                        <ChevronDown className="w-3.5 h-3.5" />
+                                    </button>
+                                    {sortDropdownOpen && (
+                                        <div className="absolute top-full right-0 mt-1 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-white/10 rounded-xl shadow-lg overflow-hidden z-50 min-w-full whitespace-nowrap">
+                                            <ul className="py-1">
+                                                {sortOptions.map((o) => (
+                                                    <li key={o.value}>
+                                                        <button
+                                                            type="button"
+                                                            onMouseDown={(e) => {
+                                                                e.preventDefault();
+                                                                setSortOption(o.value);
+                                                                setSortDropdownOpen(false);
+                                                            }}
+                                                            className={`w-full text-left px-3 py-1.5 text-sm cursor-pointer hover:bg-zinc-100 dark:hover:bg-white/10 ${sortOption === o.value
+                                                                ? 'bg-purple-50 dark:bg-purple-500/10 text-purple-600 dark:text-purple-300 font-medium'
+                                                                : 'text-zinc-700 dark:text-white/70'
+                                                                }`}
+                                                        >
+                                                            {o.label}
+                                                        </button>
+                                                    </li>
+                                                ))}
+                                            </ul>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                            {/* 排列（icon-only tabs） */}
+                            <div className="flex items-center gap-1.5">
+                                <span className="text-sm text-zinc-500 dark:text-white/50">排列</span>
+                                <div className="flex items-center bg-zinc-100 dark:bg-white/5 rounded-lg p-0.5">
+                                    <button
+                                        type="button"
+                                        onClick={() => setViewMode('grid')}
+                                        title="網格"
+                                        className={`p-1.5 rounded-md transition-all cursor-pointer ${(viewMode as ViewMode) === 'grid'
+                                            ? 'bg-purple-500 text-white'
+                                            : 'text-zinc-600 dark:text-white/60 hover:text-zinc-900 dark:hover:text-white'
+                                            }`}
+                                    >
+                                        <Grid3X3 className="w-4 h-4" />
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setViewMode('list')}
+                                        title="列表"
+                                        className={`p-1.5 rounded-md transition-all cursor-pointer ${(viewMode as ViewMode) === 'list'
+                                            ? 'bg-purple-500 text-white'
+                                            : 'text-zinc-600 dark:text-white/60 hover:text-zinc-900 dark:hover:text-white'
+                                            }`}
+                                    >
+                                        <List className="w-4 h-4" />
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => isAuthenticated && setViewMode('map')}
+                                        title={!isAuthenticated ? '請先登入以使用地圖模式' : '地圖'}
+                                        className={`p-1.5 rounded-md transition-all ${(viewMode as ViewMode) === 'map'
+                                            ? 'bg-purple-500 text-white'
+                                            : isAuthenticated
+                                                ? 'text-zinc-600 dark:text-white/60 hover:text-zinc-900 dark:hover:text-white cursor-pointer'
+                                                : 'text-zinc-300 dark:text-white/20 cursor-not-allowed'
+                                            }`}
+                                    >
+                                        <Map className="w-4 h-4" />
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
-            ) : viewMode === 'grid' ? (
+
+                {/* View-specific container */}
+                <div className="flex-1 min-h-0 lg:overflow-hidden">
+                {qLoading ? (
+                    <div className="flex items-center justify-center h-full">
+                        <motion.div
+                            animate={{ opacity: [0.3, 1, 0.3] }}
+                            transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut" }}
+                            className="w-10 h-10 rounded-full bg-purple-500"
+                        />
+                    </div>
+                ) : viewMode === 'grid' ? (
                 <div className="flex-1 min-h-0 overflow-y-auto rental-page-scroll space-y-6 pr-1">
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 lg:gap-6 content-start">
                         {paginatedProperties.length === 0 ? (
@@ -306,26 +453,7 @@ export default function RentalPage() {
             ) : viewMode === 'list' ? (
                     <div className="flex flex-col lg:flex-row flex-1 min-h-0 lg:overflow-hidden bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-white/10 overflow-hidden">
                     {/* Left: scrollable property list */}
-                    <div className="w-full lg:w-2/5 xl:w-2/5 shrink-0 border-b lg:border-b-0 lg:border-r border-zinc-200 dark:border-white/10 overflow-y-auto lg:max-h-none max-h-[60vh]">
-                        <div className="px-3 py-2 bg-zinc-50 dark:bg-white/5 sticky top-0 z-10">
-                            <div className="flex items-center justify-between">
-                                <p className="text-sm font-semibold text-zinc-600 dark:text-white/60">
-                                    {filteredProperties.length} 項出租
-                                </p>
-                                <div className="relative">
-                                    <select
-                                        value={sortOption}
-                                        onChange={(e) => setSortOption(e.target.value as typeof sortOption)}
-                                        className="appearance-none pl-2 pr-7 py-1 text-xs bg-zinc-100 dark:bg-white/10 border border-zinc-200 dark:border-white/10 text-zinc-600 dark:text-white/60 rounded-lg cursor-pointer focus:outline-none focus:ring-2 focus:ring-purple-500/30"
-                                    >
-                                        <option value="newest">最近新增</option>
-                                        <option value="area_asc">面積 (小 &gt; 大)</option>
-                                        <option value="area_desc">面積 (大 &gt; 小)</option>
-                                    </select>
-                                    <ChevronDown className="absolute right-1.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-zinc-400 dark:text-white/40 pointer-events-none" />
-                                </div>
-                            </div>
-                        </div>
+                    <div className="w-full lg:w-3/5 xl:w-3/5 shrink-0 border-b lg:border-b-0 lg:border-r border-zinc-200 dark:border-white/10 overflow-y-auto lg:max-h-none max-h-[60vh]">
                         <div>
                             {filteredProperties.map((property, index) => (
                                 <Link
@@ -345,9 +473,9 @@ export default function RentalPage() {
                                             : ''
                                     } hover:bg-zinc-200/70 dark:hover:bg-white/10`}
                                 >
-                                    <div className="flex gap-3">
+                                    <div className="flex gap-5 items-center">
                                         {/* Thumbnail */}
-                                        <div className="w-20 h-20 rounded-xl overflow-hidden bg-zinc-100 dark:bg-white/5 shrink-0 flex items-center justify-center">
+                                        <div className="w-[192px] h-[108px] rounded-xl overflow-hidden bg-zinc-100 dark:bg-white/5 shrink-0 flex items-center justify-center">
                                             {property.images && property.images.length > 0 ? (
                                                 // eslint-disable-next-line @next/next/no-img-element
                                                 <img
@@ -361,26 +489,19 @@ export default function RentalPage() {
                                         </div>
                                         {/* Info */}
                                         <div className="flex-1 min-w-0">
-                                            <div className="flex items-start justify-between gap-2">
-                                                <div className="min-w-0">
-                                                    <p className="text-base font-semibold text-zinc-900 dark:text-white truncate">
-                                                        {property.name}
-                                                    </p>
-                                                </div>
-                                                <span className="px-2 py-0.5 text-xs rounded-full bg-blue-500/10 text-blue-500 dark:bg-blue-500/20 dark:text-blue-400 font-medium shrink-0">
-                                                    出租中
-                                                </span>
+                                            <div className="min-w-0">
+                                                <p className="text-xl font-semibold text-zinc-900 dark:text-white truncate">
+                                                    {property.name}
+                                                </p>
                                             </div>
-                                            <div className="flex items-center gap-1 mt-2 text-sm text-zinc-500 dark:text-white/50">
+                                            <div className="flex items-center gap-1 mt-2 text-base text-zinc-500 dark:text-white/50">
                                                 <MapPin className="w-3.5 h-3.5 shrink-0" />
                                                 <span className="truncate">{property.address || '未設定地址'}</span>
                                             </div>
-                                            {property.lotArea && (
-                                                <div className="flex items-center gap-1 mt-1 text-xs text-zinc-400 dark:text-white/40">
-                                                    <Maximize2 className="w-3 h-3 shrink-0" />
-                                                    <span>{property.lotArea} 平方呎</span>
-                                                </div>
-                                            )}
+                                            <div className="flex items-center gap-1 mt-2 text-sm text-zinc-400 dark:text-white/40">
+                                                <Hash className="w-3 h-3 shrink-0" />
+                                                <span>{countListingLotsForProperty(property)} 個地段放租中</span>
+                                            </div>
                                         </div>
                                     </div>
                                 </Link>
@@ -459,6 +580,11 @@ export default function RentalPage() {
                                         <div className="flex-1 min-h-0 overflow-y-auto p-3 sm:p-4 flex flex-col gap-2.5 rental-page-scroll">
                                             {/* Address */}
                                             <div className="shrink-0">
+                                                {selected.name && (
+                                                    <h2 className="text-lg font-medium text-zinc-900 dark:text-white mb-1">
+                                                        {selected.name}
+                                                    </h2>
+                                                )}
                                                 <p className="text-sm sm:text-base text-zinc-600 dark:text-white/80 leading-snug">
                                                     地址 :{' '}
                                                     {selected.address ? (
@@ -475,7 +601,6 @@ export default function RentalPage() {
                                                     )}
                                                 </p>
                                             </div>
-
                                             {/* Lot Index - Rental Area Count */}
                                             {(() => {
                                                 const allLots = getPropertyLots(selected);
@@ -585,6 +710,7 @@ export default function RentalPage() {
                     <p className="text-lg font-medium">請先登入以使用地圖模式</p>
                 </div>
             )}
+                </div>
             </div>
 
             {/* Gallery Popup */}

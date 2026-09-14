@@ -419,3 +419,73 @@ export function dedupeRecordsByDisplayName<
         return true;
     });
 }
+
+/**
+ * 從香港地址中抽取「完整地區名稱」（用於右側詳情標題）。
+ * 香港地址常見格式：
+ *   - "新界元朗八鄉輞台山紅毛潭6號" → "元朗八鄉輞台山紅毛潭"
+ *   - "新界沙田火炭坳背灣街..."   → "沙田火炭坳背灣"
+ *   - "九龍尖沙咀廣東道..."       → "尖沙咀"
+ *   - "香港中環皇后大道中..."     → "中環"
+ *   - "橫台山散村 Wang Toi Shan Shan Tsuen" → "橫台山散村"
+ *
+ * 規則：
+ *   1. 移除常見前綴（新界/九龍/香港島/香港）
+ *   2. 取到第一個「停止字」（路/街/道/邨/樓/號/座/大廈/苑/閣/中心/花園/廣場/商場/會所/屋苑/洋房/別墅/廈/徑）或英文/數字為止
+ *   3. 若無停止字，取首段中文
+ *   4. 限制最多 8 字避免過長
+ */
+export function extractRegionFromAddress(address: string | null | undefined): string {
+    if (!address?.trim()) return '';
+    let text = address.trim();
+
+    // 移除常見前綴
+    text = text.replace(/^(?:新界|九龍|香港島|香港)\s*/u, '');
+
+    // 停止字 + 英數字視為結束點
+    const stopRegex = /[路街道邨樓號座大廈苑閣中心花園廣場商場會所屋苑洋房別墅廈徑]|[A-Za-z0-9]/u;
+    const stopIndex = text.search(stopRegex);
+
+    let region: string;
+    if (stopIndex > 0) {
+        region = text.slice(0, stopIndex).trim();
+    } else {
+        const match = text.match(/^[\u4e00-\u9fff]+/u);
+        region = match ? match[0] : text;
+    }
+
+    // 限制最多 8 字
+    return region.slice(0, 8).trim();
+}
+
+/**
+ * 從香港地址中抽取「大範圍地區前綴」（新界/九龍/香港島/香港）— 已停用
+ * 現改回使用 `extractRegionFromAddress` 進行子地區抽取。
+ */
+
+/**
+ * 計算單一物業的「放租中地段數」。
+ * 規則（與 rental/page.tsx 之 countListingLotsForProperty 一致）：
+ *   - lotStatus === 'listing' → 放租中（計入）
+ *   - 其他狀態 → 不計入
+ *   - 移除常見物業前綴（如 A01-LOT001 → LOT001、C33-ER033 → ER033），避免同地段被多筆重複計算
+ *   - 結果以 Set 去重
+ *
+ * 注意：alternatives 採「長度遞減」排序，確保 "A01-P" 在 "A01-" 之前先匹配。
+ * 同時不採用 "C33-E" 等會與 "C33-ER033" 衝突的「字母尾」前綴，
+ * 改為統一以基礎前綴 "C33-" 處理 C33 物業（涵蓋 "C33-ER033" / "C33-E001" 等格式）。
+ */
+const PROPERTY_CODE_PREFIX_PATTERN = /^(?:A02-P|A01-P|B01-P|A02-|A01-|B01-|C01-|C04-|C21-|C33-)/i;
+
+export function countListingLots(property: { lotIndex?: string | null }): number {
+    if (!property.lotIndex) return 0;
+    const entries = parseLotEntries(property.lotIndex);
+    const lotSet = new Set<string>();
+    for (const entry of entries) {
+        if (entry.lotStatus === 'listing') {
+            const stripped = entry.value.replace(PROPERTY_CODE_PREFIX_PATTERN, '').trim();
+            lotSet.add(stripped);
+        }
+    }
+    return lotSet.size;
+}

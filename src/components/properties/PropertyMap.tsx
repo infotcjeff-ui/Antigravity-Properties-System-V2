@@ -2,11 +2,13 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { MapContainer, TileLayer, Marker, Popup, Circle, useMap } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import L, { LatLngBounds } from 'leaflet';
 import 'leaflet/dist/leaflet.css';
+import { Building2 } from 'lucide-react';
 import type { Property } from '@/lib/db';
 import { useTheme } from '@/contexts/ThemeContext';
+import { extractRegionFromAddress, countListingLots } from '@/lib/formatters';
 
 interface PropertyMapProps {
     properties: Property[];
@@ -16,62 +18,129 @@ interface PropertyMapProps {
 const defaultCenter = { lat: 22.3193, lng: 114.1694 };
 
 // Component to handle bounds
-function MapBounds({ properties }: { properties: Property[] }) {
+function MapBounds({ clusters }: { clusters: MapRegionCluster[] }) {
     const map = useMap();
     useEffect(() => {
-        const locations = properties.filter(p => p.location?.lat && p.location?.lng);
-        if (locations.length > 0) {
-            const bounds = new LatLngBounds(locations.map(p => [p.location!.lat, p.location!.lng]));
+        if (clusters.length > 0) {
+            const bounds = new LatLngBounds(clusters.map(c => [c.lat, c.lng]));
             map.fitBounds(bounds, { padding: [50, 50], maxZoom: 16 });
         } else {
             map.setView(defaultCenter, 12);
         }
-    }, [properties, map]);
+    }, [clusters, map]);
     return null;
 }
 
-const statusColors: Record<string, string> = {
-    holding: '#10b981',
-    renting: '#3b82f6',
-    sold: '#6b7280',
-    suspended: '#ef4444',
-};
+interface MapRegionCluster {
+    key: string;
+    region: string;
+    lat: number;
+    lng: number;
+    properties: Property[];
+    lotCount: number;
+}
 
-// Custom Marker Icon 
-const createIcon = (color: string) => {
+/**
+ * 將物業按「地址地區」分組：
+ *   - 從 address 抽出地區（如「元朗八鄉」）
+ *   - 同一地區共用一個 pin 位置（取平均值）
+ *   - lotCount 為該地區所有物業的 listing 狀態地段總數
+ */
+function clusterPropertiesByRegion(properties: Property[]): MapRegionCluster[] {
+    const buckets = new Map<string, Property[]>();
+    for (const p of properties) {
+        if (!p.location?.lat || !p.location?.lng) continue;
+        const region = extractRegionFromAddress(p.address) || '其他';
+        const arr = buckets.get(region) ?? [];
+        arr.push(p);
+        buckets.set(region, arr);
+    }
+    const clusters: MapRegionCluster[] = [];
+    for (const [region, props] of buckets.entries()) {
+        const lat = props.reduce((s, p) => s + (p.location?.lat ?? 0), 0) / props.length;
+        const lng = props.reduce((s, p) => s + (p.location?.lng ?? 0), 0) / props.length;
+        const lotCount = props.reduce((s, p) => s + countListingLots(p), 0);
+        clusters.push({
+            key: region,
+            region,
+            lat,
+            lng,
+            properties: props,
+            lotCount,
+        });
+    }
+    return clusters;
+}
+
+// 自訂 Pin：白色圓角 pill，左側地區名，右側紅色 count badge
+const createClusterIcon = (region: string, count: number) => {
     return L.divIcon({
-        className: 'custom-pin',
+        className: 'custom-cluster-pin',
         html: `
-            <svg viewBox="0 0 24 24" fill="${color}" stroke="white" stroke-width="2" style="width: 32px; height: 32px; filter: drop-shadow(0 4px 6px rgba(0,0,0,0.2));">
-                <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z" />
-            </svg>
+            <div style="
+                display: inline-flex;
+                align-items: center;
+                gap: 8px;
+                background: #ffffff;
+                color: #1f2937;
+                padding: 6px 10px 6px 12px;
+                border-radius: 9999px;
+                box-shadow: 0 4px 12px rgba(0, 0, 0, 0.18);
+                font-family: inherit;
+                font-size: 12px;
+                font-weight: 600;
+                line-height: 1;
+                white-space: nowrap;
+                border: 1px solid rgba(0,0,0,0.05);
+            ">
+                <span style="max-width: 140px; overflow: hidden; text-overflow: ellipsis;">${escapeHtml(region)}</span>
+                <span style="
+                    background: linear-gradient(135deg, #ef4444, #f97316);
+                    color: #ffffff;
+                    padding: 3px 8px;
+                    border-radius: 9999px;
+                    font-size: 11px;
+                    font-weight: 700;
+                    min-width: 24px;
+                    text-align: center;
+                ">${count}</span>
+            </div>
+            <div style="
+                width: 0;
+                height: 0;
+                margin: 0 auto;
+                border-left: 6px solid transparent;
+                border-right: 6px solid transparent;
+                border-top: 8px solid #ffffff;
+                margin-top: -2px;
+                filter: drop-shadow(0 2px 2px rgba(0, 0, 0, 0.1));
+            "></div>
         `,
-        iconSize: [32, 32],
-        iconAnchor: [16, 32],
-        popupAnchor: [0, -32]
+        iconSize: [120, 40],
+        iconAnchor: [60, 40],
+        popupAnchor: [0, -40],
     });
 };
+
+function escapeHtml(s: string): string {
+    return s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
+}
 
 export default function PropertyMap({ properties, onPropertyClick }: PropertyMapProps) {
     const router = useRouter();
     const { theme } = useTheme();
     const isDark = theme === 'dark';
-    const [selectedProperty, setSelectedProperty] = useState<Property | null>(null);
+    const [selectedCluster, setSelectedCluster] = useState<MapRegionCluster | null>(null);
 
     const propertiesWithLocation = useMemo(() => {
         return properties.filter(p => p.location?.lat && p.location?.lng);
     }, [properties]);
 
-    // Mock Hotspots: For this implementation, we will artificially add a hotspot circle around each property to show "density/interest"
-    const hotspots = useMemo(() => {
-        return propertiesWithLocation.map(p => ({
-            id: `hotspot-${p.id}`,
-            lat: p.location!.lat,
-            lng: p.location!.lng,
-            radius: 200,
-            color: statusColors[p.status] || '#8b5cf6'
-        }));
-    }, [propertiesWithLocation]);
+    // 按地區分組：一個地區一個 pin
+    const clusters = useMemo(
+        () => clusterPropertiesByRegion(propertiesWithLocation),
+        [propertiesWithLocation],
+    );
 
     // CartoDB dark matter for dark mode, OpenStreetMap standard for light mode
     const tileUrl = isDark
@@ -80,7 +149,7 @@ export default function PropertyMap({ properties, onPropertyClick }: PropertyMap
 
     return (
         <div className="overflow-hidden bg-white dark:bg-white/5 flex flex-col rounded-2xl" style={{ height: 'calc(100vh - 14rem)', minHeight: '500px' }}>
-            {propertiesWithLocation.length === 0 ? (
+            {clusters.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-16 text-zinc-400 dark:text-white/40 flex-1">
                     <svg className="w-16 h-16 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
@@ -102,89 +171,66 @@ export default function PropertyMap({ properties, onPropertyClick }: PropertyMap
                             url={tileUrl}
                         />
 
-                        <MapBounds properties={propertiesWithLocation} />
+                        <MapBounds clusters={clusters} />
 
-                        {hotspots.map(spot => (
-                            <Circle
-                                key={spot.id}
-                                center={[spot.lat, spot.lng]}
-                                radius={spot.radius}
-                                pathOptions={{
-                                    color: spot.color,
-                                    fillColor: spot.color,
-                                    fillOpacity: 0.2,
-                                    weight: 1
-                                }}
-                            />
-                        ))}
-
-                        {propertiesWithLocation.map((property) => (
+                        {clusters.map((cluster) => (
                             <Marker
-                                key={property.id}
-                                position={[property.location!.lat, property.location!.lng]}
-                                icon={createIcon(statusColors[property.status] || '#8b5cf6')}
+                                key={cluster.key}
+                                position={[cluster.lat, cluster.lng]}
+                                icon={createClusterIcon(cluster.region, cluster.lotCount)}
                                 eventHandlers={{
                                     click: () => {
-                                        setSelectedProperty(property);
+                                        setSelectedCluster(cluster);
                                     },
                                 }}
                             >
                                 <Popup>
-                                        <div className="p-1 min-w-50 cursor-pointer">
-                                            {property.images && property.images.length > 0 ? (
-                                                // eslint-disable-next-line @next/next/no-img-element
-                                                <img
-                                                    src={property.images[0]}
-                                                    alt={property.name}
-                                                    className="w-full h-28 object-cover rounded-lg mb-2 cursor-pointer hover:opacity-90 transition-opacity"
-                                                    onClick={() => router.push(`/rental/${property.id}`)}
-                                                />
-                                            ) : null}
-                                            <h3 className="font-semibold text-base text-zinc-900">{property.name}</h3>
-                                            <div className="flex items-center gap-1 mt-1">
-                                                <svg className="w-3.5 h-3.5 text-zinc-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                                    <path strokeLinecap="round" strokeLinejoin="round" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                                                    <path strokeLinecap="round" strokeLinejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                                                </svg>
-                                                <p className="text-sm text-zinc-600 line-clamp-2">{property.address}</p>
-                                            </div>
-                                            {(property.lotArea || property.lotIndex) && (
-                                                <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-zinc-500">
-                                                    {property.lotArea && (
-                                                        <span className="flex items-center gap-1">
-                                                            <span className="font-medium">面積:</span>
-                                                            <span>{property.lotArea} 平方呎</span>
-                                                        </span>
-                                                    )}
-                                                    {property.lotIndex && (
-                                                        <span className="flex items-center gap-1">
-                                                            <span className="font-medium">地段:</span>
-                                                            <span>共 {
-                                                                property.lotIndex
-                                                                    .split(/\n/)
-                                                                    .map(p => p.trim())
-                                                                    .filter(p => p.length > 0)
-                                                                    .length
-                                                            } 個</span>
-                                                        </span>
-                                                    )}
-                                                </div>
-                                            )}
-                                            <div className="mt-3 flex items-center gap-2">
-                                                <span
-                                                    className="px-2 py-0.5 rounded text-[10px] font-bold text-white uppercase tracking-wider"
-                                                    style={{ backgroundColor: statusColors[property.status] }}
-                                                >
-                                                    {property.status === 'holding' ? '持有中' : property.status === 'renting' ? '出租中' : property.status === 'sold' ? '已售出' : '已暫停'}
-                                                </span>
-                                            </div>
-                                            <div
-                                                className="mt-3 px-2 py-1.5 bg-purple-600 text-white text-xs text-center rounded-lg font-medium"
-                                                onClick={(e) => { e.stopPropagation(); router.push(`/rental/${property.id}`); }}
-                                            >
-                                                前往詳情
-                                            </div>
+                                    <div className="p-2 min-w-55">
+                                        <div className="flex items-center gap-2 mb-2">
+                                            <span className="text-xs px-2 py-0.5 rounded-full bg-purple-100 text-purple-700 font-semibold">
+                                                {cluster.region}
+                                            </span>
+                                            <span className="text-xs text-zinc-500">
+                                                {cluster.lotCount} 個地段放租中
+                                            </span>
                                         </div>
+                                        <div className="space-y-2 max-h-60 overflow-y-auto">
+                                            {cluster.properties.map((property) => (
+                                                <div
+                                                    key={property.id}
+                                                    className="rounded-lg border border-zinc-200 dark:border-white/10 overflow-hidden bg-white dark:bg-zinc-800"
+                                                >
+                                                    {property.images && property.images.length > 0 ? (
+                                                        // eslint-disable-next-line @next/next/no-img-element
+                                                        <img
+                                                            src={property.images[0]}
+                                                            alt={property.name}
+                                                            className="w-full h-24 object-cover cursor-pointer hover:opacity-90 transition-opacity"
+                                                            onClick={() => router.push(`/rental/${property.id}`)}
+                                                        />
+                                                    ) : (
+                                                        <div className="w-full h-24 bg-zinc-100 dark:bg-white/5 flex items-center justify-center">
+                                                            <Building2 className="w-6 h-6 text-zinc-300 dark:text-white/20" />
+                                                        </div>
+                                                    )}
+                                                    <div className="p-2">
+                                                        <h4 className="font-semibold text-sm text-zinc-900 dark:text-white truncate">
+                                                            {property.name}
+                                                        </h4>
+                                                        <p className="text-xs text-zinc-500 dark:text-white/40 truncate mt-0.5">
+                                                            {property.address}
+                                                        </p>
+                                                        <div
+                                                            className="mt-2 px-2 py-1 bg-purple-600 text-white text-xs text-center rounded-md font-medium cursor-pointer"
+                                                            onClick={(e) => { e.stopPropagation(); router.push(`/rental/${property.id}`); }}
+                                                        >
+                                                            前往詳情
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
                                 </Popup>
                             </Marker>
                         ))}
@@ -194,23 +240,51 @@ export default function PropertyMap({ properties, onPropertyClick }: PropertyMap
 
             {/* Legend */}
             <div className="p-4 border-t border-zinc-100 dark:border-white/5 flex items-center gap-4 flex-wrap bg-white dark:bg-zinc-900 relative z-10 shrink-0 rounded-b-2xl">
-                <span className="text-zinc-500 dark:text-white/50 text-xs font-medium uppercase tracking-wider">狀態:</span>
-                {Object.entries(statusColors).map(([status, color]) => (
-                    <div key={status} className="flex items-center gap-2">
-                        <div className="w-2.5 h-2.5 rounded-full shadow-sm" style={{ backgroundColor: color }} />
-                        <span className="text-zinc-700 dark:text-white/70 text-sm capitalize font-medium">
-                            {status === 'holding' ? '持有中' : status === 'renting' ? '出租中' : status === 'sold' ? '已售出' : '已暫停'}
+                <span className="text-zinc-500 dark:text-white/50 text-xs font-medium uppercase tracking-wider">圖例:</span>
+                <div className="flex items-center gap-2">
+                    <span
+                        style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                            background: '#ffffff',
+                            color: '#1f2937',
+                            padding: '4px 8px',
+                            borderRadius: '9999px',
+                            fontSize: '11px',
+                            fontWeight: 600,
+                            border: '1px solid rgba(0,0,0,0.05)',
+                        }}
+                    >
+                        <span>地區</span>
+                        <span
+                            style={{
+                                background: 'linear-gradient(135deg, #ef4444, #f97316)',
+                                color: '#fff',
+                                padding: '2px 6px',
+                                borderRadius: '9999px',
+                                fontSize: '10px',
+                                fontWeight: 700,
+                            }}
+                        >
+                            數量
                         </span>
-                    </div>
-                ))}
+                    </span>
+                </div>
+                <span className="text-xs text-zinc-500 dark:text-white/40 ml-auto">
+                    點擊 pin 查看該地區的物業列表
+                </span>
             </div>
             <style jsx global>{`
                 .leaflet-container {
                     z-index: 0 !important;
                 }
-                .custom-pin {
-                    background: none;
-                    border: none;
+                .custom-cluster-pin {
+                    background: none !important;
+                    border: none !important;
+                }
+                .custom-cluster-pin > div {
+                    pointer-events: auto;
                 }
             `}</style>
         </div>

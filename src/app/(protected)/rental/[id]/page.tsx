@@ -222,22 +222,26 @@ function LotDetailModal({
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
-                className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm overflow-y-auto"
+                className="fixed inset-0 z-50 bg-gradient-to-br from-black/55 via-zinc-900/45 to-black/55 backdrop-blur-md overflow-y-auto"
                 onClick={onClose}
             >
             {/* 關閉按鈕 - 右上角 */}
             <div className="fixed top-3 right-3 z-20">
                 <button
                     onClick={onClose}
-                    className="p-2 bg-white/10 hover:bg-white/20 rounded-full text-white transition-all cursor-pointer backdrop-blur-sm"
+                    className="p-2 bg-white/20 hover:bg-white/30 rounded-full text-white transition-all cursor-pointer backdrop-blur-md ring-1 ring-white/30"
                 >
                     <X className="w-5 h-5 sm:w-6 sm:h-6" />
                 </button>
             </div>
 
-            {/* 整合區塊：Tab Bar + Tab 內容，浮動置中，半透明黑底 */}
+            {/* 整合區塊：Tab Bar + Tab 內容，浮動置中，深色玻璃感 */}
             <div className="min-h-screen flex items-center justify-center p-4" onClick={e => e.stopPropagation()}>
-                <div className="w-full max-w-full lg:max-w-[1800px] h-[90vh] max-h-[90vh] p-[25px] bg-black/70 backdrop-blur-md rounded-xl overflow-hidden flex flex-col shadow-2xl border border-white/10">
+                <div className="relative w-full max-w-full lg:max-w-[1800px] h-[90vh] max-h-[90vh] p-[25px] bg-gradient-to-br from-zinc-900/70 via-zinc-900/60 to-zinc-900/70 backdrop-blur-2xl rounded-2xl overflow-hidden flex flex-col shadow-[0_8px_60px_-12px_rgba(0,0,0,0.6)] border border-white/15 ring-1 ring-inset ring-white/10">
+                {/* 玻璃高光：頂部柔光 */}
+                <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/35 to-transparent" />
+                {/* 玻璃高光：左側柔光 */}
+                <div className="pointer-events-none absolute inset-y-0 left-0 w-px bg-gradient-to-b from-transparent via-white/15 to-transparent" />
                 {/* Tab 導航 */}
                 <div className="shrink-0 pl-4 pr-14 py-2 border-b border-white/10">
                     <div className="flex gap-1 overflow-x-auto scrollbar-hide">

@@ -6,7 +6,7 @@ import { motion } from 'framer-motion';
 import { Building2, MapPin, Eye } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import type { Property } from '@/lib/db';
-import { formatLotArea, formatLotIndexPlainJoined } from '@/lib/formatters';
+import { formatLotArea, parseLotEntries } from '@/lib/formatters';
 
 interface PropertyCardProps {
     property: Property;
@@ -40,7 +40,6 @@ const typeLabels: Record<string, string> = {
 export default function PropertyCard({ property, index = 0, basePath = '/properties', showOnlyStatus }: PropertyCardProps) {
     const { isAuthenticated } = useAuth();
     const [imageError, setImageError] = useState(false);
-    const lotPlainJoined = property.lotIndex ? formatLotIndexPlainJoined(property.lotIndex) : '';
 
     const cardContent = (
         <motion.div
@@ -119,22 +118,19 @@ export default function PropertyCard({ property, index = 0, basePath = '/propert
                 )}
 
                 {/* Footer with Lot Info */}
-                {(property.lotIndex || property.lotArea) && (
-                    <div className="mt-3 pt-3 border-t border-white/5 flex gap-4 text-xs text-white/40">
-                        {property.lotIndex && (
-                            <div className="min-w-0 flex-1 overflow-hidden" title={lotPlainJoined}>
-                                <span
-                                    className={`block truncate text-white/70 ${!isAuthenticated ? 'blur-sm' : ''}`}
-                                >
-                                    地段: {lotPlainJoined}
-                                </span>
-                            </div>
-                        )}
-                        {property.lotArea && (
-                            <span className={`shrink-0 ${!isAuthenticated ? 'blur-sm' : ''}`}>面積: <span className="text-white/70">{formatLotArea(property.lotArea)}</span></span>
-                        )}
-                    </div>
-                )}
+                {property.lotIndex && (() => {
+                    const entries = parseLotEntries(property.lotIndex);
+                    const listingCount = entries.filter(e => e.lotStatus === 'listing').length;
+                    if (listingCount === 0) return null;
+                    return (
+                        <div className="mt-3 pt-3 border-t border-white/5 text-xs text-white/40">
+                            <span className={`${!isAuthenticated ? 'blur-sm' : ''}`}>
+                                <span className="text-purple-400 font-semibold">{listingCount}</span>
+                                {' '}個地段放租中
+                            </span>
+                        </div>
+                    );
+                })()}
             </div>
         </motion.div>
     );

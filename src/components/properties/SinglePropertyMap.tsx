@@ -5,12 +5,14 @@ import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import type { Property } from '@/lib/db';
 import { useTheme } from '@/contexts/ThemeContext';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 interface SinglePropertyMapProps {
     property: Property;
     onLocationChange?: (lat: number, lng: number) => void;
     interactive?: boolean;
+    /** 是否預設打開 pin 的 popup（toolbox），預設 true */
+    defaultPopupOpen?: boolean;
 }
 
 const statusColors: Record<string, string> = {
@@ -46,11 +48,12 @@ function MapClickHandler({ onLocationChange }: { onLocationChange?: (lat: number
     return null;
 }
 
-export default function SinglePropertyMap({ property, onLocationChange, interactive = false }: SinglePropertyMapProps) {
+export default function SinglePropertyMap({ property, onLocationChange, interactive = false, defaultPopupOpen = true }: SinglePropertyMapProps) {
     const { theme } = useTheme();
     const isDark = theme === 'dark';
     const [center, setCenter] = useState<{ lat: number; lng: number } | null>(null);
     const [loading, setLoading] = useState(true);
+    const markerRef = useRef<L.Marker | null>(null);
 
     useEffect(() => {
         let isMounted = true;
@@ -112,6 +115,15 @@ export default function SinglePropertyMap({ property, onLocationChange, interact
         return () => { isMounted = false; };
     }, [property]);
 
+    // 預設打開 pin 的 popup（toolbox）
+    useEffect(() => {
+        if (!defaultPopupOpen || loading || !center) return;
+        const t = window.setTimeout(() => {
+            markerRef.current?.openPopup();
+        }, 150);
+        return () => window.clearTimeout(t);
+    }, [defaultPopupOpen, loading, center]);
+
     const tileUrl = isDark
         ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
         : 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
@@ -158,6 +170,9 @@ export default function SinglePropertyMap({ property, onLocationChange, interact
                 <Marker
                     position={[center.lat, center.lng]}
                     icon={createIcon(markerColor)}
+                    ref={(ref) => {
+                        if (ref) markerRef.current = ref;
+                    }}
                 >
                     <Popup>
                         <div className="p-1 min-w-[200px]">
