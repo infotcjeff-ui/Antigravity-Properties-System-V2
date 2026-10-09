@@ -453,7 +453,7 @@ export default function RentalPage() {
             ) : viewMode === 'list' ? (
                     <div className="flex flex-col lg:flex-row flex-1 min-h-0 lg:overflow-hidden bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-white/10 overflow-hidden">
                     {/* Left: scrollable property list */}
-                    <div className="w-full lg:w-3/5 xl:w-3/5 shrink-0 border-b lg:border-b-0 lg:border-r border-zinc-200 dark:border-white/10 overflow-y-auto lg:max-h-none max-h-[60vh]">
+                    <div className="w-full lg:w-[55%] xl:w-[55%] shrink-0 border-b lg:border-b-0 lg:border-r border-zinc-200 dark:border-white/10 overflow-y-auto lg:max-h-none max-h-[60vh]">
                         <div>
                             {filteredProperties.map((property, index) => (
                                 <Link
@@ -467,15 +467,15 @@ export default function RentalPage() {
                                             setSelectedPropertyId(property.id ?? null);
                                         }
                                     }}
-                                    className={`block w-full text-left px-3 py-3 transition-all cursor-pointer border-l-2 border-transparent ${
+                                    className={`block w-full text-left px-3 py-2.5 transition-all cursor-pointer border-l-2 border-transparent ${
                                         index % 2 === 1
                                             ? 'bg-zinc-100/60 dark:bg-white/[0.04]'
                                             : ''
                                     } hover:bg-zinc-200/70 dark:hover:bg-white/10`}
                                 >
-                                    <div className="flex gap-5 items-center">
+                                    <div className="flex gap-4 items-center">
                                         {/* Thumbnail */}
-                                        <div className="w-[192px] h-[108px] rounded-xl overflow-hidden bg-zinc-100 dark:bg-white/5 shrink-0 flex items-center justify-center">
+                                        <div className="w-28 h-20 rounded-lg overflow-hidden bg-zinc-100 dark:bg-white/5 shrink-0 flex items-center justify-center">
                                             {property.images && property.images.length > 0 ? (
                                                 // eslint-disable-next-line @next/next/no-img-element
                                                 <img
@@ -484,21 +484,21 @@ export default function RentalPage() {
                                                     className="w-full h-full object-cover"
                                                 />
                                             ) : (
-                                                <Building2 className="w-7 h-7 text-zinc-300 dark:text-white/20" />
+                                                <Building2 className="w-6 h-6 text-zinc-300 dark:text-white/20" />
                                             )}
                                         </div>
                                         {/* Info */}
                                         <div className="flex-1 min-w-0">
                                             <div className="min-w-0">
-                                                <p className="text-xl font-semibold text-zinc-900 dark:text-white truncate">
+                                                <p className="text-base font-semibold text-zinc-900 dark:text-white truncate">
                                                     {property.name}
                                                 </p>
                                             </div>
-                                            <div className="flex items-center gap-1 mt-2 text-base text-zinc-500 dark:text-white/50">
+                                            <div className="flex items-center gap-1 mt-1.5 text-sm text-zinc-500 dark:text-white/50">
                                                 <MapPin className="w-3.5 h-3.5 shrink-0" />
                                                 <span className="truncate">{property.address || '未設定地址'}</span>
                                             </div>
-                                            <div className="flex items-center gap-1 mt-2 text-sm text-zinc-400 dark:text-white/40">
+                                            <div className="flex items-center gap-1 mt-1 text-xs text-zinc-400 dark:text-white/40">
                                                 <Hash className="w-3 h-3 shrink-0" />
                                                 <span>{countListingLotsForProperty(property)} 個地段放租中</span>
                                             </div>

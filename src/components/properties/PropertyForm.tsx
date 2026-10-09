@@ -419,7 +419,16 @@ function LotImageWithTagPicker({
             >
                 ×
             </button>
-            {/* 圖片備註：非編輯時 hover 顯示「備註」按鈕；編輯時顯示大 textarea + 確定/取消 */}
+            {/* 圖片備註：直接顯示在圖片底部（如有備註）；非編輯時 hover 顯示「編輯備註」按鈕；編輯時顯示大 textarea + 確定/取消 */}
+            {onChangeNote && !noteOpen && item.note && (
+                /* 備註內容（半透明黑色背景 + 白色文字，置於底部） */
+                <div
+                    data-lot-image-note
+                    className="absolute left-0 right-0 bottom-0 z-10 px-2 py-1.5 bg-gradient-to-t from-black/85 via-black/70 to-black/0 text-white text-xs leading-snug break-words pointer-events-none"
+                >
+                    <span className="font-semibold">備註:</span>{item.note}
+                </div>
+            )}
             {onChangeNote && (
                 noteOpen ? (
                     /* 備註編輯面板 */
@@ -449,14 +458,14 @@ function LotImageWithTagPicker({
                         </div>
                     </div>
                 ) : (
-                    /* 備註按鈕（hover 時浮現） */
+                    /* 編輯備註按鈕（hover 時浮現於底部右側） */
                     <button
                         type="button"
                         onClick={(e) => { e.stopPropagation(); openNote(); }}
-                        className="absolute bottom-1 left-1/2 -translate-x-1/2 px-3 py-1 bg-black/60 hover:bg-black/80 text-white text-xs font-medium rounded-lg opacity-0 group-hover:opacity-100 transition-opacity z-20 whitespace-nowrap cursor-pointer flex items-center gap-1"
+                        className={`absolute right-1 z-20 px-2 py-1 bg-black/60 hover:bg-black/80 text-white text-xs font-medium rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap cursor-pointer flex items-center gap-1 ${item.note ? 'bottom-9' : 'bottom-1'}`}
                     >
                         <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
-                        {item.note ? '查看備註' : '＋備註'}
+                        編輯備註
                     </button>
                 )
             )}
@@ -4036,21 +4045,21 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                                         {viewLotEntry.media && viewLotEntry.media.length > 0 ? (
                                             <div className="space-y-3">
                                                 <span className="text-sm font-medium text-zinc-500 dark:text-white/50">圖片 ({viewLotEntry.media.length})</span>
-                                                <div className="relative rounded-xl overflow-hidden bg-zinc-100 dark:bg-white/5">
-                                                    <img src={viewLotEntry.media[viewLotImageIdx].u} alt="" className="w-full aspect-square object-contain" />
+                                                <div className="relative rounded-xl overflow-hidden bg-zinc-100 dark:bg-white/5 flex items-center justify-center min-h-64 sm:min-h-80 md:min-h-96 max-h-[60vh]">
+                                                    <img src={viewLotEntry.media[viewLotImageIdx].u} alt="" className="max-w-full max-h-full object-contain" />
                                                     {viewLotEntry.media.length > 1 && (
                                                         <>
                                                             <button
                                                                 type="button"
                                                                 onClick={() => setViewLotImageIdx(i => (i - 1 + viewLotEntry.media!.length) % viewLotEntry.media!.length)}
-                                                                className="absolute left-2 top-1/2 -translate-y-1/2 p-2 bg-black/40 hover:bg-black/60 rounded-full text-white transition-colors cursor-pointer"
+                                                                className="absolute left-2 top-1/2 -translate-y-1/2 p-2 bg-black/40 hover:bg-black/60 rounded-full text-white transition-colors cursor-pointer z-10"
                                                             >
                                                                 <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
                                                             </button>
                                                             <button
                                                                 type="button"
                                                                 onClick={() => setViewLotImageIdx(i => (i + 1) % viewLotEntry.media!.length)}
-                                                                className="absolute right-2 top-1/2 -translate-y-1/2 p-2 bg-black/40 hover:bg-black/60 rounded-full text-white transition-colors cursor-pointer"
+                                                                className="absolute right-2 top-1/2 -translate-y-1/2 p-2 bg-black/40 hover:bg-black/60 rounded-full text-white transition-colors cursor-pointer z-10"
                                                             >
                                                                 <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
                                                             </button>
@@ -4060,6 +4069,18 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                                                                 ))}
                                                             </div>
                                                         </>
+                                                    )}
+                                                    {/* 圖片備註 - icon + title 在第一行，value 在下一行（稍大字體） */}
+                                                    {viewLotEntry.media[viewLotImageIdx].note && (
+                                                        <div className="absolute bottom-12 left-3 right-3 sm:left-4 sm:right-auto sm:max-w-[70%] px-3 py-2 bg-black/70 backdrop-blur-md rounded-xl ring-1 ring-white/30 shadow-lg">
+                                                            <div className="flex items-center gap-1.5">
+                                                                <svg className="w-4 h-4 text-white/80" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                                                                <span className="text-sm font-medium text-white/80">備註</span>
+                                                            </div>
+                                                            <p className="mt-1 text-base font-semibold text-white whitespace-pre-wrap leading-snug">
+                                                                {viewLotEntry.media[viewLotImageIdx].note}
+                                                            </p>
+                                                        </div>
                                                     )}
                                                 </div>
                                                 {viewLotEntry.media.length > 1 && (
@@ -4072,6 +4093,26 @@ export default function PropertyForm({ property, onClose, onSuccess }: PropertyF
                                                                 className={`relative rounded-lg overflow-hidden border-2 transition-all cursor-pointer aspect-square ${idx === viewLotImageIdx ? 'border-purple-500' : 'border-transparent opacity-60 hover:opacity-100'}`}
                                                             >
                                                                 <img src={m.u} alt="" className="w-full h-full object-cover" />
+                                                                {/* 縮圖標籤 (固定 34x28) */}
+                                                                {m.tag && (
+                                                                    <div className={`absolute top-1 left-1 rounded-md text-xs font-bold shadow-lg backdrop-blur-sm ring-1 ring-white/40 flex items-center justify-center ${
+                                                                        m.tag === 'water' ? 'bg-blue-500/90 text-white' :
+                                                                        m.tag === 'electric' ? 'bg-amber-500/90 text-white' :
+                                                                        m.tag === 'toilet' ? 'bg-purple-500/90 text-white' :
+                                                                        m.tag === 'office' ? 'bg-indigo-500/90 text-white' :
+                                                                        m.tag === 'storage' ? 'bg-emerald-500/90 text-white' :
+                                                                        m.tag === 'room' ? 'bg-rose-500/90 text-white' :
+                                                                        'bg-white/80 text-zinc-800'
+                                                                    }`} style={{ width: '34px', height: '28px' }}>
+                                                                        {m.tag === 'water' ? '水' :
+                                                                         m.tag === 'electric' ? '電' :
+                                                                         m.tag === 'toilet' ? '廁' :
+                                                                         m.tag === 'office' ? '辦' :
+                                                                         m.tag === 'storage' ? '貯' :
+                                                                         m.tag === 'room' ? '房' :
+                                                                         m.tag}
+                                                                    </div>
+                                                                )}
                                                             </button>
                                                         ))}
                                                     </div>

@@ -278,33 +278,13 @@ function LotDetailModal({
                                 {entry.media && entry.media.length > 0 ? (
                                     <>
                                         {/* 主圖 */}
-                                        <div className="relative rounded-xl overflow-hidden bg-white/5" style={{ height: 'clamp(200px, 35vw, 700px)' }}>
+                                        <div className="relative rounded-xl overflow-hidden bg-white/5 flex items-center justify-center" style={{ height: 'clamp(200px, 35vw, 700px)' }}>
                                             <img
                                                 src={entry.media[currentIdx].u}
                                                 alt={entry.value}
-                                                className="w-full h-full object-contain"
+                                                className="max-w-full max-h-full object-contain"
                                                 onError={(e) => { e.currentTarget.style.display = 'none'; }}
                                             />
-                                            {/* 圖片標籤 - 左上方 */}
-                                            {entry.media[currentIdx].tag && (
-                                                <div className={`absolute top-4 left-4 px-5 py-2.5 rounded-xl text-base font-bold shadow-xl backdrop-blur-sm ring-1 ring-white/40 ${
-                                                    entry.media[currentIdx].tag === 'water' ? 'bg-blue-500/90 text-white' :
-                                                    entry.media[currentIdx].tag === 'electric' ? 'bg-amber-500/90 text-white' :
-                                                    entry.media[currentIdx].tag === 'toilet' ? 'bg-purple-500/90 text-white' :
-                                                    entry.media[currentIdx].tag === 'office' ? 'bg-indigo-500/90 text-white' :
-                                                    entry.media[currentIdx].tag === 'storage' ? 'bg-emerald-500/90 text-white' :
-                                                    entry.media[currentIdx].tag === 'room' ? 'bg-rose-500/90 text-white' :
-                                                    'bg-white/80 text-zinc-800'
-                                                }`}>
-                                                    {entry.media[currentIdx].tag === 'water' ? '水' :
-                                                     entry.media[currentIdx].tag === 'electric' ? '電' :
-                                                     entry.media[currentIdx].tag === 'toilet' ? '廁所' :
-                                                     entry.media[currentIdx].tag === 'office' ? '辦公室' :
-                                                     entry.media[currentIdx].tag === 'storage' ? '貯物櫃' :
-                                                     entry.media[currentIdx].tag === 'room' ? '房間' :
-                                                     entry.media[currentIdx].tag}
-                                                </div>
-                                            )}
                                             {/* 左右箭頭 */}
                                             {entry.media.length > 1 && (
                                                 <>
@@ -326,15 +306,16 @@ function LotDetailModal({
                                             <div className="absolute bottom-2 left-1/2 -translate-x-1/2 px-3 py-1 bg-black/60 backdrop-blur-sm rounded-full text-white text-xs font-medium">
                                                 {currentIdx + 1} / {entry.media.length}
                                             </div>
-                                            {/* 圖片備註 - 向上移避免擋到頁數顯示 */}
+                                            {/* 圖片備註 - icon + title 在第一行，value 在下一行（稍大字體） */}
                                             {entry.media[currentIdx].note && (
-                                                <div className="absolute bottom-14 left-4 max-w-[60%] px-4 py-2.5 bg-black/70 backdrop-blur-md rounded-xl ring-1 ring-white/30 shadow-xl">
-                                                    <div className="flex items-start gap-2">
-                                                        <FileText className="w-4 h-4 mt-0.5 shrink-0 text-white/80" />
-                                                        <p className="text-base sm:text-lg font-semibold text-white whitespace-pre-wrap leading-snug">
-                                                            {entry.media[currentIdx].note}
-                                                        </p>
+                                                <div className="absolute bottom-14 left-4 max-w-[60%] px-3 py-2 bg-black/70 backdrop-blur-md rounded-xl ring-1 ring-white/30 shadow-xl">
+                                                    <div className="flex items-center gap-1.5">
+                                                        <FileText className="w-4 h-4 text-white/80" />
+                                                        <span className="text-sm font-medium text-white/80">備註</span>
                                                     </div>
+                                                    <p className="mt-1 text-base sm:text-lg font-semibold text-white whitespace-pre-wrap leading-snug">
+                                                        {entry.media[currentIdx].note}
+                                                    </p>
                                                 </div>
                                             )}
                                         </div>
@@ -374,9 +355,9 @@ function LotDetailModal({
                                                                     }`}
                                                                 >
                                                                     <img src={m.u} alt="" className="w-full h-full object-contain" />
-                                                                    {/* 縮圖標籤 */}
+                                                                    {/* 縮圖標籤 (固定 34x28) */}
                                                                     {m.tag && (
-                                                                        <div className={`absolute top-2 left-2 px-2.5 py-1 rounded-lg text-sm font-bold shadow-xl backdrop-blur-sm ring-1 ring-white/40 ${
+                                                                        <div className={`absolute top-1 left-1 rounded-md text-xs font-bold shadow-lg backdrop-blur-sm ring-1 ring-white/40 flex items-center justify-center ${
                                                                             m.tag === 'water' ? 'bg-blue-500/90 text-white' :
                                                                             m.tag === 'electric' ? 'bg-amber-500/90 text-white' :
                                                                             m.tag === 'toilet' ? 'bg-purple-500/90 text-white' :
@@ -384,7 +365,7 @@ function LotDetailModal({
                                                                             m.tag === 'storage' ? 'bg-emerald-500/90 text-white' :
                                                                             m.tag === 'room' ? 'bg-rose-500/90 text-white' :
                                                                             'bg-white/80 text-zinc-800'
-                                                                        }`}>
+                                                                        }`} style={{ width: '34px', height: '28px' }}>
                                                                             {m.tag === 'water' ? '水' :
                                                                              m.tag === 'electric' ? '電' :
                                                                              m.tag === 'toilet' ? '廁' :
@@ -456,33 +437,33 @@ function LotDetailModal({
                                         {(entry.waterMeter || entry.electricMeter || entry.toilet || entry.office || entry.storage || entry.room) ? (
                                             <div className="flex flex-wrap gap-2 sm:gap-3">
                                                 {entry.waterMeter && (
-                                                    <div className="px-2.5 py-1.5 bg-white/10 rounded-lg border border-white/10">
-                                                        <span className="text-sm font-medium text-white/80">水</span>
+                                                    <div className="px-2.5 py-1.5 bg-cyan-500/20 rounded-lg border border-cyan-500/30">
+                                                        <span className="text-sm font-medium text-cyan-400">水</span>
                                                     </div>
                                                 )}
                                                 {entry.electricMeter && (
-                                                    <div className="px-2.5 py-1.5 bg-white/10 rounded-lg border border-white/10">
-                                                        <span className="text-sm font-medium text-white/80">電</span>
+                                                    <div className="px-2.5 py-1.5 bg-amber-500/20 rounded-lg border border-amber-500/30">
+                                                        <span className="text-sm font-medium text-amber-400">電</span>
                                                     </div>
                                                 )}
                                                 {entry.toilet && (
-                                                    <div className="px-2.5 py-1.5 bg-white/10 rounded-lg border border-white/10">
-                                                        <span className="text-sm font-medium text-white/80">廁所</span>
+                                                    <div className="px-2.5 py-1.5 bg-purple-500/20 rounded-lg border border-purple-500/30">
+                                                        <span className="text-sm font-medium text-purple-400">廁所</span>
                                                     </div>
                                                 )}
                                                 {entry.office && (
-                                                    <div className="px-2.5 py-1.5 bg-white/10 rounded-lg border border-white/10">
-                                                        <span className="text-sm font-medium text-white/80">辦公室</span>
+                                                    <div className="px-2.5 py-1.5 bg-indigo-500/20 rounded-lg border border-indigo-500/30">
+                                                        <span className="text-sm font-medium text-indigo-400">辦公室</span>
                                                     </div>
                                                 )}
                                                 {entry.storage && (
-                                                    <div className="px-2.5 py-1.5 bg-white/10 rounded-lg border border-white/10">
-                                                        <span className="text-sm font-medium text-white/80">貯物櫃</span>
+                                                    <div className="px-2.5 py-1.5 bg-emerald-500/20 rounded-lg border border-emerald-500/30">
+                                                        <span className="text-sm font-medium text-emerald-400">貯物櫃</span>
                                                     </div>
                                                 )}
                                                 {entry.room && (
-                                                    <div className="px-2.5 py-1.5 bg-white/10 rounded-lg border border-white/10">
-                                                        <span className="text-sm font-medium text-white/80">房間</span>
+                                                    <div className="px-2.5 py-1.5 bg-rose-500/20 rounded-lg border border-rose-500/30">
+                                                        <span className="text-sm font-medium text-rose-400">房間</span>
                                                     </div>
                                                 )}
                                             </div>
