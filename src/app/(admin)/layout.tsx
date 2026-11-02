@@ -98,8 +98,8 @@ export default function AdminLayout({
 
             {/* Main Content - No margin on mobile, fixed margin on desktop */}
             <div className="flex-1 md:ml-70 min-h-screen flex flex-col transition-all duration-300">
-                {/* TopBar - sticky on desktop so it stays visible while content scrolls */}
-                <div className="md:sticky md:top-0 md:z-30 md:bg-white md:dark:bg-[#0f0f1a]">
+                {/* TopBar - sticky（手機與桌面） */}
+                <div className="sticky top-0 z-30 md:bg-white md:dark:bg-[#0f0f1a]">
                     <TopBar
                         isAuthenticated={isAuthenticated}
                         isAdmin={true}

@@ -83,7 +83,7 @@ export default function PropertiesPage() {
             {/* Filters and View Toggle */}
             <div className="flex flex-wrap items-center gap-4">
                 {/* Search */}
-                <div className="relative flex-1 min-w-[200px]">
+                <div className="relative w-full md:flex-1 md:min-w-[200px]">
                     <div className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 dark:text-white/30">
                         <Search className="w-5 h-5" />
                     </div>
@@ -236,7 +236,7 @@ export default function PropertiesPage() {
                     )}
                 </div>
             ) : (
-                <PropertyMapDynamic properties={filteredProperties} />
+                <PropertyMapDynamic properties={filteredProperties} heightMode="viewport" basePath="/properties" />
             )}
             </SensitiveContent>
         </div>

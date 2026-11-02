@@ -1,30 +1,67 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import L, { LatLngBounds } from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import { Building2 } from 'lucide-react';
+import { Building2, MapPin, AlertTriangle } from 'lucide-react';
 import type { Property } from '@/lib/db';
 import { useTheme } from '@/contexts/ThemeContext';
 import { countListingLots } from '@/lib/formatters';
 
 interface PropertyMapProps {
     properties: Property[];
+    /**
+     * 點擊 pin 時觸發（用於切換頁面 / 選取物業）。
+     * Popup 仍會正常開啟；此回呼為額外動作。
+     */
     onPropertyClick?: (property: Property) => void;
+    /**
+     * 只顯示「出租中」(status 含 renting) 的物業。
+     * 出租頁（/rental）地圖模式使用；物業總覽頁則不傳，顯示全部。
+     */
+    onlyRenting?: boolean;
+    /**
+     * 地圖高度模式：
+     *   - 'fill'（預設）：填滿父容器高度（父容器需有高度）
+     *   - 'viewport'：以視窗高度計算（父容器高度未定時使用）
+     */
+    heightMode?: 'fill' | 'viewport';
+    /** 詳情頁路由前綴（'/rental' 或 '/properties'） */
+    basePath?: string;
 }
 
 const defaultCenter = { lat: 22.3193, lng: 114.1694 };
+
+/** 座標是否可用（避免 lat/lng 為 0 或 NaN 時被誤判為「無座標」） */
+function hasValidLocation(property: Property): boolean {
+    const loc = property.location;
+    if (!loc) return false;
+    return Number.isFinite(loc.lat) && Number.isFinite(loc.lng);
+}
+
+/** status 是否含「出租中」(renting) */
+function isRentingStatus(property: Property): boolean {
+    return String(property.status || '')
+        .split(',')
+        .map(s => s.trim())
+        .includes('renting');
+}
 
 // Component to handle bounds
 function MapBounds({ properties }: { properties: Property[] }) {
     const map = useMap();
     useEffect(() => {
-        const locations = properties.filter(p => p.location?.lat && p.location?.lng);
+        const locations = properties.filter(hasValidLocation);
         if (locations.length > 0) {
+            // 行動裝置使用較小的 padding，避免 pin 被推到地圖邊界外
+            const isNarrow = typeof window !== 'undefined' && window.innerWidth < 640;
             const bounds = new LatLngBounds(locations.map(p => [p.location!.lat, p.location!.lng]));
-            map.fitBounds(bounds, { padding: [50, 50], maxZoom: 16 });
+            map.fitBounds(bounds, {
+                padding: isNarrow ? [24, 24] : [50, 50],
+                maxZoom: 16,
+            });
         } else {
             map.setView(defaultCenter, 12);
         }
@@ -86,33 +123,53 @@ function escapeHtml(s: string): string {
     return s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
 }
 
-export default function PropertyMap({ properties, onPropertyClick }: PropertyMapProps) {
+export default function PropertyMap({ properties, onPropertyClick, onlyRenting = false, heightMode = 'fill', basePath = '/rental' }: PropertyMapProps) {
     const router = useRouter();
     const { theme } = useTheme();
     const isDark = theme === 'dark';
-    const [selectedProperty, setSelectedProperty] = useState<Property | null>(null);
+
+    // 只顯示「出租中」物業（出租頁地圖模式）
+    const rentingProperties = useMemo(() => {
+        if (!onlyRenting) return properties;
+        return properties.filter(isRentingStatus);
+    }, [properties, onlyRenting]);
 
     const propertiesWithLocation = useMemo(() => {
-        return properties.filter(p => p.location?.lat && p.location?.lng);
-    }, [properties]);
+        return rentingProperties.filter(hasValidLocation);
+    }, [rentingProperties]);
+
+    // 有地址但未設定座標的物業（無法在地圖顯示 pin）
+    const propertiesMissingLocation = useMemo(() => {
+        return rentingProperties.filter(p => !hasValidLocation(p));
+    }, [rentingProperties]);
 
     // CartoDB dark matter for dark mode, OpenStreetMap standard for light mode
     const tileUrl = isDark
         ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
         : 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
 
+    // 容器高度：fill 填滿父容器；viewport 以視窗高度計算（響應式）
+    const containerStyle: React.CSSProperties = heightMode === 'viewport'
+        ? { height: 'clamp(320px, calc(100dvh - 16rem), 720px)' }
+        : { height: '100%', minHeight: '320px' };
+
     return (
-        <div className="overflow-hidden bg-white dark:bg-white/5 flex flex-col rounded-2xl" style={{ height: 'calc(100vh - 14rem)', minHeight: '500px' }}>
+        <div
+            className="overflow-hidden bg-white dark:bg-white/5 flex flex-col rounded-2xl w-full"
+            style={containerStyle}
+        >
             {propertiesWithLocation.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-16 text-zinc-400 dark:text-white/40 flex-1">
-                    <svg className="w-16 h-16 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <div className="flex flex-col items-center justify-center px-4 py-10 sm:py-16 text-zinc-400 dark:text-white/40 flex-1">
+                    <svg className="w-14 h-14 sm:w-16 sm:h-16 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
                     </svg>
-                    <p className="text-lg font-medium">暫無包含位置數據的物業</p>
-                    <p className="text-sm mt-1">請為您的物業添加經緯度，以便在地圖上顯示</p>
+                    <p className="text-base sm:text-lg font-medium text-center">暫無包含位置數據的物業</p>
+                    <p className="text-xs sm:text-sm mt-1 text-center max-w-sm">
+                        請為您的物業添加經緯度，以便在地圖上顯示
+                    </p>
                 </div>
             ) : (
-                <div className="w-full h-full relative z-0 flex-1">
+                <div className="w-full h-full relative z-0 flex-1 min-h-0">
                     <MapContainer
                         center={defaultCenter}
                         zoom={12}
@@ -136,7 +193,7 @@ export default function PropertyMap({ properties, onPropertyClick }: PropertyMap
                                     icon={createPropertyIcon(property.name, lotCount)}
                                     eventHandlers={{
                                         click: () => {
-                                            setSelectedProperty(property);
+                                            if (onPropertyClick) onPropertyClick(property);
                                         },
                                     }}
                                 >
@@ -159,7 +216,7 @@ export default function PropertyMap({ properties, onPropertyClick }: PropertyMap
                                                         src={property.images[0]}
                                                         alt={property.name}
                                                         className="w-full h-24 object-cover cursor-pointer hover:opacity-90 transition-opacity"
-                                                        onClick={() => router.push(`/rental/${property.id}`)}
+                                                        onClick={() => router.push(`${basePath}/${property.id}`)}
                                                     />
                                                 ) : (
                                                     <div className="w-full h-24 bg-zinc-100 dark:bg-white/5 flex items-center justify-center">
@@ -172,7 +229,7 @@ export default function PropertyMap({ properties, onPropertyClick }: PropertyMap
                                                     </p>
                                                     <div
                                                         className="mt-2 px-2 py-1 bg-purple-600 text-white text-xs text-center rounded-md font-medium cursor-pointer"
-                                                        onClick={(e) => { e.stopPropagation(); router.push(`/rental/${property.id}`); }}
+                                                        onClick={(e) => { e.stopPropagation(); router.push(`${basePath}/${property.id}`); }}
                                                     >
                                                         前往詳情
                                                     </div>
@@ -187,9 +244,24 @@ export default function PropertyMap({ properties, onPropertyClick }: PropertyMap
                 </div>
             )}
 
+            {/* 提示：部分物業未設定座標，未能於地圖顯示 */}
+            {propertiesMissingLocation.length > 0 && (
+                <div className="px-3 sm:px-4 py-2.5 bg-amber-50 dark:bg-amber-500/10 border-t border-amber-200 dark:border-amber-500/20 flex items-start gap-2 shrink-0">
+                    <AlertTriangle className="w-4 h-4 text-amber-500 dark:text-amber-400 shrink-0 mt-0.5" />
+                    <div className="min-w-0 flex-1">
+                        <p className="text-xs sm:text-sm font-medium text-amber-700 dark:text-amber-300">
+                            {propertiesMissingLocation.length} 個物業未設定位置，未在地圖顯示
+                        </p>
+                        <p className="text-xs text-amber-600/90 dark:text-amber-400/70 mt-0.5 break-words">
+                            {propertiesMissingLocation.map(p => p.name).join('、')}
+                        </p>
+                    </div>
+                </div>
+            )}
+
             {/* Legend */}
-            <div className="p-4 border-t border-zinc-100 dark:border-white/5 flex items-center gap-4 flex-wrap bg-white dark:bg-zinc-900 relative z-10 shrink-0 rounded-b-2xl">
-                <span className="text-zinc-500 dark:text-white/50 text-xs font-medium uppercase tracking-wider">圖例:</span>
+            <div className="px-3 sm:px-4 py-2.5 sm:py-3 border-t border-zinc-100 dark:border-white/5 flex items-center gap-3 sm:gap-4 flex-wrap bg-white dark:bg-zinc-900 relative z-10 shrink-0 rounded-b-2xl">
+                <span className="text-zinc-500 dark:text-white/50 text-[11px] sm:text-xs font-medium uppercase tracking-wider">圖例:</span>
                 <div className="flex items-center gap-2">
                     <span
                         style={{
@@ -220,8 +292,12 @@ export default function PropertyMap({ properties, onPropertyClick }: PropertyMap
                         </span>
                     </span>
                 </div>
-                <span className="text-xs text-zinc-500 dark:text-white/40 ml-auto">
+                <span className="hidden sm:inline text-xs text-zinc-500 dark:text-white/40 ml-auto">
                     點擊 pin 查看該物業詳情
+                </span>
+                <span className="sm:hidden inline-flex items-center gap-1 text-xs text-zinc-500 dark:text-white/40 ml-auto">
+                    <MapPin className="w-3.5 h-3.5" />
+                    點擊 pin 查看詳情
                 </span>
             </div>
             <style jsx global>{`
@@ -234,6 +310,12 @@ export default function PropertyMap({ properties, onPropertyClick }: PropertyMap
                 }
                 .custom-property-pin > div {
                     pointer-events: auto;
+                }
+                /* 行動裝置：縮小 pin 名稱最大寬度，避免遮擋地圖 */
+                @media (max-width: 640px) {
+                    .custom-property-pin span:first-child {
+                        max-width: 88px !important;
+                    }
                 }
             `}</style>
         </div>

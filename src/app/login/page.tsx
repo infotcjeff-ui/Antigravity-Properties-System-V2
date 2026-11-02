@@ -87,7 +87,8 @@ export default function LoginPage() {
                         <img
                             src="/sitelogo/EasyParking - 橫.png"
                             alt="EasyParking"
-                            className="w-48 object-contain mb-4"
+                            className="w-48 h-auto mb-4"
+                            style={{ objectFit: 'contain' }}
                         />
                         <h1 className="text-2xl font-bold text-zinc-900 dark:text-white">泊車易管理系統</h1>
                         <p className="text-zinc-500 dark:text-white/50 text-sm mt-1">EasyParking Management System</p>

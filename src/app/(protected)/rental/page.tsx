@@ -189,86 +189,74 @@ export default function RentalPage() {
 
             {/* Page header */}
             <div className="flex flex-wrap items-center justify-between gap-4 shrink-0">
-                <div className="flex items-center gap-4 w-[60%]">
-                    {/* 搜尋欄：輸入 ≥2 個字才顯示下拉選單，選擇後才篩選 listing（即時不過濾） */}
-                    <div className="relative flex-1">
-                        <div className="relative">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400 dark:text-white/40 pointer-events-none" />
-                            <input
-                                type="text"
-                                value={searchQuery}
-                                onChange={(e) => {
-                                    setSearchQuery(e.target.value);
-                                    // 重新輸入時清空先前的選中狀態（避免舊篩選殘留）
-                                    if (searchSelected) setSearchSelected(null);
+                {/* 搜尋欄：輸入 ≥2 個字才顯示下拉選單，選擇後才篩選 listing（即時不過濾） */}
+                <div className="relative w-full">
+                    <div className="relative">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400 dark:text-white/40 pointer-events-none" />
+                        <input
+                            type="text"
+                            value={searchQuery}
+                            onChange={(e) => {
+                                setSearchQuery(e.target.value);
+                                // 重新輸入時清空先前的選中狀態（避免舊篩選殘留）
+                                if (searchSelected) setSearchSelected(null);
+                            }}
+                            onFocus={() => setSearchFocused(true)}
+                            onBlur={() => {
+                                // 延遲關閉，讓點擊 dropdown 項目能正確觸發
+                                setTimeout(() => setSearchFocused(false), 150);
+                            }}
+                            placeholder="搜尋物業名稱 / 編號 / 地址（至少 2 個字）"
+                            className="w-full pl-10 pr-10 py-3 text-base bg-zinc-100 dark:bg-white/5 border border-zinc-200 dark:border-white/10 text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-white/30 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500/30 focus:border-purple-500/40"
+                        />
+                        {searchQuery && (
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setSearchQuery('');
+                                    setSearchSelected(null);
                                 }}
-                                onFocus={() => setSearchFocused(true)}
-                                onBlur={() => {
-                                    // 延遲關閉，讓點擊 dropdown 項目能正確觸發
-                                    setTimeout(() => setSearchFocused(false), 150);
-                                }}
-                                placeholder="搜尋物業名稱 / 編號 / 地址（至少 2 個字）"
-                                className="w-full pl-10 pr-10 py-2.5 text-base bg-zinc-100 dark:bg-white/5 border border-zinc-200 dark:border-white/10 text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-white/30 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500/30 focus:border-purple-500/40"
-                            />
-                            {searchQuery && (
-                                <button
-                                    type="button"
-                                    onClick={() => {
-                                        setSearchQuery('');
-                                        setSearchSelected(null);
-                                    }}
-                                    className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded-md text-zinc-400 dark:text-white/40 hover:bg-zinc-200 dark:hover:bg-white/10 hover:text-zinc-700 dark:hover:text-white cursor-pointer"
-                                    aria-label="清除搜尋"
-                                >
-                                    <X className="w-4 h-4" />
-                                </button>
-                            )}
-                        </div>
-                        {/* 下拉選單：≥2 個字且 focus 時顯示 */}
-                        {searchFocused && searchQuery.length >= 2 && (
-                            <div className="absolute top-full left-0 right-0 mt-1 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-white/10 rounded-xl shadow-lg overflow-hidden z-50">
-                                {searchMatches.length > 0 ? (
-                                    <ul className="max-h-64 overflow-y-auto py-1">
-                                        {searchMatches.map((p) => (
-                                            <li key={p.id}>
-                                                <button
-                                                    type="button"
-                                                    onMouseDown={(e) => {
-                                                        e.preventDefault();
-                                                        setSearchSelected(p);
-                                                        setSearchQuery(p.name);
-                                                        setSearchFocused(false);
-                                                    }}
-                                                    className="w-full text-left px-3 py-2 hover:bg-zinc-100 dark:hover:bg-white/10 cursor-pointer"
-                                                >
-                                                    <div className="text-sm font-medium text-zinc-900 dark:text-white truncate">
-                                                        {p.name}
-                                                    </div>
-                                                    <div className="text-xs text-zinc-500 dark:text-white/40 truncate">
-                                                        {p.code} · {p.address || '未設定地址'}
-                                                    </div>
-                                                </button>
-                                            </li>
-                                        ))}
-                                    </ul>
-                                ) : (
-                                    <div className="px-3 py-3 text-sm text-zinc-500 dark:text-white/40 text-center">
-                                        沒有符合的物業
-                                    </div>
-                                )}
-                            </div>
+                                className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded-md text-zinc-400 dark:text-white/40 hover:bg-zinc-200 dark:hover:bg-white/10 hover:text-zinc-700 dark:hover:text-white cursor-pointer"
+                                aria-label="清除搜尋"
+                            >
+                                <X className="w-4 h-4" />
+                            </button>
                         )}
                     </div>
-
-                    {/* 以地圖搜尋按鈕 */}
-                    <button
-                        type="button"
-                        onClick={() => setViewMode('map')}
-                        className="shrink-0 flex items-center gap-2 px-4 py-2.5 text-base font-medium bg-purple-600 hover:bg-purple-700 text-white rounded-xl transition-colors cursor-pointer"
-                    >
-                        <Map className="w-4 h-4" />
-                        以地圖搜尋
-                    </button>
+                    {/* 下拉選單：≥2 個字且 focus 時顯示 */}
+                    {searchFocused && searchQuery.length >= 2 && (
+                        <div className="absolute top-full left-0 right-0 mt-1 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-white/10 rounded-xl shadow-lg overflow-hidden z-50">
+                            {searchMatches.length > 0 ? (
+                                <ul className="max-h-64 overflow-y-auto py-1">
+                                    {searchMatches.map((p) => (
+                                        <li key={p.id}>
+                                            <button
+                                                type="button"
+                                                onMouseDown={(e) => {
+                                                    e.preventDefault();
+                                                    setSearchSelected(p);
+                                                    setSearchQuery(p.name);
+                                                    setSearchFocused(false);
+                                                }}
+                                                className="w-full text-left px-3 py-2 hover:bg-zinc-100 dark:hover:bg-white/10 cursor-pointer"
+                                            >
+                                                <div className="text-sm font-medium text-zinc-900 dark:text-white truncate">
+                                                    {p.name}
+                                                </div>
+                                                <div className="text-xs text-zinc-500 dark:text-white/40 truncate">
+                                                    {p.code} · {p.address || '未設定地址'}
+                                                </div>
+                                            </button>
+                                        </li>
+                                    ))}
+                                </ul>
+                            ) : (
+                                <div className="px-3 py-3 text-sm text-zinc-500 dark:text-white/40 text-center">
+                                    沒有符合的物業
+                                </div>
+                            )}
+                        </div>
+                    )}
                 </div>
             </div>
 
@@ -467,7 +455,7 @@ export default function RentalPage() {
                                             setSelectedPropertyId(property.id ?? null);
                                         }
                                     }}
-                                    className={`block w-full text-left px-3 py-2.5 transition-all cursor-pointer border-l-2 border-transparent ${
+                                    className={`block w-full text-left px-3 py-3 sm:px-3 sm:py-2.5 transition-all cursor-pointer border-l-2 border-transparent ${
                                         index % 2 === 1
                                             ? 'bg-zinc-100/60 dark:bg-white/[0.04]'
                                             : ''
@@ -475,7 +463,7 @@ export default function RentalPage() {
                                 >
                                     <div className="flex gap-4 items-center">
                                         {/* Thumbnail */}
-                                        <div className="w-28 h-20 rounded-lg overflow-hidden bg-zinc-100 dark:bg-white/5 shrink-0 flex items-center justify-center">
+                                        <div className="w-32 h-24 sm:w-28 sm:h-20 rounded-xl overflow-hidden bg-zinc-100 dark:bg-white/5 shrink-0 flex items-center justify-center">
                                             {property.images && property.images.length > 0 ? (
                                                 // eslint-disable-next-line @next/next/no-img-element
                                                 <img
@@ -490,16 +478,16 @@ export default function RentalPage() {
                                         {/* Info */}
                                         <div className="flex-1 min-w-0">
                                             <div className="min-w-0">
-                                                <p className="text-base font-semibold text-zinc-900 dark:text-white truncate">
+                                                <p className="text-lg sm:text-base font-semibold text-zinc-900 dark:text-white truncate">
                                                     {property.name}
                                                 </p>
                                             </div>
-                                            <div className="flex items-center gap-1 mt-1.5 text-sm text-zinc-500 dark:text-white/50">
-                                                <MapPin className="w-3.5 h-3.5 shrink-0" />
+                                            <div className="flex items-center gap-1 mt-1.5 text-base sm:text-sm text-zinc-500 dark:text-white/50">
+                                                <MapPin className="w-4 sm:w-3.5 h-4 sm:h-3.5 shrink-0" />
                                                 <span className="truncate">{property.address || '未設定地址'}</span>
                                             </div>
-                                            <div className="flex items-center gap-1 mt-1 text-xs text-zinc-400 dark:text-white/40">
-                                                <Hash className="w-3 h-3 shrink-0" />
+                                            <div className="flex items-center gap-1 mt-1 text-sm sm:text-xs text-zinc-400 dark:text-white/40">
+                                                <Hash className="w-3.5 sm:w-3 h-3.5 sm:h-3 shrink-0" />
                                                 <span>{countListingLotsForProperty(property)} 個地段放租中</span>
                                             </div>
                                         </div>
@@ -699,8 +687,9 @@ export default function RentalPage() {
             ) : isAuthenticated ? (
                 <PropertyMapDynamic
                             properties={filteredProperties}
+                            onlyRenting
                             onPropertyClick={(property) => {
-                                setViewMode('list');
+                                // 點擊 pin 時記錄選取狀態（Popup 仍會開啟），切回列表時已選中該物業
                                 setSelectedPropertyId(property.id ?? null);
                             }}
                         />

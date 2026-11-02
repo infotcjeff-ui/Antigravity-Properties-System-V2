@@ -19,6 +19,7 @@ import {
     MapPin,
     ChevronLeft,
     ChevronRight,
+    ChevronDown,
     X,
     Map,
     Image as ImageIcon,
@@ -165,7 +166,25 @@ function LotDetailModal({
     const [activeTab, setActiveTab] = useState<'info' | 'video' | 'plan' | 'map'>('info');
     const [mapLoaded, setMapLoaded] = useState(false);
     const [thumbOffset, setThumbOffset] = useState(0);
-    const THUMB_VISIBLE = 5;
+    const [noteOpen, setNoteOpen] = useState(false);
+    // 縮圖可見數量：行動裝置（< 1024px）顯示 3 格，桌面顯示 5 格
+    const [thumbVisible, setThumbVisible] = useState(5);
+
+    useEffect(() => {
+        if (typeof window === 'undefined') return;
+        const mql = window.matchMedia('(min-width: 1024px)');
+        const apply = (e: MediaQueryListEvent | MediaQueryList) => {
+            setThumbVisible(e.matches ? 5 : 3);
+        };
+        apply(mql);
+        mql.addEventListener('change', apply);
+        return () => mql.removeEventListener('change', apply);
+    }, []);
+
+    // 視窗尺寸變化時，切換縮圖可見數量需重設位移
+    useEffect(() => {
+        setThumbOffset(0);
+    }, [thumbVisible]);
 
     const photoCount = entry.media?.length ?? 0;
     const videoCount = 0; // 預留：視頻功能
@@ -189,7 +208,7 @@ function LotDetailModal({
     const prevThumb = () => {
         if (!entry.media?.length) return;
         if (currentIdx === 0) {
-            setThumbOffset(Math.max(0, entry.media.length - THUMB_VISIBLE));
+            setThumbOffset(Math.max(0, entry.media.length - thumbVisible));
         } else if (currentIdx <= thumbOffset) {
             setThumbOffset(i => Math.max(0, i - 1));
         }
@@ -200,8 +219,8 @@ function LotDetailModal({
         if (!entry.media?.length) return;
         if (currentIdx === entry.media.length - 1) {
             setThumbOffset(0);
-        } else if (currentIdx >= thumbOffset + THUMB_VISIBLE - 1) {
-            setThumbOffset(i => Math.min(entry.media!.length - THUMB_VISIBLE, i + 1));
+        } else if (currentIdx >= thumbOffset + thumbVisible - 1) {
+            setThumbOffset(i => Math.min(entry.media!.length - thumbVisible, i + 1));
         }
         setCurrentIdx(i => (i + 1) % entry.media!.length);
     };
@@ -278,7 +297,7 @@ function LotDetailModal({
                                 {entry.media && entry.media.length > 0 ? (
                                     <>
                                         {/* 主圖 */}
-                                        <div className="relative rounded-xl overflow-hidden bg-white/5 flex items-center justify-center" style={{ height: 'clamp(200px, 35vw, 700px)' }}>
+                                        <div className="relative rounded-xl overflow-hidden bg-white/5 flex items-center justify-center" style={{ height: 'clamp(240px, 38vw, 700px)' }}>
                                             <img
                                                 src={entry.media[currentIdx].u}
                                                 alt={entry.value}
@@ -306,17 +325,30 @@ function LotDetailModal({
                                             <div className="absolute bottom-2 left-1/2 -translate-x-1/2 px-3 py-1 bg-black/60 backdrop-blur-sm rounded-full text-white text-xs font-medium">
                                                 {currentIdx + 1} / {entry.media.length}
                                             </div>
-                                            {/* 圖片備註 - icon + title 在第一行，value 在下一行（稍大字體） */}
+                                            {/* 圖片備註 - 左下角按鈕，點擊展開完整備註 */}
                                             {entry.media[currentIdx].note && (
-                                                <div className="absolute bottom-14 left-4 max-w-[60%] px-3 py-2 bg-black/70 backdrop-blur-md rounded-xl ring-1 ring-white/30 shadow-xl">
-                                                    <div className="flex items-center gap-1.5">
-                                                        <FileText className="w-4 h-4 text-white/80" />
-                                                        <span className="text-sm font-medium text-white/80">備註</span>
-                                                    </div>
-                                                    <p className="mt-1 text-base sm:text-lg font-semibold text-white whitespace-pre-wrap leading-snug">
-                                                        {entry.media[currentIdx].note}
-                                                    </p>
-                                                </div>
+                                                <>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setNoteOpen((v) => !v)}
+                                                        className="absolute bottom-3 left-3 z-10 inline-flex items-center gap-1.5 px-2.5 py-1.5 bg-black/60 hover:bg-black/75 backdrop-blur-md rounded-lg ring-1 ring-white/30 shadow-lg transition-colors cursor-pointer"
+                                                    >
+                                                        <FileText className="w-3.5 h-3.5 text-white/80" />
+                                                        <span className="text-xs font-medium text-white/90">備註</span>
+                                                        {noteOpen ? (
+                                                            <ChevronDown className="w-3 h-3 text-white/70" />
+                                                        ) : (
+                                                            <ChevronRight className="w-3 h-3 text-white/70" />
+                                                        )}
+                                                    </button>
+                                                    {noteOpen && (
+                                                        <div className="absolute bottom-14 left-3 z-10 max-w-[70%] max-h-40 overflow-y-auto lot-modal-scroll px-3 py-2 bg-black/75 backdrop-blur-md rounded-xl ring-1 ring-white/30 shadow-xl">
+                                                            <p className="text-sm sm:text-base font-semibold text-white whitespace-pre-wrap leading-snug">
+                                                                {entry.media[currentIdx].note}
+                                                            </p>
+                                                        </div>
+                                                    )}
+                                                </>
                                             )}
                                         </div>
                                         {/* 縮圖列 */}
@@ -340,11 +372,11 @@ function LotDetailModal({
                                                     <div
                                                         className="grid gap-2 transition-transform duration-300 ease-out"
                                                         style={{ 
-                                                            gridTemplateColumns: `repeat(${Math.min(entry.media.length, THUMB_VISIBLE)}, 1fr)`,
-                                                            transform: `translateX(-${thumbOffset * (100 / THUMB_VISIBLE + 0.5)}%)`
+                                                            gridTemplateColumns: `repeat(${Math.min(entry.media.length, thumbVisible)}, 1fr)`,
+                                                            transform: `translateX(-${thumbOffset * (100 / thumbVisible + 0.5)}%)`
                                                         }}
                                                     >
-                                                        {entry.media.slice(thumbOffset, thumbOffset + THUMB_VISIBLE).map((m, idx) => {
+                                                        {entry.media.slice(thumbOffset, thumbOffset + thumbVisible).map((m, idx) => {
                                                             const actualIdx = thumbOffset + idx;
                                                             return (
                                                                 <button
@@ -355,9 +387,9 @@ function LotDetailModal({
                                                                     }`}
                                                                 >
                                                                     <img src={m.u} alt="" className="w-full h-full object-contain" />
-                                                                    {/* 縮圖標籤 (固定 34x28) */}
+                                                                    {/* 縮圖標籤 (固定 24x20) */}
                                                                     {m.tag && (
-                                                                        <div className={`absolute top-1 left-1 rounded-md text-xs font-bold shadow-lg backdrop-blur-sm ring-1 ring-white/40 flex items-center justify-center ${
+                                                                        <div className={`absolute top-1 left-1 rounded text-[10px] font-bold shadow-lg backdrop-blur-sm ring-1 ring-white/40 flex items-center justify-center ${
                                                                             m.tag === 'water' ? 'bg-blue-500/90 text-white' :
                                                                             m.tag === 'electric' ? 'bg-amber-500/90 text-white' :
                                                                             m.tag === 'toilet' ? 'bg-purple-500/90 text-white' :
@@ -365,7 +397,7 @@ function LotDetailModal({
                                                                             m.tag === 'storage' ? 'bg-emerald-500/90 text-white' :
                                                                             m.tag === 'room' ? 'bg-rose-500/90 text-white' :
                                                                             'bg-white/80 text-zinc-800'
-                                                                        }`} style={{ width: '34px', height: '28px' }}>
+                                                                        }`} style={{ width: '24px', height: '20px' }}>
                                                                             {m.tag === 'water' ? '水' :
                                                                              m.tag === 'electric' ? '電' :
                                                                              m.tag === 'toilet' ? '廁' :

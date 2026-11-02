@@ -51,7 +51,7 @@ export default function PropertyCard({ property, index = 0, basePath = '/propert
             className={`group relative bg-[#1a1a2e] border border-white/10 rounded-2xl overflow-hidden hover:border-purple-500/30 transition-all h-full ${!isAuthenticated ? 'cursor-default select-none' : 'cursor-pointer'}`}
         >
             {/* Image Cover */}
-            <div className="relative h-48 overflow-hidden bg-gradient-to-br from-purple-500/10 to-blue-500/10">
+            <div className="relative h-56 sm:h-48 overflow-hidden bg-gradient-to-br from-purple-500/10 to-blue-500/10">
                 {property.images?.[0] && !imageError ? (
                     <img
                         src={property.images[0]}
@@ -96,14 +96,14 @@ export default function PropertyCard({ property, index = 0, basePath = '/propert
             </div>
 
             {/* Content */}
-            <div className="p-4">
+            <div className="p-4 sm:p-4">
                 {/* Name and Code */}
                 <div className="flex items-start justify-between gap-2">
                     <div className="flex-1 min-w-0">
-                        <h3 className={`text-white font-semibold text-lg truncate transition-colors ${isAuthenticated ? 'group-hover:text-purple-400' : 'blur-sm'}`}>
+                        <h3 className={`text-white font-semibold text-xl sm:text-lg truncate transition-colors ${isAuthenticated ? 'group-hover:text-purple-400' : 'blur-sm'}`}>
                             {property.name}
                         </h3>
-                        <p className={`text-white/40 text-sm mt-0.5 ${!isAuthenticated ? 'blur-sm' : ''}`}>
+                        <p className={`text-white/40 text-base sm:text-sm mt-0.5 ${!isAuthenticated ? 'blur-sm' : ''}`}>
                             {property.code}
                         </p>
                     </div>
@@ -111,8 +111,8 @@ export default function PropertyCard({ property, index = 0, basePath = '/propert
 
                 {/* Address */}
                 {property.address && (
-                    <div className={`flex items-start gap-2 mt-3 text-white/50 text-sm ${!isAuthenticated ? 'blur-[3px]' : ''}`}>
-                        <MapPin className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                    <div className={`flex items-start gap-2 mt-3 text-white/50 text-base sm:text-sm ${!isAuthenticated ? 'blur-[3px]' : ''}`}>
+                        <MapPin className="w-5 sm:w-4 h-5 sm:h-4 flex-shrink-0 mt-0.5" />
                         <span className="line-clamp-2">{property.address}</span>
                     </div>
                 )}
@@ -123,9 +123,9 @@ export default function PropertyCard({ property, index = 0, basePath = '/propert
                     const listingCount = entries.filter(e => e.lotStatus === 'listing').length;
                     if (listingCount === 0) return null;
                     return (
-                        <div className="mt-3 pt-3 border-t border-white/5 text-xs text-white/40">
+                        <div className="mt-3 pt-3 border-t border-white/5 text-sm sm:text-xs text-white/40">
                             <span className={`${!isAuthenticated ? 'blur-sm' : ''}`}>
-                                <span className="text-purple-400 font-semibold">{listingCount}</span>
+                                <span className="text-purple-400 font-semibold text-base sm:text-sm">{listingCount}</span>
                                 {' '}個地段放租中
                             </span>
                         </div>

@@ -2,13 +2,12 @@
 
 import { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { createPortal } from 'react-dom';
 import { Search, Bell, Check, Trash2, LayoutDashboard, LogIn, LogOut, Database, Cloud, Menu, X, Building2, Users, ArrowUpFromLine, ArrowDownToLine, Network, Settings, FileText, User, TrendingUp, ChevronDown, ScrollText } from 'lucide-react';
 import { useNotifications } from '@/contexts/NotificationContext';
 import ThemeToggle from './ThemeToggle';
-import { useLanguage } from '@/components/common/LanguageSwitcher';
 import { useAuth } from '@/contexts/AuthContext';
 
 interface TopBarProps {
@@ -20,10 +19,10 @@ interface TopBarProps {
 
 export default function TopBar({ onSearch, placeholder = '搜尋...', isAuthenticated = false, isAdmin = false }: TopBarProps) {
     const router = useRouter();
-    const lang = useLanguage();
+    const pathname = usePathname();
     const { user } = useAuth();
-    const isZh = lang === 'zh-TW';
-    const t = (en: string, zh: string) => (isZh ? zh : en);
+    // 是否位於後台（/dashboard）頁面
+    const isDashboard = pathname === '/dashboard' || pathname.startsWith('/dashboard/');
     const [searchValue, setSearchValue] = useState('');
     const [showNotifications, setShowNotifications] = useState(false);
     const [showMobileMenu, setShowMobileMenu] = useState(false);
@@ -95,17 +94,37 @@ export default function TopBar({ onSearch, placeholder = '搜尋...', isAuthenti
                 className={`sticky top-0 z-40 h-16 px-4 md:px-6 flex items-center justify-between transition-all duration-300 ${showMobileMenu ? 'bg-white dark:bg-[#0f0f1a]' : 'bg-white/80 dark:bg-[#0f0f1a]/80 backdrop-blur-xl border-b border-zinc-200 dark:border-white/5'
                     }`}
             >
-                {/* Mobile Menu Toggle */}
-                <div className="flex items-center gap-3 md:hidden">
+                {/* Mobile: Logo 左邊，Burger Toggle 最右邊 */}
+                <div className="flex items-center gap-3 md:hidden w-full">
+                    {/* Logo：主頁回到 /，後台回到 /dashboard
+                        註：globals.css 將 .object-contain 覆寫為 cover，
+                        故此處以 inline style 明確指定 contain，避免橫向 logo 被裁切變形。 */}
+                    <Link href={isDashboard ? '/dashboard' : '/'} className="cursor-pointer shrink-0">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                            src="/sitelogo/EasyParking - 橫.png"
+                            alt="EasyParking"
+                            className="h-9 w-auto shrink-0"
+                            style={{ objectFit: 'contain' }}
+                        />
+                    </Link>
+                    <div className="flex-1" />
+                    {/* 未登入訪客：手機版顯示登入按鈕 */}
+                    {!isAuthenticated && (
+                        <Link href="/login" className="md:hidden">
+                            <span className="flex items-center gap-1.5 px-3 py-2 bg-linear-to-r from-purple-600 to-blue-600 rounded-xl text-white text-sm font-medium">
+                                <LogIn className="w-4 h-4" />
+                                登入
+                            </span>
+                        </Link>
+                    )}
                     <button
                         onClick={() => setShowMobileMenu(!showMobileMenu)}
-                        className="p-2 rounded-xl bg-zinc-100 dark:bg-white/5 text-zinc-600 dark:text-white/70"
+                        aria-label="選單"
+                        className="p-2 rounded-xl bg-zinc-100 dark:bg-white/5 text-zinc-600 dark:text-white/70 cursor-pointer"
                     >
                         {showMobileMenu ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
                     </button>
-                    {isAdmin && (
-                        <div className="font-bold text-xl text-zinc-900 dark:text-white">{t('Backend', '後台')}</div>
-                    )}
                 </div>
 
                 {/* Search - Hidden for now */}
@@ -122,10 +141,10 @@ export default function TopBar({ onSearch, placeholder = '搜尋...', isAuthenti
                     />
                 </div>
                 {/* Spacer for when search is hidden to keep flex layout intact if needed, or flex-1 handles it */}
-                <div className="flex-1" />
+                <div className="hidden md:block flex-1" />
 
-                {/* Right side actions */}
-                <div className="flex items-center gap-3">
+                {/* Right side actions - 手機版已搬進 burger menu */}
+                <div className="hidden md:flex items-center gap-3">
                     {/* Theme Toggle */}
                     <ThemeToggle />
 
@@ -220,7 +239,8 @@ export default function TopBar({ onSearch, placeholder = '搜尋...', isAuthenti
                                 <img
                                     src="/sitelogo/EasyParking - 橫.png"
                                     alt="EasyParking"
-                                    className="h-10 w-auto max-w-[60%] object-contain"
+                                    className="h-10 w-auto shrink-0"
+                                    style={{ objectFit: 'contain' }}
                                 />
                                 <button
                                     onClick={() => setShowMobileMenu(false)}
@@ -261,13 +281,24 @@ export default function TopBar({ onSearch, placeholder = '搜尋...', isAuthenti
                             <div className="p-4 border-t border-zinc-200 dark:border-white/5 space-y-3 shrink-0">
                                 <ThemeToggle className="w-full justify-start px-4 h-11" showLabel />
                                 {isAuthenticated && (
-                                    <button
-                                        onClick={() => setShowLogoutConfirm(true)}
-                                        className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10 transition-all font-medium cursor-pointer"
-                                    >
-                                        <LogOut className="w-5 h-5" />
-                                        登出系統
-                                    </button>
+                                    <>
+                                        {/* 物業管理：與登出系統同款 UI，置於登出系統上方；在 /dashboard 頁面則顯示「返回主頁」 */}
+                                        <Link
+                                            href={isDashboard ? '/' : '/dashboard'}
+                                            onClick={() => setShowMobileMenu(false)}
+                                            className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-zinc-700 dark:text-white/80 hover:bg-zinc-100 dark:hover:bg-white/5 transition-all font-medium cursor-pointer"
+                                        >
+                                            {isDashboard ? <ArrowUpFromLine className="w-5 h-5" /> : <LayoutDashboard className="w-5 h-5" />}
+                                            {isDashboard ? '返回主頁' : '物業管理'}
+                                        </Link>
+                                        <button
+                                            onClick={() => setShowLogoutConfirm(true)}
+                                            className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10 transition-all font-medium cursor-pointer"
+                                        >
+                                            <LogOut className="w-5 h-5" />
+                                            登出系統
+                                        </button>
+                                    </>
                                 )}
                             </div>
                         </motion.div>

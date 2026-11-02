@@ -110,7 +110,8 @@ export default function Sidebar({ isAuthenticated = false }: SidebarProps) {
                     <img
                         src="/sitelogo/EasyParking - 橫.png"
                         alt="EasyParking"
-                        className="w-[80%] object-contain"
+                        className="w-[80%] h-auto"
+                        style={{ objectFit: 'contain' }}
                     />
                 </Link>
             </div>
