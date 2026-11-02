@@ -188,7 +188,12 @@ export default function RentalPage() {
             `}</style>
 
             {/* Page header */}
-            <div className="flex flex-wrap items-center justify-between gap-4 shrink-0">
+            <div className="flex flex-wrap items-center justify-between gap-3 shrink-0">
+                {/* 出租地段標題 */}
+                <div className="w-full">
+                    <h1 className="text-2xl md:text-3xl font-bold text-zinc-900 dark:text-white">出租地段</h1>
+                    <p className="text-sm text-zinc-500 dark:text-white/50 mt-1">搜尋並瀏覽所有放租中的地段</p>
+                </div>
                 {/* 搜尋欄：輸入 ≥2 個字才顯示下拉選單，選擇後才篩選 listing（即時不過濾） */}
                 <div className="relative w-full">
                     <div className="relative">

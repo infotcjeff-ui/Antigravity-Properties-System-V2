@@ -205,6 +205,18 @@ function LotDetailModal({
         setCurrentIdx(0);
     };
 
+    // Tab 切換方向（用於 app 式左右滑動動畫）
+    const tabOrder: Array<'info' | 'video' | 'plan' | 'map'> = ['info', 'video', 'plan', 'map'];
+    const [tabDirection, setTabDirection] = useState(1);
+    const touchStartX = useRef(0);
+
+    const switchTab = (tab: typeof activeTab) => {
+        const fromIdx = tabOrder.indexOf(activeTab);
+        const toIdx = tabOrder.indexOf(tab);
+        setTabDirection(toIdx >= fromIdx ? 1 : -1);
+        handleTabChange(tab);
+    };
+
     const prevThumb = () => {
         if (!entry.media?.length) return;
         if (currentIdx === 0) {
@@ -241,7 +253,7 @@ function LotDetailModal({
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
-                className="fixed inset-0 z-50 bg-gradient-to-br from-black/55 via-zinc-900/45 to-black/55 backdrop-blur-md overflow-y-auto"
+                className="fixed inset-0 z-50 bg-gradient-to-br from-black/55 via-zinc-900/45 to-black/55 backdrop-blur-md overflow-hidden"
                 onClick={onClose}
             >
             {/* 關閉按鈕 - 右上角 */}
@@ -255,8 +267,8 @@ function LotDetailModal({
             </div>
 
             {/* 整合區塊：Tab Bar + Tab 內容，浮動置中，深色玻璃感 */}
-            <div className="min-h-screen flex items-center justify-center p-4" onClick={e => e.stopPropagation()}>
-                <div className="relative w-full max-w-full lg:max-w-[1800px] h-[90vh] max-h-[90vh] p-[25px] bg-gradient-to-br from-zinc-900/70 via-zinc-900/60 to-zinc-900/70 backdrop-blur-2xl rounded-2xl overflow-hidden flex flex-col shadow-[0_8px_60px_-12px_rgba(0,0,0,0.6)] border border-white/15 ring-1 ring-inset ring-white/10">
+            <div className="h-full w-full flex items-center justify-center p-2 sm:p-4" onClick={e => e.stopPropagation()}>
+                <div className="relative w-full max-w-full lg:max-w-[1800px] h-full max-h-[calc(100dvh-1rem)] lg:max-h-[calc(100dvh-2rem)] p-3 sm:p-[25px] bg-gradient-to-br from-zinc-900/70 via-zinc-900/60 to-zinc-900/70 backdrop-blur-2xl rounded-2xl overflow-hidden flex flex-col shadow-[0_8px_60px_-12px_rgba(0,0,0,0.6)] border border-white/15 ring-1 ring-inset ring-white/10">
                 {/* 玻璃高光：頂部柔光 */}
                 <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/35 to-transparent" />
                 {/* 玻璃高光：左側柔光 */}
@@ -267,7 +279,7 @@ function LotDetailModal({
                         {tabs.map(tab => (
                             <button
                                 key={tab.key}
-                                onClick={() => handleTabChange(tab.key)}
+                                onClick={() => switchTab(tab.key)}
                                 className={`shrink-0 px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-medium transition-all whitespace-nowrap cursor-pointer ${
                                     activeTab === tab.key
                                         ? 'bg-white/20 text-white'
@@ -287,17 +299,43 @@ function LotDetailModal({
                     </div>
                 </div>
 
-                {/* Tab 內容區 */}
-                <div className="flex-1 overflow-hidden relative">
+                {/* Tab 內容區 — app 式滑動切換（方向感知 + 支援手勢滑動） */}
+                <div
+                    className="flex-1 min-h-0 overflow-hidden relative"
+                    onTouchStart={(e) => { touchStartX.current = e.touches[0].clientX; }}
+                    onTouchEnd={(e) => {
+                        const dx = e.changedTouches[0].clientX - touchStartX.current;
+                        if (Math.abs(dx) < 60) return;
+                        const curIdx = tabOrder.indexOf(activeTab);
+                        const nextIdx = dx < 0 ? curIdx + 1 : curIdx - 1;
+                        if (nextIdx < 0 || nextIdx >= tabOrder.length) return;
+                        switchTab(tabOrder[nextIdx]);
+                    }}
+                >
+                    <AnimatePresence mode="wait" initial={false} custom={tabDirection}>
+                    <motion.div
+                        key={activeTab}
+                        custom={tabDirection}
+                        variants={{
+                            enter: (d: number) => ({ x: d * 60, opacity: 0 }),
+                            center: { x: 0, opacity: 1 },
+                            exit: (d: number) => ({ x: d * -60, opacity: 0 }),
+                        }}
+                        initial="enter"
+                        animate="center"
+                        exit="exit"
+                        transition={{ type: 'spring', stiffness: 380, damping: 38, mass: 0.7 }}
+                        className="absolute inset-0"
+                    >
                     {/* 地段資料 Tab */}
                     {activeTab === 'info' && (
                         <div className="absolute inset-0 flex flex-col lg:flex-row">
                             {/* 左側：圖片區 */}
-                            <div className="w-full lg:w-1/2 flex flex-col p-4 border-b lg:border-b-0 lg:border-r border-white/10">
+                            <div className="w-full lg:w-1/2 flex flex-col min-h-0 p-3 sm:p-4 border-b lg:border-b-0 lg:border-r border-white/10">
                                 {entry.media && entry.media.length > 0 ? (
                                     <>
                                         {/* 主圖 */}
-                                        <div className="relative rounded-xl overflow-hidden bg-white/5 flex items-center justify-center" style={{ height: 'clamp(240px, 38vw, 700px)' }}>
+                                        <div className="relative flex-1 min-h-0 rounded-xl overflow-hidden bg-white/5 flex items-center justify-center" style={{ minHeight: 'clamp(160px, 30vh, 700px)' }}>
                                             <img
                                                 src={entry.media[currentIdx].u}
                                                 alt={entry.value}
@@ -371,7 +409,7 @@ function LotDetailModal({
                                                 <div className="overflow-hidden mx-6">
                                                     <div
                                                         className="grid gap-2 transition-transform duration-300 ease-out"
-                                                        style={{ 
+                                                        style={{
                                                             gridTemplateColumns: `repeat(${Math.min(entry.media.length, thumbVisible)}, 1fr)`,
                                                             transform: `translateX(-${thumbOffset * (100 / thumbVisible + 0.5)}%)`
                                                         }}
@@ -424,122 +462,122 @@ function LotDetailModal({
                             </div>
 
                             {/* 右側：地段資料區 */}
-                            <div className="w-full lg:w-1/2 p-4 sm:p-6 overflow-y-auto lot-modal-scroll">
-                                <div className="space-y-5">
+                            <div className="w-full lg:w-1/2 min-h-0 p-3 sm:p-4 overflow-hidden">
+                                <div className="space-y-2.5 sm:space-y-3 h-full flex flex-col justify-center">
                                     {/* 標題區 - 地段名稱 + 地址 */}
-                                    <div className="pb-4 border-b border-white/10">
-                                        <h2 className="text-xl sm:text-2xl font-bold text-white tracking-tight">{entry.value}</h2>
+                                    <div className="shrink-0 pb-2.5 border-b border-white/10">
+                                        <h2 className="text-lg sm:text-2xl font-bold text-white tracking-tight">{entry.value}</h2>
                                         {parentAddress && (
-                                            <div className="flex items-center gap-1.5 mt-2 text-white/50">
-                                                <MapPin className="w-3.5 h-3.5" />
-                                                <span className="text-sm">{parentAddress}</span>
+                                            <div className="flex items-center gap-1.5 mt-1.5 text-white/50">
+                                                <MapPin className="w-3.5 h-3.5 shrink-0" />
+                                                <span className="text-xs sm:text-sm truncate">{parentAddress}</span>
                                             </div>
                                         )}
                                     </div>
 
                                     {/* 數據摘要 - 狀態 / 面積 */}
-                                    <div className="grid grid-cols-2 gap-2 sm:gap-3">
+                                    <div className="grid grid-cols-2 gap-2 sm:gap-3 shrink-0">
                                         {/* 出租狀態 */}
-                                        <div className="px-3 py-3 bg-white/[0.03] border border-white/10 rounded-lg">
-                                            <div className="flex items-center gap-1.5 mb-2">
+                                        <div className="px-3 py-2.5 bg-white/[0.03] border border-white/10 rounded-lg">
+                                            <div className="flex items-center gap-1.5 mb-1.5">
                                                 <CheckCircle className="w-3.5 h-3.5 text-white/50" />
-                                                <span className="text-sm text-white/60 font-semibold">狀態</span>
+                                                <span className="text-xs sm:text-sm text-white/60 font-semibold">狀態</span>
                                             </div>
                                             <LotStatusBadge status={entry.lotStatus} variant="dark" />
                                         </div>
 
                                         {/* 面積 */}
                                         {entry.lotArea && (
-                                            <div className="px-3 py-3 bg-white/[0.03] border border-white/10 rounded-lg">
-                                                <div className="flex items-center gap-1.5 mb-2">
+                                            <div className="px-3 py-2.5 bg-white/[0.03] border border-white/10 rounded-lg">
+                                                <div className="flex items-center gap-1.5 mb-1.5">
                                                     <Ruler className="w-3.5 h-3.5 text-white/50" />
-                                                    <span className="text-sm text-white/60 font-semibold">面積</span>
+                                                    <span className="text-xs sm:text-sm text-white/60 font-semibold">面積</span>
                                                 </div>
-                                                <p className="text-base font-bold text-white truncate">{entry.lotArea}</p>
+                                                <p className="text-sm sm:text-base font-bold text-white truncate">{entry.lotArea}</p>
                                             </div>
                                         )}
                                     </div>
 
                                     {/* 設施 */}
-                                    <div className="p-4 bg-white/[0.03] border border-white/10 rounded-lg">
-                                        <div className="flex items-center gap-2 mb-3">
+                                    <div className="p-3 bg-white/[0.03] border border-white/10 rounded-lg shrink-0">
+                                        <div className="flex items-center gap-2 mb-2">
                                             <Building2 className="w-4 h-4 text-white/50" />
-                                            <span className="text-sm text-white/60 font-semibold">設施</span>
+                                            <span className="text-xs sm:text-sm text-white/60 font-semibold">設施</span>
                                         </div>
                                         {(entry.waterMeter || entry.electricMeter || entry.toilet || entry.office || entry.storage || entry.room) ? (
-                                            <div className="flex flex-wrap gap-2 sm:gap-3">
+                                            <div className="flex flex-wrap gap-1.5 sm:gap-2">
                                                 {entry.waterMeter && (
-                                                    <div className="px-2.5 py-1.5 bg-cyan-500/20 rounded-lg border border-cyan-500/30">
-                                                        <span className="text-sm font-medium text-cyan-400">水</span>
+                                                    <div className="px-2 py-1 bg-cyan-500/20 rounded-lg border border-cyan-500/30">
+                                                        <span className="text-xs sm:text-sm font-medium text-cyan-400">水</span>
                                                     </div>
                                                 )}
                                                 {entry.electricMeter && (
-                                                    <div className="px-2.5 py-1.5 bg-amber-500/20 rounded-lg border border-amber-500/30">
-                                                        <span className="text-sm font-medium text-amber-400">電</span>
+                                                    <div className="px-2 py-1 bg-amber-500/20 rounded-lg border border-amber-500/30">
+                                                        <span className="text-xs sm:text-sm font-medium text-amber-400">電</span>
                                                     </div>
                                                 )}
                                                 {entry.toilet && (
-                                                    <div className="px-2.5 py-1.5 bg-purple-500/20 rounded-lg border border-purple-500/30">
-                                                        <span className="text-sm font-medium text-purple-400">廁所</span>
+                                                    <div className="px-2 py-1 bg-purple-500/20 rounded-lg border border-purple-500/30">
+                                                        <span className="text-xs sm:text-sm font-medium text-purple-400">廁所</span>
                                                     </div>
                                                 )}
                                                 {entry.office && (
-                                                    <div className="px-2.5 py-1.5 bg-indigo-500/20 rounded-lg border border-indigo-500/30">
-                                                        <span className="text-sm font-medium text-indigo-400">辦公室</span>
+                                                    <div className="px-2 py-1 bg-indigo-500/20 rounded-lg border border-indigo-500/30">
+                                                        <span className="text-xs sm:text-sm font-medium text-indigo-400">辦公室</span>
                                                     </div>
                                                 )}
                                                 {entry.storage && (
-                                                    <div className="px-2.5 py-1.5 bg-emerald-500/20 rounded-lg border border-emerald-500/30">
-                                                        <span className="text-sm font-medium text-emerald-400">貯物櫃</span>
+                                                    <div className="px-2 py-1 bg-emerald-500/20 rounded-lg border border-emerald-500/30">
+                                                        <span className="text-xs sm:text-sm font-medium text-emerald-400">貯物櫃</span>
                                                     </div>
                                                 )}
                                                 {entry.room && (
-                                                    <div className="px-2.5 py-1.5 bg-rose-500/20 rounded-lg border border-rose-500/30">
-                                                        <span className="text-sm font-medium text-rose-400">房間</span>
+                                                    <div className="px-2 py-1 bg-rose-500/20 rounded-lg border border-rose-500/30">
+                                                        <span className="text-xs sm:text-sm font-medium text-rose-400">房間</span>
                                                     </div>
                                                 )}
                                             </div>
                                         ) : (
-                                            <p className="text-sm text-white/40 italic">暫無設施資料</p>
+                                            <p className="text-xs sm:text-sm text-white/40 italic">暫無設施資料</p>
                                         )}
                                     </div>
 
                                     {/* 備註 */}
                                     {entry.note && (
-                                        <div className="pt-4 border-t border-white/10">
-                                            <div className="flex items-center gap-2 mb-2">
+                                        <div className="pt-2.5 border-t border-white/10 shrink-0">
+                                            <div className="flex items-center gap-2 mb-1.5">
                                                 <FileText className="w-4 h-4 text-white/50" />
-                                                <span className="text-sm text-white/60 font-semibold">備註</span>
+                                                <span className="text-xs sm:text-sm text-white/60 font-semibold">備註</span>
                                             </div>
-                                            <p className="text-sm text-white/80 whitespace-pre-wrap leading-relaxed">{entry.note}</p>
+                                            <p className="text-xs sm:text-sm text-white/80 whitespace-pre-wrap leading-relaxed">{entry.note}</p>
                                         </div>
                                     )}
 
                                     {/* 租金 — 琥珀金重點卡片，置於底部（無資料也顯示） */}
-                                    <div className="relative overflow-hidden p-5 bg-gradient-to-br from-amber-500/15 via-amber-500/10 to-amber-600/5 border border-amber-500/30 rounded-xl">
+                                    <div className="relative overflow-hidden p-4 bg-gradient-to-br from-amber-500/15 via-amber-500/10 to-amber-600/5 border border-amber-500/30 rounded-xl shrink-0">
                                         <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/[0.08] rounded-full blur-3xl -mr-12 -mt-12"></div>
                                         <div className="relative">
-                                            <div className="flex items-center gap-2 mb-2">
+                                            <div className="flex items-center gap-2 mb-1.5">
                                                 <DollarSign className="w-4 h-4 text-amber-400" />
-                                                <span className="text-sm text-amber-200/80 font-semibold">租金</span>
+                                                <span className="text-xs sm:text-sm text-amber-200/80 font-semibold">租金</span>
                                             </div>
                                             {entry.rentPrice && user && entry.lotStatus !== 'rented' ? (
                                                 <div className="flex items-baseline gap-1.5">
-                                                    <span className="text-3xl sm:text-4xl font-bold text-amber-400 tracking-tight">
+                                                    <span className="text-2xl sm:text-4xl font-bold text-amber-400 tracking-tight">
                                                         {formatNumberWithCommas(entry.rentPrice)}
                                                     </span>
-                                                    <span className="text-base font-medium text-amber-200/70">/ 月</span>
+                                                    <span className="text-sm sm:text-base font-medium text-amber-200/70">/ 月</span>
                                                 </div>
                                             ) : (
                                                 <div className="space-y-2">
-                                                    <p className="text-base text-amber-200/80 leading-relaxed">
+                                                    <p className="text-sm sm:text-base text-amber-200/80 leading-relaxed">
                                                         {entry.lotStatus === 'rented' ? '此地段已出租，欲知此地段詳情，歡迎聯絡我們' : '欲知租約條款詳情，歡迎聯絡我們'}
                                                     </p>
                                                     <a
                                                         href={`https://wa.me/85293280283?text=${encodeURIComponent(`我對「${entry.value}」有興趣，我想了解更多此地段的資料。`)}`}
                                                         target="_blank"
                                                         rel="noopener noreferrer"
-                                                        className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-semibold rounded-lg transition-colors shadow-sm hover:shadow w-fit"
+                                                        className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white text-xs sm:text-sm font-semibold rounded-lg transition-colors shadow-sm hover:shadow w-fit"
                                                     >
                                                         <img src="/sitelogo/whatsapp-svgrepo-com.svg" alt="" className="w-5 h-5 shrink-0" />
                                                         <span>WhatsApp 9328 0283</span>
@@ -574,30 +612,33 @@ function LotDetailModal({
                             </div>
                         </div>
                     )}
-
                     {/* 地圖 Tab */}
                     {activeTab === 'map' && (
-                        <div className="absolute inset-0 flex flex-col items-center justify-center px-[70px] py-4 gap-4">
+                        <div className="absolute inset-0 flex flex-col items-center justify-center p-3 sm:p-4 gap-3">
                             {parentLocation ? (
                                 <>
-                                    <div className="flex-1 w-full max-w-[57vw] rounded-lg sm:rounded-xl overflow-hidden bg-zinc-800">
-                                        <iframe
-                                            src={`https://www.google.com/maps?q=${parentLocation.lat},${parentLocation.lng}&z=17&output=embed`}
-                                            className="w-full h-full border-0"
-                                            allowFullScreen
-                                            loading="lazy"
-                                            referrerPolicy="no-referrer-when-downgrade"
-                                            title="地段位置"
-                                            onLoad={() => setMapLoaded(true)}
-                                        />
+                                    {/* 地圖：正方形容器（以可用高度為準），zoom 拉遠避免過近 */}
+                                    <div className="flex-1 min-h-0 w-full flex items-center justify-center">
+                                        <div className="aspect-square h-full max-w-full overflow-hidden rounded-lg sm:rounded-xl bg-zinc-800 border border-white/10">
+                                            <iframe
+                                                src={`https://www.google.com/maps?q=${parentLocation.lat},${parentLocation.lng}&z=15&output=embed`}
+                                                className="w-full h-full border-0"
+                                                allowFullScreen
+                                                loading="lazy"
+                                                referrerPolicy="no-referrer-when-downgrade"
+                                                title="地段位置"
+                                                onLoad={() => setMapLoaded(true)}
+                                            />
+                                        </div>
                                     </div>
+                                    {/* 地址按鈕 — 置於地圖最底 */}
                                     {parentAddress && (
-                                        <div className="shrink-0 w-full max-w-[57vw] p-3 bg-black/60 backdrop-blur-sm rounded-xl border border-white/10">
+                                        <div className="shrink-0 w-full max-w-full">
                                             <a
                                                 href={`https://www.google.com/maps?hl=zh-TW&q=${encodeURIComponent(parentAddress)}`}
                                                 target="_blank"
                                                 rel="noopener noreferrer"
-                                                className="text-sm sm:text-base text-white/90 text-center font-medium flex items-center justify-center gap-2 hover:text-white/100 transition-colors"
+                                                className="flex w-full items-center justify-center gap-2 p-3 bg-black/60 hover:bg-black/70 backdrop-blur-sm rounded-xl border border-white/10 text-sm sm:text-base text-white/90 font-medium transition-colors"
                                             >
                                                 <MapPin className="w-4 h-4 shrink-0" />
                                                 <span className="truncate">{parentAddress}</span>
@@ -607,14 +648,18 @@ function LotDetailModal({
                                     )}
                                 </>
                             ) : (
-                                <div className="w-full max-w-[57vw] h-[68vh] flex flex-col items-center justify-center gap-2 sm:gap-3 text-white/40 rounded-lg sm:rounded-xl bg-white/5 border border-white/10">
-                                    <Map className="w-10 h-10 sm:w-14 sm:h-14 md:w-16 md:h-16" />
-                                    <p className="text-base sm:text-lg">暫無地段位置</p>
-                                    <p className="text-xs sm:text-sm text-white/30">使用父物業位置顯示</p>
+                                <div className="flex-1 min-h-0 w-full flex items-center justify-center">
+                                    <div className="aspect-square h-full max-w-full flex flex-col items-center justify-center gap-2 sm:gap-3 text-white/40 rounded-lg sm:rounded-xl bg-white/5 border border-white/10">
+                                        <Map className="w-10 h-10 sm:w-14 sm:h-14 md:w-16 md:h-16" />
+                                        <p className="text-base sm:text-lg">暫無地段位置</p>
+                                        <p className="text-xs sm:text-sm text-white/30">使用父物業位置顯示</p>
+                                    </div>
                                 </div>
                             )}
                         </div>
                     )}
+                    </motion.div>
+                    </AnimatePresence>
                 </div>
             </div>
                 </div>
